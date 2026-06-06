@@ -13,6 +13,9 @@ import {
   PROJECT_FILE_TEMPLATES,
   createProjectFileTemplateContent,
   flattenEnabledProjectFiles,
+  isLicenseProjectFileTemplate,
+  mergeLicenseEditableMetadata,
+  normalizeLicenseForTemplateMatch,
   readProjectFiles,
   updateProjectFile,
   writeProjectFiles,
@@ -62,35 +65,6 @@ const removeGitignoreSnippet = (
     .replace(/\n{3,}/g, '\n\n')
     .trim();
   return next ? `${next}\n` : '';
-};
-
-const findCopyrightLineIndex = (lines: string[]) =>
-  lines.findIndex((line) => /^copyright\b/i.test(line.trim()));
-
-const mergeLicenseEditableMetadata = (
-  templateContent: string,
-  value: string
-) => {
-  const templateLines = templateContent.split('\n');
-  const valueLines = value.split('\n');
-  const templateCopyrightIndex = findCopyrightLineIndex(templateLines);
-  const valueCopyrightIndex = findCopyrightLineIndex(valueLines);
-  if (templateCopyrightIndex === -1 || valueCopyrightIndex === -1) {
-    return templateContent;
-  }
-  const nextLines = [...templateLines];
-  nextLines[templateCopyrightIndex] = valueLines[valueCopyrightIndex];
-  return nextLines.join('\n');
-};
-
-const isLicenseTemplate = (template: ProjectFileTemplate) =>
-  template.targetPath === 'LICENSE';
-
-const normalizeLicenseForTemplateMatch = (content: string) => {
-  const lines = content.trim().split('\n');
-  const copyrightLineIndex = findCopyrightLineIndex(lines);
-  if (copyrightLineIndex !== -1) lines[copyrightLineIndex] = '';
-  return lines.join('\n').trim();
 };
 
 export function ProjectFileManager({
@@ -179,7 +153,7 @@ export function ProjectFileManager({
           projectName: project?.name,
           projectDescription: project?.description,
         });
-        if (isLicenseTemplate(template)) {
+        if (isLicenseProjectFileTemplate(template)) {
           return (
             normalizeLicenseForTemplateMatch(templateContent) ===
             normalizeLicenseForTemplateMatch(selectedFile.content)
@@ -216,12 +190,15 @@ export function ProjectFileManager({
   };
 
   const applyTemplateToEditor = (template: ProjectFileTemplate) => {
-    setEditorValue(
-      createProjectFileTemplateContent(template, {
-        projectName: project?.name,
-        projectDescription: project?.description,
-      })
-    );
+    const templateContent = createProjectFileTemplateContent(template, {
+      projectName: project?.name,
+      projectDescription: project?.description,
+    });
+    const nextContent =
+      isLicenseProjectFileTemplate(template) && selectedFile?.path === 'LICENSE'
+        ? mergeLicenseEditableMetadata(templateContent, editorValue)
+        : templateContent;
+    setEditorValue(nextContent);
     setSelectedTemplateByPath((current) => ({
       ...current,
       [template.targetPath]: template.id,
@@ -249,7 +226,7 @@ export function ProjectFileManager({
       setEditorValue(value);
       return;
     }
-    if (!isLicenseTemplate(selectedTemplate)) {
+    if (!isLicenseProjectFileTemplate(selectedTemplate)) {
       setEditorValue(value);
       return;
     }
