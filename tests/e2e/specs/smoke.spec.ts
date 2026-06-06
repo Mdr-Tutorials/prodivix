@@ -3,14 +3,15 @@ import { expect, test } from '@playwright/test';
 test.describe('application smoke', () => {
   test('loads the home page @smoke', async ({ page }) => {
     await page.goto('/');
+    const navigation = page.getByRole('navigation');
 
     await expect(page).toHaveTitle(/prodivix/i);
     await expect(
-      page.getByRole('heading', { name: /Prodivix/i })
+      navigation.getByRole('link', { name: /Prodivix/i })
     ).toBeVisible();
-    await expect(page.getByRole('link', { name: /GitHub/i })).toHaveAttribute(
+    await expect(navigation.getByRole('link', { name: /GitHub/i })).toHaveAttribute(
       'href',
-      'https://github.com/Prodivix/prodivix'
+      'https://github.com/Mdr-Tutorials/prodivix'
     );
   });
 

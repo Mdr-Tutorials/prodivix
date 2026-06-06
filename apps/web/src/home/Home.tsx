@@ -5,6 +5,7 @@ import { useSettingsStore } from '@/editor/store/useSettingsStore';
 import { useAuthStore } from '@/auth/useAuthStore';
 
 const docsSiteUrl = 'https://mdr-tutorials.github.io/prodivix/';
+const githubUrl = 'https://github.com/Mdr-Tutorials/prodivix';
 
 const heroPoints = ['visual', 'code', 'deploy'] as const;
 const explanationItems = ['state', 'authoring', 'output'] as const;
@@ -30,7 +31,7 @@ const footerLinks = {
     { key: 'projectStructure', to: `${docsSiteUrl}guide/project-structure` },
   ],
   community: [
-    { key: 'github', to: 'https://github.com/Prodivix/prodivix' },
+    { key: 'github', to: githubUrl },
     { key: 'contributing', to: `${docsSiteUrl}community/contributing` },
     { key: 'changelog', to: `${docsSiteUrl}community/changelog` },
   ],
@@ -109,7 +110,7 @@ function Home() {
             </div>
             <a
               className={navIconClassName}
-              href="https://github.com/Prodivix/prodivix"
+              href={githubUrl}
               target="_blank"
               rel="noreferrer"
               aria-label={t('nav.github')}
@@ -433,7 +434,7 @@ function Home() {
               {t('footer.legal.contributing')}
             </PdxLink>
             <PdxLink
-              to="https://github.com/Prodivix/prodivix/blob/main/LICENSE"
+              to={`${githubUrl}/blob/main/LICENSE`}
               className="text-(--home-footer-text) no-underline transition-colors duration-200 hover:text-(--text-primary)"
             >
               {t('footer.legal.license')}
