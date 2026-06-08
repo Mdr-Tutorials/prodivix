@@ -5,7 +5,7 @@ import { javascript } from '@codemirror/lang-javascript';
 import { useParams } from 'react-router';
 import { Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { CodeFileTree, type CodeFileKind } from './CodeFileTree';
+import { CodeFileTree } from './CodeFileTree';
 import { useEditorShortcut } from '@/editor/shortcuts';
 import {
   createCodeFile,
@@ -19,85 +19,17 @@ import {
   writeCodeTree,
   type CodeResourceNode,
 } from './codeTree';
+import { resolveCreatedNodeId } from './codeResourceCreate';
+import {
+  getResourceManagerCodeSelectionStorageKey,
+  inferMimeByCodeFileName,
+  resolveDefaultCodeKindByParentPath,
+  resolveTemplateByCodeKind,
+  type CodeFileKind,
+} from './codeResourceModel';
 
 type CodeResourcePageProps = {
   embedded?: boolean;
-};
-
-const getResourceManagerCodeSelectionStorageKey = (projectId?: string) =>
-  `prodivix.resourceManager.code.selection.${projectId?.trim() || 'default'}`;
-
-const resolveTemplateByKind = (kind: CodeFileKind) => {
-  if (kind === 'ts') {
-    return {
-      name: 'untitled.ts',
-      mime: 'text/typescript',
-      content: 'export const hello = "prodivix";\n',
-    };
-  }
-  if (kind === 'tsx') {
-    return {
-      name: 'untitled.tsx',
-      mime: 'text/tsx',
-      content: 'export function Demo() {\n  return <div>demo</div>;\n}\n',
-    };
-  }
-  if (kind === 'js') {
-    return {
-      name: 'untitled.js',
-      mime: 'text/javascript',
-      content: 'export const hello = "prodivix";\n',
-    };
-  }
-  if (kind === 'css') {
-    return {
-      name: 'untitled.css',
-      mime: 'text/css',
-      content: '.demo {\n  display: block;\n}\n',
-    };
-  }
-  if (kind === 'scss') {
-    return {
-      name: 'untitled.scss',
-      mime: 'text/x-scss',
-      content: '.demo {\n  .title {\n    color: #111;\n  }\n}\n',
-    };
-  }
-  if (kind === 'json') {
-    return {
-      name: 'untitled.json',
-      mime: 'application/json',
-      content: '{\n  "name": "resource"\n}\n',
-    };
-  }
-  if (kind === 'wgsl') {
-    return {
-      name: 'untitled.wgsl',
-      mime: 'text/wgsl',
-      content:
-        '@vertex\nfn vs_main() -> @builtin(position) vec4f {\n  return vec4f(0.0, 0.0, 0.0, 1.0);\n}\n',
-    };
-  }
-  return {
-    name: 'untitled.glsl',
-    mime: 'text/glsl',
-    content: 'void main() {\n  gl_Position = vec4(0.0);\n}\n',
-  };
-};
-
-const inferMimeByName = (name: string) => {
-  const lower = name.toLowerCase();
-  if (lower.endsWith('.ts')) return 'text/typescript';
-  if (lower.endsWith('.tsx')) return 'text/tsx';
-  if (lower.endsWith('.js')) return 'text/javascript';
-  if (lower.endsWith('.jsx')) return 'text/jsx';
-  if (lower.endsWith('.css')) return 'text/css';
-  if (lower.endsWith('.scss')) return 'text/x-scss';
-  if (lower.endsWith('.json')) return 'application/json';
-  if (lower.endsWith('.wgsl')) return 'text/wgsl';
-  if (lower.endsWith('.glsl')) return 'text/glsl';
-  if (lower.endsWith('.svg')) return 'image/svg+xml';
-  return 'text/plain';
 };
 
 const resolveLanguageExtensionByName = (name: string) => {
@@ -179,34 +111,6 @@ export function CodeResourcePage({ embedded = false }: CodeResourcePageProps) {
     setEditorValue(selectedFile.textContent ?? '');
   }, [selectedFile?.id]);
 
-  const collectNodeIds = (node: CodeResourceNode): Set<string> => {
-    const ids = new Set<string>();
-    const walk = (current: CodeResourceNode) => {
-      ids.add(current.id);
-      (current.children ?? []).forEach(walk);
-    };
-    walk(node);
-    return ids;
-  };
-
-  const resolveCreatedNodeId = (
-    previousTree: CodeResourceNode,
-    nextTree: CodeResourceNode
-  ) => {
-    const beforeIds = collectNodeIds(previousTree);
-    let createdId: string | undefined;
-    const walk = (current: CodeResourceNode) => {
-      if (createdId) return;
-      if (!beforeIds.has(current.id)) {
-        createdId = current.id;
-        return;
-      }
-      (current.children ?? []).forEach(walk);
-    };
-    walk(nextTree);
-    return createdId;
-  };
-
   const handleCreateFolder = (parentId: string) => {
     const nextTree = createCodeFolder(tree, parentId, 'new-folder');
     const createdId = resolveCreatedNodeId(tree, nextTree);
@@ -219,15 +123,12 @@ export function CodeResourcePage({ embedded = false }: CodeResourcePageProps) {
 
   const resolveDefaultKindByParent = (parentId: string): CodeFileKind => {
     const parent = findCodeNodeById(tree, parentId);
-    const parentPath = parent?.path.toLowerCase() ?? '';
-    if (parentPath.startsWith('code/styles')) return 'css';
-    if (parentPath.startsWith('code/shaders')) return 'glsl';
-    return 'ts';
+    return resolveDefaultCodeKindByParentPath(parent?.path ?? '');
   };
 
   const handleCreateCodeFile = (parentId: string, kind?: CodeFileKind) => {
     const resolvedKind = kind ?? resolveDefaultKindByParent(parentId);
-    const template = resolveTemplateByKind(resolvedKind);
+    const template = resolveTemplateByCodeKind(resolvedKind);
     const nextTree = createCodeFile(tree, parentId, {
       name: template.name,
       mime: template.mime,
@@ -323,8 +224,9 @@ export function CodeResourcePage({ embedded = false }: CodeResourcePageProps) {
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-(--text-secondary)">
                   {t('resourceManager.code.labels.mime')}:{' '}
-                  {selectedFile.mime || inferMimeByName(selectedFile.name)} |
-                  {t('resourceManager.code.labels.size')}: {selectedFileSize}{' '}
+                  {selectedFile.mime ||
+                    inferMimeByCodeFileName(selectedFile.name)}{' '}
+                  | {t('resourceManager.code.labels.size')}: {selectedFileSize}{' '}
                   {t('resourceManager.code.labels.bytes')}
                 </p>
                 <button

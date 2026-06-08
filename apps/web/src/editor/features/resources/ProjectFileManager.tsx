@@ -2,20 +2,19 @@ import { useEffect, useMemo, useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { css } from '@codemirror/lang-css';
 import { javascript } from '@codemirror/lang-javascript';
+import { EditorView } from '@codemirror/view';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
-import { Check, FileText, Save } from 'lucide-react';
+import { Check, FileText, LayoutTemplate, Save } from 'lucide-react';
 import { EditorConfirmModal } from '@/editor/components/EditorConfirmModal';
 import { useEditorShortcut } from '@/editor/shortcuts';
 import { useEditorStore } from '@/editor/store/useEditorStore';
+import { ProjectFileTemplatePicker } from './ProjectFileTemplatePicker';
 import {
   PROJECT_GITIGNORE_SNIPPETS,
   PROJECT_FILE_TEMPLATES,
   createProjectFileTemplateContent,
   flattenEnabledProjectFiles,
-  isLicenseProjectFileTemplate,
-  mergeLicenseEditableMetadata,
-  normalizeLicenseForTemplateMatch,
   readProjectFiles,
   updateProjectFile,
   writeProjectFiles,
@@ -24,6 +23,16 @@ import {
   type ProjectFileTemplateId,
   type ProjectGitignoreSnippet,
 } from './projectFileStore';
+import {
+  LICENSE_TEMPLATE_PROFILES,
+  type LicenseTemplateCategory,
+} from './licenseTemplates';
+import {
+  isLicenseProjectFileTemplate,
+  isProjectCopyrightLicenseTemplate,
+  mergeLicenseEditableMetadata,
+  normalizeLicenseForTemplateMatch,
+} from './licenseTemplateUtils';
 
 type ProjectFileManagerProps = {
   embedded?: boolean;
@@ -100,6 +109,7 @@ export function ProjectFileManager({
   >({});
   const [pendingTemplate, setPendingTemplate] =
     useState<ProjectFileTemplate | null>(null);
+  const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
 
   const selectedFile = useMemo(
     () => files.find((file) => file.path === selectedPath) ?? files[0],
@@ -124,6 +134,21 @@ export function ProjectFileManager({
       ),
     [templateOptions]
   );
+  const licenseTemplateGroups = useMemo(() => {
+    if (selectedFile?.path !== 'LICENSE') return [];
+    const grouped = new Map<LicenseTemplateCategory, ProjectFileTemplate[]>();
+    fileTemplateOptions.forEach((template) => {
+      const profile = LICENSE_TEMPLATE_PROFILES[template.id];
+      if (!profile) return;
+      const current = grouped.get(profile.category) ?? [];
+      current.push(template);
+      grouped.set(profile.category, current);
+    });
+    return Array.from(grouped.entries()).map(([category, templates]) => ({
+      category,
+      templates,
+    }));
+  }, [fileTemplateOptions, selectedFile?.path]);
   const selectedTemplateId = selectedFile
     ? selectedTemplateByPath[selectedFile.path]
     : undefined;
@@ -137,6 +162,8 @@ export function ProjectFileManager({
     [selectedTemplateId]
   );
   const isDirty = Boolean(selectedFile && editorValue !== selectedFile.content);
+  const canUseTemplatePicker =
+    isEditingGitignore || fileTemplateOptions.length > 0;
 
   const persistFiles = (nextFiles: ProjectFile[]) => {
     setFiles(nextFiles);
@@ -148,6 +175,12 @@ export function ProjectFileManager({
     setEditorValue(selectedFile.content);
     setSelectedTemplateByPath((current) => {
       if (current[selectedFile.path]) return current;
+      if (selectedFile.templateId) {
+        return {
+          ...current,
+          [selectedFile.path]: selectedFile.templateId,
+        };
+      }
       const matchingTemplate = fileTemplateOptions.find((template) => {
         const templateContent = createProjectFileTemplateContent(template, {
           projectName: project?.name,
@@ -185,8 +218,10 @@ export function ProjectFileManager({
     persistFiles(
       updateProjectFile(files, selectedFile.path, {
         content: editorValue,
+        templateId: selectedTemplateId,
       })
     );
+    setIsTemplatePickerOpen(false);
   };
 
   const applyTemplateToEditor = (template: ProjectFileTemplate) => {
@@ -195,7 +230,8 @@ export function ProjectFileManager({
       projectDescription: project?.description,
     });
     const nextContent =
-      isLicenseProjectFileTemplate(template) && selectedFile?.path === 'LICENSE'
+      isProjectCopyrightLicenseTemplate(template) &&
+      selectedFile?.path === 'LICENSE'
         ? mergeLicenseEditableMetadata(templateContent, editorValue)
         : templateContent;
     setEditorValue(nextContent);
@@ -213,12 +249,14 @@ export function ProjectFileManager({
       return;
     }
     applyTemplateToEditor(template);
+    if (template.targetPath !== '.gitignore') setIsTemplatePickerOpen(false);
   };
 
   const handleConfirmTemplateSwitch = () => {
     if (!pendingTemplate) return;
     applyTemplateToEditor(pendingTemplate);
     setPendingTemplate(null);
+    setIsTemplatePickerOpen(false);
   };
 
   const handleEditorChange = (value: string) => {
@@ -226,7 +264,7 @@ export function ProjectFileManager({
       setEditorValue(value);
       return;
     }
-    if (!isLicenseProjectFileTemplate(selectedTemplate)) {
+    if (!isProjectCopyrightLicenseTemplate(selectedTemplate)) {
       setEditorValue(value);
       return;
     }
@@ -247,6 +285,10 @@ export function ProjectFileManager({
         : removeGitignoreSnippet(currentValue, snippet)
     );
   };
+
+  useEffect(() => {
+    setIsTemplatePickerOpen(false);
+  }, [selectedFile?.path]);
 
   useEditorShortcut(
     'Mod+S',
@@ -323,7 +365,7 @@ export function ProjectFileManager({
           </div>
         </aside>
 
-        <article className="grid gap-3 rounded-xl border border-black/10 bg-(--bg-canvas) p-4">
+        <article className="relative grid gap-3 rounded-xl border border-black/10 bg-(--bg-canvas) p-4">
           {selectedFile ? (
             <>
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -341,6 +383,28 @@ export function ProjectFileManager({
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  {canUseTemplatePicker ? (
+                    <button
+                      type="button"
+                      className={`grid h-8 w-8 place-items-center rounded-lg transition-colors ${
+                        isTemplatePickerOpen
+                          ? 'bg-black text-white'
+                          : 'text-(--text-secondary) hover:bg-black/[0.04] hover:text-(--text-primary)'
+                      }`}
+                      onClick={() =>
+                        setIsTemplatePickerOpen((current) => !current)
+                      }
+                      aria-label={t(
+                        'resourceManager.projectFiles.actions.openTemplates'
+                      )}
+                      title={t(
+                        'resourceManager.projectFiles.actions.openTemplates'
+                      )}
+                      aria-expanded={isTemplatePickerOpen}
+                    >
+                      <LayoutTemplate size={15} />
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
@@ -372,68 +436,28 @@ export function ProjectFileManager({
                 </div>
               </div>
 
-              {isEditingGitignore || fileTemplateOptions.length ? (
-                <div className="rounded-xl border border-black/8 bg-black/[0.015] p-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="px-1 text-[11px] font-semibold tracking-[0.08em] text-(--text-muted) uppercase">
-                      {t('resourceManager.projectFiles.labels.templates')}
-                    </span>
-                    {isEditingGitignore
-                      ? PROJECT_GITIGNORE_SNIPPETS.map((snippet) => (
-                          <label
-                            key={snippet.id}
-                            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-xs text-(--text-secondary) hover:border-black/20 hover:text-(--text-primary)"
-                          >
-                            <input
-                              type="checkbox"
-                              className="h-3.5 w-3.5 accent-black"
-                              checked={hasGitignoreSnippet(
-                                editorValue,
-                                snippet
-                              )}
-                              onChange={(event) =>
-                                handleToggleGitignoreSnippet(
-                                  snippet,
-                                  event.target.checked
-                                )
-                              }
-                            />
-                            <span>{snippet.label}</span>
-                          </label>
-                        ))
-                      : fileTemplateOptions.map((template) => {
-                          const isSelected = selectedTemplateId === template.id;
-                          return (
-                            <button
-                              key={template.id}
-                              type="button"
-                              className={`rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
-                                isSelected
-                                  ? 'border-black/18 bg-black text-white'
-                                  : 'border-black/10 bg-white text-(--text-secondary) hover:border-black/20 hover:text-(--text-primary)'
-                              }`}
-                              onClick={() => handleApplyTemplate(template)}
-                              aria-pressed={isSelected}
-                            >
-                              {isSelected
-                                ? t(
-                                    'resourceManager.projectFiles.labels.selectedTemplate',
-                                    {
-                                      template: template.label,
-                                    }
-                                  )
-                                : template.label}
-                            </button>
-                          );
-                        })}
-                  </div>
-                </div>
-              ) : null}
+              <ProjectFileTemplatePicker
+                open={isTemplatePickerOpen}
+                isEditingGitignore={isEditingGitignore}
+                fileTemplateOptions={fileTemplateOptions}
+                gitignoreSnippets={PROJECT_GITIGNORE_SNIPPETS}
+                licenseTemplateGroups={licenseTemplateGroups}
+                selectedTemplateId={selectedTemplateId}
+                isGitignoreSnippetEnabled={(snippet) =>
+                  hasGitignoreSnippet(editorValue, snippet)
+                }
+                onApplyTemplate={handleApplyTemplate}
+                onToggleGitignoreSnippet={handleToggleGitignoreSnippet}
+                onClose={() => setIsTemplatePickerOpen(false)}
+              />
 
               <CodeMirror
                 value={editorValue}
                 onChange={handleEditorChange}
-                extensions={[resolveLanguageExtensionByPath(selectedFile.path)]}
+                extensions={[
+                  resolveLanguageExtensionByPath(selectedFile.path),
+                  EditorView.lineWrapping,
+                ]}
                 basicSetup={{
                   lineNumbers: true,
                   foldGutter: true,

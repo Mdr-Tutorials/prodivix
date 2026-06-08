@@ -18,68 +18,21 @@ import {
   writePublicTree,
   type PublicResourceNode,
 } from './publicTree';
-
-const formatBytes = (value?: number) => {
-  if (!value || value <= 0) return '0 B';
-  if (value > 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-  if (value > 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${value} B`;
-};
-
-const isSvgFileNode = (node?: PublicResourceNode) =>
-  Boolean(node?.type === 'file' && node.mime?.includes('svg'));
-
-const isTextLikeNode = (node?: PublicResourceNode) =>
-  Boolean(
-    node?.type === 'file' &&
-      (node.mime?.startsWith('text/') ||
-        node.mime?.includes('json') ||
-        node.mime?.includes('svg'))
-  );
-
-const getDefaultNewFileTemplate = (name: string) => {
-  const lower = name.toLowerCase();
-  if (lower.endsWith('.json')) {
-    return {
-      mime: 'application/json',
-      content: '{\n  "name": "resource"\n}\n',
-    };
-  }
-  if (lower.endsWith('.svg')) {
-    return {
-      mime: 'image/svg+xml',
-      content:
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">\n  <circle cx="60" cy="60" r="48" fill="#111"/>\n</svg>\n',
-    };
-  }
-  return { mime: 'text/plain', content: 'new file\n' };
-};
-
-const createTemplateByKind = (kind: 'text' | 'json' | 'svg') => {
-  if (kind === 'json') {
-    return {
-      name: 'untitled.json',
-      mime: 'application/json',
-      content: '{\n}\n',
-    };
-  }
-  if (kind === 'svg') {
-    return {
-      name: 'untitled.svg',
-      mime: 'image/svg+xml',
-      content:
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">\n  <circle cx="60" cy="60" r="48" fill="#111"/>\n</svg>\n',
-    };
-  }
-  return { name: 'untitled.txt', mime: 'text/plain', content: 'new file\n' };
-};
+import {
+  createPublicTemplateByKind,
+  formatPublicResourceBytes,
+  getDefaultPublicFileTemplate,
+  getResourceManagerPublicSelectionStorageKey,
+  isSvgFileNode,
+  isTextLikeNode,
+  resolveCreatedPublicNodeId,
+  shouldReadPublicFileText,
+  type PublicFileKind,
+} from './publicResourceModel';
 
 type PublicResourcePageProps = {
   embedded?: boolean;
 };
-
-const getResourceManagerPublicSelectionStorageKey = (projectId?: string) =>
-  `prodivix.resourceManager.public.selection.${projectId?.trim() || 'default'}`;
 
 export function PublicResourcePage({
   embedded = false,
@@ -145,37 +98,9 @@ export function PublicResourcePage({
     );
   }, [projectId, selectedNodeId, tree]);
 
-  const collectNodeIds = (node: PublicResourceNode): Set<string> => {
-    const ids = new Set<string>();
-    const walk = (current: PublicResourceNode) => {
-      ids.add(current.id);
-      (current.children ?? []).forEach(walk);
-    };
-    walk(node);
-    return ids;
-  };
-
-  const resolveCreatedNodeId = (
-    previousTree: PublicResourceNode,
-    nextTree: PublicResourceNode
-  ) => {
-    const beforeIds = collectNodeIds(previousTree);
-    let createdId: string | undefined;
-    const walk = (current: PublicResourceNode) => {
-      if (createdId) return;
-      if (!beforeIds.has(current.id)) {
-        createdId = current.id;
-        return;
-      }
-      (current.children ?? []).forEach(walk);
-    };
-    walk(nextTree);
-    return createdId;
-  };
-
   const handleCreateFolder = (parentId: string) => {
     const nextTree = createFolder(tree, parentId, 'new-folder');
-    const createdId = resolveCreatedNodeId(tree, nextTree);
+    const createdId = resolveCreatedPublicNodeId(tree, nextTree);
     persistTree(nextTree);
     if (createdId) {
       setSelectedNodeId(createdId);
@@ -184,7 +109,7 @@ export function PublicResourcePage({
   };
 
   const handleCreateFile = (parentId: string) => {
-    const template = getDefaultNewFileTemplate('untitled.txt');
+    const template = getDefaultPublicFileTemplate('untitled.txt');
     const dataUrl = `data:${template.mime};charset=utf-8,${encodeURIComponent(template.content)}`;
     const nextTree = createFile(tree, parentId, {
       name: 'untitled.txt',
@@ -196,7 +121,7 @@ export function PublicResourcePage({
       textContent: template.content,
       contentRef: dataUrl,
     });
-    const createdId = resolveCreatedNodeId(tree, nextTree);
+    const createdId = resolveCreatedPublicNodeId(tree, nextTree);
     persistTree(nextTree);
     if (createdId) {
       setSelectedNodeId(createdId);
@@ -204,11 +129,8 @@ export function PublicResourcePage({
     }
   };
 
-  const handleCreateFileByKind = (
-    parentId: string,
-    kind: 'text' | 'json' | 'svg'
-  ) => {
-    const template = createTemplateByKind(kind);
+  const handleCreateFileByKind = (parentId: string, kind: PublicFileKind) => {
+    const template = createPublicTemplateByKind(kind);
     const dataUrl = `data:${template.mime};charset=utf-8,${encodeURIComponent(template.content)}`;
     const nextTree = createFile(tree, parentId, {
       name: template.name,
@@ -220,7 +142,7 @@ export function PublicResourcePage({
       textContent: template.content,
       contentRef: dataUrl,
     });
-    const createdId = resolveCreatedNodeId(tree, nextTree);
+    const createdId = resolveCreatedPublicNodeId(tree, nextTree);
     persistTree(nextTree);
     if (createdId) {
       setSelectedNodeId(createdId);
@@ -244,12 +166,9 @@ export function PublicResourcePage({
     let nextTree = tree;
     for (const file of Array.from(files)) {
       const contentRef = await readFileAsDataUrl(file);
-      const textContent =
-        file.type.includes('text') ||
-        file.type.includes('json') ||
-        file.name.toLowerCase().endsWith('.svg')
-          ? await file.text()
-          : undefined;
+      const textContent = shouldReadPublicFileText(file)
+        ? await file.text()
+        : undefined;
       nextTree = createFile(nextTree, parentId, {
         name: file.name,
         category: inferCategoryByFile(file),
@@ -271,12 +190,9 @@ export function PublicResourcePage({
     let nextTree = tree;
     for (const file of Array.from(files)) {
       const contentRef = await readFileAsDataUrl(file);
-      const textContent =
-        file.type.includes('text') ||
-        file.type.includes('json') ||
-        file.name.toLowerCase().endsWith('.svg')
-          ? await file.text()
-          : undefined;
+      const textContent = shouldReadPublicFileText(file)
+        ? await file.text()
+        : undefined;
       nextTree = createFile(nextTree, parentId, {
         name: file.name,
         category: forcedCategory,
@@ -365,7 +281,7 @@ export function PublicResourcePage({
                 </p>
                 <p>
                   {t('resourceManager.public.labels.size')}:{' '}
-                  {formatBytes(selectedNode.size)}
+                  {formatPublicResourceBytes(selectedNode.size)}
                 </p>
               </div>
               {isSvgFileNode(selectedNode) ? (

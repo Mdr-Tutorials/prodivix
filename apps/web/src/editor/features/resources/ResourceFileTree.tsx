@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { PublicFileCategory, PublicResourceNode } from './publicTree';
+import { ResourceFileTreeContextMenu } from './ResourceFileTreeContextMenu';
+import type { PublicFileKind } from './publicResourceModel';
 import { useEditorShortcut } from '@/editor/shortcuts';
 
 type ResourceFileTreeMode = 'readonly' | 'editable';
@@ -25,10 +27,7 @@ type ResourceFileTreeProps = {
   onSelect?: (nodeId: string) => void;
   onCreateFolder?: (parentId: string) => void;
   onCreateFile?: (parentId: string) => void;
-  onCreateFileByKind?: (
-    parentId: string,
-    kind: 'text' | 'json' | 'svg'
-  ) => void;
+  onCreateFileByKind?: (parentId: string, kind: PublicFileKind) => void;
   onImport?: (parentId: string, files: FileList | null) => void;
   onImportByCategory?: (
     parentId: string,
@@ -112,6 +111,9 @@ export function ResourceFileTree({
     selectedNode?.type === 'folder'
       ? selectedNode.id
       : (selectedNode?.parentId ?? tree.id);
+  const contextMenuNode = contextMenu
+    ? findNodeById(tree, contextMenu.nodeId)
+    : undefined;
 
   const toggleExpanded = (nodeId: string) => {
     setExpanded((current) => ({ ...current, [nodeId]: !current[nodeId] }));
@@ -429,139 +431,22 @@ export function ResourceFileTree({
         }}
       />
       <div className="max-h-[65vh] overflow-auto">{renderNode(tree)}</div>
-      {contextMenu ? (
-        <div
-          ref={contextMenuRef}
-          className="fixed z-50 min-w-[220px] rounded-md border border-black/12 bg-white p-1 text-xs shadow-[0_8px_30px_rgba(0,0,0,0.15)]"
-          style={{ left: contextMenu.x + 4, top: contextMenu.y + 4 }}
-        >
-          {(() => {
-            const node = findNodeById(tree, contextMenu.nodeId);
-            if (!node) return null;
-            const targetParentId =
-              node.type === 'folder' ? node.id : (node.parentId ?? tree.id);
-            return (
-              <>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left hover:bg-black/5"
-                  onClick={() => {
-                    onCreateFolder?.(targetParentId);
-                    setContextMenu(null);
-                  }}
-                >
-                  <span>{t('resourceManager.tree.menu.newFolder')}</span>
-                  <span>{t('resourceManager.tree.menu.folder')}</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left hover:bg-black/5"
-                  onClick={() => {
-                    onCreateFile?.(targetParentId);
-                    setContextMenu(null);
-                  }}
-                >
-                  <span>{t('resourceManager.tree.menu.newFile')}</span>
-                  <span>{t('resourceManager.tree.menu.text')}</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left hover:bg-black/5"
-                  onClick={() => {
-                    onCreateFileByKind?.(targetParentId, 'json');
-                    setContextMenu(null);
-                  }}
-                >
-                  <span>{t('resourceManager.tree.menu.newFileJson')}</span>
-                  <span>.json</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left hover:bg-black/5"
-                  onClick={() => {
-                    onCreateFileByKind?.(targetParentId, 'svg');
-                    setContextMenu(null);
-                  }}
-                >
-                  <span>{t('resourceManager.tree.menu.newFileSvg')}</span>
-                  <span>.svg</span>
-                </button>
-                <div className="my-1 h-px bg-black/10" />
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left hover:bg-black/5"
-                  onClick={() => {
-                    triggerImport(targetParentId);
-                    setContextMenu(null);
-                  }}
-                >
-                  <span>{t('resourceManager.tree.menu.importFiles')}</span>
-                  <span>{t('resourceManager.tree.menu.any')}</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left hover:bg-black/5"
-                  onClick={() => {
-                    triggerImportByCategory(targetParentId, 'image');
-                    setContextMenu(null);
-                  }}
-                >
-                  <span>{t('resourceManager.tree.menu.importImage')}</span>
-                  <span>png/jpg/webp/svg</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left hover:bg-black/5"
-                  onClick={() => {
-                    triggerImportByCategory(targetParentId, 'font');
-                    setContextMenu(null);
-                  }}
-                >
-                  <span>{t('resourceManager.tree.menu.importFont')}</span>
-                  <span>woff/woff2/ttf/otf</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left hover:bg-black/5"
-                  onClick={() => {
-                    triggerImportByCategory(targetParentId, 'document');
-                    setContextMenu(null);
-                  }}
-                >
-                  <span>{t('resourceManager.tree.menu.importDocument')}</span>
-                  <span>txt/md/json/svg</span>
-                </button>
-                {node.id !== tree.id ? (
-                  <>
-                    <div className="my-1 h-px bg-black/10" />
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left hover:bg-black/5"
-                      onClick={() => {
-                        startRenaming(node);
-                        setContextMenu(null);
-                      }}
-                    >
-                      <span>{t('resourceManager.tree.menu.rename')}</span>
-                      <span>F2</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-red-700 hover:bg-red-50"
-                      onClick={() => {
-                        onDelete?.(node.id);
-                        setContextMenu(null);
-                      }}
-                    >
-                      <span>{t('resourceManager.tree.menu.delete')}</span>
-                      <span>Del</span>
-                    </button>
-                  </>
-                ) : null}
-              </>
-            );
-          })()}
-        </div>
+      {contextMenu && contextMenuNode ? (
+        <ResourceFileTreeContextMenu
+          menuRef={contextMenuRef}
+          node={contextMenuNode}
+          rootId={tree.id}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          onCreateFolder={onCreateFolder}
+          onCreateFile={onCreateFile}
+          onCreateFileByKind={onCreateFileByKind}
+          onImport={triggerImport}
+          onImportByCategory={triggerImportByCategory}
+          onRename={startRenaming}
+          onDelete={onDelete}
+        />
       ) : null}
     </div>
   );

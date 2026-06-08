@@ -1131,10 +1131,51 @@
         "templates": "模板",
         "selectedTemplate": "当前：{{template}}"
       },
+      "licenseGuide": {
+        "note": "先用这里的摘要判断许可证类型，再打开 SPDX 查看标准全文。Prodivix 不提供法律意见。",
+        "categories": {
+          "permissive": {
+            "label": "宽松许可",
+            "badge": "限制较低",
+            "hint": "通常允许广泛复用，但需要保留版权与许可声明。"
+          },
+          "weakCopyleft": {
+            "label": "弱 Copyleft",
+            "badge": "库级开源传染",
+            "hint": "常用于库；对库本身的修改通常需要保持可共享。"
+          },
+          "strongCopyleft": {
+            "label": "强 Copyleft",
+            "badge": "源码共享",
+            "hint": "分发衍生作品时通常需要共享对应源码。"
+          },
+          "networkCopyleft": {
+            "label": "网络 Copyleft",
+            "badge": "网络服务源码共享",
+            "hint": "把强 Copyleft 的要求扩展到网络服务使用场景。"
+          }
+        },
+        "summaries": {
+          "mit": "非常简短的宽松许可证，要求保留署名并声明无担保。",
+          "isc": "接近 MIT 的宽松许可证，正文更精简。",
+          "bsd2": "宽松许可证，要求保留版权声明和免责声明。",
+          "bsd3": "在 BSD-2 基础上增加名称和贡献者不得背书条款。",
+          "apache2": "宽松许可证，包含明确专利授权和 NOTICE 相关要求。",
+          "lgpl3Only": "面向库的弱 Copyleft，仅限 LGPL v3 条款。",
+          "lgpl3OrLater": "面向库的弱 Copyleft，允许 LGPL v3 或后续版本。",
+          "gpl3Only": "面向分发衍生作品的强 Copyleft，仅限 GPL v3。",
+          "gpl3OrLater": "强 Copyleft，允许 GPL v3 或后续版本。",
+          "agpl3Only": "面向网络服务的强 Copyleft，仅限 AGPL v3。",
+          "agpl3OrLater": "面向网络服务的强 Copyleft，允许 AGPL v3 或后续版本。"
+        }
+      },
       "actions": {
         "cancel": "取消",
+        "closeTemplates": "关闭模板",
         "include": "包含到导出",
         "included": "已包含到导出",
+        "openLicenseReference": "打开 {{template}} 参考",
+        "openTemplates": "打开模板",
         "save": "保存",
         "switchTemplate": "切换模板"
       },
@@ -1174,6 +1215,12 @@
         "key": "键",
         "status": "状态",
         "action": "操作"
+      },
+      "status": {
+        "sourceMissing": "源缺失",
+        "missing": "缺失",
+        "translated": "已翻译",
+        "reviewed": "已审核"
       },
       "actions": {
         "addLocale": "添加语言",

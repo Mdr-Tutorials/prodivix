@@ -1131,10 +1131,51 @@
         "templates": "Templates",
         "selectedTemplate": "Current: {{template}}"
       },
+      "licenseGuide": {
+        "note": "Use the summaries to choose a license family, then open SPDX for the full canonical text. Prodivix does not provide legal advice.",
+        "categories": {
+          "permissive": {
+            "label": "Permissive",
+            "badge": "low restriction",
+            "hint": "Broad reuse with attribution and notice requirements."
+          },
+          "weakCopyleft": {
+            "label": "Weak copyleft",
+            "badge": "library copyleft",
+            "hint": "Useful for libraries; changes to the library stay shareable."
+          },
+          "strongCopyleft": {
+            "label": "Strong copyleft",
+            "badge": "source sharing",
+            "hint": "Derivative distributions generally need source sharing."
+          },
+          "networkCopyleft": {
+            "label": "Network copyleft",
+            "badge": "network source sharing",
+            "hint": "Extends strong copyleft expectations to network use."
+          }
+        },
+        "summaries": {
+          "mit": "Very short permissive license with attribution and warranty disclaimer.",
+          "isc": "MIT-like permissive license with compact wording.",
+          "bsd2": "Permissive license requiring copyright and disclaimer retention.",
+          "bsd3": "BSD-2 plus a non-endorsement clause for names and contributors.",
+          "apache2": "Permissive license with explicit patent grant and notice terms.",
+          "lgpl3Only": "Weak copyleft for libraries, limited to LGPL v3 terms.",
+          "lgpl3OrLater": "Weak copyleft for libraries, allowing LGPL v3 or later versions.",
+          "gpl3Only": "Strong copyleft for distributed derivatives, limited to GPL v3.",
+          "gpl3OrLater": "Strong copyleft allowing GPL v3 or later versions.",
+          "agpl3Only": "Strong network copyleft for services, limited to AGPL v3.",
+          "agpl3OrLater": "Strong network copyleft allowing AGPL v3 or later versions."
+        }
+      },
       "actions": {
         "cancel": "Cancel",
+        "closeTemplates": "Close templates",
         "include": "Include in export",
         "included": "Included in export",
+        "openLicenseReference": "Open {{template}} reference",
+        "openTemplates": "Open templates",
         "save": "Save",
         "switchTemplate": "Switch template"
       },
@@ -1174,6 +1215,12 @@
         "key": "Key",
         "status": "Status",
         "action": "Action"
+      },
+      "status": {
+        "sourceMissing": "Source missing",
+        "missing": "Missing",
+        "translated": "Translated",
+        "reviewed": "Reviewed"
       },
       "actions": {
         "addLocale": "Add locale",

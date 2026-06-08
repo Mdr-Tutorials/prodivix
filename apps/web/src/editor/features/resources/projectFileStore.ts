@@ -1,8 +1,5 @@
-import apache20LicenseTemplate from './templates/licenses/apache-2.0.txt?raw';
-import bsd2ClauseLicenseTemplate from './templates/licenses/bsd-2-clause.txt?raw';
-import bsd3ClauseLicenseTemplate from './templates/licenses/bsd-3-clause.txt?raw';
-import iscLicenseTemplate from './templates/licenses/isc.txt?raw';
-import mitLicenseTemplate from './templates/licenses/mit.txt?raw';
+import { isProjectCopyrightLicenseTemplate } from './licenseTemplateUtils';
+import { LICENSE_FILE_TEMPLATES } from './licenseTemplates';
 
 export type ProjectFileKind = 'gitignore' | 'license' | 'readme' | 'env';
 
@@ -12,6 +9,7 @@ export type ProjectFile = {
   kind: ProjectFileKind;
   mime: string;
   content: string;
+  templateId?: ProjectFileTemplateId;
   enabled: boolean;
   updatedAt: string;
 };
@@ -23,6 +21,12 @@ export type ProjectFileTemplateId =
   | 'license-bsd-2-clause'
   | 'license-bsd-3-clause'
   | 'license-apache-2'
+  | 'license-gpl-3-only'
+  | 'license-gpl-3-or-later'
+  | 'license-lgpl-3-only'
+  | 'license-lgpl-3-or-later'
+  | 'license-agpl-3-only'
+  | 'license-agpl-3-or-later'
   | 'readme-basic'
   | 'env-example';
 
@@ -172,36 +176,7 @@ export const PROJECT_FILE_TEMPLATES: ProjectFileTemplate[] = [
     label: 'Vite + React',
     content: `${defaultGitignoreContent}\n`,
   },
-  {
-    id: 'license-mit',
-    targetPath: 'LICENSE',
-    label: 'MIT',
-    content: mitLicenseTemplate,
-  },
-  {
-    id: 'license-isc',
-    targetPath: 'LICENSE',
-    label: 'ISC',
-    content: iscLicenseTemplate,
-  },
-  {
-    id: 'license-bsd-2-clause',
-    targetPath: 'LICENSE',
-    label: 'BSD-2-Clause',
-    content: bsd2ClauseLicenseTemplate,
-  },
-  {
-    id: 'license-bsd-3-clause',
-    targetPath: 'LICENSE',
-    label: 'BSD-3-Clause',
-    content: bsd3ClauseLicenseTemplate,
-  },
-  {
-    id: 'license-apache-2',
-    targetPath: 'LICENSE',
-    label: 'Apache-2.0',
-    content: apache20LicenseTemplate,
-  },
+  ...LICENSE_FILE_TEMPLATES,
   {
     id: 'readme-basic',
     targetPath: 'README.md',
@@ -237,13 +212,7 @@ export const createProjectFileTemplateContent = (
     return createReadmeTemplateContent(projectName, projectDescription);
   }
 
-  if (
-    template.id === 'license-mit' ||
-    template.id === 'license-isc' ||
-    template.id === 'license-bsd-2-clause' ||
-    template.id === 'license-bsd-3-clause' ||
-    template.id === 'license-apache-2'
-  ) {
+  if (isProjectCopyrightLicenseTemplate(template)) {
     return template.content
       .replaceAll('[year]', year)
       .replaceAll('[copyright holder]', copyrightHolder);
@@ -252,47 +221,20 @@ export const createProjectFileTemplateContent = (
   return template.content;
 };
 
-const findLicenseCopyrightLineIndex = (lines: string[]) =>
-  lines.findIndex((line) => /^copyright\b/i.test(line.trim()));
-
-export const isLicenseProjectFileTemplate = (template: ProjectFileTemplate) =>
-  template.targetPath === 'LICENSE';
-
-export const mergeLicenseEditableMetadata = (
-  templateContent: string,
-  value: string
-) => {
-  const templateLines = templateContent.split('\n');
-  const valueLines = value.split('\n');
-  const templateCopyrightIndex = findLicenseCopyrightLineIndex(templateLines);
-  const valueCopyrightIndex = findLicenseCopyrightLineIndex(valueLines);
-  if (templateCopyrightIndex === -1 || valueCopyrightIndex === -1) {
-    return templateContent;
-  }
-  const nextLines = [...templateLines];
-  nextLines[templateCopyrightIndex] = valueLines[valueCopyrightIndex];
-  return nextLines.join('\n');
-};
-
-export const normalizeLicenseForTemplateMatch = (content: string) => {
-  const lines = content.trim().split('\n');
-  const copyrightLineIndex = findLicenseCopyrightLineIndex(lines);
-  if (copyrightLineIndex !== -1) lines[copyrightLineIndex] = '';
-  return lines.join('\n').trim();
-};
-
 const createProjectFile = (
   path: string,
   kind: ProjectFileKind,
   mime: string,
   content: string,
-  enabled: boolean
+  enabled: boolean,
+  templateId?: ProjectFileTemplateId
 ): ProjectFile => ({
   id: `project-file-${path.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`,
   path,
   kind,
   mime,
   content,
+  templateId,
   enabled,
   updatedAt: nowIso(),
 });
@@ -308,7 +250,8 @@ export const createDefaultProjectFiles = (): ProjectFile[] => [
       'gitignore',
       'text/plain',
       template?.content ?? '',
-      true
+      true,
+      template?.id
     );
   })(),
   (() => {
@@ -318,7 +261,8 @@ export const createDefaultProjectFiles = (): ProjectFile[] => [
       'license',
       'text/plain',
       template ? createProjectFileTemplateContent(template) : '',
-      false
+      false,
+      template?.id
     );
   })(),
   (() => {
@@ -328,7 +272,8 @@ export const createDefaultProjectFiles = (): ProjectFile[] => [
       'readme',
       'text/markdown',
       template ? createProjectFileTemplateContent(template) : '',
-      false
+      false,
+      template?.id
     );
   })(),
   (() => {
@@ -338,7 +283,8 @@ export const createDefaultProjectFiles = (): ProjectFile[] => [
       'env',
       'text/plain',
       template?.content ?? '',
-      false
+      false,
+      template?.id
     );
   })(),
 ];
@@ -394,7 +340,7 @@ export const writeProjectFiles = (
 export const updateProjectFile = (
   files: ProjectFile[],
   path: string,
-  patch: Partial<Pick<ProjectFile, 'content' | 'enabled'>>
+  patch: Partial<Pick<ProjectFile, 'content' | 'enabled' | 'templateId'>>
 ): ProjectFile[] =>
   withDefaultProjectFiles(files).map((file) =>
     file.path === path
@@ -417,6 +363,7 @@ export const applyProjectFileTemplate = (
   return updateProjectFile(files, template.targetPath, {
     content: createProjectFileTemplateContent(template),
     enabled: true,
+    templateId: template.id,
   });
 };
 

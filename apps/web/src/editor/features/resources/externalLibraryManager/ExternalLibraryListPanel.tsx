@@ -197,16 +197,6 @@ export function ExternalLibraryListPanel({
           })}
         </div>
       )}
-
-      <button
-        type="button"
-        aria-label={t('resourceManager.external.actions.addNewLibrary')}
-        title={t('resourceManager.external.actions.addNewLibrary')}
-        className="inline-flex size-9 items-center justify-center justify-self-start rounded-lg border border-dashed border-(--border-default) bg-(--bg-canvas) text-(--text-secondary) hover:border-(--border-strong) hover:text-(--text-primary)"
-        onClick={onOpenAddModal}
-      >
-        <Plus size={17} />
-      </button>
     </section>
   );
 }

@@ -12,17 +12,8 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { CodeResourceNode } from './codeTree';
+import { CODE_FILE_KINDS, type CodeFileKind } from './codeResourceModel';
 import { useEditorShortcut } from '@/editor/shortcuts';
-
-export type CodeFileKind =
-  | 'ts'
-  | 'tsx'
-  | 'js'
-  | 'css'
-  | 'scss'
-  | 'json'
-  | 'wgsl'
-  | 'glsl';
 
 type CodeFileTreeProps = {
   tree: CodeResourceNode;
@@ -60,17 +51,6 @@ const findNodeById = (
 
 const RENAME_RECLICK_MIN_MS = 20;
 const RENAME_RECLICK_MAX_MS = 200;
-const CODE_KINDS: CodeFileKind[] = [
-  'ts',
-  'tsx',
-  'js',
-  'css',
-  'scss',
-  'json',
-  'wgsl',
-  'glsl',
-];
-
 export function CodeFileTree({
   tree,
   selectedId,
@@ -387,7 +367,7 @@ export function CodeFileTree({
               node.type === 'folder' ? node.id : (node.parentId ?? tree.id);
             return (
               <>
-                {CODE_KINDS.map((kind) => (
+                {CODE_FILE_KINDS.map((kind) => (
                   <button
                     key={kind}
                     type="button"

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PdxButton, PdxInput, PdxSearch } from '@prodivix/ui';
-import { Download, Upload } from 'lucide-react';
+import { Download, Trash2, Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
 import {
@@ -8,73 +8,20 @@ import {
   readI18nStore,
   writeI18nStore,
   type I18nLocaleStore,
-  type I18nNamespaceMap,
 } from './i18nStore';
+import {
+  buildNamespaceStats,
+  buildTranslationRows,
+  getI18nReviewStorageKey,
+  getI18nSelectionStorageKey,
+  readReviewedMap,
+  readSelection,
+  type I18nSelection,
+  type TranslationRow,
+} from './i18nResourceModel';
 
 type I18nResourcePageProps = {
   embedded?: boolean;
-};
-
-type I18nSelection = {
-  sourceLocale: string;
-  targetLocale: string;
-  namespace: string;
-  key?: string;
-};
-
-type TranslationStatus = 'missing' | 'translated' | 'reviewed';
-
-type TranslationRow = {
-  id: string;
-  key: string;
-  translationsByLocale: Record<string, string>;
-  source: string;
-  target: string;
-  missingLocales: string[];
-  status: TranslationStatus;
-  hasVariable: boolean;
-};
-
-const getI18nSelectionStorageKey = (projectId?: string) =>
-  `prodivix.resourceManager.i18n.selection.${projectId?.trim() || 'default'}`;
-
-const getI18nReviewStorageKey = (projectId?: string) =>
-  `prodivix.resourceManager.i18n.review.${projectId?.trim() || 'default'}`;
-
-const readSelection = (projectId: string | undefined): I18nSelection | null => {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.localStorage.getItem(
-      getI18nSelectionStorageKey(projectId)
-    );
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as I18nSelection;
-    if (
-      !parsed ||
-      !parsed.sourceLocale ||
-      !parsed.targetLocale ||
-      !parsed.namespace
-    ) {
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-};
-
-const readReviewedMap = (
-  projectId: string | undefined
-): Record<string, boolean> => {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = window.localStorage.getItem(getI18nReviewStorageKey(projectId));
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as Record<string, boolean>;
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
 };
 
 const escapeRegex = (value: string) =>
@@ -96,18 +43,6 @@ const highlightVariables = (value: string) => {
       <span key={`${part}-${index}`}>{part}</span>
     )
   );
-};
-
-const getCompletionRate = (
-  source: Record<string, string>,
-  target: Record<string, string>
-) => {
-  const sourceKeys = Object.keys(source);
-  if (sourceKeys.length === 0) return 100;
-  const translatedCount = sourceKeys.filter(
-    (key) => (target[key] ?? '').trim().length > 0
-  ).length;
-  return Math.round((translatedCount / sourceKeys.length) * 100);
 };
 
 export function I18nResourcePage({ embedded = false }: I18nResourcePageProps) {
@@ -155,10 +90,8 @@ export function I18nResourcePage({ embedded = false }: I18nResourcePageProps) {
     () => Object.keys(store[selection.sourceLocale] ?? {}),
     [selection.sourceLocale, store]
   );
-  const sourceNamespaceMap = (store[selection.sourceLocale] ??
-    {}) as I18nNamespaceMap;
-  const targetNamespaceMap = (store[selection.targetLocale] ??
-    {}) as I18nNamespaceMap;
+  const sourceNamespaceMap = store[selection.sourceLocale] ?? {};
+  const targetNamespaceMap = store[selection.targetLocale] ?? {};
   const missingStats = useMemo(
     () => collectLocaleMissingStats(store, selection.sourceLocale),
     [selection.sourceLocale, store]
@@ -166,89 +99,35 @@ export function I18nResourcePage({ embedded = false }: I18nResourcePageProps) {
 
   const namespaceStats = useMemo(
     () =>
-      sourceNamespaces.map((namespace) => {
-        const source = sourceNamespaceMap[namespace] ?? {};
-        const target = targetNamespaceMap[namespace] ?? {};
-        const missingCount = Object.keys(source).filter(
-          (key) => !(target[key] ?? '').trim()
-        ).length;
-        return {
-          namespace,
-          sourceCount: Object.keys(source).length,
-          missingCount,
-          completionRate: getCompletionRate(source, target),
-        };
+      buildNamespaceStats({
+        sourceNamespaces,
+        sourceNamespaceMap,
+        targetNamespaceMap,
       }),
     [sourceNamespaceMap, sourceNamespaces, targetNamespaceMap]
   );
 
-  const rows = useMemo<TranslationRow[]>(() => {
-    const keySet = new Set<string>();
-    locales.forEach((locale) => {
-      Object.keys(store[locale]?.[selection.namespace] ?? {}).forEach((key) =>
-        keySet.add(key)
-      );
-    });
-    const matchedRows = [...keySet]
-      .sort((a, b) => a.localeCompare(b))
-      .map((key) => {
-        const translationsByLocale = Object.fromEntries(
-          locales.map((locale) => [
-            locale,
-            store[locale]?.[selection.namespace]?.[key] ?? '',
-          ])
-        );
-        const source = translationsByLocale[selection.sourceLocale] ?? '';
-        const target = translationsByLocale[selection.targetLocale] ?? '';
-        const missingLocales = locales.filter(
-          (locale) => !String(translationsByLocale[locale] ?? '').trim()
-        );
-        const reviewKey = `${selection.targetLocale}::${selection.namespace}::${key}`;
-        const reviewed = reviewedMap[reviewKey] === true;
-        const status: TranslationStatus =
-          target.trim().length === 0
-            ? 'missing'
-            : reviewed
-              ? 'reviewed'
-              : 'translated';
-        return {
-          id: reviewKey,
-          key,
-          translationsByLocale,
-          source,
-          target,
-          missingLocales,
-          status,
-          hasVariable: Object.values(translationsByLocale).some((value) =>
-            /\{[^}]+\}/.test(value)
-          ),
-        };
-      });
-    return matchedRows.filter((row) => {
-      const normalizedSearch = searchKeyword.trim().toLowerCase();
-      const matchSearch =
-        normalizedSearch.length === 0 ||
-        row.key.toLowerCase().includes(normalizedSearch) ||
-        row.source.toLowerCase().includes(normalizedSearch) ||
-        row.target.toLowerCase().includes(normalizedSearch) ||
-        Object.values(row.translationsByLocale).some((value) =>
-          value.toLowerCase().includes(normalizedSearch)
-        );
-      if (!matchSearch) return false;
-      if (missingOnly && row.missingLocales.length === 0) return false;
-      if (reviewOnly && row.status !== 'reviewed') return false;
-      return true;
-    });
-  }, [
-    missingOnly,
-    reviewOnly,
-    reviewedMap,
-    searchKeyword,
-    selection.namespace,
-    selection.targetLocale,
-    locales,
-    store,
-  ]);
+  const rows = useMemo<TranslationRow[]>(
+    () =>
+      buildTranslationRows({
+        locales,
+        store,
+        selection,
+        reviewedMap,
+        searchKeyword,
+        missingOnly,
+        reviewOnly,
+      }),
+    [
+      locales,
+      missingOnly,
+      reviewOnly,
+      reviewedMap,
+      searchKeyword,
+      selection,
+      store,
+    ]
+  );
 
   const selectedRow =
     rows.find((row) => row.key === selection.key) ??
@@ -575,21 +454,23 @@ export function I18nResourcePage({ embedded = false }: I18nResourcePageProps) {
               {selection.namespace}
             </h3>
             <div className="flex items-center gap-1">
-              <PdxButton
-                text={t('resourceManager.i18n.actions.export')}
-                size="Tiny"
-                category="Secondary"
-                icon={<Download size={12} />}
-                iconPosition="Left"
-                onClick={exportLocale}
-              />
               <label
                 htmlFor={fileInputId}
-                className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-md border border-black/12 px-2 text-xs hover:bg-black/5"
+                className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-(--text-secondary) hover:bg-black/5 hover:text-(--text-primary)"
+                aria-label={t('resourceManager.i18n.actions.import')}
+                title={t('resourceManager.i18n.actions.import')}
               >
-                <Upload size={12} />
-                {t('resourceManager.i18n.actions.import')}
+                <Upload size={14} aria-hidden="true" />
               </label>
+              <button
+                type="button"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border-0 bg-transparent text-(--text-secondary) hover:bg-black/5 hover:text-(--text-primary)"
+                aria-label={t('resourceManager.i18n.actions.export')}
+                title={t('resourceManager.i18n.actions.export')}
+                onClick={exportLocale}
+              >
+                <Download size={14} aria-hidden="true" />
+              </button>
               <input
                 id={fileInputId}
                 type="file"
@@ -634,22 +515,19 @@ export function I18nResourcePage({ embedded = false }: I18nResourcePageProps) {
             <table className="min-w-full border-collapse text-xs">
               <thead className="bg-black/[0.04] text-(--text-secondary)">
                 <tr>
-                  <th className="min-w-[220px] px-2 py-2 text-left font-semibold">
+                  <th className="min-w-[220px] px-2 py-2 text-left align-middle font-semibold">
                     {t('resourceManager.i18n.table.key')}
                   </th>
                   {locales.map((locale) => (
                     <th
                       key={`col-${locale}`}
-                      className="min-w-[220px] px-2 py-2 text-left font-semibold"
+                      className="min-w-[220px] px-2 py-2 text-left align-middle font-semibold"
                     >
                       {locale}
                     </th>
                   ))}
-                  <th className="px-2 py-2 text-left font-semibold">
+                  <th className="w-[88px] min-w-[88px] px-2 py-2 text-left align-middle font-semibold whitespace-nowrap">
                     {t('resourceManager.i18n.table.status')}
-                  </th>
-                  <th className="px-2 py-2 text-left font-semibold">
-                    {t('resourceManager.i18n.table.action')}
                   </th>
                 </tr>
               </thead>
@@ -664,19 +542,30 @@ export function I18nResourcePage({ embedded = false }: I18nResourcePageProps) {
                       setSelection((current) => ({ ...current, key: row.key }))
                     }
                   >
-                    <td className="max-w-[220px] px-2 py-2 align-top">
-                      <button
-                        type="button"
-                        className="truncate text-left font-mono text-[11px] text-(--text-primary)"
-                        onClick={() =>
-                          setSelection((current) => ({
-                            ...current,
-                            key: row.key,
-                          }))
-                        }
-                      >
-                        {row.key}
-                      </button>
+                    <td className="max-w-[220px] px-2 py-2 align-middle">
+                      <div className="flex min-w-0 items-center gap-1">
+                        <button
+                          type="button"
+                          className="min-w-0 flex-1 truncate text-left font-mono text-[11px] text-(--text-primary)"
+                          onClick={() =>
+                            setSelection((current) => ({
+                              ...current,
+                              key: row.key,
+                            }))
+                          }
+                        >
+                          {row.key}
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-(--text-muted) hover:bg-red-50 hover:text-red-700"
+                          aria-label={t('resourceManager.i18n.actions.delete')}
+                          title={t('resourceManager.i18n.actions.delete')}
+                          onClick={() => deleteKey(row.key)}
+                        >
+                          <Trash2 size={12} aria-hidden="true" />
+                        </button>
+                      </div>
                     </td>
                     {locales.map((locale) => {
                       const localeValue =
@@ -686,7 +575,7 @@ export function I18nResourcePage({ embedded = false }: I18nResourcePageProps) {
                       return (
                         <td
                           key={`${row.id}-${locale}`}
-                          className="min-w-[220px] px-2 py-2 align-top"
+                          className="min-w-[220px] px-2 py-2 align-middle"
                         >
                           <input
                             aria-label={`translation-${row.key}-${locale}`}
@@ -717,38 +606,31 @@ export function I18nResourcePage({ embedded = false }: I18nResourcePageProps) {
                         </td>
                       );
                     })}
-                    <td className="px-2 py-2 align-top">
+                    <td className="w-[88px] min-w-[88px] px-2 py-2 align-middle">
                       <button
                         type="button"
-                        className={`rounded-full px-2 py-0.5 text-[11px] ${
+                        className={`inline-flex min-w-[52px] items-center justify-center rounded-full px-2 py-0.5 text-[11px] whitespace-nowrap ${
                           row.status === 'missing'
                             ? 'bg-amber-100 text-amber-700'
                             : row.status === 'reviewed'
                               ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-slate-100 text-slate-700'
+                              : row.status === 'sourceMissing'
+                                ? 'bg-amber-200 text-amber-950'
+                                : 'bg-slate-100 text-slate-700'
                         }`}
                         onClick={() => toggleReviewed(row)}
                       >
                         {t(`resourceManager.i18n.status.${row.status}`)}
                       </button>
                     </td>
-                    <td className="px-2 py-2 align-top">
-                      <button
-                        type="button"
-                        className="rounded-md border border-red-200 px-2 py-1 text-[11px] text-red-700 hover:bg-red-50"
-                        onClick={() => deleteKey(row.key)}
-                      >
-                        {t('resourceManager.i18n.actions.delete')}
-                      </button>
-                    </td>
                   </tr>
                 ))}
                 <tr className="border-t border-dashed border-black/12 bg-black/[0.02]">
-                  <td className="max-w-[220px] px-2 py-2 align-top">
+                  <td className="max-w-[220px] px-2 py-2 align-middle">
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        className="inline-flex h-5 w-5 items-center justify-center border-0 bg-transparent p-0 text-[14px] leading-none text-(--text-secondary) hover:text-(--text-primary)"
+                        className="inline-flex h-5 w-5 items-center justify-center rounded border-0 bg-transparent p-0 text-[14px] leading-none text-(--text-secondary) hover:bg-black/6 hover:text-(--text-primary) focus-visible:ring-2 focus-visible:ring-black/20 focus-visible:outline-none"
                         aria-label="Add key"
                         onClick={addKey}
                       >
@@ -769,7 +651,7 @@ export function I18nResourcePage({ embedded = false }: I18nResourcePageProps) {
                   {locales.map((locale) => (
                     <td
                       key={`new-row-${locale}`}
-                      className="min-w-[220px] px-2 py-2 align-top"
+                      className="min-w-[220px] px-2 py-2 align-middle"
                     >
                       {locale === selection.sourceLocale ? (
                         <PdxInput
@@ -790,19 +672,7 @@ export function I18nResourcePage({ embedded = false }: I18nResourcePageProps) {
                       )}
                     </td>
                   ))}
-                  <td className="px-2 py-2 align-top">
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">
-                      {t('resourceManager.i18n.new')}
-                    </span>
-                  </td>
-                  <td className="px-2 py-2 align-top">
-                    <PdxButton
-                      text={t('resourceManager.i18n.actions.add')}
-                      size="Tiny"
-                      category="Secondary"
-                      onClick={addKey}
-                    />
-                  </td>
+                  <td className="w-[88px] min-w-[88px] px-2 py-2 align-middle" />
                 </tr>
               </tbody>
             </table>
