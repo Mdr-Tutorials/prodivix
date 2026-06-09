@@ -84,6 +84,8 @@ pnpm dev:backend
 pnpm dev:web
 ```
 
+Backend-backed workspace, auth, sync, and project persistence flows require PostgreSQL. Start a local database from `apps/backend` with `docker compose up -d`; backend dependencies are managed by Go modules and can be preloaded with `go mod download`. See `apps/backend/README.md` for backend-specific setup.
+
 Common entry points:
 
 | Command                | Description                              |

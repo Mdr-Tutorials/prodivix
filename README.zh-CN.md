@@ -84,6 +84,8 @@ pnpm dev:backend
 pnpm dev:web
 ```
 
+后端 Workspace、鉴权、同步和项目持久化流程需要 PostgreSQL。可在 `apps/backend` 下执行 `docker compose up -d` 启动本地数据库；后端依赖由 Go modules 管理，也可以提前执行 `go mod download` 拉取。后端专属配置见 `apps/backend/README.md`。
+
 常用入口：
 
 | 命令                   | 说明                      |

@@ -37,6 +37,7 @@ apps/backend
 ## 常用命令
 
 ```bash
+go mod download           # 预拉取 Go modules 依赖
 pnpm dev:backend           # go run（普通模式）
 pnpm dev:backend:hot       # Air 热重载
 pnpm build:backend         # 构建产物
@@ -48,4 +49,5 @@ cd apps/backend && go fmt ./...
 
 - 主库：PostgreSQL
 - 迁移由 `migrations/` 管理，启动时按需自动应用
-- 本地开发可用 `docker-compose up -d` 起 PG
+- 本地开发可在 `apps/backend` 下执行 `docker compose up -d` 起 PG
+- 默认连接串：`BACKEND_DB_URL=postgres://postgres:postgres@localhost:5432/prodivix?sslmode=disable`
