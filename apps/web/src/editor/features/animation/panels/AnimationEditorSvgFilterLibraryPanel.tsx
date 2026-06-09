@@ -39,7 +39,7 @@ export const AnimationEditorSvgFilterLibraryPanel = ({
   return (
     <aside className="w-[340px] shrink-0 rounded-2xl border border-black/8 bg-(--bg-canvas) p-4 max-[1280px]:w-full">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold">
+        <h2 className="text-sm font-medium">
           {t('animationEditor.svgFilters.title')}
         </h2>
         <button
@@ -61,7 +61,7 @@ export const AnimationEditorSvgFilterLibraryPanel = ({
             className="rounded-lg border border-black/10 bg-black/[0.015] p-3"
           >
             <div className="flex items-center justify-between gap-2">
-              <p className="truncate text-xs font-semibold">{filter.id}</p>
+              <p className="truncate text-xs font-medium">{filter.id}</p>
               <button
                 type="button"
                 onClick={() => onDeleteSvgFilter(filter.id)}

@@ -8,9 +8,9 @@ import type { NodeI18n } from './nodeI18n';
 import { tNode } from './nodeI18n';
 
 export const NODE_TEXT_INPUT_CLASS =
-  'nodrag nopan h-7 w-full rounded border border-(--nodegraph-node-border) bg-(--nodegraph-node-soft-bg) px-2 font-[Inter,sans-serif] text-[11px] font-normal text-(--nodegraph-text) outline-none focus:border-(--nodegraph-node-border-strong) focus:bg-(--nodegraph-node-bg)';
+  'nodrag nopan h-7 w-full rounded border border-(--nodegraph-node-border) bg-(--nodegraph-node-soft-bg) px-2 text-[11px] font-normal text-(--nodegraph-text) outline-none focus:border-(--nodegraph-node-border-strong) focus:bg-(--nodegraph-node-bg)';
 export const NODE_TEXTAREA_CLASS =
-  'nodrag nopan min-h-7 w-full resize-none overflow-hidden rounded border border-(--nodegraph-node-border) bg-(--nodegraph-node-soft-bg) px-2 py-1 font-[Inter,sans-serif] text-[11px] font-normal text-(--nodegraph-text) outline-none focus:border-(--nodegraph-node-border-strong) focus:bg-(--nodegraph-node-bg)';
+  'nodrag nopan min-h-7 w-full resize-none overflow-hidden rounded border border-(--nodegraph-node-border) bg-(--nodegraph-node-soft-bg) px-2 py-1 text-[11px] font-normal text-(--nodegraph-text) outline-none focus:border-(--nodegraph-node-border-strong) focus:bg-(--nodegraph-node-bg)';
 export const NODE_ROW_CLASS =
   'relative flex min-h-7 items-center px-4 text-[11px] font-normal text-(--nodegraph-text)';
 export const NODE_MUTED_ROW_CLASS =
@@ -53,7 +53,7 @@ export const NodeHeader = ({
 }: NodeHeaderProps) => (
   <div className="relative flex min-h-9 items-center justify-between px-3.5 py-1.5">
     {leftSlot}
-    <div className="truncate pr-2 pl-1 font-[Poppins,sans-serif] text-[13px] font-semibold tracking-[0.01em] text-(--nodegraph-strong-text)">
+    <div className="truncate pr-2 pl-1 text-[13px] font-medium tracking-[0.01em] text-(--nodegraph-strong-text)">
       {title}
     </div>
     <div className="nodrag nopan ml-auto flex items-center gap-1">
@@ -117,7 +117,7 @@ export const SelectField = ({
     value={value}
     onChange={(event) => onChange(event.target.value)}
     disabled={disabled}
-    className={`nodrag nopan h-7 rounded border border-(--nodegraph-node-border) bg-(--nodegraph-node-soft-bg) px-2 font-[Inter,sans-serif] text-[11px] font-normal text-(--nodegraph-text) outline-none focus:border-(--nodegraph-node-border-strong) focus:bg-(--nodegraph-node-bg) disabled:cursor-not-allowed disabled:border-(--nodegraph-node-border) disabled:bg-(--nodegraph-node-soft-bg) disabled:text-(--nodegraph-subtle-text) ${
+    className={`nodrag nopan h-7 rounded border border-(--nodegraph-node-border) bg-(--nodegraph-node-soft-bg) px-2 text-[11px] font-normal text-(--nodegraph-text) outline-none focus:border-(--nodegraph-node-border-strong) focus:bg-(--nodegraph-node-bg) disabled:cursor-not-allowed disabled:border-(--nodegraph-node-border) disabled:bg-(--nodegraph-node-soft-bg) disabled:text-(--nodegraph-subtle-text) ${
       className ?? ''
     }`}
   >

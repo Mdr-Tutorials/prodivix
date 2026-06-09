@@ -14,7 +14,7 @@ const SizeGroupContent = ({ node, updateNode, t }: LayoutGroupRenderProps) => {
   return (
     <div className="grid grid-cols-2 gap-1.5">
       <div className="flex flex-col gap-1">
-        <span className="text-[10px] font-semibold text-(--text-muted)">
+        <span className="text-[10px] font-medium text-(--text-muted)">
           {t('inspector.panels.layout.fields.width', {
             defaultValue: 'Width',
           })}
@@ -33,7 +33,7 @@ const SizeGroupContent = ({ node, updateNode, t }: LayoutGroupRenderProps) => {
         />
       </div>
       <div className="flex flex-col gap-1">
-        <span className="text-[10px] font-semibold text-(--text-muted)">
+        <span className="text-[10px] font-medium text-(--text-muted)">
           {t('inspector.panels.layout.fields.height', {
             defaultValue: 'Height',
           })}

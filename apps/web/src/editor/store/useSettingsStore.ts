@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import {
   createGlobalDefaults,
   createProjectDefaults,
+  getGlobalSettingsKeys,
   isProjectOverridableSetting,
   type GlobalSettingsState,
   type OverrideState,
@@ -69,7 +70,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const cloneDefaultOverrides = (): OverrideState =>
-  Object.keys(createGlobalDefaults()).reduce<OverrideState>((acc, key) => {
+  getGlobalSettingsKeys().reduce<OverrideState>((acc, key) => {
     acc[key] = false;
     return acc;
   }, {});
@@ -118,10 +119,9 @@ const normalizeGlobalSettings = (
 const normalizeOverrides = (value: unknown): OverrideState => {
   const fallback = cloneDefaultOverrides();
   if (!isRecord(value)) return fallback;
-  Object.keys(fallback).forEach((key) => {
+  getGlobalSettingsKeys().forEach((key) => {
     fallback[key] =
-      isProjectOverridableSetting(key as keyof GlobalSettingsState) &&
-      typeof value[key] === 'boolean'
+      isProjectOverridableSetting(key) && typeof value[key] === 'boolean'
         ? Boolean(value[key])
         : false;
   });
@@ -167,14 +167,7 @@ export const useSettingsStore = create<SettingsStore>()((set) => ({
   ensureProjectGlobal: (projectId) =>
     set((state) => {
       if (!projectId || state.projectGlobalById[projectId]) return state;
-      const defaults = createGlobalDefaults();
-      const overrides = Object.keys(defaults).reduce<OverrideState>(
-        (acc, key) => {
-          acc[key] = false;
-          return acc;
-        },
-        {}
-      );
+      const overrides = cloneDefaultOverrides();
       return {
         projectGlobalById: {
           ...state.projectGlobalById,
@@ -191,13 +184,7 @@ export const useSettingsStore = create<SettingsStore>()((set) => ({
       if (!isProjectOverridableSetting(key)) return state;
       const current = state.projectGlobalById[projectId] ?? {
         values: createProjectDefaults(),
-        overrides: Object.keys(createGlobalDefaults()).reduce<OverrideState>(
-          (acc, item) => {
-            acc[item] = false;
-            return acc;
-          },
-          {}
-        ),
+        overrides: cloneDefaultOverrides(),
       };
       return {
         projectGlobalById: {
@@ -237,13 +224,7 @@ export const useSettingsStore = create<SettingsStore>()((set) => ({
       if (!isProjectOverridableSetting(key)) return state;
       const current = state.projectGlobalById[projectId] ?? {
         values: createProjectDefaults(),
-        overrides: Object.keys(createGlobalDefaults()).reduce<OverrideState>(
-          (acc, item) => {
-            acc[item] = false;
-            return acc;
-          },
-          {}
-        ),
+        overrides: cloneDefaultOverrides(),
       };
       return {
         projectGlobalById: {

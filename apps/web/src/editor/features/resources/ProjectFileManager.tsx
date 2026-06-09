@@ -9,6 +9,7 @@ import { Check, FileText, LayoutTemplate, Save } from 'lucide-react';
 import { EditorConfirmModal } from '@/editor/components/EditorConfirmModal';
 import { useEditorShortcut } from '@/editor/shortcuts';
 import { useEditorStore } from '@/editor/store/useEditorStore';
+import { codeMirrorTypographyTheme } from '@/editor/codeMirrorTypography';
 import { ProjectFileTemplatePicker } from './ProjectFileTemplatePicker';
 import {
   PROJECT_GITIGNORE_SNIPPETS,
@@ -307,7 +308,7 @@ export function ProjectFileManager({
   return (
     <section className={shellClassName}>
       <article className="rounded-2xl border border-black/8 bg-(--bg-canvas) p-5">
-        <h2 className="text-base font-semibold text-(--text-primary)">
+        <h2 className="text-base font-medium text-(--text-primary)">
           {t('resourceManager.projectFiles.header.title')}
         </h2>
         <p className="mt-1 text-sm text-(--text-secondary)">
@@ -318,7 +319,7 @@ export function ProjectFileManager({
       <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="grid content-start gap-3 rounded-xl border border-black/10 bg-(--bg-canvas) p-3">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[11px] font-semibold tracking-[0.08em] text-(--text-muted) uppercase">
+            <p className="text-[11px] font-medium tracking-[0.08em] text-(--text-muted) uppercase">
               {t('resourceManager.projectFiles.labels.rootFiles')}
             </p>
             <span className="rounded-full bg-black/[0.04] px-2 py-1 text-[11px] text-(--text-secondary)">
@@ -344,7 +345,7 @@ export function ProjectFileManager({
                     className="shrink-0 text-(--text-secondary)"
                   />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold text-(--text-primary)">
+                    <span className="block truncate font-medium text-(--text-primary)">
                       {file.path}
                     </span>
                     <span className="block truncate text-(--text-muted)">
@@ -373,7 +374,7 @@ export function ProjectFileManager({
                   <p className="text-[11px] tracking-[0.08em] text-(--text-muted) uppercase">
                     {t('resourceManager.projectFiles.labels.selected')}
                   </p>
-                  <h3 className="text-sm font-semibold text-(--text-primary)">
+                  <h3 className="text-sm font-medium text-(--text-primary)">
                     {selectedFile.path}
                   </h3>
                   <p className="text-xs text-(--text-secondary)">
@@ -457,6 +458,7 @@ export function ProjectFileManager({
                 extensions={[
                   resolveLanguageExtensionByPath(selectedFile.path),
                   EditorView.lineWrapping,
+                  codeMirrorTypographyTheme,
                 ]}
                 basicSetup={{
                   lineNumbers: true,

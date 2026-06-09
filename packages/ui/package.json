@@ -1,7 +1,12 @@
 {
   "name": "@prodivix/ui",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mdr-Tutorials/prodivix.git",
+    "directory": "packages/ui"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -59,7 +64,7 @@
     "react-router": "7"
   },
   "scripts": {
-    "build": "pnpm run clean && vite build && tsc -p tsconfig.json --emitDeclarationOnly",
+    "build": "pnpm run clean && vite build && node scripts/prepend-theme-css.mjs && tsc -p tsconfig.json --emitDeclarationOnly",
     "clean": "node -e \"const fs=require('node:fs'); fs.rmSync('dist',{recursive:true,force:true}); fs.rmSync('tsconfig.tsbuildinfo',{force:true})\"",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"

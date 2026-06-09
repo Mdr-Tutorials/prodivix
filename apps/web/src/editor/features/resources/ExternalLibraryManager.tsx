@@ -666,7 +666,7 @@ export function ExternalLibraryManager({
   return (
     <article className="relative grid gap-4 rounded-2xl border border-(--border-subtle) bg-(--bg-canvas) p-5">
       <header>
-        <h2 className="text-base font-semibold text-(--text-primary)">
+        <h2 className="text-base font-medium text-(--text-primary)">
           {t('resourceManager.external.header.title')}
         </h2>
         <p className="mt-1 text-sm text-(--text-secondary)">

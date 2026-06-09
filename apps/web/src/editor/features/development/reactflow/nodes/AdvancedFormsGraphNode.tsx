@@ -1,5 +1,4 @@
 ﻿import {
-  renderSource,
   renderTarget,
   resolveMultiplicity,
   type GraphNodeData,
@@ -13,6 +12,7 @@ import {
   SelectField,
 } from './nodePrimitives';
 import type { NodeI18n } from './nodeI18n';
+import { renderNodeRow } from './nodeRows';
 import { tNode } from './nodeI18n';
 
 type Props = {
@@ -21,42 +21,6 @@ type Props = {
   selected: boolean;
   t: NodeI18n;
 };
-
-const row = (
-  id: string,
-  nodeData: GraphNodeData,
-  label: string,
-  options: {
-    inHandle?: string;
-    outHandle?: string;
-    inSemantic?: 'control' | 'data' | 'condition';
-    outSemantic?: 'control' | 'data' | 'condition';
-  }
-) => (
-  <div className="relative flex min-h-7 items-center px-4 text-[11px] font-normal text-(--nodegraph-text)">
-    {options.inHandle
-      ? renderTarget(
-          id,
-          options.inHandle,
-          options.inSemantic ?? 'control',
-          resolveMultiplicity('target', options.inSemantic ?? 'control'),
-          undefined,
-          nodeData.onPortContextMenu
-        )
-      : null}
-    <span>{label}</span>
-    {options.outHandle
-      ? renderSource(
-          id,
-          options.outHandle,
-          options.outSemantic ?? 'control',
-          resolveMultiplicity('source', options.outSemantic ?? 'control'),
-          undefined,
-          nodeData.onPortContextMenu
-        )
-      : null}
-  </div>
-);
 
 export const renderAdvancedFormsGraphNode = ({
   id,
@@ -155,28 +119,43 @@ export const renderAdvancedFormsGraphNode = ({
               spellCheck={false}
             />
           </div>
-          {row(id, nodeData, tNode(t, 'common.rows.value', 'value'), {
+          {renderNodeRow(id, nodeData, tNode(t, 'common.rows.value', 'value'), {
             inHandle: 'in.data.value',
             inSemantic: 'data',
           })}
-          {row(id, nodeData, tNode(t, 'common.rows.rules', 'rules'), {
+          {renderNodeRow(id, nodeData, tNode(t, 'common.rows.rules', 'rules'), {
             inHandle: 'in.data.rules',
             inSemantic: 'data',
           })}
-          {row(id, nodeData, tNode(t, 'common.rows.valid', 'valid'), {
+          {renderNodeRow(id, nodeData, tNode(t, 'common.rows.valid', 'valid'), {
             outHandle: 'out.control.valid',
           })}
-          {row(id, nodeData, tNode(t, 'common.rows.invalid', 'invalid'), {
-            outHandle: 'out.control.invalid',
-          })}
-          {row(id, nodeData, tNode(t, 'common.rows.cleaned', 'cleaned'), {
-            outHandle: 'out.data.cleaned',
-            outSemantic: 'data',
-          })}
-          {row(id, nodeData, tNode(t, 'common.rows.errors', 'errors'), {
-            outHandle: 'out.data.errors',
-            outSemantic: 'data',
-          })}
+          {renderNodeRow(
+            id,
+            nodeData,
+            tNode(t, 'common.rows.invalid', 'invalid'),
+            {
+              outHandle: 'out.control.invalid',
+            }
+          )}
+          {renderNodeRow(
+            id,
+            nodeData,
+            tNode(t, 'common.rows.cleaned', 'cleaned'),
+            {
+              outHandle: 'out.data.cleaned',
+              outSemantic: 'data',
+            }
+          )}
+          {renderNodeRow(
+            id,
+            nodeData,
+            tNode(t, 'common.rows.errors', 'errors'),
+            {
+              outHandle: 'out.data.errors',
+              outSemantic: 'data',
+            }
+          )}
         </div>
         <NodeValidationHint message={nodeData.validationMessage} />
       </div>
@@ -301,14 +280,19 @@ export const renderAdvancedFormsGraphNode = ({
               spellCheck={false}
             />
           </div>
-          {row(id, nodeData, tNode(t, 'common.rows.value', 'value'), {
+          {renderNodeRow(id, nodeData, tNode(t, 'common.rows.value', 'value'), {
             inHandle: 'in.data.value',
             inSemantic: 'data',
           })}
-          {row(id, nodeData, tNode(t, 'advancedForms.rateLimit.fire', 'fire'), {
-            outHandle: 'out.control.fire',
-          })}
-          {row(id, nodeData, tNode(t, 'common.rows.value', 'value'), {
+          {renderNodeRow(
+            id,
+            nodeData,
+            tNode(t, 'advancedForms.rateLimit.fire', 'fire'),
+            {
+              outHandle: 'out.control.fire',
+            }
+          )}
+          {renderNodeRow(id, nodeData, tNode(t, 'common.rows.value', 'value'), {
             outHandle: 'out.data.value',
             outSemantic: 'data',
           })}
@@ -399,21 +383,36 @@ export const renderAdvancedFormsGraphNode = ({
               ]}
             />
           </div>
-          {row(id, nodeData, tNode(t, 'common.rows.changed', 'changed'), {
-            outHandle: 'out.control.changed',
-          })}
-          {row(id, nodeData, tNode(t, 'common.rows.form', 'form'), {
+          {renderNodeRow(
+            id,
+            nodeData,
+            tNode(t, 'common.rows.changed', 'changed'),
+            {
+              outHandle: 'out.control.changed',
+            }
+          )}
+          {renderNodeRow(id, nodeData, tNode(t, 'common.rows.form', 'form'), {
             outHandle: 'out.data.form',
             outSemantic: 'data',
           })}
-          {row(id, nodeData, tNode(t, 'common.rows.values', 'values'), {
-            outHandle: 'out.data.values',
-            outSemantic: 'data',
-          })}
-          {row(id, nodeData, tNode(t, 'common.rows.errors', 'errors'), {
-            outHandle: 'out.data.errors',
-            outSemantic: 'data',
-          })}
+          {renderNodeRow(
+            id,
+            nodeData,
+            tNode(t, 'common.rows.values', 'values'),
+            {
+              outHandle: 'out.data.values',
+              outSemantic: 'data',
+            }
+          )}
+          {renderNodeRow(
+            id,
+            nodeData,
+            tNode(t, 'common.rows.errors', 'errors'),
+            {
+              outHandle: 'out.data.errors',
+              outSemantic: 'data',
+            }
+          )}
         </div>
       </div>
     );
@@ -497,22 +496,27 @@ export const renderAdvancedFormsGraphNode = ({
               spellCheck={false}
             />
           </div>
-          {row(id, nodeData, tNode(t, 'common.rows.form', 'form'), {
+          {renderNodeRow(id, nodeData, tNode(t, 'common.rows.form', 'form'), {
             inHandle: 'in.data.form',
             inSemantic: 'data',
           })}
-          {row(id, nodeData, tNode(t, 'common.rows.value', 'value'), {
+          {renderNodeRow(id, nodeData, tNode(t, 'common.rows.value', 'value'), {
             inHandle: 'in.data.value',
             inSemantic: 'data',
           })}
-          {row(id, nodeData, tNode(t, 'common.rows.changed', 'changed'), {
-            outHandle: 'out.control.changed',
-          })}
-          {row(id, nodeData, tNode(t, 'common.rows.value', 'value'), {
+          {renderNodeRow(
+            id,
+            nodeData,
+            tNode(t, 'common.rows.changed', 'changed'),
+            {
+              outHandle: 'out.control.changed',
+            }
+          )}
+          {renderNodeRow(id, nodeData, tNode(t, 'common.rows.value', 'value'), {
             outHandle: 'out.data.value',
             outSemantic: 'data',
           })}
-          {row(id, nodeData, tNode(t, 'common.rows.error', 'error'), {
+          {renderNodeRow(id, nodeData, tNode(t, 'common.rows.error', 'error'), {
             outHandle: 'out.data.error',
             outSemantic: 'data',
           })}

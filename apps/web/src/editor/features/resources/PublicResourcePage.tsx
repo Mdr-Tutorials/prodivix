@@ -249,7 +249,7 @@ export function PublicResourcePage({
         <article className="rounded-2xl border border-black/8 bg-(--bg-canvas) p-4">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-(--text-primary)">
+              <h2 className="text-lg font-medium text-(--text-primary)">
                 {selectedNode.name}
               </h2>
               <p className="text-xs text-(--text-muted)">{selectedNode.path}</p>

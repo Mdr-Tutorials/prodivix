@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { PIRDocument } from '@/core/types/engine.types';
 import { compilePirToReactComponent } from '@/pir/generator/react/compileComponent';
+import {
+  REACT_PROJECT_SCAFFOLD_PRESET,
+  createProjectReactBundle,
+} from '@/pir/generator/react/projectScaffold';
 
 describe('compilePirToReactComponent', () => {
   it('exports mounted CSS from code slot artifacts without leaking bindings as props', () => {
@@ -136,5 +140,99 @@ describe('compilePirToReactComponent', () => {
     expect(compiled.code).toContain(
       "window.open(\"https://example.com/docs\", '_blank', 'noopener,noreferrer')"
     );
+  });
+
+  it('exports Prodivix button text and package styles', () => {
+    const pirDoc: PIRDocument = {
+      version: '1.3',
+      metadata: { name: 'StyledButtonExample' },
+      ui: {
+        graph: {
+          version: 1,
+          rootId: 'root',
+          nodesById: {
+            root: {
+              id: 'root',
+              type: 'PdxButton',
+              text: 'Button',
+              props: {
+                size: 'Big',
+                category: 'Primary',
+              },
+            },
+          },
+          childIdsById: {
+            root: [],
+          },
+        },
+      },
+    };
+
+    const compiled = compilePirToReactComponent(pirDoc);
+
+    expect(compiled.code).toContain(
+      "import { PdxButton } from '@prodivix/ui';"
+    );
+    expect(compiled.code).toContain("import '@prodivix/ui/style.css';");
+    expect(compiled.code).toContain(
+      '<PdxButton size="Big" category="Primary" text="Button" />'
+    );
+    expect(compiled.code).not.toContain('>\n      Button\n    </PdxButton>');
+  });
+
+  it('scaffolds a pnpm-installable Vite React project', () => {
+    const pirDoc: PIRDocument = {
+      version: '1.3',
+      metadata: { name: 'RunnableProjectExample' },
+      ui: {
+        graph: {
+          version: 1,
+          rootId: 'root',
+          nodesById: {
+            root: {
+              id: 'root',
+              type: 'container',
+              text: 'Hello',
+            },
+          },
+          childIdsById: {
+            root: [],
+          },
+        },
+      },
+    };
+
+    const bundle = createProjectReactBundle(compilePirToReactComponent(pirDoc));
+    const packageJson = JSON.parse(
+      bundle.files.find((file) => file.path === 'package.json')?.content ?? '{}'
+    ) as {
+      packageManager?: string;
+      scripts?: Record<string, string>;
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const pnpmWorkspace = bundle.files.find(
+      (file) => file.path === 'pnpm-workspace.yaml'
+    );
+
+    expect(packageJson.packageManager).toBe(
+      REACT_PROJECT_SCAFFOLD_PRESET.packageManager
+    );
+    expect(packageJson.scripts?.build).toBe('tsc -b && vite build');
+    expect(packageJson.dependencies?.react).toBe(
+      REACT_PROJECT_SCAFFOLD_PRESET.dependencies.react
+    );
+    expect(packageJson.dependencies?.['react-dom']).toBe(
+      REACT_PROJECT_SCAFFOLD_PRESET.dependencies['react-dom']
+    );
+    expect(packageJson.devDependencies?.['@types/react']).toBe(
+      REACT_PROJECT_SCAFFOLD_PRESET.devDependencies['@types/react']
+    );
+    expect(packageJson.devDependencies?.['@types/react-dom']).toBe(
+      REACT_PROJECT_SCAFFOLD_PRESET.devDependencies['@types/react-dom']
+    );
+    expect(pnpmWorkspace?.language).toBe('yaml');
+    expect(pnpmWorkspace?.content).toContain('onlyBuiltDependencies:');
+    expect(pnpmWorkspace?.content).toContain('esbuild');
   });
 });

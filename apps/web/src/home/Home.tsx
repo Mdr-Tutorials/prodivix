@@ -162,7 +162,7 @@ function Home() {
 
       <main className="flex w-full flex-1 flex-col items-center px-2">
         <section className="flex min-h-[calc(100vh-128px)] w-full max-w-[960px] flex-col items-center justify-center py-14 text-center md:py-18">
-          <div className="text-(length:--font-size-xs) font-semibold tracking-[0.16em] text-(--text-muted) uppercase">
+          <div className="text-(length:--font-size-xs) font-medium tracking-[0.16em] text-(--text-muted) uppercase">
             {t('hero.eyebrow')}
           </div>
           <h1 className="mt-6 max-w-[780px] text-[44px] leading-[1.04] font-semibold text-(--home-hero-text) sm:text-[60px] lg:text-[76px]">
@@ -200,10 +200,10 @@ function Home() {
 
         <section className="grid w-full max-w-[1120px] gap-10 border-t border-(--border-subtle) py-20 md:grid-cols-[0.72fr_1fr] md:py-24">
           <div>
-            <p className="text-(length:--font-size-xs) font-semibold tracking-[0.16em] text-(--text-muted) uppercase">
+            <p className="text-(length:--font-size-xs) font-medium tracking-[0.16em] text-(--text-muted) uppercase">
               {t('why.eyebrow')}
             </p>
-            <h2 className="mt-4 max-w-[520px] text-[32px] leading-[1.12] font-semibold text-(--text-primary) sm:text-[42px]">
+            <h2 className="mt-4 max-w-[520px] text-[32px] leading-[1.12] font-medium text-(--text-primary) sm:text-[42px]">
               {t('why.title')}
             </h2>
           </div>
@@ -216,10 +216,10 @@ function Home() {
         <section className="w-full max-w-[1120px] border-t border-(--border-subtle) py-20 md:py-24">
           <div className="grid gap-10 md:grid-cols-[0.8fr_1fr]">
             <div>
-              <p className="text-(length:--font-size-xs) font-semibold tracking-[0.16em] text-(--text-muted) uppercase">
+              <p className="text-(length:--font-size-xs) font-medium tracking-[0.16em] text-(--text-muted) uppercase">
                 {t('explanation.eyebrow')}
               </p>
-              <h2 className="mt-4 max-w-[560px] text-[32px] leading-[1.12] font-semibold text-(--text-primary) sm:text-[42px]">
+              <h2 className="mt-4 max-w-[560px] text-[32px] leading-[1.12] font-medium text-(--text-primary) sm:text-[42px]">
                 {t('explanation.title')}
               </h2>
             </div>
@@ -230,10 +230,10 @@ function Home() {
           <div className="mt-12 grid gap-px overflow-hidden rounded-lg border border-(--border-subtle) bg-(--border-subtle) md:grid-cols-3">
             {explanationItems.map((key) => (
               <article key={key} className="bg-(--bg-panel) p-6">
-                <p className="text-(length:--font-size-xs) font-semibold tracking-[0.14em] text-(--text-muted) uppercase">
+                <p className="text-(length:--font-size-xs) font-medium tracking-[0.14em] text-(--text-muted) uppercase">
                   {t(`explanation.items.${key}.label`)}
                 </p>
-                <h3 className="mt-6 text-(length:--font-size-xl) font-semibold text-(--text-primary)">
+                <h3 className="mt-6 text-(length:--font-size-xl) font-medium text-(--text-primary)">
                   {t(`explanation.items.${key}.title`)}
                 </h3>
                 <p className="mt-3 text-(length:--font-size-sm) leading-[1.7] text-(--text-secondary)">
@@ -246,10 +246,10 @@ function Home() {
 
         <section className="w-full max-w-[1120px] border-t border-(--border-subtle) py-20 md:py-24">
           <div className="max-w-[700px]">
-            <p className="text-(length:--font-size-xs) font-semibold tracking-[0.16em] text-(--text-muted) uppercase">
+            <p className="text-(length:--font-size-xs) font-medium tracking-[0.16em] text-(--text-muted) uppercase">
               {t('workflow.eyebrow')}
             </p>
-            <h2 className="mt-4 text-[32px] leading-[1.12] font-semibold text-(--text-primary) sm:text-[42px]">
+            <h2 className="mt-4 text-[32px] leading-[1.12] font-medium text-(--text-primary) sm:text-[42px]">
               {t('workflow.title')}
             </h2>
             <p className="mt-5 text-(length:--font-size-lg) leading-[1.7] text-(--text-secondary)">
@@ -262,7 +262,7 @@ function Home() {
                 <div className="font-mono text-(length:--font-size-xs) text-(--text-muted)">
                   {String(index + 1).padStart(2, '0')}
                 </div>
-                <h3 className="mt-8 text-(length:--font-size-xl) font-semibold text-(--text-primary)">
+                <h3 className="mt-8 text-(length:--font-size-xl) font-medium text-(--text-primary)">
                   {t(`workflow.steps.${key}.title`)}
                 </h3>
                 <p className="mt-3 text-(length:--font-size-sm) leading-[1.65] text-(--text-secondary)">
@@ -275,10 +275,10 @@ function Home() {
 
         <section className="w-full max-w-[1120px] border-t border-(--border-subtle) py-20 md:py-24">
           <div className="mx-auto max-w-[760px] text-center">
-            <p className="text-(length:--font-size-xs) font-semibold tracking-[0.16em] text-(--text-muted) uppercase">
+            <p className="text-(length:--font-size-xs) font-medium tracking-[0.16em] text-(--text-muted) uppercase">
               {t('capabilities.eyebrow')}
             </p>
-            <h2 className="mt-4 text-[32px] leading-[1.12] font-semibold text-(--text-primary) sm:text-[42px]">
+            <h2 className="mt-4 text-[32px] leading-[1.12] font-medium text-(--text-primary) sm:text-[42px]">
               {t('capabilities.title')}
             </h2>
             <p className="mt-5 text-(length:--font-size-lg) leading-[1.7] text-(--text-secondary)">
@@ -291,7 +291,7 @@ function Home() {
                 key={key}
                 className="rounded-lg border border-(--border-subtle) bg-(--bg-panel) p-6"
               >
-                <h3 className="text-(length:--font-size-xl) font-semibold text-(--text-primary)">
+                <h3 className="text-(length:--font-size-xl) font-medium text-(--text-primary)">
                   {t(`capabilities.cards.${key}.title`)}
                 </h3>
                 <p className="mt-4 text-(length:--font-size-sm) leading-[1.7] text-(--text-secondary)">
@@ -305,10 +305,10 @@ function Home() {
         <section className="w-full max-w-[1120px] border-t border-(--border-subtle) py-20 md:py-24">
           <div className="grid gap-10 md:grid-cols-[0.95fr_1fr]">
             <div>
-              <p className="text-(length:--font-size-xs) font-semibold tracking-[0.16em] text-(--text-muted) uppercase">
+              <p className="text-(length:--font-size-xs) font-medium tracking-[0.16em] text-(--text-muted) uppercase">
                 {t('audience.eyebrow')}
               </p>
-              <h2 className="mt-4 text-[32px] leading-[1.12] font-semibold text-(--text-primary) sm:text-[42px]">
+              <h2 className="mt-4 text-[32px] leading-[1.12] font-medium text-(--text-primary) sm:text-[42px]">
                 {t('audience.title')}
               </h2>
               <p className="mt-5 text-(length:--font-size-lg) leading-[1.7] text-(--text-secondary)">
@@ -321,7 +321,7 @@ function Home() {
                   key={key}
                   className="rounded-lg border border-(--border-subtle) bg-(--bg-panel) p-5"
                 >
-                  <h3 className="text-(length:--font-size-md) font-semibold text-(--text-primary)">
+                  <h3 className="text-(length:--font-size-md) font-medium text-(--text-primary)">
                     {t(`audience.items.${key}.title`)}
                   </h3>
                   <p className="mt-2 text-(length:--font-size-sm) leading-[1.65] text-(--text-secondary)">
@@ -335,10 +335,10 @@ function Home() {
 
         <section className="grid w-full max-w-[1120px] gap-10 border-t border-(--border-subtle) py-20 md:grid-cols-[1fr_0.92fr] md:py-24">
           <div>
-            <p className="text-(length:--font-size-xs) font-semibold tracking-[0.16em] text-(--text-muted) uppercase">
+            <p className="text-(length:--font-size-xs) font-medium tracking-[0.16em] text-(--text-muted) uppercase">
               {t('developer.eyebrow')}
             </p>
-            <h2 className="mt-4 text-[32px] leading-[1.12] font-semibold text-(--text-primary) sm:text-[42px]">
+            <h2 className="mt-4 text-[32px] leading-[1.12] font-medium text-(--text-primary) sm:text-[42px]">
               {t('developer.title')}
             </h2>
             <p className="mt-5 max-w-[620px] text-(length:--font-size-lg) leading-[1.7] text-(--text-secondary)">
@@ -348,7 +348,7 @@ function Home() {
           <div className="grid gap-px overflow-hidden rounded-lg border border-(--border-subtle) bg-(--border-subtle)">
             {developerNotes.map((key) => (
               <article key={key} className="bg-(--bg-panel) p-5">
-                <h3 className="text-(length:--font-size-md) font-semibold text-(--text-primary)">
+                <h3 className="text-(length:--font-size-md) font-medium text-(--text-primary)">
                   {t(`developer.notes.${key}.title`)}
                 </h3>
                 <p className="mt-2 text-(length:--font-size-sm) leading-[1.65] text-(--text-secondary)">
@@ -360,10 +360,10 @@ function Home() {
         </section>
 
         <section className="w-full max-w-[1120px] border-t border-(--border-subtle) py-20 text-center md:py-24">
-          <p className="text-(length:--font-size-xs) font-semibold tracking-[0.16em] text-(--text-muted) uppercase">
+          <p className="text-(length:--font-size-xs) font-medium tracking-[0.16em] text-(--text-muted) uppercase">
             {t('finalCta.eyebrow')}
           </p>
-          <h2 className="mx-auto mt-4 max-w-[720px] text-[34px] leading-[1.12] font-semibold text-(--text-primary) sm:text-[48px]">
+          <h2 className="mx-auto mt-4 max-w-[720px] text-[34px] leading-[1.12] font-medium text-(--text-primary) sm:text-[48px]">
             {t('finalCta.title')}
           </h2>
           <p className="mx-auto mt-5 max-w-[620px] text-(length:--font-size-lg) leading-[1.7] text-(--text-secondary)">
@@ -405,7 +405,7 @@ function Home() {
           <div className="mt-10 grid gap-8 sm:grid-cols-2 md:mt-0 lg:grid-cols-4">
             {footerGroups.map((group) => (
               <div key={group}>
-                <h2 className="text-(length:--font-size-xs) font-semibold tracking-[0.14em] text-(--text-muted) uppercase">
+                <h2 className="text-(length:--font-size-xs) font-medium tracking-[0.14em] text-(--text-muted) uppercase">
                   {t(`footer.groups.${group}.title`)}
                 </h2>
                 <ul className="mt-4 grid gap-3">

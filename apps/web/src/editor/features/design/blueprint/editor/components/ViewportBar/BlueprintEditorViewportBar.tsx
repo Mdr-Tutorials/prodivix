@@ -41,7 +41,7 @@ export function BlueprintEditorViewportBar({
   return (
     <section className="flex min-h-[30px] flex-nowrap items-center gap-2.5 bg-(--bg-canvas) px-[14px] py-1 text-[11px] text-(--text-muted)">
       <div className="flex flex-none items-center gap-2.5">
-        <div className="font-semibold text-(--text-secondary)">
+        <div className="font-medium text-(--text-secondary)">
           {t('viewport.label')}
         </div>
         <div className="inline-flex items-center gap-1.5 [&_.PdxInput]:w-[76px] [&_.PdxInput]:max-w-[76px] max-[980px]:[&_.PdxInput]:w-[62px] max-[980px]:[&_.PdxInput]:max-w-[62px]">
@@ -59,7 +59,7 @@ export function BlueprintEditorViewportBar({
         </div>
       </div>
       <div className="inline-flex flex-none items-center gap-2 whitespace-nowrap">
-        <span className="font-semibold text-(--text-secondary) max-[980px]:hidden">
+        <span className="font-medium text-(--text-secondary) max-[980px]:hidden">
           {t('viewport.zoom')}
         </span>
         <PdxSlider
@@ -107,7 +107,7 @@ export function BlueprintEditorViewportBar({
       </div>
       <div className="hidden min-w-0 flex-1 items-center gap-2 max-[980px]:inline-flex">
         <label
-          className="font-semibold whitespace-nowrap text-(--text-secondary)"
+          className="font-medium whitespace-nowrap text-(--text-secondary)"
           htmlFor="ViewportQuickPresetsSelect"
         >
           {t('viewport.quickPresetMenu')}
@@ -179,7 +179,7 @@ export function BlueprintEditorViewportBar({
                     <Icon size={18} />
                   </span>
                   <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className="text-xs font-semibold text-(--text-primary)">
+                    <span className="text-xs font-medium text-(--text-primary)">
                       {deviceName}
                     </span>
                     <span className="text-[10px] text-(--text-muted)">

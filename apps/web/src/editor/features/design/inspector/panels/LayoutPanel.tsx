@@ -193,7 +193,7 @@ function LayoutPanelView({ node, updateNode }: InspectorPanelRenderProps) {
                 onClick={() => toggleGroup(group.key)}
                 data-testid={`inspector-layout-group-toggle-${group.key}`}
               >
-                <span className="InspectorLabel text-[11px] font-semibold text-(--text-secondary)">
+                <span className="InspectorLabel text-[11px] font-medium text-(--text-secondary)">
                   {groupTitle}
                 </span>
                 <ChevronDown

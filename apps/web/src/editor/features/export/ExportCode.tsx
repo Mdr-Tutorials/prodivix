@@ -1,9 +1,13 @@
 import { type ReactElement, useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
+import { PdxPopover } from '@prodivix/ui';
 import {
+  Check,
   ChevronDown,
   ChevronRight,
+  Copy,
+  Download,
   FileCode2,
   FileJson2,
   FileText,
@@ -38,6 +42,8 @@ type ExportFileLanguage =
   | 'json'
   | 'html'
   | 'css'
+  | 'yaml'
+  | 'ignore'
   | 'markdown'
   | 'text';
 type ExportCodeFile = {
@@ -112,7 +118,10 @@ const sanitizeFileName = (value: string) =>
 
 const resolveProjectFileLanguage = (path: string): ExportFileLanguage => {
   const lower = path.toLowerCase();
+  const fileName = lower.split('/').pop() ?? lower;
+  if (fileName.endsWith('ignore')) return 'ignore';
   if (lower.endsWith('.json')) return 'json';
+  if (lower.endsWith('.yaml') || lower.endsWith('.yml')) return 'yaml';
   if (lower.endsWith('.html') || lower.endsWith('.htm')) return 'html';
   if (lower.endsWith('.css')) return 'css';
   if (lower.endsWith('.md')) return 'markdown';
@@ -123,7 +132,9 @@ const resolveCodeViewerLanguage = (language?: ExportFileLanguage) => {
   if (language === 'json') return 'json';
   if (language === 'html') return 'html';
   if (language === 'css') return 'css';
+  if (language === 'yaml') return 'yaml';
   if (language === 'markdown') return 'markdown';
+  if (language === 'ignore') return 'ignore';
   if (language === 'text') return 'text';
   return 'typescript';
 };
@@ -150,6 +161,7 @@ export function ExportCode() {
   const activeRouteNodeId = useEditorStore((state) => state.activeRouteNodeId);
   const [copied, setCopied] = useState(false);
   const [downloadingZip, setDownloadingZip] = useState(false);
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ExportTab>('vfs');
   const [activeReactFile, setActiveReactFile] = useState('');
   const [activeVfsFile, setActiveVfsFile] = useState('');
@@ -411,10 +423,14 @@ export function ExportCode() {
       : t('react.empty', {
           defaultValue: '暂无 React 代码（先生成 PIR）',
         });
+  const exportViewOptions: Array<{ value: ExportTab; label: string }> = [
+    { value: 'react', label: t('tabs.react', { defaultValue: 'React' }) },
+    { value: 'vfs', label: t('tabs.vfs', { defaultValue: 'VFS' }) },
+  ];
 
   useEffect(() => {
     setCopied(false);
-  }, [activeTab]);
+  }, [activeReactFile, activeTab, activeVfsFile]);
 
   useEffect(() => {
     const files = activeTab === 'vfs' ? vfsProjectFiles : reactProjectFiles;
@@ -439,6 +455,49 @@ export function ExportCode() {
     }));
   };
 
+  const copyActiveFile = async () => {
+    if (!activeCode) return;
+    await navigator.clipboard.writeText(activeCode);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 900);
+  };
+
+  const renderCodePreview = (
+    code: string,
+    language: string,
+    disabled = false
+  ) => (
+    <div className="ExportCodePreview">
+      <button
+        type="button"
+        className="ExportCodeIconButton ExportCodePreviewCopy"
+        aria-label={
+          copied
+            ? t('copySuccess', { defaultValue: '已复制' })
+            : t('copy', { defaultValue: '复制' })
+        }
+        title={
+          copied
+            ? t('copySuccess', { defaultValue: '已复制' })
+            : t('copy', { defaultValue: '复制' })
+        }
+        disabled={disabled || !code}
+        onClick={copyActiveFile}
+      >
+        {copied ? (
+          <Check size={15} aria-hidden="true" />
+        ) : (
+          <Copy size={15} aria-hidden="true" />
+        )}
+      </button>
+      <CodeViewer
+        code={code}
+        lang={language}
+        className="ExportCodePreviewViewer"
+      />
+    </div>
+  );
+
   const renderTreeNodes = (nodes: FileTreeNode[], depth = 0): ReactElement[] =>
     nodes.map((node) => {
       const isFolder = node.children.length > 0 && !node.file;
@@ -449,7 +508,9 @@ export function ExportCode() {
       const fileIcon =
         node.file?.language === 'json' ? (
           <FileJson2 size={13} />
-        ) : node.file?.language === 'html' || node.file?.language === 'css' ? (
+        ) : node.file?.language === 'html' ||
+          node.file?.language === 'css' ||
+          node.file?.language === 'ignore' ? (
           <FileText size={13} />
         ) : (
           <FileCode2 size={13} />
@@ -524,55 +585,61 @@ export function ExportCode() {
     <div className="ExportCode">
       <div className="ExportCodeHeader">
         <div className="ExportCodeTitle">
-          <h1>{activeTitle}</h1>
+          <div className="ExportCodeTitleRow">
+            <h1>{activeTitle}</h1>
+            <PdxPopover
+              open={viewMenuOpen}
+              onOpenChange={setViewMenuOpen}
+              panelClassName="ExportCodeViewMenu"
+              content={
+                <div className="ExportCodeViewMenuList" role="listbox">
+                  {exportViewOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`ExportCodeViewMenuItem ${
+                        activeTab === option.value ? 'Active' : ''
+                      }`}
+                      role="option"
+                      aria-selected={activeTab === option.value}
+                      onClick={() => {
+                        setActiveTab(option.value);
+                        setViewMenuOpen(false);
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              }
+            >
+              <button
+                type="button"
+                className="ExportCodeViewTrigger"
+                aria-label={t('title', { defaultValue: '导出代码' })}
+                aria-expanded={viewMenuOpen}
+              >
+                <ChevronDown size={13} aria-hidden="true" />
+              </button>
+            </PdxPopover>
+          </div>
           <p>{activeDescription}</p>
         </div>
         <div className="ExportCodeActions">
-          <div
-            className="ExportCodeTabs"
-            role="tablist"
-            aria-label={t('title', { defaultValue: '导出代码' })}
-          >
-            <button
-              type="button"
-              className={`ExportCodeTab ${activeTab === 'react' ? 'Active' : ''}`}
-              onClick={() => setActiveTab('react')}
-              role="tab"
-              aria-selected={activeTab === 'react'}
-            >
-              {t('tabs.react', { defaultValue: 'React' })}
-            </button>
-            <button
-              type="button"
-              className={`ExportCodeTab ${activeTab === 'vfs' ? 'Active' : ''}`}
-              onClick={() => setActiveTab('vfs')}
-              role="tab"
-              aria-selected={activeTab === 'vfs'}
-            >
-              {t('tabs.vfs', { defaultValue: 'VFS' })}
-            </button>
-          </div>
-          <button
-            type="button"
-            className="ExportCodeCopy"
-            disabled={
-              !activeCode || (activeTab === 'react' && hasPirValidationError)
-            }
-            onClick={async () => {
-              if (!activeCode) return;
-              await navigator.clipboard.writeText(activeCode);
-              setCopied(true);
-              window.setTimeout(() => setCopied(false), 900);
-            }}
-          >
-            {copied
-              ? t('copySuccess', { defaultValue: '已复制' })
-              : t('copy', { defaultValue: '复制' })}
-          </button>
           {activeTab === 'react' ? (
             <button
               type="button"
-              className="ExportCodeCopy"
+              className="ExportCodeIconButton"
+              aria-label={
+                downloadingZip
+                  ? t('downloading', { defaultValue: 'Downloading...' })
+                  : t('downloadZip', { defaultValue: 'Download ZIP' })
+              }
+              title={
+                downloadingZip
+                  ? t('downloading', { defaultValue: 'Downloading...' })
+                  : t('downloadZip', { defaultValue: 'Download ZIP' })
+              }
               disabled={
                 !reactProjectFiles.length ||
                 downloadingZip ||
@@ -607,9 +674,7 @@ export function ExportCode() {
                 }
               }}
             >
-              {downloadingZip
-                ? t('downloading', { defaultValue: 'Downloading...' })
-                : t('downloadZip', { defaultValue: 'Download ZIP' })}
+              <Download size={15} aria-hidden="true" />
             </button>
           ) : null}
         </div>
@@ -650,23 +715,24 @@ export function ExportCode() {
             <aside className="w-52 shrink-0 overflow-auto rounded-md border border-black/10 p-1 dark:border-white/15">
               {renderTreeNodes(vfsFileTree)}
             </aside>
-            <CodeViewer
-              code={activeVfsFileContent}
-              lang={resolveCodeViewerLanguage(activeVfsFileRecord?.language)}
-            />
+            {renderCodePreview(
+              activeVfsFileContent,
+              resolveCodeViewerLanguage(activeVfsFileRecord?.language)
+            )}
           </div>
         ) : activeTab === 'react' && reactProjectFiles.length ? (
           <div className="flex h-full min-h-0 gap-2">
             <aside className="w-52 shrink-0 overflow-auto rounded-md border border-black/10 p-1 dark:border-white/15">
               {renderTreeNodes(reactFileTree)}
             </aside>
-            <CodeViewer
-              code={activeReactFileContent}
-              lang={resolveCodeViewerLanguage(activeReactFileRecord?.language)}
-            />
+            {renderCodePreview(
+              activeReactFileContent,
+              resolveCodeViewerLanguage(activeReactFileRecord?.language),
+              hasPirValidationError
+            )}
           </div>
         ) : (
-          <CodeViewer code={activeCode} lang="typescript" />
+          renderCodePreview(activeCode, 'typescript')
         )}
       </div>
     </div>

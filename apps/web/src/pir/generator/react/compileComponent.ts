@@ -374,6 +374,8 @@ const INTERNAL_NODE_PROP_KEYS = new Set([
 
 const INTERNAL_DATA_ATTRIBUTE_PREFIXES = ['data-pir-', 'data-layout-'];
 
+const TEXT_PROP_ONLY_COMPONENTS = new Set(['PdxButton', 'PdxButtonLink']);
+
 const asRecord = (value: unknown): UnsafeRecord | null =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as UnsafeRecord)
@@ -778,6 +780,17 @@ ${indent}))`;
       }
     });
 
+    const shouldMapTextToProp =
+      TEXT_PROP_ONLY_COMPONENTS.has(tag) &&
+      node.text !== undefined &&
+      !Object.prototype.hasOwnProperty.call(sanitizedProps, 'text');
+    if (shouldMapTextToProp) {
+      const expr = compilePropExpression(node.text, scopeVar);
+      if (expr !== null) {
+        propsArray.push(`text=${expr}`);
+      }
+    }
+
     if (
       staticIconRef?.provider === 'fontawesome' &&
       !Object.prototype.hasOwnProperty.call(sanitizedProps, 'icon')
@@ -819,7 +832,9 @@ ${indent}))`;
     });
 
     const allProps = propsArray.length ? ` ${propsArray.join(' ')}` : '';
-    const textContent = compileTextContent(node.text, scopeVar);
+    const textContent = shouldMapTextToProp
+      ? ''
+      : compileTextContent(node.text, scopeVar);
     const childJsx =
       node.children
         .map((child) => compileNode(child, `${indent}  `, scopeVar))
@@ -883,6 +898,11 @@ ${indent}))`;
   const mountedCssImportBlock = mountedCssFiles
     .map((file) => `import './${file.path}';`)
     .join('\n');
+  const packageStyleImportBlock = resolvedImports.some(
+    (item) => item.resolution.packageName === '@prodivix/ui'
+  )
+    ? "import '@prodivix/ui/style.css';"
+    : '';
   const functionSignature = `export default function ${componentName}(${
     hasProps ? `{ ${destructuredProps} }: ${interfaceName}` : ''
   }) {`;
@@ -900,6 +920,7 @@ ${indent}))`;
   const code = [
     reactImport,
     adapterImportBlock,
+    packageStyleImportBlock,
     mountedCssImportBlock,
     interfaceBlock.trim(),
     `${functionSignature}

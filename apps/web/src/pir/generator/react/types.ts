@@ -8,7 +8,14 @@ export type ExportResourceType = 'project' | 'component' | 'nodegraph';
 
 export type ReactExportFile = {
   path: string;
-  language: 'typescript' | 'json' | 'html' | 'css';
+  language:
+    | 'typescript'
+    | 'json'
+    | 'html'
+    | 'css'
+    | 'yaml'
+    | 'markdown'
+    | 'text';
   content: string;
 };
 

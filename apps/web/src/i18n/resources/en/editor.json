@@ -1473,6 +1473,12 @@
       "copySuffix": "Copy",
       "untitled": "Untitled"
     },
+    "controls": {
+      "label": "Node graph view controls",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fitView": "Fit view"
+    },
     "connection": {
       "missingEndpoint": "Invalid connection: missing source or target.",
       "invalidHandle": "Invalid connection: unable to resolve port handle.",

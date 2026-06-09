@@ -109,7 +109,7 @@ function SpacingControlInternal({
                 className="h-14 w-16 shrink-0 text-(--text-muted)"
               />
               <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <span className="text-[10px] leading-none font-semibold">
+                <span className="text-[10px] leading-none font-medium">
                   {t(`inspector.panels.layout.fields.sides.${side}`, {
                     defaultValue: side.charAt(0).toUpperCase() + side.slice(1),
                   })}

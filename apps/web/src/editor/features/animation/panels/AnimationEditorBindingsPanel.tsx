@@ -123,7 +123,7 @@ export const AnimationEditorBindingsPanel = ({
   return (
     <main className="flex min-h-0 min-w-0 flex-1 flex-col rounded-2xl border border-black/8 bg-(--bg-canvas) p-4">
       <div className="border-b border-black/8 pb-3">
-        <p className="text-sm font-semibold text-(--text-primary)">
+        <p className="text-sm font-medium text-(--text-primary)">
           {activeTimelineDisplayName}
         </p>
         <p className="mt-1 text-xs text-(--text-muted)">
@@ -173,7 +173,7 @@ export const AnimationEditorBindingsPanel = ({
         {!activeTimeline ? null : (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">
+              <h3 className="text-sm font-medium">
                 {t('animationEditor.bindings.title')}
               </h3>
               <button

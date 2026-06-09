@@ -38,7 +38,7 @@ export const AnimationEditorSvgFilterLibrarySection = ({
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold tracking-[0.08em] text-(--text-secondary)">
+        <h3 className="text-xs font-medium tracking-[0.08em] text-(--text-secondary)">
           {t('animationEditor.svgFilters.title')}
         </h3>
         <button
@@ -62,7 +62,7 @@ export const AnimationEditorSvgFilterLibrarySection = ({
           {svgFilters.map((filter) => (
             <div key={filter.id} className="rounded-xl bg-black/[0.03] p-3">
               <div className="flex items-center justify-between gap-2">
-                <p className="min-w-0 flex-1 truncate text-xs font-semibold text-(--text-primary)">
+                <p className="min-w-0 flex-1 truncate text-xs font-medium text-(--text-primary)">
                   {filter.id}
                 </p>
                 <button

@@ -157,7 +157,7 @@ export function InspectorDataScopeFields() {
         className="flex min-h-5.5 w-full cursor-pointer items-center justify-between border-0 bg-transparent p-0 text-left"
         onClick={() => togglePanel(panelKey)}
       >
-        <span className="InspectorLabel text-[11px] font-semibold text-(--text-secondary)">
+        <span className="InspectorLabel text-[11px] font-medium text-(--text-secondary)">
           {t('inspector.fields.dataModel.title', {
             defaultValue: 'Data Model',
           })}

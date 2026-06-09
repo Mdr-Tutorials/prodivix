@@ -28,7 +28,7 @@ export function InspectorPanelFrame({
       data-testid={`inspector-panel-${panelKey}`}
     >
       <div className="flex w-full items-center justify-between gap-1 px-0 py-1">
-        <span className="min-w-0 flex-1 text-[14px] font-semibold text-(--text-primary)">
+        <span className="min-w-0 flex-1 text-[14px] font-medium text-(--text-primary)">
           {title}
         </span>
         <div className="flex shrink-0 items-center gap-1">

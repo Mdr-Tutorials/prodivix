@@ -187,7 +187,7 @@ function ProjectHome() {
           <span className="text-(--text-muted)">
             {t('projectHome.fields.visibility', 'Visibility')}
           </span>
-          <span className="font-semibold text-(--text-primary)">
+          <span className="font-medium text-(--text-primary)">
             {projectIsPublic
               ? t('projectHome.visibility.public', 'Public')
               : t('projectHome.visibility.private', 'Private')}
@@ -238,7 +238,7 @@ function ProjectHome() {
               {action.icon}
             </span>
             <span className="flex min-w-0 flex-col gap-[2px]">
-              <span className="text-[13px] font-semibold">
+              <span className="text-[13px] font-medium">
                 {t(`projectHome.actions.${action.key}.label`)}
               </span>
               <span className="text-[11px] text-(--text-muted)">

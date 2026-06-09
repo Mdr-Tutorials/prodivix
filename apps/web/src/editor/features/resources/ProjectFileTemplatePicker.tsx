@@ -52,7 +52,7 @@ export function ProjectFileTemplatePicker({
     <div className="absolute top-20 right-4 z-20 grid max-h-[min(620px,calc(100vh-180px))] w-[min(620px,calc(100%-2rem))] gap-4 overflow-auto rounded-xl bg-(--bg-canvas) p-4 shadow-2xl ring-1 ring-black/10">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold tracking-[0.08em] text-(--text-muted) uppercase">
+          <p className="text-[11px] font-medium tracking-[0.08em] text-(--text-muted) uppercase">
             {t('resourceManager.projectFiles.labels.templates')}
           </p>
           {isLicensePicker ? (
@@ -131,7 +131,7 @@ export function ProjectFileTemplatePicker({
           {licenseTemplateGroups.map((group) => (
             <section key={group.category} className="grid gap-2">
               <div className="grid gap-1 px-1">
-                <p className="text-[11px] font-semibold tracking-[0.08em] text-(--text-muted) uppercase">
+                <p className="text-[11px] font-medium tracking-[0.08em] text-(--text-muted) uppercase">
                   {t(
                     `resourceManager.projectFiles.licenseGuide.categories.${group.category}.label`
                   )}
@@ -159,7 +159,7 @@ export function ProjectFileTemplatePicker({
                         onClick={() => onApplyTemplate(template)}
                         aria-pressed={isSelected}
                       >
-                        <span className="flex min-w-0 items-center gap-2 text-xs font-semibold text-(--text-primary)">
+                        <span className="flex min-w-0 items-center gap-2 text-xs font-medium text-(--text-primary)">
                           <span className="truncate">{template.label}</span>
                           {isSelected ? (
                             <Check size={13} className="shrink-0" />

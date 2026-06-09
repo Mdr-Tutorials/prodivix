@@ -4,15 +4,18 @@ import { useTranslation } from 'react-i18next';
 import { PdxButton, PdxHeading, PdxParagraph } from '@prodivix/ui';
 import { GlobalSettingsContent } from './GlobalSettingsContent';
 import { ProjectSettingsContent } from './ProjectSettingsContent';
-import { createGlobalDefaults } from './SettingsDefaults';
+import {
+  getGlobalSettingsKeys,
+  type GlobalSettingsState,
+  type OverrideState,
+} from './SettingsDefaults';
 import { useSettingsStore } from '@/editor/store/useSettingsStore';
 
 const createOverrideDefaults = () => {
-  const defaults = createGlobalDefaults();
-  return Object.keys(defaults).reduce<Record<string, boolean>>((acc, key) => {
+  return getGlobalSettingsKeys().reduce((acc, key) => {
     acc[key] = false;
     return acc;
-  }, {});
+  }, {} as OverrideState);
 };
 const DEFAULT_OVERRIDES = createOverrideDefaults();
 
@@ -37,7 +40,7 @@ export const ProjectSettingsPage = () => {
     ensureProjectGlobal(projectId);
   }, [ensureProjectGlobal, projectId]);
 
-  const handleToggleOverride = (key: keyof typeof overrides) => {
+  const handleToggleOverride = (key: keyof GlobalSettingsState) => {
     if (!projectId) return;
     toggleProjectOverride(projectId, key);
   };
@@ -66,7 +69,7 @@ export const ProjectSettingsPage = () => {
         <ProjectSettingsContent />
         <section className="grid gap-3">
           <div className="flex items-center gap-2.5 rounded-xl bg-[rgba(0,0,0,0.04)] px-3 py-2 text-[12px] text-(--text-secondary) in-data-[theme='dark']:bg-[rgba(255,255,255,0.08)]">
-            <span className="font-semibold text-(--text-primary)">
+            <span className="font-medium text-(--text-primary)">
               {t('settings.projectPage.overrides.title')}
             </span>
             <span className="text-(--text-muted)">

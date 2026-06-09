@@ -275,10 +275,10 @@ function ProjectCard({
                     void applyRename();
                   }
                 }}
-                className="h-[30px] w-full rounded-[8px] border border-(--border-default) bg-(--bg-canvas) px-[8px] text-(length:--font-size-lg) font-semibold text-(--text-primary) outline-none"
+                className="h-[30px] w-full rounded-[8px] border border-(--border-default) bg-(--bg-canvas) px-[8px] text-(length:--font-size-lg) font-medium text-(--text-primary) outline-none"
               />
             ) : (
-              <h3 className="m-0 min-w-0 flex-1 text-(length:--font-size-xl) font-semibold text-(--text-primary)">
+              <h3 className="m-0 min-w-0 flex-1 text-(length:--font-size-xl) font-medium text-(--text-primary)">
                 <span className="block truncate">
                   {project.name || t('home.card.untitled', 'Untitled')}
                 </span>

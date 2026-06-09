@@ -1,0 +1,46 @@
+name: NPM Packages
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'packages-v*'
+
+concurrency:
+  group: npm-packages-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set up npm trusted publishing CLI
+        run: npm install -g npm@11.16.0
+
+      - name: Publish packages
+        run: pnpm run publish:packages

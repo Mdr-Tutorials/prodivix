@@ -48,7 +48,7 @@ const ResourceTile = ({
     <article className="relative overflow-hidden rounded-2xl border border-black/8 bg-(--bg-canvas) p-5 shadow-[0_10px_28px_rgba(0,0,0,0.04)]">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="inline-flex items-center gap-2 text-xs font-semibold tracking-[0.12em] text-(--text-muted) uppercase">
+          <p className="inline-flex items-center gap-2 text-xs font-medium tracking-[0.12em] text-(--text-muted) uppercase">
             <Icon size={14} />
             {title}
           </p>
@@ -73,7 +73,7 @@ const ResourceTile = ({
             <p className="text-[11px] tracking-[0.08em] text-(--text-muted) uppercase">
               {metric.label}
             </p>
-            <p className="mt-1 text-sm font-semibold text-(--text-primary)">
+            <p className="mt-1 text-sm font-medium text-(--text-primary)">
               {metric.value}
             </p>
           </div>
@@ -248,10 +248,10 @@ export function ResourceOverviewPanel({
         <article className="rounded-2xl border border-black/8 bg-(--bg-canvas) p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold tracking-[0.12em] text-(--text-muted) uppercase">
+              <p className="text-xs font-medium tracking-[0.12em] text-(--text-muted) uppercase">
                 {t('resourceManager.overview.quickActions.badgeTitle')}
               </p>
-              <h2 className="mt-2 text-base font-semibold text-(--text-primary)">
+              <h2 className="mt-2 text-base font-medium text-(--text-primary)">
                 {t('resourceManager.overview.quickActions.title')}
               </h2>
               <p className="mt-2 max-w-2xl text-sm text-(--text-secondary)">
@@ -270,11 +270,11 @@ export function ResourceOverviewPanel({
               className="group grid gap-1 rounded-2xl border border-black/8 bg-white p-4 text-left hover:border-black/16 hover:bg-black/[0.01]"
               onClick={() => onCreateCodeAsset('scripts')}
             >
-              <p className="inline-flex items-center gap-2 text-xs font-semibold tracking-[0.12em] text-(--text-muted) uppercase">
+              <p className="inline-flex items-center gap-2 text-xs font-medium tracking-[0.12em] text-(--text-muted) uppercase">
                 <Plus size={14} />
                 {t('resourceManager.overview.quickActions.newScript')}
               </p>
-              <p className="text-sm font-semibold text-(--text-primary)">
+              <p className="text-sm font-medium text-(--text-primary)">
                 {t('resourceManager.overview.quickActions.scriptPath')}
               </p>
               <p className="text-xs text-(--text-secondary)">
@@ -287,11 +287,11 @@ export function ResourceOverviewPanel({
               className="group grid gap-1 rounded-2xl border border-black/8 bg-white p-4 text-left hover:border-black/16 hover:bg-black/[0.01]"
               onClick={() => onCreateCodeAsset('styles')}
             >
-              <p className="inline-flex items-center gap-2 text-xs font-semibold tracking-[0.12em] text-(--text-muted) uppercase">
+              <p className="inline-flex items-center gap-2 text-xs font-medium tracking-[0.12em] text-(--text-muted) uppercase">
                 <Plus size={14} />
                 {t('resourceManager.overview.quickActions.newStyle')}
               </p>
-              <p className="text-sm font-semibold text-(--text-primary)">
+              <p className="text-sm font-medium text-(--text-primary)">
                 {t('resourceManager.overview.quickActions.stylePath')}
               </p>
               <p className="text-xs text-(--text-secondary)">
@@ -304,11 +304,11 @@ export function ResourceOverviewPanel({
               className="group grid gap-1 rounded-2xl border border-black/8 bg-white p-4 text-left hover:border-black/16 hover:bg-black/[0.01]"
               onClick={() => onCreateCodeAsset('shaders')}
             >
-              <p className="inline-flex items-center gap-2 text-xs font-semibold tracking-[0.12em] text-(--text-muted) uppercase">
+              <p className="inline-flex items-center gap-2 text-xs font-medium tracking-[0.12em] text-(--text-muted) uppercase">
                 <Plus size={14} />
                 {t('resourceManager.overview.quickActions.newShader')}
               </p>
-              <p className="text-sm font-semibold text-(--text-primary)">
+              <p className="text-sm font-medium text-(--text-primary)">
                 {t('resourceManager.overview.quickActions.shaderPath')}
               </p>
               <p className="text-xs text-(--text-secondary)">
@@ -319,10 +319,10 @@ export function ResourceOverviewPanel({
         </article>
 
         <article className="rounded-2xl border border-black/8 bg-(--bg-canvas) p-5">
-          <p className="text-xs font-semibold tracking-[0.12em] text-(--text-muted) uppercase">
+          <p className="text-xs font-medium tracking-[0.12em] text-(--text-muted) uppercase">
             {t('resourceManager.overview.healthCheck.badge')}
           </p>
-          <h2 className="mt-2 text-base font-semibold text-(--text-primary)">
+          <h2 className="mt-2 text-base font-medium text-(--text-primary)">
             {t('resourceManager.overview.healthCheck.title')}
           </h2>
           <div className="mt-4 grid gap-2 text-sm text-(--text-secondary)">

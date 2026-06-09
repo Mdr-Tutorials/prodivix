@@ -50,7 +50,7 @@ export function SidebarHeader({
 
   return (
     <div
-      className={`BlueprintEditorSidebarHeader flex items-center justify-between gap-2.5 border-b border-(--border-subtle) px-3 py-2.5 text-[13px] font-semibold text-(--text-primary) ${isCollapsed ? 'w-full items-center justify-center border-b-0 p-0' : ''}`}
+      className={`BlueprintEditorSidebarHeader flex items-center justify-between gap-2.5 border-b border-(--border-subtle) px-3 py-2.5 text-[13px] font-medium text-(--text-primary) ${isCollapsed ? 'w-full items-center justify-center border-b-0 p-0' : ''}`}
     >
       <span
         className={`BlueprintEditorSidebarTitle min-w-0 ${isCollapsed ? 'hidden' : ''}`}

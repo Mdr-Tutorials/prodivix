@@ -1,4 +1,41 @@
 import type { ReactComponentCompileResult, ReactExportBundle } from './types';
+import webPackageJson from '../../../../package.json';
+import rootPackageJson from '../../../../../../package.json';
+import uiPackageJson from '../../../../../../packages/ui/package.json';
+
+const readDependencyVersion = (
+  manifest: {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+    peerDependencies?: Record<string, string>;
+  },
+  packageName: string
+) =>
+  manifest.dependencies?.[packageName] ??
+  manifest.devDependencies?.[packageName] ??
+  manifest.peerDependencies?.[packageName] ??
+  'latest';
+
+export const REACT_PROJECT_SCAFFOLD_PRESET = {
+  packageManager: rootPackageJson.packageManager,
+  dependencies: {
+    react: readDependencyVersion(webPackageJson, 'react'),
+    'react-dom': readDependencyVersion(webPackageJson, 'react-dom'),
+  },
+  devDependencies: {
+    typescript: readDependencyVersion(webPackageJson, 'typescript'),
+    vite: readDependencyVersion(uiPackageJson, 'vite'),
+    '@vitejs/plugin-react': readDependencyVersion(
+      webPackageJson,
+      '@vitejs/plugin-react'
+    ),
+    '@types/react': readDependencyVersion(webPackageJson, '@types/react'),
+    '@types/react-dom': readDependencyVersion(
+      webPackageJson,
+      '@types/react-dom'
+    ),
+  },
+} as const;
 
 export const createProjectReactBundle = (
   compiled: ReactComponentCompileResult
@@ -16,27 +53,28 @@ export const createProjectReactBundle = (
           private: true,
           version: '0.1.0',
           type: 'module',
+          packageManager: REACT_PROJECT_SCAFFOLD_PRESET.packageManager,
           scripts: {
             dev: 'vite',
             build: 'tsc -b && vite build',
             preview: 'vite preview',
           },
           dependencies: {
-            react: '^18.3.1',
-            'react-dom': '^18.3.1',
             ...compiled.dependencies,
+            ...REACT_PROJECT_SCAFFOLD_PRESET.dependencies,
           },
-          devDependencies: {
-            typescript: '^5.6.3',
-            vite: '^5.4.10',
-            '@vitejs/plugin-react': '^4.3.3',
-            '@types/react': '^18.3.12',
-            '@types/react-dom': '^18.3.1',
-          },
+          devDependencies: REACT_PROJECT_SCAFFOLD_PRESET.devDependencies,
         },
         null,
         2
       ),
+    },
+    {
+      path: 'pnpm-workspace.yaml',
+      language: 'yaml',
+      content: `onlyBuiltDependencies:
+  - esbuild
+`,
     },
     {
       path: 'index.html',

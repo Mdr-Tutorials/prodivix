@@ -24,7 +24,7 @@ export const ProjectSettingsContent = () => {
     themeTokenSet: 'prodivix-default',
     componentLibraryVersion: 'v1.4.2',
     assetHost: 'https://assets.example.com',
-    fontPack: ['inter', 'source-serif'],
+    fontPack: ['mona-sans', 'monaspace-neon'],
     iconSet: 'lucide',
     apiBase: 'https://api.example.com',
     authMode: ['oauth'],
@@ -295,12 +295,9 @@ export const ProjectSettingsContent = () => {
           control={
             <PdxCheckList
               items={[
-                { label: 'Inter', value: 'inter' },
-                {
-                  label: 'Source Serif',
-                  value: 'source-serif',
-                },
-                { label: 'Noto Sans', value: 'noto' },
+                { label: 'Mona Sans', value: 'mona-sans' },
+                { label: 'Monaspace Neon', value: 'monaspace-neon' },
+                { label: 'CJK fallbacks', value: 'cjk-fallbacks' },
               ]}
               value={projectValues.fontPack}
               onChange={(values) => updateProjectValue('fontPack', values)}

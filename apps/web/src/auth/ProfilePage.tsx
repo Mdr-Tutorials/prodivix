@@ -213,7 +213,7 @@ export const ProfilePage = () => {
           <div className="grid min-w-0 gap-2.5">
             <PdxHeading
               level={1}
-              className="m-0 [font-family:'JetBrains_Mono','SFMono-Regular','Menlo',monospace] text-[56px] md:text-[96px] lg:text-[108px]"
+              className="m-0 [font-family:var(--font-family-mono)] text-[56px] md:text-[96px] lg:text-[108px]"
             >
               {displayName}
             </PdxHeading>
@@ -247,7 +247,7 @@ export const ProfilePage = () => {
                   ))}
                 </div>
               ) : (
-                <span className="[font-family:'JetBrains_Mono','SFMono-Regular','Menlo',monospace] text-xs tracking-[0.12em] break-all text-(--text-primary)">
+                <span className="[font-family:var(--font-family-mono)] text-xs tracking-[0.12em] break-all text-(--text-primary)">
                   {user?.id}
                 </span>
               )}

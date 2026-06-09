@@ -55,7 +55,7 @@ export function BlueprintEditorInspector({
 
   return (
     <aside className="BlueprintEditorInspector absolute top-0 right-0 bottom-0 z-4 flex min-h-0 w-(--inspector-width) flex-col rounded-[14px] bg-(--bg-canvas) shadow-(--shadow-md) ring-1 ring-(--border-subtle)">
-      <div className="InspectorHeader flex items-center justify-between border-b border-(--border-subtle) px-4 py-2.5 text-[13px] font-semibold text-(--text-primary)">
+      <div className="InspectorHeader flex items-center justify-between border-b border-(--border-subtle) px-4 py-2.5 text-[13px] font-medium text-(--text-primary)">
         <span>{t('inspector.title')}</span>
         <button
           type="button"

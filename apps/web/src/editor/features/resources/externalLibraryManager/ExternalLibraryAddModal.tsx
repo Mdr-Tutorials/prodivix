@@ -25,7 +25,7 @@ export function ExternalLibraryAddModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
       <div className="grid w-full max-w-md gap-3 rounded-2xl border border-(--border-default) bg-(--bg-canvas) p-4 shadow-(--shadow-lg)">
-        <h3 className="text-sm font-semibold text-(--text-primary)">
+        <h3 className="text-sm font-medium text-(--text-primary)">
           {t('resourceManager.external.modal.title')}
         </h3>
         <input

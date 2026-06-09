@@ -83,7 +83,7 @@ export function InspectorTriggerItem({ item }: { item: TriggerEntry }) {
     <div className="grid gap-1.5" data-testid={`inspector-trigger-${item.key}`}>
       <div className="grid grid-cols-[1fr_1fr_auto] gap-1.5">
         <div className="grid gap-1">
-          <span className="text-[10px] font-semibold text-(--text-muted)">
+          <span className="text-[10px] font-medium text-(--text-muted)">
             {t('inspector.groups.triggers.eventLabel', {
               defaultValue: 'Trigger Event',
             })}
@@ -109,7 +109,7 @@ export function InspectorTriggerItem({ item }: { item: TriggerEntry }) {
           </select>
         </div>
         <div className="grid gap-1">
-          <span className="text-[10px] font-semibold text-(--text-muted)">
+          <span className="text-[10px] font-medium text-(--text-muted)">
             {t('inspector.groups.triggers.actionLabel', {
               defaultValue: 'Action',
             })}

@@ -22,7 +22,7 @@ export function TriggerNavigateFields({
   return (
     <>
       <div className="grid gap-1">
-        <span className="text-[10px] font-semibold text-(--text-muted)">
+        <span className="text-[10px] font-medium text-(--text-muted)">
           {t('inspector.groups.triggers.toLabel', {
             defaultValue: 'Destination',
           })}

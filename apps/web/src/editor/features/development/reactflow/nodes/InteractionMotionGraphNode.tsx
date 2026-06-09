@@ -1,5 +1,4 @@
 ﻿import {
-  renderSource,
   renderTarget,
   resolveMultiplicity,
   type GraphNodeData,
@@ -12,6 +11,7 @@ import {
   SelectField,
 } from './nodePrimitives';
 import type { NodeI18n } from './nodeI18n';
+import { renderNodeRow } from './nodeRows';
 import { tNode } from './nodeI18n';
 
 type Props = {
@@ -20,42 +20,6 @@ type Props = {
   selected: boolean;
   t: NodeI18n;
 };
-
-const row = (
-  id: string,
-  nodeData: GraphNodeData,
-  label: string,
-  options: {
-    inHandle?: string;
-    outHandle?: string;
-    inSemantic?: 'control' | 'data' | 'condition';
-    outSemantic?: 'control' | 'data' | 'condition';
-  }
-) => (
-  <div className="relative flex min-h-7 items-center px-4 text-[11px] font-normal text-(--nodegraph-text)">
-    {options.inHandle
-      ? renderTarget(
-          id,
-          options.inHandle,
-          options.inSemantic ?? 'control',
-          resolveMultiplicity('target', options.inSemantic ?? 'control'),
-          undefined,
-          nodeData.onPortContextMenu
-        )
-      : null}
-    <span>{label}</span>
-    {options.outHandle
-      ? renderSource(
-          id,
-          options.outHandle,
-          options.outSemantic ?? 'control',
-          resolveMultiplicity('source', options.outSemantic ?? 'control'),
-          undefined,
-          nodeData.onPortContextMenu
-        )
-      : null}
-  </div>
-);
 
 export const renderInteractionMotionGraphNode = ({
   id,
@@ -175,21 +139,36 @@ export const renderInteractionMotionGraphNode = ({
               spellCheck={false}
             />
           </div>
-          {row(id, nodeData, tNode(t, 'common.rows.target', 'target'), {
-            inHandle: 'in.data.target',
-            inSemantic: 'data',
-          })}
-          {row(id, nodeData, tNode(t, 'common.rows.timeline', 'timeline'), {
-            inHandle: 'in.data.timeline',
-            inSemantic: 'data',
-          })}
-          {row(id, nodeData, tNode(t, 'common.rows.start', 'start'), {
+          {renderNodeRow(
+            id,
+            nodeData,
+            tNode(t, 'common.rows.target', 'target'),
+            {
+              inHandle: 'in.data.target',
+              inSemantic: 'data',
+            }
+          )}
+          {renderNodeRow(
+            id,
+            nodeData,
+            tNode(t, 'common.rows.timeline', 'timeline'),
+            {
+              inHandle: 'in.data.timeline',
+              inSemantic: 'data',
+            }
+          )}
+          {renderNodeRow(id, nodeData, tNode(t, 'common.rows.start', 'start'), {
             outHandle: 'out.control.start',
           })}
-          {row(id, nodeData, tNode(t, 'common.rows.complete', 'complete'), {
-            outHandle: 'out.control.complete',
-          })}
-          {row(id, nodeData, tNode(t, 'common.rows.error', 'error'), {
+          {renderNodeRow(
+            id,
+            nodeData,
+            tNode(t, 'common.rows.complete', 'complete'),
+            {
+              outHandle: 'out.control.complete',
+            }
+          )}
+          {renderNodeRow(id, nodeData, tNode(t, 'common.rows.error', 'error'), {
             outHandle: 'out.control.error',
           })}
         </div>
@@ -303,14 +282,19 @@ export const renderInteractionMotionGraphNode = ({
               />
             </div>
           ) : null}
-          {row(id, nodeData, tNode(t, 'common.rows.target', 'target'), {
-            inHandle: 'in.data.target',
-            inSemantic: 'data',
-          })}
-          {row(id, nodeData, tNode(t, 'common.rows.done', 'done'), {
+          {renderNodeRow(
+            id,
+            nodeData,
+            tNode(t, 'common.rows.target', 'target'),
+            {
+              inHandle: 'in.data.target',
+              inSemantic: 'data',
+            }
+          )}
+          {renderNodeRow(id, nodeData, tNode(t, 'common.rows.done', 'done'), {
             outHandle: 'out.control.done',
           })}
-          {row(id, nodeData, tNode(t, 'common.rows.error', 'error'), {
+          {renderNodeRow(id, nodeData, tNode(t, 'common.rows.error', 'error'), {
             outHandle: 'out.control.error',
           })}
         </div>
@@ -382,14 +366,19 @@ export const renderInteractionMotionGraphNode = ({
               spellCheck={false}
             />
           </div>
-          {row(id, nodeData, tNode(t, 'common.rows.target', 'target'), {
-            inHandle: 'in.data.target',
-            inSemantic: 'data',
-          })}
-          {row(id, nodeData, tNode(t, 'common.rows.done', 'done'), {
+          {renderNodeRow(
+            id,
+            nodeData,
+            tNode(t, 'common.rows.target', 'target'),
+            {
+              inHandle: 'in.data.target',
+              inSemantic: 'data',
+            }
+          )}
+          {renderNodeRow(id, nodeData, tNode(t, 'common.rows.done', 'done'), {
             outHandle: 'out.control.done',
           })}
-          {row(id, nodeData, tNode(t, 'common.rows.error', 'error'), {
+          {renderNodeRow(id, nodeData, tNode(t, 'common.rows.error', 'error'), {
             outHandle: 'out.control.error',
           })}
         </div>
@@ -438,20 +427,30 @@ export const renderInteractionMotionGraphNode = ({
               ]}
             />
           </div>
-          {row(id, nodeData, tNode(t, 'clipboard.rows.valueIn', 'value in'), {
-            inHandle: 'in.data.value',
-            inSemantic: 'data',
-          })}
-          {row(id, nodeData, tNode(t, 'common.rows.done', 'done'), {
+          {renderNodeRow(
+            id,
+            nodeData,
+            tNode(t, 'clipboard.rows.valueIn', 'value in'),
+            {
+              inHandle: 'in.data.value',
+              inSemantic: 'data',
+            }
+          )}
+          {renderNodeRow(id, nodeData, tNode(t, 'common.rows.done', 'done'), {
             outHandle: 'out.control.done',
           })}
-          {row(id, nodeData, tNode(t, 'common.rows.error', 'error'), {
+          {renderNodeRow(id, nodeData, tNode(t, 'common.rows.error', 'error'), {
             outHandle: 'out.control.error',
           })}
-          {row(id, nodeData, tNode(t, 'clipboard.rows.valueOut', 'value out'), {
-            outHandle: 'out.data.value',
-            outSemantic: 'data',
-          })}
+          {renderNodeRow(
+            id,
+            nodeData,
+            tNode(t, 'clipboard.rows.valueOut', 'value out'),
+            {
+              outHandle: 'out.data.value',
+              outSemantic: 'data',
+            }
+          )}
         </div>
       </div>
     );

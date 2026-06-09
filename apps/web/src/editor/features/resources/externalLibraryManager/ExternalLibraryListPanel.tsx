@@ -49,7 +49,7 @@ export function ExternalLibraryListPanel({
     <section className="grid gap-3 rounded-xl border border-(--border-subtle) bg-(--bg-panel) p-3">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-(--text-primary)">
+          <h3 className="text-sm font-medium text-(--text-primary)">
             {t('resourceManager.external.activeLibraries')}
           </h3>
           <p className="mt-1 text-xs text-(--text-secondary)">
@@ -103,7 +103,7 @@ export function ExternalLibraryListPanel({
                   onClick={() => onSelectLibrary(library.id)}
                 >
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-(--text-primary)">
+                    <p className="text-sm font-medium text-(--text-primary)">
                       {library.label}
                     </p>
                     <span className="rounded-md border border-(--border-default) bg-(--bg-panel) px-2 py-0.5 text-[11px] text-(--text-secondary)">

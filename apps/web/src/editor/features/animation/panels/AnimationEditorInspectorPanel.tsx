@@ -196,7 +196,7 @@ export const AnimationEditorInspectorPanel = ({
       <div className="min-h-0 flex-1 space-y-5 overflow-auto p-4">
         <section className="space-y-2">
           <div className="flex items-center justify-between">
-            <h2 className="text-xs font-semibold tracking-[0.08em] text-(--text-secondary)">
+            <h2 className="text-xs font-medium tracking-[0.08em] text-(--text-secondary)">
               {t('animationEditor.inspector.timeline.title')}
             </h2>
             <div className="text-[11px] text-(--text-muted) tabular-nums">
@@ -339,7 +339,7 @@ export const AnimationEditorInspectorPanel = ({
 
         <section className="space-y-2">
           <div className="flex items-center justify-between">
-            <h2 className="text-xs font-semibold tracking-[0.08em] text-(--text-secondary)">
+            <h2 className="text-xs font-medium tracking-[0.08em] text-(--text-secondary)">
               {t('animationEditor.inspector.binding.title')}
             </h2>
             <span className="text-[11px] text-(--text-muted) tabular-nums">
@@ -388,7 +388,7 @@ export const AnimationEditorInspectorPanel = ({
 
         <section className="space-y-2">
           <div className="flex items-center justify-between">
-            <h2 className="text-xs font-semibold tracking-[0.08em] text-(--text-secondary)">
+            <h2 className="text-xs font-medium tracking-[0.08em] text-(--text-secondary)">
               {t('animationEditor.inspector.track.title')}
             </h2>
             <div className="flex items-center gap-1">

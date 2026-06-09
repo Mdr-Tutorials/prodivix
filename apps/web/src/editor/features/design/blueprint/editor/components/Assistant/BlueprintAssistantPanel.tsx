@@ -291,7 +291,7 @@ const DebugToggleButton = ({
     </button>
     {isOpen ? (
       <div className="absolute right-0 bottom-8 z-20 w-[320px] border border-(--border-default) bg-(--bg-canvas) p-2 shadow-(--shadow-md)">
-        <div className="mb-1 text-[10px] font-semibold text-(--text-muted) uppercase">
+        <div className="mb-1 text-[10px] font-medium text-(--text-muted) uppercase">
           {label}
         </div>
         <div className="max-h-56 overflow-auto font-mono text-[11px] whitespace-pre-wrap text-(--text-secondary) select-text">
@@ -491,7 +491,7 @@ export function BlueprintAssistantPanel({
       {isOpen ? (
         <>
           <header className="flex h-10 items-center justify-between border-b border-(--border-subtle) px-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-(--text-primary)">
+            <div className="flex items-center gap-2 text-sm font-medium text-(--text-primary)">
               <Bot size={16} />
               {t('assistant.title')}
             </div>
@@ -560,7 +560,7 @@ export function BlueprintAssistantPanel({
             ) : null}
             {plan ? (
               <div className="space-y-2 border border-(--border-default) bg-(--bg-panel) p-2">
-                <div className="text-xs font-semibold text-(--text-primary)">
+                <div className="text-xs font-medium text-(--text-primary)">
                   {plan.goal}
                 </div>
                 <div className="space-y-1">

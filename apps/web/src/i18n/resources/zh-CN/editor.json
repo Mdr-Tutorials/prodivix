@@ -1473,6 +1473,12 @@
       "copySuffix": "副本",
       "untitled": "未命名"
     },
+    "controls": {
+      "label": "节点图视图控制",
+      "zoomIn": "放大",
+      "zoomOut": "缩小",
+      "fitView": "适应视图"
+    },
     "connection": {
       "missingEndpoint": "连接无效：缺少起点或终点。",
       "invalidHandle": "连接无效：端口标识无法识别。",

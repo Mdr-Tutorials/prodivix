@@ -46,6 +46,35 @@ export type ThemeDensityTokens = ThemeTokenTree;
 
 export type ThemeMotionTokens = ThemeTokenTree;
 
+export type ThemeFontFormat = 'woff2' | 'woff';
+
+export type ThemeFontDisplay =
+  | 'auto'
+  | 'block'
+  | 'swap'
+  | 'fallback'
+  | 'optional';
+
+export type ThemeFontSource = {
+  url: string;
+  format: ThemeFontFormat;
+  bytes?: number;
+};
+
+export type ThemeFontFace = {
+  family: string;
+  style?: string;
+  display?: ThemeFontDisplay;
+  weight?: string;
+  stretch?: string;
+  unicodeRange?: string;
+  sources: ThemeFontSource[];
+};
+
+export type ThemeFontRegistry = {
+  faces: ThemeFontFace[];
+};
+
 export type ThemeManifest = {
   schemaVersion: ThemeSchemaVersion;
   id: string;
@@ -60,6 +89,7 @@ export type ThemeManifest = {
   shadow?: ThemeShadowTokens;
   density?: ThemeDensityTokens;
   motion?: ThemeMotionTokens;
+  fonts?: ThemeFontRegistry;
   metadata?: {
     description?: string;
     tags?: string[];

@@ -193,7 +193,7 @@ export function BlueprintTreeNode({
           </span>
           <span className="BlueprintEditorTreeMeta flex min-w-0 items-center gap-1.5 select-none">
             <span className="BlueprintEditorTreeTypeRow inline-flex min-w-0 items-center gap-1.5">
-              <span className="BlueprintEditorTreeType truncate text-[10px] font-semibold tracking-[0.01em]">
+              <span className="BlueprintEditorTreeType truncate text-[10px] font-medium tracking-[0.01em]">
                 {nodeTypeLabel}
               </span>
               {nodeTypeSecondaryLabel ? (

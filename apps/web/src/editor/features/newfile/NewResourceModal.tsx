@@ -121,7 +121,7 @@ function NewResourceModal({
             </p>
           )}
           <div className="flex flex-col gap-[10px]">
-            <label className="flex items-center gap-[4px] text-(length:--font-size-sm) font-semibold text-(--text-primary)">
+            <label className="flex items-center gap-[4px] text-(length:--font-size-sm) font-medium text-(--text-primary)">
               {t('modals.newResource.typeLabel', 'Type')}
             </label>
             <div className="mb-[8px] grid grid-cols-3 gap-[16px]">
@@ -178,7 +178,7 @@ function NewResourceModal({
 
           <div className="flex flex-col gap-[10px]">
             <label
-              className="flex items-center gap-[4px] text-(length:--font-size-sm) font-semibold text-(--text-primary)"
+              className="flex items-center gap-[4px] text-(length:--font-size-sm) font-medium text-(--text-primary)"
               htmlFor="new-resource-name"
             >
               <span>{t('modals.newResource.nameLabel', 'Name')}</span>
@@ -192,7 +192,7 @@ function NewResourceModal({
           </div>
 
           <div className="flex flex-col gap-[10px]">
-            <label className="flex items-center gap-[4px] text-(length:--font-size-sm) font-semibold text-(--text-primary)">
+            <label className="flex items-center gap-[4px] text-(length:--font-size-sm) font-medium text-(--text-primary)">
               {t('modals.newProject.descriptionLabel', 'Description')}
             </label>
             <PdxTextarea
@@ -206,7 +206,7 @@ function NewResourceModal({
           </div>
 
           <label className="inline-flex cursor-pointer items-center justify-between rounded-[12px] border border-(--border-default) bg-(--bg-panel) px-[12px] py-[10px]">
-            <span className="text-(length:--font-size-sm) font-semibold text-(--text-primary)">
+            <span className="text-(length:--font-size-sm) font-medium text-(--text-primary)">
               {t(
                 'modals.newResource.publicLabel',
                 'Publish to community after creation'

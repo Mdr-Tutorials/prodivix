@@ -7,6 +7,7 @@ import { Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { CodeFileTree } from './CodeFileTree';
 import { useEditorShortcut } from '@/editor/shortcuts';
+import { codeMirrorTypographyTheme } from '@/editor/codeMirrorTypography';
 import {
   createCodeFile,
   createCodeFolder,
@@ -167,7 +168,7 @@ export function CodeResourcePage({ embedded = false }: CodeResourcePageProps) {
   return (
     <section className={shellClassName}>
       <article className="rounded-2xl border border-black/8 bg-(--bg-canvas) p-5">
-        <h2 className="text-base font-semibold text-(--text-primary)">
+        <h2 className="text-base font-medium text-(--text-primary)">
           {t('resourceManager.code.header.title')}
         </h2>
         <p className="mt-1 text-sm text-(--text-secondary)">
@@ -204,7 +205,7 @@ export function CodeResourcePage({ embedded = false }: CodeResourcePageProps) {
               <p className="text-[11px] tracking-[0.08em] text-(--text-muted) uppercase">
                 {t('resourceManager.code.labels.selected')}
               </p>
-              <h3 className="text-sm font-semibold text-(--text-primary)">
+              <h3 className="text-sm font-medium text-(--text-primary)">
                 {selectedNode.type === 'file'
                   ? selectedNode.name
                   : t('resourceManager.code.labels.folder')}
@@ -242,7 +243,10 @@ export function CodeResourcePage({ embedded = false }: CodeResourcePageProps) {
               <CodeMirror
                 value={editorValue}
                 onChange={(value) => setEditorValue(value)}
-                extensions={[resolveLanguageExtensionByName(selectedFile.name)]}
+                extensions={[
+                  resolveLanguageExtensionByName(selectedFile.name),
+                  codeMirrorTypographyTheme,
+                ]}
                 basicSetup={{
                   lineNumbers: true,
                   foldGutter: true,

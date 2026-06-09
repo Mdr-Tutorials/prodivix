@@ -225,7 +225,7 @@ export function CommunityDetailPage() {
         {project && (
           <>
             <header className="rounded-3xl border border-black/10 bg-white/90 p-7 shadow-[0_10px_24px_rgba(0,0,0,0.06)] backdrop-blur">
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-black/15 bg-black/5 px-3 py-1 text-[11px] font-semibold tracking-[0.14em] text-black/70 uppercase">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-black/15 bg-black/5 px-3 py-1 text-[11px] font-medium tracking-[0.14em] text-black/70 uppercase">
                 {typeIcon(project.resourceType)}
                 {project.resourceType}
               </div>

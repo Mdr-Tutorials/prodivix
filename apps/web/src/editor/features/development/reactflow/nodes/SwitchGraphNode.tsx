@@ -102,7 +102,7 @@ export const renderSwitchGraphNode = ({ id, nodeData, selected, t }: Props) => {
         }
       />
       {isCollapsed ? (
-        <div className="relative flex min-h-7 items-center px-4 pb-2 font-[Inter,sans-serif] text-[11px] font-normal text-(--nodegraph-muted-text)">
+        <div className="relative flex min-h-7 items-center px-4 pb-2 text-[11px] font-normal text-(--nodegraph-muted-text)">
           <span>
             {tNode(t, 'switch.caseCount', '{{count}} cases', {
               count: cases.length,

@@ -40,7 +40,10 @@ export const createProjectDefaults = () => ({
 
 export type GlobalSettingsState = ReturnType<typeof createGlobalDefaults>;
 export type SettingsMode = 'global' | 'project';
-export type OverrideState = Record<string, boolean>;
+export type OverrideState = Partial<Record<keyof GlobalSettingsState, boolean>>;
+
+export const getGlobalSettingsKeys = () =>
+  Object.keys(createGlobalDefaults()) as Array<keyof GlobalSettingsState>;
 
 export const PROJECT_OVERRIDABLE_SETTINGS = [
   'classPxTransformMode',
@@ -58,9 +61,7 @@ export const PROJECT_OVERRIDABLE_SETTINGS = [
   'metadata',
 ] as const satisfies ReadonlyArray<keyof GlobalSettingsState>;
 
-export const GLOBAL_ONLY_SETTINGS = (
-  Object.keys(createGlobalDefaults()) as Array<keyof GlobalSettingsState>
-).filter(
+export const GLOBAL_ONLY_SETTINGS = getGlobalSettingsKeys().filter(
   (key) =>
     !PROJECT_OVERRIDABLE_SETTINGS.includes(
       key as (typeof PROJECT_OVERRIDABLE_SETTINGS)[number]

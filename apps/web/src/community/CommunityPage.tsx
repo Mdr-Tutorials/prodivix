@@ -122,7 +122,7 @@ export function CommunityPage() {
         </a>
 
         <header className="rounded-3xl border border-black/10 bg-white/85 p-7 shadow-[0_10px_30px_rgba(0,0,0,0.05)] backdrop-blur">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-black/15 bg-black px-3 py-1 text-xs font-semibold tracking-[0.16em] text-white uppercase">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-black/15 bg-black px-3 py-1 text-xs font-medium tracking-[0.16em] text-white uppercase">
             <Sparkles size={13} />
             {t('badge', 'Community')}
           </div>
@@ -180,7 +180,7 @@ export function CommunityPage() {
             <option value="popular">{t('sort.popular', 'Popular')}</option>
           </select>
 
-          <div className="inline-flex h-11 items-center justify-center rounded-xl border border-black/20 bg-black px-4 text-xs font-semibold tracking-[0.14em] text-white uppercase">
+          <div className="inline-flex h-11 items-center justify-center rounded-xl border border-black/20 bg-black px-4 text-xs font-medium tracking-[0.14em] text-white uppercase">
             {projects.length > 0 ? (
               <span className="inline-flex items-end gap-1 tracking-normal normal-case">
                 <span className="text-base leading-none font-black md:text-lg">
@@ -217,7 +217,7 @@ export function CommunityPage() {
                   {project.starsCount}
                 </div>
                 <div>
-                  <div className="mb-3 inline-flex items-center gap-1 rounded-full border border-black/15 bg-black/5 px-2 py-1 text-[11px] font-semibold tracking-[0.12em] text-black/75 uppercase">
+                  <div className="mb-3 inline-flex items-center gap-1 rounded-full border border-black/15 bg-black/5 px-2 py-1 text-[11px] font-medium tracking-[0.12em] text-black/75 uppercase">
                     {typeToIcon(project.resourceType)}
                     {project.resourceType}
                   </div>

@@ -1,10 +1,12 @@
 import {
+  createThemeFontFaceCss,
   createThemeStyleText,
   officialMonochromeDarkTheme,
   officialMonochromeLightTheme,
   type ThemeManifest,
   validateThemeManifest,
 } from '@prodivix/themes';
+import { resolveThemeFontSourceUrl } from './fontAssets';
 
 export type ThemePreference = 'home' | 'light' | 'dark';
 
@@ -86,7 +88,14 @@ export const applyThemeManifest = (manifest: ThemeManifest) => {
   const root = document.documentElement;
   const styleElement = ensureThemeStyleElement();
 
-  styleElement.textContent = createThemeStyleText(manifest);
+  styleElement.textContent = [
+    createThemeStyleText(manifest),
+    createThemeFontFaceCss(manifest.fonts, {
+      resolveFontSourceUrl: resolveThemeFontSourceUrl,
+    }),
+  ]
+    .filter(Boolean)
+    .join('\n\n');
   root.dataset.theme = manifest.mode === 'dark' ? 'dark' : 'light';
   root.dataset.themeId = manifest.id;
   root.style.colorScheme = root.dataset.theme;

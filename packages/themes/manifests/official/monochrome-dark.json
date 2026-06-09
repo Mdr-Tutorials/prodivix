@@ -87,11 +87,6 @@
     }
   },
   "typography": {
-    "fontFamily": {
-      "ui": "Inter, 'HarmonyOS Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-      "mono": "JetBrains Mono, Consolas, monospace",
-      "canvas": "{typography.fontFamily.ui}"
-    },
     "fontSize": {
       "micro": "10px",
       "caption": "11px",

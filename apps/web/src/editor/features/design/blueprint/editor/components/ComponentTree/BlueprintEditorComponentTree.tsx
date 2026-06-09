@@ -242,7 +242,7 @@ export function BlueprintEditorComponentTree({
     <aside
       className={`BlueprintEditorComponentTree absolute bottom-0 left-0 z-[3] flex h-[var(--component-tree-height)] min-h-0 w-[var(--tree-width)] flex-col overflow-hidden rounded-xl border-0 bg-(--bg-canvas) shadow-(--shadow-sm) ${!isTreeCollapsed ? 'rounded-t-none' : ''}`}
     >
-      <div className="BlueprintEditorTreeHeader flex items-center justify-between bg-transparent px-2.5 pt-2.5 pb-1.5 text-[13px] font-semibold">
+      <div className="BlueprintEditorTreeHeader flex items-center justify-between bg-transparent px-2.5 pt-2.5 pb-1.5 text-[13px] font-medium">
         <div className="BlueprintEditorTreeHeaderLeft inline-flex min-w-0 items-center gap-2">
           <span
             className="BlueprintEditorTreeHeaderIcon inline-flex h-[18px] w-[18px] flex-none items-center justify-center rounded-md bg-transparent text-(--text-muted)"

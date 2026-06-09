@@ -322,7 +322,7 @@ export function I18nResourcePage({ embedded = false }: I18nResourcePageProps) {
   return (
     <section className={shellClassName}>
       <article className="rounded-2xl border border-black/8 bg-(--bg-canvas) p-5">
-        <h2 className="text-base font-semibold text-(--text-primary)">
+        <h2 className="text-base font-medium text-(--text-primary)">
           {t('resourceManager.i18n.header.title')}
         </h2>
         <p className="mt-1 text-sm text-(--text-secondary)">
@@ -359,7 +359,7 @@ export function I18nResourcePage({ embedded = false }: I18nResourcePageProps) {
           </div>
 
           <div className="grid gap-2">
-            <p className="text-[11px] font-semibold tracking-[0.08em] text-(--text-muted) uppercase">
+            <p className="text-[11px] font-medium tracking-[0.08em] text-(--text-muted) uppercase">
               {t('resourceManager.i18n.modules')}
             </p>
             <div className="grid gap-1">
@@ -450,7 +450,7 @@ export function I18nResourcePage({ embedded = false }: I18nResourcePageProps) {
 
         <article className="grid gap-3 rounded-xl border border-black/10 bg-(--bg-canvas) p-3">
           <header className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-(--text-primary)">
+            <h3 className="text-sm font-medium text-(--text-primary)">
               {selection.namespace}
             </h3>
             <div className="flex items-center gap-1">
@@ -681,10 +681,10 @@ export function I18nResourcePage({ embedded = false }: I18nResourcePageProps) {
 
         <aside className="grid gap-3 rounded-xl border border-black/10 bg-(--bg-canvas) p-3">
           <div>
-            <p className="text-[11px] font-semibold tracking-[0.08em] text-(--text-muted) uppercase">
+            <p className="text-[11px] font-medium tracking-[0.08em] text-(--text-muted) uppercase">
               {t('resourceManager.i18n.livePreview')}
             </p>
-            <h4 className="mt-1 text-sm font-semibold text-(--text-primary)">
+            <h4 className="mt-1 text-sm font-medium text-(--text-primary)">
               {selectedRow.key}
             </h4>
           </div>

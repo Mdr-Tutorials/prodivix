@@ -18,7 +18,7 @@ export const HEADLESS_GROUP: ComponentGroup = {
       id: 'radix-label',
       name: 'Label',
       preview: (
-        <label className="text-[10px] font-semibold text-(--text-secondary)">
+        <label className="text-[10px] font-medium text-(--text-secondary)">
           Label
         </label>
       ),

@@ -20,6 +20,12 @@
   gap: 4px;
 }
 
+.ExportCodeTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .ExportCodeTitle h1 {
   margin: 0;
   font-size: 16px;
@@ -33,22 +39,82 @@
   font-size: 12px;
 }
 
-.ExportCodeCopy {
-  border: none;
-  background: rgba(0, 0, 0, 0.06);
-  color: var(--text-primary);
-  padding: 6px 10px;
-  border-radius: 10px;
+.ExportCodeViewTrigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: transparent;
+  border-radius: 4px;
+  color: var(--text-secondary);
   cursor: pointer;
+  transition: color 120ms ease;
+}
+
+.ExportCodeViewTrigger:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary);
+}
+
+.ExportCodeViewTrigger:focus-visible {
+  outline: 2px solid rgba(0, 0, 0, 0.22);
+  outline-offset: 2px;
+}
+
+.ExportCodeViewMenu {
+  min-width: 96px;
+  padding: 4px;
+}
+
+.ExportCodeViewMenu .PdxPopoverContent {
+  color: var(--text-secondary);
+}
+
+.ExportCodeViewMenuList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ExportCodeViewMenuItem {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  padding: 6px 8px;
+  cursor: pointer;
+  text-align: left;
   font-size: 12px;
-  font-weight: 600;
 }
 
-.ExportCodeCopy:hover {
-  background: rgba(0, 0, 0, 0.08);
+.ExportCodeViewMenuItem:hover,
+.ExportCodeViewMenuItem.Active {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary);
 }
 
-.ExportCodeCopy:disabled {
+.ExportCodeIconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+
+.ExportCodeIconButton:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary);
+}
+
+.ExportCodeIconButton:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
@@ -89,6 +155,25 @@
 .ExportCodeBody {
   flex: 1;
   min-height: 0;
+}
+
+.ExportCodePreview {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.ExportCodePreviewCopy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+}
+
+.ExportCodePreviewViewer pre {
+  padding-right: 56px !important;
 }
 
 .ExportCodeEmpty {

@@ -317,7 +317,7 @@ export function CodeFileTree({
   return (
     <div className="rounded-xl border border-black/10 bg-white/90 p-2">
       <div className="mb-2 flex items-center justify-between px-1">
-        <p className="text-[11px] font-semibold tracking-[0.08em] text-(--text-muted) uppercase">
+        <p className="text-[11px] font-medium tracking-[0.08em] text-(--text-muted) uppercase">
           {t('resourceManager.tree.codeTree')}
         </p>
         <div className="inline-flex items-center gap-1">

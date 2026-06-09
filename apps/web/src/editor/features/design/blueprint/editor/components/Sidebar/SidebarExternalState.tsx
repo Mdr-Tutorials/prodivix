@@ -32,7 +32,7 @@ export function SidebarExternalState({
                 className="rounded px-1.5 py-1 text-(--text-muted)"
                 title={item.hint}
               >
-                <span className="mr-1 font-semibold text-(--text-secondary)">
+                <span className="mr-1 font-medium text-(--text-secondary)">
                   [{item.code}]
                 </span>
                 <span>{item.message}</span>

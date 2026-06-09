@@ -181,7 +181,7 @@ export function BlueprintAssistantSettingsModal({
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 px-4">
       <section className="flex w-[520px] max-w-full flex-col border border-(--border-subtle) bg-(--bg-canvas) shadow-(--shadow-lg)">
         <header className="flex h-12 items-center justify-between border-b border-(--border-subtle) px-4">
-          <div className="flex items-center gap-2 text-sm font-semibold text-(--text-primary)">
+          <div className="flex items-center gap-2 text-sm font-medium text-(--text-primary)">
             <Bot size={16} />
             {t('assistant.settings.title')}
           </div>
@@ -196,7 +196,7 @@ export function BlueprintAssistantSettingsModal({
           </button>
         </header>
         <div className="grid gap-3 p-4">
-          <label className="grid gap-1 text-xs font-semibold text-(--text-secondary)">
+          <label className="grid gap-1 text-xs font-medium text-(--text-secondary)">
             {t('assistant.settings.provider')}
             <select
               className="h-9 border border-(--border-default) bg-(--bg-panel) px-2 text-sm text-(--text-primary)"
@@ -217,7 +217,7 @@ export function BlueprintAssistantSettingsModal({
           </label>
           {draft.provider === 'openai-compatible' ? (
             <>
-              <label className="grid gap-1 text-xs font-semibold text-(--text-secondary)">
+              <label className="grid gap-1 text-xs font-medium text-(--text-secondary)">
                 {t('assistant.settings.baseURL')}
                 <input
                   className="h-9 border border-(--border-default) bg-(--bg-panel) px-2 text-sm text-(--text-primary)"
@@ -228,7 +228,7 @@ export function BlueprintAssistantSettingsModal({
                   }
                 />
               </label>
-              <label className="grid gap-1 text-xs font-semibold text-(--text-secondary)">
+              <label className="grid gap-1 text-xs font-medium text-(--text-secondary)">
                 {t('assistant.settings.apiKey')}
                 <input
                   className="h-9 border border-(--border-default) bg-(--bg-panel) px-2 text-sm text-(--text-primary)"
@@ -242,7 +242,7 @@ export function BlueprintAssistantSettingsModal({
               </label>
               <div className="grid gap-2">
                 <div className="flex items-end gap-2">
-                  <label className="grid min-w-0 flex-1 gap-1 text-xs font-semibold text-(--text-secondary)">
+                  <label className="grid min-w-0 flex-1 gap-1 text-xs font-medium text-(--text-secondary)">
                     {t('assistant.settings.model')}
                     <input
                       className="h-9 border border-(--border-default) bg-(--bg-panel) px-2 text-sm text-(--text-primary)"
@@ -278,7 +278,7 @@ export function BlueprintAssistantSettingsModal({
                   </div>
                 ) : null}
               </div>
-              <label className="flex items-center gap-2 text-xs font-semibold text-(--text-secondary)">
+              <label className="flex items-center gap-2 text-xs font-medium text-(--text-secondary)">
                 <input
                   type="checkbox"
                   checked={draft.jsonMode}
@@ -289,7 +289,7 @@ export function BlueprintAssistantSettingsModal({
                 {t('assistant.settings.jsonMode')}
               </label>
               <div className="grid grid-cols-2 gap-3">
-                <label className="grid gap-1 text-xs font-semibold text-(--text-secondary)">
+                <label className="grid gap-1 text-xs font-medium text-(--text-secondary)">
                   {t('assistant.settings.temperature')}
                   <input
                     className="h-9 border border-(--border-default) bg-(--bg-panel) px-2 text-sm text-(--text-primary)"
@@ -300,7 +300,7 @@ export function BlueprintAssistantSettingsModal({
                     }
                   />
                 </label>
-                <label className="grid gap-1 text-xs font-semibold text-(--text-secondary)">
+                <label className="grid gap-1 text-xs font-medium text-(--text-secondary)">
                   {t('assistant.settings.maxOutputTokens')}
                   <input
                     className="h-9 border border-(--border-default) bg-(--bg-panel) px-2 text-sm text-(--text-primary)"

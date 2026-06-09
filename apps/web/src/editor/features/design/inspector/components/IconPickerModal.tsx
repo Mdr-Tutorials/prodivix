@@ -230,7 +230,7 @@ export function IconPickerModal({
       >
         <header className="flex items-center justify-between border-b border-(--border-default) px-4 py-3">
           <div className="min-w-0">
-            <h3 className="m-0 truncate text-[14px] font-semibold text-(--text-primary)">
+            <h3 className="m-0 truncate text-[14px] font-medium text-(--text-primary)">
               {t('inspector.iconPicker.title', {
                 defaultValue: 'Select icon',
               })}
@@ -256,7 +256,7 @@ export function IconPickerModal({
         </header>
 
         <div className="grid grid-cols-1 gap-2 border-b border-(--border-default) px-4 py-3 md:grid-cols-[180px_1fr]">
-          <label className="grid gap-1 text-[11px] font-semibold text-(--text-muted)">
+          <label className="grid gap-1 text-[11px] font-medium text-(--text-muted)">
             {t('inspector.iconPicker.source', {
               defaultValue: 'Source',
             })}
@@ -279,7 +279,7 @@ export function IconPickerModal({
               ))}
             </select>
           </label>
-          <label className="grid gap-1 text-[11px] font-semibold text-(--text-muted)">
+          <label className="grid gap-1 text-[11px] font-medium text-(--text-muted)">
             {t('inspector.iconPicker.search', {
               defaultValue: 'Search',
             })}
@@ -459,7 +459,7 @@ export function IconPickerModal({
             </div>
           </div>
           <aside className="hidden w-52 border-l border-(--border-default) px-3 py-3 md:flex md:flex-col">
-            <span className="text-[11px] font-semibold text-(--text-muted)">
+            <span className="text-[11px] font-medium text-(--text-muted)">
               {t('inspector.iconPicker.preview', {
                 defaultValue: 'Preview',
               })}

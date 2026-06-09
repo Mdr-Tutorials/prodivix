@@ -113,7 +113,7 @@ export function ExternalLibraryDetailsPanel({
   return (
     <aside className="grid gap-3 self-start rounded-xl border border-(--border-subtle) bg-(--bg-panel) p-3">
       <header>
-        <h3 className="text-sm font-semibold text-(--text-primary)">
+        <h3 className="text-sm font-medium text-(--text-primary)">
           {t('resourceManager.external.details.title')}
         </h3>
       </header>
@@ -124,7 +124,7 @@ export function ExternalLibraryDetailsPanel({
       ) : (
         <div className="grid gap-3">
           <div className="rounded-lg border border-(--border-subtle) bg-(--bg-canvas) p-3">
-            <p className="text-sm font-semibold text-(--text-primary)">
+            <p className="text-sm font-medium text-(--text-primary)">
               {selectedLibrary.label}
             </p>
             <p className="mt-2 text-xs text-(--text-secondary)">

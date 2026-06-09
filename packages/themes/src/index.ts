@@ -3,6 +3,11 @@ export type {
   ResolvedThemeManifest,
   ThemeColorScale,
   ThemeDensityTokens,
+  ThemeFontDisplay,
+  ThemeFontFace,
+  ThemeFontFormat,
+  ThemeFontRegistry,
+  ThemeFontSource,
   ThemeManifest,
   ThemeMode,
   ThemeMotionTokens,
@@ -44,6 +49,11 @@ export {
   tokenPathToCssVariable,
 } from './tokens/tokenPaths';
 export {
+  OFFICIAL_THEME_FONT_FACES,
+  THEME_FONT_STACKS,
+  type ThemeFontStackRole,
+} from './tokens/fontStacks';
+export {
   ThemeTokenResolutionError,
   resolveTokenReferences,
 } from './resolver/resolveTokenReferences';
@@ -64,6 +74,18 @@ export {
   createThemeStyleText,
   type CreateThemeStyleTextOptions,
 } from './css/createThemeStyleText';
+export {
+  MAX_THEME_FONT_FACE_COUNT,
+  MAX_THEME_FONT_SOURCE_BYTES,
+  MAX_THEME_FONT_SOURCE_COUNT,
+  SUPPORTED_THEME_FONT_DISPLAYS,
+  SUPPORTED_THEME_FONT_FORMATS,
+  createThemeFontFaceCss,
+  isSafeFontSourceUrl,
+  validateThemeFontRegistry,
+  type CreateThemeFontFaceCssOptions,
+  type ThemeFontRegistryValidationResult,
+} from './fonts/themeFontRegistry';
 export {
   validateThemeManifest,
   type ValidateThemeManifestOptions,

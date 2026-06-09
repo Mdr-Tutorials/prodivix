@@ -17,6 +17,7 @@ import { css } from '@codemirror/lang-css';
 import { linter, lintGutter, type Diagnostic } from '@codemirror/lint';
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { codeMirrorTypographyTheme } from '@/editor/codeMirrorTypography';
 
 type MountedCssEditorModalProps = {
   isOpen: boolean;
@@ -157,6 +158,7 @@ export function MountedCssEditorModal({
       lintCompartment.of(createSyntaxLinterExtension(invalidSyntaxMessage)),
       lintGutter(),
       lintTheme,
+      codeMirrorTypographyTheme,
     ];
   }, [invalidSyntaxMessage, lintCompartment]);
   const editorRef = useRef<EditorView | null>(null);
@@ -246,7 +248,7 @@ export function MountedCssEditorModal({
       <div className="grid h-[min(80vh,720px)] w-[min(880px,96vw)] grid-rows-[auto_1fr_auto] rounded-xl border border-(--border-default) bg-(--bg-canvas) shadow-(--shadow-lg)">
         <header className="flex items-center justify-between border-b border-(--border-default) px-3 py-2">
           <div className="min-w-0">
-            <div className="text-xs font-semibold text-(--text-primary)">
+            <div className="text-xs font-medium text-(--text-primary)">
               {t('inspector.classProtocol.mountedCss.title', {
                 defaultValue: 'Mounted CSS',
               })}

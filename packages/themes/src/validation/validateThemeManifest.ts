@@ -13,6 +13,7 @@ import {
   isThemeTokenTree,
 } from '../tokens/tokenPaths';
 import { defaultFallbackTheme } from '../tokens/defaultFallback';
+import { validateThemeFontRegistry } from '../fonts/themeFontRegistry';
 
 const THEME_ID_PATTERN = /^[a-z][a-z0-9]*(\.[a-z0-9][a-z0-9-]*)+$/;
 
@@ -87,6 +88,14 @@ export const validateThemeManifest = (
   ]) {
     if (input[optionalSection] !== undefined) {
       validateTokenTree(input[optionalSection], `$.${optionalSection}`, errors);
+    }
+  }
+
+  if (input.fonts !== undefined) {
+    const fontValidation = validateThemeFontRegistry(input.fonts);
+
+    if (!fontValidation.valid) {
+      errors.push(...fontValidation.errors);
     }
   }
 

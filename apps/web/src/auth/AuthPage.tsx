@@ -245,7 +245,7 @@ export const AuthPage = () => {
         <PdxParagraph color="Muted">{t('subtitle')}</PdxParagraph>
         <div className="grid gap-3">
           <div className="rounded-2xl border border-(--bg-raised) bg-(--bg-panel) px-4 py-3.5 shadow-(--shadow-md) dark:border-(--border-default) dark:shadow-[0_18px_38px_rgba(0,0,0,0.45)]">
-            <span className="text-xs font-semibold text-(--text-primary) dark:text-(--text-primary)">
+            <span className="text-xs font-medium text-(--text-primary) dark:text-(--text-primary)">
               {t('highlights.speedTitle')}
             </span>
             <p className="mt-1.5 text-[13px] text-(--text-muted) dark:text-(--text-secondary)">
@@ -253,7 +253,7 @@ export const AuthPage = () => {
             </p>
           </div>
           <div className="rounded-2xl border border-(--bg-raised) bg-(--bg-panel) px-4 py-3.5 shadow-(--shadow-md) dark:border-(--border-default) dark:shadow-[0_18px_38px_rgba(0,0,0,0.45)]">
-            <span className="text-xs font-semibold text-(--text-primary) dark:text-(--text-primary)">
+            <span className="text-xs font-medium text-(--text-primary) dark:text-(--text-primary)">
               {t('highlights.workspaceTitle')}
             </span>
             <p className="mt-1.5 text-[13px] text-(--text-muted) dark:text-(--text-secondary)">

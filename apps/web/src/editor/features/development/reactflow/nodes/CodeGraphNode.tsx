@@ -8,6 +8,7 @@ import {
   resolveMultiplicity,
   type GraphNodeData,
 } from '@/editor/features/development/reactflow/graphNodeShared';
+import { codeMirrorTypographyTheme } from '@/editor/codeMirrorTypography';
 import {
   buildNodeContainerClass,
   CollapseSummary,
@@ -116,7 +117,11 @@ export const renderCodeGraphNode = ({ id, nodeData, selected, t }: Props) => {
           <CodeMirror
             value={nodeData.code ?? ''}
             onChange={(value) => nodeData.onChangeCode?.(id, value)}
-            extensions={[languageExtension, completionExtension]}
+            extensions={[
+              languageExtension,
+              completionExtension,
+              codeMirrorTypographyTheme,
+            ]}
             basicSetup={{
               lineNumbers: true,
               foldGutter: false,

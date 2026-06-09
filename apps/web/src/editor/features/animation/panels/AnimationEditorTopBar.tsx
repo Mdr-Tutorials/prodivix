@@ -21,7 +21,7 @@ export const AnimationEditorTopBar = ({
 
   return (
     <header className="flex h-11 shrink-0 items-center gap-3 border-b border-black/8 bg-[rgb(var(--bg-canvas-rgb)_/_0.92)] px-3 backdrop-blur-sm">
-      <div className="shrink-0 text-xs font-semibold tracking-[0.02em] text-(--text-primary)">
+      <div className="shrink-0 text-xs font-medium tracking-[0.02em] text-(--text-primary)">
         {t('animationEditor.topBar.title')}
       </div>
 
