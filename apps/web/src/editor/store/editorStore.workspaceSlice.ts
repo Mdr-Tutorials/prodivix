@@ -29,14 +29,20 @@ export interface WorkspaceSlice {
   treeById: Record<string, WorkspaceVfsNode>;
   workspaceCapabilities: Record<string, boolean>;
   workspaceCapabilitiesLoaded: boolean;
+  workspaceReadonly: boolean;
   setWorkspaceSnapshot: (workspace: WorkspaceSnapshot) => void;
   setWorkspaceCapabilities: (
     workspaceId: string,
     capabilities: Record<string, boolean>
   ) => void;
+  setWorkspaceReadonly: (readonly: boolean) => void;
   clearWorkspaceState: () => void;
   setActiveDocumentId: (documentId: string | undefined) => void;
   applyWorkspaceMutation: (mutation: WorkspaceMutationResponse) => void;
+  markLocalWorkspaceDocumentSaved: (
+    workspaceId: string,
+    documentId: string
+  ) => void;
 }
 
 export const createWorkspaceSlice: StateCreator<
@@ -55,6 +61,7 @@ export const createWorkspaceSlice: StateCreator<
   treeById: {},
   workspaceCapabilities: {},
   workspaceCapabilitiesLoaded: false,
+  workspaceReadonly: false,
   setWorkspaceSnapshot: (workspace) =>
     set((state) => {
       const isSameWorkspace = state.workspaceId === workspace.id;
@@ -97,6 +104,7 @@ export const createWorkspaceSlice: StateCreator<
         workspaceCapabilitiesLoaded: isSameWorkspace
           ? state.workspaceCapabilitiesLoaded
           : false,
+        workspaceReadonly: isSameWorkspace ? state.workspaceReadonly : false,
         routeManifest: nextRouteManifest,
         activeRouteNodeId: nextActiveRouteNodeId,
         activeDocumentId: nextActiveDocumentId,
@@ -121,6 +129,8 @@ export const createWorkspaceSlice: StateCreator<
         workspaceCapabilitiesLoaded: true,
       };
     }),
+  setWorkspaceReadonly: (readonly) =>
+    set({ workspaceReadonly: Boolean(readonly) }),
   clearWorkspaceState: () =>
     set({
       workspaceId: undefined,
@@ -133,6 +143,7 @@ export const createWorkspaceSlice: StateCreator<
       treeById: {},
       workspaceCapabilities: {},
       workspaceCapabilitiesLoaded: false,
+      workspaceReadonly: false,
       routeManifest: DEFAULT_ROUTE_MANIFEST,
       activeRouteNodeId: undefined,
       runtimeStateByProject: {},
@@ -190,6 +201,26 @@ export const createWorkspaceSlice: StateCreator<
         routeRev: mutation.routeRev,
         opSeq: mutation.opSeq,
         workspaceDocumentsById: nextDocumentsById,
+      };
+    }),
+  markLocalWorkspaceDocumentSaved: (workspaceId, documentId) =>
+    set((state) => {
+      if (!state.workspaceId || state.workspaceId !== workspaceId) {
+        return state;
+      }
+      if (state.workspaceReadonly) return state;
+      const document = state.workspaceDocumentsById[documentId];
+      if (!document) return state;
+      return {
+        opSeq: (state.opSeq ?? 1) + 1,
+        workspaceDocumentsById: {
+          ...state.workspaceDocumentsById,
+          [documentId]: {
+            ...document,
+            contentRev: document.contentRev + 1,
+            updatedAt: new Date().toISOString(),
+          },
+        },
       };
     }),
 });

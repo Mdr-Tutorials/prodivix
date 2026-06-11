@@ -50,6 +50,7 @@ export const createRouteSlice: StateCreator<EditorStore, [], [], RouteSlice> = (
     }),
   updateRouteManifest: (updater) =>
     set((state) => {
+      if (state.workspaceReadonly) return state;
       const nextRouteManifest = normalizeRouteManifest(
         updater(state.routeManifest)
       );
@@ -64,12 +65,14 @@ export const createRouteSlice: StateCreator<EditorStore, [], [], RouteSlice> = (
     }),
   applyRouteIntent: (intent) =>
     set((state) => {
+      if (state.workspaceReadonly) return state;
       const next = applyRouteIntentToState(state, intent);
       if (!next) return state;
       return next;
     }),
   bindOutletToRoute: (routeNodeId, outletNodeId) =>
     set((state) => {
+      if (state.workspaceReadonly) return state;
       const normalizedRouteNodeId = routeNodeId.trim();
       if (!normalizedRouteNodeId) return state;
       const normalizedOutletNodeId = outletNodeId?.trim();

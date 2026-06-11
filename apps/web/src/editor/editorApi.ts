@@ -119,6 +119,13 @@ export type PatchWorkspaceDocumentRequest = {
   clientMutationId?: string;
 };
 
+export type ImportLocalProjectRequest = {
+  name: string;
+  description?: string;
+  resourceType: ProjectResourceType;
+  workspace: WorkspaceSnapshot;
+};
+
 const JSON_HEADERS = {
   'Content-Type': 'application/json',
 } as const;
@@ -216,6 +223,23 @@ export const editorApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  importLocalProject: async (
+    token: string,
+    data: ImportLocalProjectRequest
+  ) => {
+    const response = await request<{
+      project: ProjectSummary;
+      workspace: WorkspaceSnapshot;
+    }>(token, '/workspaces/import-local-project', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return {
+      project: response.project,
+      workspace: validateWorkspaceSnapshot(response.workspace),
+    };
+  },
 
   getProject: async (
     token: string,

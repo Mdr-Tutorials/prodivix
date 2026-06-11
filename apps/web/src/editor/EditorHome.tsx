@@ -10,6 +10,9 @@ import {
   Trash2,
   Pencil,
   Check,
+  CloudUpload,
+  Copy,
+  Lock,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
@@ -22,6 +25,46 @@ import { useAuthStore } from '@/auth/useAuthStore';
 import { isAbortError } from '@/infra/api';
 import { useEditorShortcut } from './shortcuts';
 import { useEditorStore } from './store/useEditorStore';
+import {
+  deleteLocalProject,
+  duplicateLocalProject,
+  isLocalProjectId,
+  isSyncedLocalProject,
+  listLocalProjectRecords,
+  markLocalProjectSynced,
+  updateLocalProject,
+  type LocalProjectRecord,
+} from './localProjectStore';
+
+type ProjectHomeItem = ProjectSummary & {
+  source: 'remote' | 'local';
+  localRecord?: LocalProjectRecord;
+};
+
+type ProjectBusyState =
+  | 'publishing'
+  | 'deleting'
+  | 'renaming'
+  | 'syncing'
+  | 'duplicating';
+
+const toRemoteItem = (project: ProjectSummary): ProjectHomeItem => ({
+  ...project,
+  source: 'remote',
+});
+
+const toLocalItem = (project: LocalProjectRecord): ProjectHomeItem => ({
+  id: project.id,
+  resourceType: project.resourceType,
+  name: project.name,
+  description: project.description,
+  isPublic: project.isPublic,
+  starsCount: project.starsCount,
+  createdAt: project.createdAt,
+  updatedAt: project.updatedAt,
+  source: 'local',
+  localRecord: project,
+});
 
 function EditorTipsRandom() {
   const { t } = useTranslation('editor');
@@ -75,18 +118,28 @@ function ProjectCard({
   onOpen,
   onRename,
   onPublish,
+  onSync,
+  onDuplicate,
   onDelete,
+  canSyncLocalProject,
   isRenaming,
   isPublishing,
+  isSyncing,
+  isDuplicating,
   isDeleting,
 }: {
-  project: ProjectSummary;
-  onOpen: (project: ProjectSummary) => void;
-  onRename: (project: ProjectSummary, name: string) => Promise<boolean>;
-  onPublish: (project: ProjectSummary) => void;
-  onDelete: (project: ProjectSummary) => void;
+  project: ProjectHomeItem;
+  onOpen: (project: ProjectHomeItem) => void;
+  onRename: (project: ProjectHomeItem, name: string) => Promise<boolean>;
+  onPublish: (project: ProjectHomeItem) => void;
+  onSync: (project: ProjectHomeItem) => void;
+  onDuplicate: (project: ProjectHomeItem) => void;
+  onDelete: (project: ProjectHomeItem) => void;
+  canSyncLocalProject: boolean;
   isRenaming: boolean;
   isPublishing: boolean;
+  isSyncing: boolean;
+  isDuplicating: boolean;
   isDeleting: boolean;
 }) {
   const { t } = useTranslation('editor');
@@ -94,6 +147,10 @@ function ProjectCard({
   const [draftName, setDraftName] = useState(project.name || '');
   const [isEditingName, setEditingName] = useState(false);
   const isClonedProject = /\(copy\)\s*$/i.test(project.name || '');
+  const isLocalProject =
+    project.source === 'local' || isLocalProjectId(project.id);
+  const isReadonlyLocalCache = isSyncedLocalProject(project.localRecord);
+  const canRename = !isReadonlyLocalCache;
 
   useEffect(() => {
     if (isEditingName) return;
@@ -124,6 +181,7 @@ function ProjectCard({
 
   const startRename = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
+    if (!canRename) return;
     setActionsOpen(false);
     setDraftName(project.name || '');
     setEditingName(true);
@@ -158,7 +216,41 @@ function ProjectCard({
 
       {isActionsOpen && (
         <div className="absolute top-[48px] right-[14px] z-20 flex min-w-[170px] flex-col gap-[6px] rounded-[12px] border border-(--border-subtle) bg-(--bg-canvas) p-[8px] shadow-(--shadow-lg)">
-          {!project.isPublic ? (
+          {isLocalProject ? (
+            !isReadonlyLocalCache ? (
+              <button
+                type="button"
+                onClick={() => onSync(project)}
+                disabled={isSyncing || isDeleting || !canSyncLocalProject}
+                title={
+                  canSyncLocalProject
+                    ? undefined
+                    : t(
+                        'home.card.syncSignInRequired',
+                        'Sign in to sync local projects.'
+                      )
+                }
+                className="inline-flex items-center gap-[6px] rounded-[8px] border border-(--border-subtle) bg-(--bg-canvas) px-[10px] py-[7px] text-(length:--font-size-xs) text-(--text-primary) transition-colors hover:border-(--border-default) disabled:cursor-not-allowed disabled:opacity-[0.45]"
+              >
+                <CloudUpload size={14} />
+                {isSyncing
+                  ? t('home.card.syncing', 'Syncing...')
+                  : t('home.card.syncToCloud', 'Sync to Cloud')}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onDuplicate(project)}
+                disabled={isDuplicating || isDeleting}
+                className="inline-flex items-center gap-[6px] rounded-[8px] border border-(--border-subtle) bg-(--bg-canvas) px-[10px] py-[7px] text-(length:--font-size-xs) text-(--text-primary) transition-colors hover:border-(--border-default) disabled:cursor-not-allowed disabled:opacity-[0.45]"
+              >
+                <Copy size={14} />
+                {isDuplicating
+                  ? t('home.card.duplicating', 'Creating copy...')
+                  : t('home.card.saveAsLocalCopy', 'Save as Local Copy')}
+              </button>
+            )
+          ) : !project.isPublic ? (
             <button
               type="button"
               onClick={() => onPublish(project)}
@@ -223,8 +315,9 @@ function ProjectCard({
         <button
           type="button"
           onClick={startRename}
+          disabled={!canRename}
           aria-label={t('home.card.rename', 'Rename project')}
-          className="absolute top-[70px] right-[14px] z-10 inline-flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-[6px] border border-transparent text-(--text-muted) opacity-0 transition group-hover/card:opacity-100 hover:border-(--border-default) hover:text-(--text-primary) focus:opacity-100"
+          className="absolute top-[70px] right-[14px] z-10 inline-flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-[6px] border border-transparent text-(--text-muted) opacity-0 transition group-hover/card:opacity-100 hover:border-(--border-default) hover:text-(--text-primary) focus:opacity-100 disabled:hidden"
         >
           <Pencil size={14} />
         </button>
@@ -278,11 +371,21 @@ function ProjectCard({
                 className="h-[30px] w-full rounded-[8px] border border-(--border-default) bg-(--bg-canvas) px-[8px] text-(length:--font-size-lg) font-medium text-(--text-primary) outline-none"
               />
             ) : (
-              <h3 className="m-0 min-w-0 flex-1 text-(length:--font-size-xl) font-medium text-(--text-primary)">
-                <span className="block truncate">
-                  {project.name || t('home.card.untitled', 'Untitled')}
-                </span>
-              </h3>
+              <div className="flex min-w-0 items-center gap-[8px]">
+                <h3 className="m-0 min-w-0 flex-1 text-(length:--font-size-xl) font-medium text-(--text-primary)">
+                  <span className="block truncate">
+                    {project.name || t('home.card.untitled', 'Untitled')}
+                  </span>
+                </h3>
+                {isLocalProject && (
+                  <span className="inline-flex shrink-0 items-center gap-[4px] rounded-[6px] border border-(--border-subtle) px-[6px] py-[2px] text-(length:--font-size-xs) font-medium text-(--text-muted)">
+                    {isReadonlyLocalCache && <Lock size={12} />}
+                    {isReadonlyLocalCache
+                      ? t('home.card.syncedCache', 'Synced cache')
+                      : t('home.card.localOnly', 'Local only')}
+                  </span>
+                )}
+              </div>
             )}
           </div>
           <p className="flex items-center justify-between border-t border-(--border-subtle) pt-[16px] text-(length:--font-size-xs) leading-(--line-height-normal) text-(--text-muted)">
@@ -309,11 +412,11 @@ function EditorHome() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated());
   const [isResourceModalOpen, setResourceModalOpen] = useState(false);
   const [isExitModalOpen, setExitModalOpen] = useState(false);
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [projects, setProjects] = useState<ProjectHomeItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyByProject, setBusyByProject] = useState<
-    Record<string, 'publishing' | 'deleting' | 'renaming' | undefined>
+    Record<string, ProjectBusyState | undefined>
   >({});
   const setProjectsInStore = useEditorStore((state) => state.setProjects);
   const setProjectInStore = useEditorStore((state) => state.setProject);
@@ -334,9 +437,39 @@ function EditorHome() {
       return;
     }
     if (!isAuthenticated || !token) {
-      setProjects([]);
+      let cancelled = false;
       setLoadError(null);
-      return;
+      setIsLoading(true);
+      void listLocalProjectRecords()
+        .then((localProjects) => {
+          if (cancelled) return;
+          const items = localProjects.map(toLocalItem);
+          setProjects(items);
+          setProjectsInStore(
+            items.map((project) => ({
+              id: project.id,
+              name: project.name,
+              description: project.description,
+              type: project.resourceType,
+              isPublic: project.isPublic,
+              starsCount: project.starsCount,
+            }))
+          );
+        })
+        .catch((error: unknown) => {
+          if (cancelled) return;
+          setLoadError(
+            error instanceof Error
+              ? error.message
+              : t('home.localLoadFailed', 'Failed to load local projects.')
+          );
+        })
+        .finally(() => {
+          if (!cancelled) setIsLoading(false);
+        });
+      return () => {
+        cancelled = true;
+      };
     }
 
     let cancelled = false;
@@ -348,13 +481,25 @@ function EditorHome() {
     setIsLoading(true);
     setLoadError(null);
 
-    editorApi
-      .listProjects(token, requestOptions)
-      .then(({ projects: remoteProjects }) => {
+    Promise.all([
+      editorApi.listProjects(token, requestOptions),
+      listLocalProjectRecords(),
+    ])
+      .then(([{ projects: remoteProjects }, localProjects]) => {
         if (cancelled) return;
-        setProjects(remoteProjects);
+        const remoteItems = remoteProjects.map(toRemoteItem);
+        const remoteIds = new Set(remoteProjects.map((project) => project.id));
+        const unsyncedLocalItems = localProjects
+          .filter((project) => {
+            const remoteProjectId = project.syncBinding?.remoteProjectId;
+            if (!remoteProjectId) return true;
+            return !remoteIds.has(remoteProjectId);
+          })
+          .map(toLocalItem);
+        const items = [...remoteItems, ...unsyncedLocalItems];
+        setProjects(items);
         setProjectsInStore(
-          remoteProjects.map((project) => ({
+          items.map((project) => ({
             id: project.id,
             name: project.name,
             description: project.description,
@@ -378,7 +523,7 @@ function EditorHome() {
       cancelled = true;
       controller?.abort();
     };
-  }, [hasAuthHydrated, isAuthenticated, token, setProjectsInStore]);
+  }, [hasAuthHydrated, isAuthenticated, token, setProjectsInStore, t]);
 
   const sortedProjects = useMemo(
     () =>
@@ -389,7 +534,14 @@ function EditorHome() {
     [projects]
   );
 
-  const openProject = (project: ProjectSummary) => {
+  const openProject = (project: ProjectHomeItem) => {
+    if (project.source === 'local' && isAuthenticated) {
+      const remoteProjectId = project.localRecord?.syncBinding?.remoteProjectId;
+      if (remoteProjectId) {
+        openProject({ ...project, id: remoteProjectId, source: 'remote' });
+        return;
+      }
+    }
     switch (project.resourceType) {
       case 'component':
         navigate(`/editor/project/${project.id}/component`);
@@ -402,9 +554,10 @@ function EditorHome() {
     }
   };
 
-  const publishProject = async (project: ProjectSummary) => {
+  const publishProject = async (project: ProjectHomeItem) => {
     const isClonedProject = /\(copy\)\s*$/i.test(project.name || '');
     if (
+      isLocalProjectId(project.id) ||
       !token ||
       project.isPublic ||
       busyByProject[project.id] ||
@@ -448,7 +601,47 @@ function EditorHome() {
     }
   };
 
-  const renameProject = async (project: ProjectSummary, name: string) => {
+  const renameProject = async (project: ProjectHomeItem, name: string) => {
+    if (isSyncedLocalProject(project.localRecord)) return false;
+
+    if (project.source === 'local' || isLocalProjectId(project.id)) {
+      if (busyByProject[project.id]) return false;
+      setBusyByProject((prev) => ({ ...prev, [project.id]: 'renaming' }));
+      try {
+        const renamed = await updateLocalProject(project.id, { name });
+        if (!renamed) {
+          setLoadError(
+            t('home.card.renameFailed', 'Failed to rename project.')
+          );
+          return false;
+        }
+        setProjects((prev) =>
+          prev.map((item) =>
+            item.id === project.id
+              ? {
+                  ...item,
+                  name: renamed.name,
+                  description: renamed.description,
+                  updatedAt: renamed.updatedAt,
+                  localRecord: renamed,
+                }
+              : item
+          )
+        );
+        setProjectInStore({
+          id: renamed.id,
+          name: renamed.name,
+          description: renamed.description,
+          type: renamed.resourceType,
+          isPublic: renamed.isPublic,
+          starsCount: renamed.starsCount,
+        });
+        return true;
+      } finally {
+        setBusyByProject((prev) => ({ ...prev, [project.id]: undefined }));
+      }
+    }
+
     if (!token || busyByProject[project.id]) return false;
     setBusyByProject((prev) => ({ ...prev, [project.id]: 'renaming' }));
     try {
@@ -492,14 +685,100 @@ function EditorHome() {
     }
   };
 
-  const deleteProject = async (project: ProjectSummary) => {
-    if (!token || busyByProject[project.id]) return;
+  const syncLocalProject = async (project: ProjectHomeItem) => {
+    if (!token || !isAuthenticated || project.source !== 'local') return;
+    if (busyByProject[project.id] || !project.localRecord) return;
+    if (isSyncedLocalProject(project.localRecord)) return;
+
+    setBusyByProject((prev) => ({ ...prev, [project.id]: 'syncing' }));
+    try {
+      const { project: remoteProject, workspace } =
+        await editorApi.importLocalProject(token, {
+          name: project.localRecord.name,
+          description: project.localRecord.description,
+          resourceType: project.localRecord.resourceType,
+          workspace: project.localRecord.workspace,
+        });
+      await markLocalProjectSynced(project.id, {
+        remoteProjectId: remoteProject.id,
+        remoteWorkspaceId: workspace.id,
+        workspaceRev: workspace.workspaceRev,
+      });
+      setProjects((prev) => {
+        const withoutLocal = prev.filter((item) => item.id !== project.id);
+        const withoutDuplicateRemote = withoutLocal.filter(
+          (item) => item.id !== remoteProject.id
+        );
+        return [toRemoteItem(remoteProject), ...withoutDuplicateRemote];
+      });
+      setProjectInStore({
+        id: remoteProject.id,
+        name: remoteProject.name,
+        description: remoteProject.description,
+        type: remoteProject.resourceType,
+        isPublic: remoteProject.isPublic,
+        starsCount: remoteProject.starsCount,
+      });
+    } catch (error) {
+      setLoadError(
+        error instanceof Error
+          ? error.message
+          : t('home.card.syncFailed', 'Failed to sync local project.')
+      );
+    } finally {
+      setBusyByProject((prev) => ({ ...prev, [project.id]: undefined }));
+    }
+  };
+
+  const duplicateProject = async (project: ProjectHomeItem) => {
+    if (project.source !== 'local') return;
+    if (busyByProject[project.id]) return;
+    setBusyByProject((prev) => ({ ...prev, [project.id]: 'duplicating' }));
+    try {
+      const duplicated = await duplicateLocalProject(project.id, {
+        name: t('home.card.localCopyName', '{{name}} (local copy)', {
+          name: project.name || t('home.card.untitled', 'Untitled'),
+        }),
+      });
+      if (!duplicated) {
+        setLoadError(t('home.card.copyFailed', 'Failed to create local copy.'));
+        return;
+      }
+      setProjects((prev) => [toLocalItem(duplicated), ...prev]);
+      setProjectInStore({
+        id: duplicated.id,
+        name: duplicated.name,
+        description: duplicated.description,
+        type: duplicated.resourceType,
+        isPublic: duplicated.isPublic,
+        starsCount: duplicated.starsCount,
+      });
+    } catch (error) {
+      setLoadError(
+        error instanceof Error
+          ? error.message
+          : t('home.card.copyFailed', 'Failed to create local copy.')
+      );
+    } finally {
+      setBusyByProject((prev) => ({ ...prev, [project.id]: undefined }));
+    }
+  };
+
+  const deleteProject = async (project: ProjectHomeItem) => {
+    if (busyByProject[project.id]) return;
     const confirmed = window.confirm(
       t('home.card.deleteConfirm', 'Delete this project permanently?')
     );
     if (!confirmed) return;
     setBusyByProject((prev) => ({ ...prev, [project.id]: 'deleting' }));
     try {
+      if (project.source === 'local' || isLocalProjectId(project.id)) {
+        await deleteLocalProject(project.id);
+        setProjects((prev) => prev.filter((item) => item.id !== project.id));
+        removeProjectInStore(project.id);
+        return;
+      }
+      if (!token) return;
       await editorApi.deleteProject(token, project.id);
       setProjects((prev) => prev.filter((item) => item.id !== project.id));
       removeProjectInStore(project.id);
@@ -542,7 +821,10 @@ function EditorHome() {
 
           {hasAuthHydrated && !isAuthenticated && (
             <div className="flex min-h-[280px] items-center justify-center rounded-[16px] border border-(--border-subtle) bg-(--bg-panel) p-[24px] text-(length:--font-size-sm) text-(--text-muted)">
-              {t('auth.required', 'Please sign in to load your projects.')}
+              {t(
+                'home.localModeHint',
+                'Local projects are saved in this browser. Sign in to sync and publish.'
+              )}
             </div>
           )}
 
@@ -560,9 +842,14 @@ function EditorHome() {
                 onOpen={openProject}
                 onRename={renameProject}
                 onPublish={publishProject}
+                onSync={syncLocalProject}
+                onDuplicate={duplicateProject}
                 onDelete={deleteProject}
+                canSyncLocalProject={Boolean(isAuthenticated && token)}
                 isRenaming={busyByProject[project.id] === 'renaming'}
                 isPublishing={busyByProject[project.id] === 'publishing'}
+                isSyncing={busyByProject[project.id] === 'syncing'}
+                isDuplicating={busyByProject[project.id] === 'duplicating'}
                 isDeleting={busyByProject[project.id] === 'deleting'}
               />
             ))}
@@ -576,6 +863,17 @@ function EditorHome() {
       <NewResourceModal
         open={isResourceModalOpen}
         onClose={() => setResourceModalOpen(false)}
+        onCreated={(project) => {
+          setProjects((prev) => {
+            const next = prev.filter((item) => item.id !== project.id);
+            return [
+              isLocalProjectId(project.id)
+                ? toLocalItem(project as LocalProjectRecord)
+                : toRemoteItem(project),
+              ...next,
+            ];
+          });
+        }}
       />
       <EditorBarExitModal
         isOpen={isExitModalOpen}

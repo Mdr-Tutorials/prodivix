@@ -4,6 +4,7 @@
   zoom: number;
   pan: { x: number; y: number };
   selectedId?: string;
+  hiddenNodeIds: string[];
 };
 
 export type WorkspaceRouteNode = {
@@ -59,6 +60,7 @@ export const DEFAULT_BLUEPRINT_STATE: BlueprintState = {
   zoom: 100,
   pan: { x: 80, y: 60 },
   selectedId: undefined,
+  hiddenNodeIds: [],
 };
 
 export const DEFAULT_ROUTE_MANIFEST: WorkspaceRouteManifest = {

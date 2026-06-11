@@ -1,26 +1,53 @@
-import { ArrowDown, ArrowUp, Copy, MoreHorizontal, Trash2 } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  Copy,
+  Eye,
+  EyeOff,
+  MoreHorizontal,
+  Trash2,
+} from 'lucide-react';
 
 type TreeNodeActionsProps = {
   nodeId: string;
   isRoot?: boolean | '';
+  isHidden: boolean;
   isMenuOpen: boolean;
   onMenuAction?: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
   onCopy: (nodeId: string) => void;
   onMove: (nodeId: string, direction: 'up' | 'down') => void;
+  onToggleHidden: (nodeId: string) => void;
 };
 
 export function TreeNodeActions({
   nodeId,
   isRoot,
+  isHidden,
   isMenuOpen,
   onMenuAction,
   onDelete,
   onCopy,
   onMove,
+  onToggleHidden,
 }: TreeNodeActionsProps) {
+  const VisibilityIcon = isHidden ? EyeOff : Eye;
+
   return (
     <span className="BlueprintEditorTreeActions ml-auto inline-flex items-center opacity-0 transition-opacity duration-150">
+      <button
+        type="button"
+        className="BlueprintEditorTreeNodeAction inline-flex items-center gap-1 rounded-full border-0 bg-transparent px-0.5 py-0 text-[10px] text-(--text-muted) hover:text-(--text-primary) disabled:cursor-not-allowed disabled:opacity-45"
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggleHidden(nodeId);
+        }}
+        disabled={Boolean(isRoot)}
+        aria-label={isHidden ? 'Show layer on canvas' : 'Hide layer on canvas'}
+        title={isHidden ? 'Show layer on canvas' : 'Hide layer on canvas'}
+      >
+        <VisibilityIcon size={12} />
+      </button>
       <button
         type="button"
         className="BlueprintEditorTreeNodeAction Danger inline-flex items-center gap-1 rounded-full border-0 bg-transparent px-0.5 py-0 text-[10px] text-(--danger-color) hover:text-(--danger-hover) disabled:cursor-not-allowed disabled:opacity-45"

@@ -42,6 +42,26 @@
     backdrop-filter: blur(12px);
   }
 
+  &.Align-Start {
+    align-items: flex-start;
+  }
+
+  &.Align-Center {
+    align-items: center;
+  }
+
+  &.Align-End {
+    align-items: flex-end;
+  }
+
+  &.Align-Baseline {
+    align-items: baseline;
+  }
+
+  &.Align-Stretch {
+    align-items: stretch;
+  }
+
   &.Columns-2 {
     .PdxNavCenter {
       display: none;
@@ -64,14 +84,14 @@
 .PdxNavCenter,
 .PdxNavRight {
   display: flex;
-  align-items: center;
+  align-items: inherit;
 }
 
 .PdxNavLeft,
 .PdxNavRight {
   display: flex;
   flex-direction: row;
-  align-items: center;
+  align-items: inherit;
   min-width: 140px;
 }
 

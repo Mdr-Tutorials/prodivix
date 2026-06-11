@@ -17,6 +17,7 @@ export const createPirSlice: StateCreator<EditorStore, [], [], PirSlice> = (
   pirDocRevision: 0,
   setPirDoc: (doc) =>
     set((state) => {
+      if (state.workspaceReadonly) return state;
       if (doc === state.pirDoc) return state;
       const nextRevision = state.pirDocRevision + 1;
       if (!state.activeDocumentId) {
@@ -41,6 +42,7 @@ export const createPirSlice: StateCreator<EditorStore, [], [], PirSlice> = (
     }),
   updatePirDoc: (updater) =>
     set((state) => {
+      if (state.workspaceReadonly) return state;
       const nextPirDoc = updater(state.pirDoc);
       if (nextPirDoc === state.pirDoc) {
         return state;

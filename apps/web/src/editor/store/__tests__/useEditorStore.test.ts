@@ -63,6 +63,43 @@ describe('useEditorStore workspace state', () => {
     expect(state.workspaceCapabilities).toEqual({});
   });
 
+  it('blocks workspace write APIs while the workspace is read-only', () => {
+    const store = useEditorStore.getState();
+    store.setWorkspaceSnapshot(
+      createWorkspaceSnapshot(
+        'ws-1',
+        [
+          {
+            id: 'page-root',
+            type: 'pir-page',
+            path: '/',
+            contentRev: 1,
+            metaRev: 1,
+            content: createDocumentContent('root'),
+          },
+        ],
+        {
+          routeManifest: {
+            version: '1',
+            root: { id: 'root', children: [] },
+          },
+        }
+      )
+    );
+
+    const before = useEditorStore.getState();
+    store.setWorkspaceReadonly(true);
+    store.updatePirDoc(() => createDocumentContent('next-root'));
+    store.applyRouteIntent({ type: 'create-page', path: '/about' });
+    store.markLocalWorkspaceDocumentSaved('ws-1', 'page-root');
+
+    const state = useEditorStore.getState();
+    expect(state.pirDoc).toBe(before.pirDoc);
+    expect(state.pirDocRevision).toBe(before.pirDocRevision);
+    expect(state.routeManifest.root.children ?? []).toEqual([]);
+    expect(state.workspaceDocumentsById['page-root']?.contentRev).toBe(1);
+  });
+
   it('prefers workspace activeRouteNodeId when it exists in routeManifest', () => {
     const store = useEditorStore.getState();
     store.setWorkspaceSnapshot(

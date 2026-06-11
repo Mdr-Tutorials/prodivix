@@ -39,6 +39,7 @@ export const resetEditorStore = (overrides: Partial<EditorState> = {}) => {
       treeById: {},
       workspaceCapabilities: {},
       workspaceCapabilitiesLoaded: false,
+      workspaceReadonly: false,
       routeManifest: {
         version: '1',
         root: { id: 'root', children: [] },

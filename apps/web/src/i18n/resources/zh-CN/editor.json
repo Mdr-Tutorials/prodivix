@@ -18,8 +18,21 @@
       "deleting": "删除中...",
       "deleteConfirm": "确定要永久删除这个项目吗？",
       "publishFailed": "发布项目失败。",
-      "deleteFailed": "删除项目失败。"
-    }
+      "deleteFailed": "删除项目失败。",
+      "localOnly": "仅本地",
+      "publishLocalDisabledReason": "登录后才能发布本地项目。",
+      "syncToCloud": "同步到云端",
+      "syncing": "同步中...",
+      "syncFailed": "同步本地项目失败。",
+      "syncSignInRequired": "登录后才能同步本地项目。",
+      "syncedCache": "同步缓存",
+      "saveAsLocalCopy": "另存本地副本",
+      "duplicating": "正在创建副本...",
+      "copyFailed": "创建本地副本失败。",
+      "localCopyName": "{{name}}（本地副本）"
+    },
+    "localModeHint": "本地项目会保存在当前浏览器中。同步缓存未登录时只读；要离线编辑，请另存为本地副本。",
+    "localLoadFailed": "加载本地项目失败。"
   },
   "projectHome": {
     "title": "{{name}}",

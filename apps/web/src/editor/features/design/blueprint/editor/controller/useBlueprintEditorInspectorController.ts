@@ -78,6 +78,7 @@ export const useBlueprintEditorInspectorController = () => {
   const workspaceCapabilitiesLoaded = useEditorStore(
     (state) => state.workspaceCapabilitiesLoaded
   );
+  const workspaceReadonly = useEditorStore((state) => state.workspaceReadonly);
   const setWorkspaceSnapshot = useEditorStore(
     (state) => state.setWorkspaceSnapshot
   );
@@ -287,6 +288,7 @@ export const useBlueprintEditorInspectorController = () => {
   const updateSelectedNode = (
     updater: (node: ComponentNode) => ComponentNode
   ) => {
+    if (workspaceReadonly) return;
     if (!selectedNode?.id) return;
     const currentSelectedId = selectedNode.id;
     const currentPatternId = getLayoutPatternId(selectedNode);
@@ -543,6 +545,7 @@ export const useBlueprintEditorInspectorController = () => {
       if (!selectedNode?.id || !token || !workspaceId || workspaceRev == null) {
         return false;
       }
+      if (workspaceReadonly) return false;
       if (
         workspaceCapabilitiesLoaded &&
         workspaceCapabilities['core.workspace.code-document.create@1.0'] !==
@@ -623,6 +626,7 @@ export const useBlueprintEditorInspectorController = () => {
       workspaceCapabilitiesLoaded,
       workspaceDocumentsById,
       workspaceId,
+      workspaceReadonly,
       workspaceRev,
     ]
   );

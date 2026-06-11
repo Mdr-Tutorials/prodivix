@@ -128,6 +128,7 @@ export const useBlueprintEditorController = () => {
   const workspaceCapabilitiesLoaded = useEditorStore(
     (state) => state.workspaceCapabilitiesLoaded
   );
+  const workspaceReadonly = useEditorStore((state) => state.workspaceReadonly);
   const routeManifest = useEditorStore((state) => state.routeManifest);
   const activeRouteNodeId = useEditorStore((state) => state.activeRouteNodeId);
   const applyRouteIntent = useEditorStore((state) => state.applyRouteIntent);
@@ -144,6 +145,9 @@ export const useBlueprintEditorController = () => {
   );
   const applyWorkspaceMutation = useEditorStore(
     (state) => state.applyWorkspaceMutation
+  );
+  const markLocalWorkspaceDocumentSaved = useEditorStore(
+    (state) => state.markLocalWorkspaceDocumentSaved
   );
   const token = useAuthStore((state) => state.token);
   const autosaveMode = useSettingsStore(
@@ -172,6 +176,7 @@ export const useBlueprintEditorController = () => {
   const resolvedBlueprintState = blueprintState ?? DEFAULT_BLUEPRINT_STATE;
   const { viewportWidth, viewportHeight, zoom, pan, selectedId } =
     resolvedBlueprintState;
+  const hiddenNodeIds = resolvedBlueprintState.hiddenNodeIds ?? [];
   const routes = useMemo(
     () => flattenRouteItems(routeManifest.root, '/'),
     [routeManifest]
@@ -210,7 +215,9 @@ export const useBlueprintEditorController = () => {
     activeDocumentContentRev,
     canUpdateWorkspaceDocument,
     workspaceCapabilitiesLoaded,
+    workspaceReadonly,
     applyWorkspaceMutation,
+    markLocalWorkspaceDocumentSaved,
   });
 
   useEditorShortcut('Mod+S', saveNow, {
@@ -231,6 +238,7 @@ export const useBlueprintEditorController = () => {
   useEffect(() => {
     if (!token) return;
     if (!workspaceId) return;
+    if (workspaceReadonly) return;
     if (!workspaceCapabilitiesLoaded) return;
     if (!canUpdateRouteManifest) return;
     if (typeof workspaceRev !== 'number' || workspaceRev <= 0) return;
@@ -283,10 +291,12 @@ export const useBlueprintEditorController = () => {
     token,
     workspaceCapabilitiesLoaded,
     workspaceId,
+    workspaceReadonly,
     workspaceRev,
   ]);
 
   const handleAddRoute = () => {
+    if (workspaceReadonly) return;
     const value = newPath.trim();
     if (!value) return;
     const nextPath = normalizeRoutePath(value);
@@ -519,7 +529,22 @@ export const useBlueprintEditorController = () => {
     setBlueprintState(blueprintKey, { selectedId: nodeId });
   };
 
+  const handleToggleNodeHidden = (nodeId: string) => {
+    if (!nodeId) return;
+    const root = materializePirRoot(pirDoc);
+    if (nodeId === root.id) return;
+    const exists = Boolean(findNodeById(root, nodeId));
+    if (!exists) return;
+    const currentHiddenNodeIds = resolvedBlueprintState.hiddenNodeIds ?? [];
+    setBlueprintState(blueprintKey, {
+      hiddenNodeIds: currentHiddenNodeIds.includes(nodeId)
+        ? currentHiddenNodeIds.filter((id) => id !== nodeId)
+        : [...currentHiddenNodeIds, nodeId],
+    });
+  };
+
   const handleAddComponent = (itemId: string) => {
+    if (workspaceReadonly) return;
     const targetId = selectedId ?? 'root';
     let nextNodeId = '';
     updatePirDoc((doc) => {
@@ -583,13 +608,19 @@ export const useBlueprintEditorController = () => {
   });
 
   const handleDeleteSelected = () => {
+    if (workspaceReadonly) return;
     if (!selectedId) return;
     let nextSelectedId: string | undefined;
     let removed = false;
+    let removedNodeIds = new Set<string>();
     updatePirDoc((doc) => {
       const root = materializePirRoot(doc);
       if (selectedId === root.id) return doc;
       const parentId = findParentId(root, selectedId);
+      const nodeToRemove = findNodeById(root, selectedId);
+      if (nodeToRemove) {
+        removedNodeIds = collectNodeIdSet(nodeToRemove);
+      }
       const removal = removeNodeById(root, selectedId);
       removed = removal.removed;
       if (!removal.removed) return doc;
@@ -601,18 +632,27 @@ export const useBlueprintEditorController = () => {
       return cleanupDeletedNodeAnimationBindings(nextDoc);
     });
     if (removed) {
-      setBlueprintState(blueprintKey, { selectedId: nextSelectedId });
+      setBlueprintState(blueprintKey, {
+        selectedId: nextSelectedId,
+        hiddenNodeIds: hiddenNodeIds.filter((id) => !removedNodeIds.has(id)),
+      });
     }
   };
 
   const handleDeleteNode = (nodeId: string) => {
+    if (workspaceReadonly) return;
     if (!nodeId) return;
     let nextSelectedId: string | undefined;
     let removed = false;
+    let removedNodeIds = new Set<string>();
     updatePirDoc((doc) => {
       const root = materializePirRoot(doc);
       if (nodeId === root.id) return doc;
       const parentId = findParentId(root, nodeId);
+      const nodeToRemove = findNodeById(root, nodeId);
+      if (nodeToRemove) {
+        removedNodeIds = collectNodeIdSet(nodeToRemove);
+      }
       const removal = removeNodeById(root, nodeId);
       removed = removal.removed;
       if (!removal.removed) return doc;
@@ -625,12 +665,16 @@ export const useBlueprintEditorController = () => {
       };
       return cleanupDeletedNodeAnimationBindings(nextDoc);
     });
-    if (removed && selectedId === nodeId) {
-      setBlueprintState(blueprintKey, { selectedId: nextSelectedId });
+    if (removed) {
+      setBlueprintState(blueprintKey, {
+        ...(selectedId === nodeId ? { selectedId: nextSelectedId } : {}),
+        hiddenNodeIds: hiddenNodeIds.filter((id) => !removedNodeIds.has(id)),
+      });
     }
   };
 
   const handleCopyNode = (nodeId: string) => {
+    if (workspaceReadonly) return;
     if (!nodeId) return;
     let nextNodeId = '';
     updatePirDoc((doc) => {
@@ -656,6 +700,7 @@ export const useBlueprintEditorController = () => {
   };
 
   const handleMoveNode = (nodeId: string, direction: 'up' | 'down') => {
+    if (workspaceReadonly) return;
     if (!nodeId) return;
     let moved = false;
     updatePirDoc((doc) => {
@@ -735,6 +780,7 @@ export const useBlueprintEditorController = () => {
       isCollapsed: isTreeCollapsed,
       isTreeCollapsed,
       selectedId,
+      hiddenNodeIds,
       dropHint: treeDropHint,
       onToggleCollapse: handleToggleTreeCollapse,
       onSelectNode: handleNodeSelect,
@@ -742,6 +788,7 @@ export const useBlueprintEditorController = () => {
       onDeleteNode: handleDeleteNode,
       onCopyNode: handleCopyNode,
       onMoveNode: handleMoveNode,
+      onToggleNodeHidden: handleToggleNodeHidden,
     },
     canvas: {
       viewportWidth,
@@ -749,6 +796,7 @@ export const useBlueprintEditorController = () => {
       zoom,
       pan,
       selectedId,
+      hiddenNodeIds,
       runtimeState,
       onPanChange: handlePanChange,
       onZoomChange: handleZoomChange,
@@ -822,4 +870,10 @@ const cleanupDeletedNodeAnimationBindings = (doc: PIRDocument): PIRDocument => {
 const collectNodeIds = (node: ComponentNode, bucket: Set<string>) => {
   bucket.add(node.id);
   (node.children ?? []).forEach((child) => collectNodeIds(child, bucket));
+};
+
+const collectNodeIdSet = (node: ComponentNode) => {
+  const result = new Set<string>();
+  collectNodeIds(node, result);
+  return result;
 };

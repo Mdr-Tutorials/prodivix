@@ -143,6 +143,9 @@ export function ExportCode() {
   const { t } = useTranslation('export');
   const { projectId } = useParams();
   const pirDoc = useEditorStore((state) => state.pirDoc);
+  const projectName = useEditorStore((state) =>
+    projectId ? state.projectsById[projectId]?.name : undefined
+  );
   const projectType = useEditorStore(
     (state) =>
       (projectId ? state.projectsById[projectId]?.type : undefined) ?? 'project'
@@ -361,13 +364,13 @@ export function ExportCode() {
     [activeVfsFile, vfsProjectFiles]
   );
   const activeVfsFileContent = activeVfsFileRecord?.content ?? '';
-  const reactZipBaseName = useMemo(
-    () =>
-      sanitizeFileName(
-        pirDoc?.metadata?.name || projectId || 'prodivix-react-export'
-      ),
-    [pirDoc?.metadata?.name, projectId]
-  );
+  const reactZipBaseName = useMemo(() => {
+    const nameSource =
+      projectName?.trim() ||
+      pirDoc?.metadata?.name?.trim() ||
+      'prodivix-react-export';
+    return sanitizeFileName(nameSource);
+  }, [pirDoc?.metadata?.name, projectName]);
 
   useEffect(() => {
     if (!reactProjectFiles.length) {

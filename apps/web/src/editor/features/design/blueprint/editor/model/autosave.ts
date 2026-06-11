@@ -4,9 +4,10 @@ import { ApiError } from '@/auth/authApi';
 import { editorApi, type WorkspaceCommandEnvelope } from '@/editor/editorApi';
 import type { PIRDocument } from '@/core/types/engine.types';
 import { validatePirDocument } from '@/pir/validator/validator';
+import { isLocalProjectId } from '@/editor/localProjectStore';
 
 export type AutosaveMode = 'manual' | 'on-change' | 'interval';
-export type SaveTransport = 'workspace' | 'project' | null;
+export type SaveTransport = 'workspace' | 'local' | null;
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 export type SaveIndicatorTone = 'error' | 'warning' | 'success' | 'neutral';
 
@@ -26,7 +27,12 @@ type UseBlueprintAutosaveOptions = {
   activeDocumentContentRev?: number;
   canUpdateWorkspaceDocument: boolean;
   workspaceCapabilitiesLoaded: boolean;
+  workspaceReadonly: boolean;
   applyWorkspaceMutation: (mutation: WorkspaceMutation) => void;
+  markLocalWorkspaceDocumentSaved: (
+    workspaceId: string,
+    documentId: string
+  ) => void;
 };
 
 type UseBlueprintAutosaveResult = {
@@ -80,7 +86,7 @@ const resolveApiErrorMessage = (error: unknown): string | null => {
 
 export const useBlueprintAutosave = ({
   token,
-  projectId: _projectId,
+  projectId,
   pirDoc,
   pirDocRevision,
   autosaveMode,
@@ -90,7 +96,9 @@ export const useBlueprintAutosave = ({
   activeDocumentContentRev,
   canUpdateWorkspaceDocument,
   workspaceCapabilitiesLoaded,
+  workspaceReadonly,
   applyWorkspaceMutation,
+  markLocalWorkspaceDocumentSaved,
 }: UseBlueprintAutosaveOptions): UseBlueprintAutosaveResult => {
   const { t } = useTranslation('blueprint');
   const saveRequestSeqRef = useRef(0);
@@ -138,7 +146,7 @@ export const useBlueprintAutosave = ({
       ? 'error'
       : saveStatus === 'saving'
         ? 'neutral'
-        : isWorkspaceSaveDisabled
+        : workspaceReadonly || isWorkspaceSaveDisabled
           ? 'warning'
           : saveStatus === 'saved'
             ? 'success'
@@ -154,6 +162,11 @@ export const useBlueprintAutosave = ({
     }
     if (saveStatus === 'saving') {
       return t('autosave.status.saving', { defaultValue: 'Saving...' });
+    }
+    if (workspaceReadonly) {
+      return t('autosave.status.readonlyCache', {
+        defaultValue: 'Synced cache is read-only. Save a local copy to edit.',
+      });
     }
     if (saveStatus === 'error') {
       return (
@@ -187,6 +200,7 @@ export const useBlueprintAutosave = ({
     saveTransport,
     t,
     workspaceCapabilitiesLoaded,
+    workspaceReadonly,
   ]);
   const workspaceRetryMessage = t('autosave.messages.workspaceRetry', {
     defaultValue: 'Workspace save failed. Retrying on next change.',
@@ -200,8 +214,13 @@ export const useBlueprintAutosave = ({
   const pirValidationFailedMessageKey = 'autosave.messages.pirValidationFailed';
 
   const flushSave = useCallback(() => {
-    if (!token) return;
     if (!hasPendingChanges) return;
+    if (workspaceReadonly) {
+      setSaveTransport(null);
+      setSaveStatus('idle');
+      setSaveMessage('');
+      return;
+    }
     if (hasWorkspaceTarget && !workspaceCapabilitiesLoaded) return;
     if (isSavingRef.current) return;
 
@@ -218,6 +237,24 @@ export const useBlueprintAutosave = ({
       );
       return;
     }
+
+    if (projectId && isLocalProjectId(projectId)) {
+      if (workspaceId && activeDocumentId) {
+        markLocalWorkspaceDocumentSaved(workspaceId, activeDocumentId);
+      }
+      lastSavedGraphRef.current = pirDoc.ui.graph;
+      setLastSavedRevision((previous) => Math.max(previous, targetRevision));
+      setSaveTransport('local');
+      setSaveStatus('saved');
+      setSaveMessage(
+        t('autosave.status.localSaved', {
+          defaultValue: 'Saved to local workspace.',
+        })
+      );
+      return;
+    }
+
+    if (!token) return;
 
     if (
       workspaceId &&
@@ -282,13 +319,15 @@ export const useBlueprintAutosave = ({
     canUpdateWorkspaceDocument,
     hasPendingChanges,
     hasWorkspaceTarget,
-    isWorkspaceSaveDisabled,
+    markLocalWorkspaceDocumentSaved,
     pirDoc,
     pirDocRevision,
+    projectId,
     t,
     token,
     workspaceCapabilitiesLoaded,
     workspaceId,
+    workspaceReadonly,
     workspaceRetryMessage,
     workspaceUnavailableMessage,
   ]);

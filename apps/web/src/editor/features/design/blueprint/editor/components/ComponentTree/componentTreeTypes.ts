@@ -5,6 +5,7 @@ export type BlueprintEditorComponentTreeProps = {
   isCollapsed: boolean;
   isTreeCollapsed?: boolean;
   selectedId?: string;
+  hiddenNodeIds: string[];
   dropHint?: {
     overNodeId: string;
     placement: 'before' | 'after' | 'child';
@@ -15,6 +16,7 @@ export type BlueprintEditorComponentTreeProps = {
   onDeleteNode: (nodeId: string) => void;
   onCopyNode: (nodeId: string) => void;
   onMoveNode: (nodeId: string, direction: 'up' | 'down') => void;
+  onToggleNodeHidden: (nodeId: string) => void;
 };
 
 export type TreeNodeProps = {
@@ -22,6 +24,7 @@ export type TreeNodeProps = {
   depth: number;
   expandedKeys: string[];
   selectedId?: string;
+  hiddenNodeIds: string[];
   dropHint?: {
     overNodeId: string;
     placement: 'before' | 'after' | 'child';
@@ -35,6 +38,7 @@ export type TreeNodeProps = {
   onDelete: (nodeId: string) => void;
   onCopy: (nodeId: string) => void;
   onMove: (nodeId: string, direction: 'up' | 'down') => void;
+  onToggleHidden: (nodeId: string) => void;
   onOpenContextMenu: (
     node: ComponentNode,
     event: ReactMouseEvent<HTMLDivElement>

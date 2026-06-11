@@ -8,7 +8,11 @@ import {
   createDefaultPirDoc,
 } from '@/editor/store/useEditorStore';
 import { useAuthStore } from '@/auth/useAuthStore';
-import { editorApi } from '@/editor/editorApi';
+import { editorApi, type ProjectSummary } from '@/editor/editorApi';
+import {
+  createLocalProject,
+  type LocalProjectRecord,
+} from '@/editor/localProjectStore';
 
 export type ResourceType = 'project' | 'component' | 'nodegraph';
 
@@ -16,12 +20,14 @@ interface NewResourceModalProps {
   open: boolean;
   onClose: () => void;
   defaultType?: ResourceType;
+  onCreated?: (project: ProjectSummary | LocalProjectRecord) => void;
 }
 
 function NewResourceModal({
   open,
   onClose,
   defaultType = 'project',
+  onCreated,
 }: NewResourceModalProps) {
   const { t } = useTranslation('editor');
   const navigate = useNavigate();
@@ -29,6 +35,9 @@ function NewResourceModal({
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated());
   const setProject = useEditorStore((state) => state.setProject);
   const setPirDoc = useEditorStore((state) => state.setPirDoc);
+  const setWorkspaceSnapshot = useEditorStore(
+    (state) => state.setWorkspaceSnapshot
+  );
 
   // State
   const [name, setName] = useState('');
@@ -42,16 +51,41 @@ function NewResourceModal({
   if (!open) return null;
 
   const handleCreate = async () => {
-    if (!isAuthenticated || !token) {
-      setError('Please sign in first.');
-      return;
-    }
     setSubmitting(true);
     setError(null);
     const finalName = name.trim() || 'Untitled';
     const initialPir = createDefaultPirDoc();
 
     try {
+      if (!isAuthenticated || !token) {
+        const project = await createLocalProject({
+          name: finalName,
+          description: description.trim() || undefined,
+          resourceType: type,
+          pir: initialPir,
+        });
+        setProject({
+          id: project.id,
+          name: project.name,
+          description: project.description,
+          type: project.resourceType,
+          isPublic: project.isPublic,
+          starsCount: project.starsCount,
+        });
+        setWorkspaceSnapshot(project.workspace);
+        onCreated?.(project);
+
+        onClose();
+        if (type === 'project') {
+          navigate(`/editor/project/${project.id}/blueprint`);
+        } else if (type === 'component') {
+          navigate(`/editor/project/${project.id}/component`);
+        } else {
+          navigate(`/editor/project/${project.id}/nodegraph`);
+        }
+        return;
+      }
+
       const { project } = await editorApi.createProject(token, {
         name: finalName,
         description: description.trim() || undefined,
@@ -68,6 +102,7 @@ function NewResourceModal({
         starsCount: project.starsCount,
       });
       setPirDoc(initialPir);
+      onCreated?.(project);
 
       onClose();
       if (type === 'project') {

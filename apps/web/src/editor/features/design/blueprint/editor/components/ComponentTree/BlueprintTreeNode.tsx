@@ -21,6 +21,7 @@ export function BlueprintTreeNode({
   depth,
   expandedKeys,
   selectedId,
+  hiddenNodeIds,
   dropHint,
   rootId,
   parentId,
@@ -31,6 +32,7 @@ export function BlueprintTreeNode({
   onDelete,
   onCopy,
   onMove,
+  onToggleHidden,
   onOpenContextMenu,
 }: TreeNodeProps) {
   const children = node.children ?? [];
@@ -49,6 +51,7 @@ export function BlueprintTreeNode({
     ? 'Hidden by 2 Columns'
     : null;
   const isRoot = rootId && node.id === rootId;
+  const isHidden = hiddenNodeIds.includes(node.id);
   const dropPlacement =
     dropHint?.overNodeId === node.id ? dropHint.placement : null;
   const {
@@ -136,7 +139,7 @@ export function BlueprintTreeNode({
           ref={setNodeRef}
           role="button"
           tabIndex={0}
-          className={`BlueprintEditorTreeItem relative flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-[8px] border-0 bg-transparent px-0 py-px text-left text-(--text-secondary) transition-[color,opacity,background,box-shadow] duration-150 hover:text-(--text-primary) [&.IsOver]:text-(--text-primary) [&.Selected]:text-(--text-primary) [&.Selected_.BlueprintEditorTreeCount]:text-(--text-secondary) [&.Selected_.BlueprintEditorTreeIcon]:text-(--text-primary) [&:focus-within_.BlueprintEditorTreeActions]:opacity-100 [&:hover_.BlueprintEditorTreeActions]:opacity-100 [&:hover_.BlueprintEditorTreeIcon]:text-(--text-primary) ${selectedId === node.id ? 'Selected' : ''} ${isOver ? 'IsOver' : ''} ${dropPlacement === 'before' ? 'DropBefore' : ''} ${dropPlacement === 'after' ? 'DropAfter' : ''} ${dropPlacement === 'child' ? 'DropChild bg-(--bg-raised) shadow-[inset_0_0_0_1px_var(--border-strong)]' : ''}`.trim()}
+          className={`BlueprintEditorTreeItem relative flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-[8px] border-0 bg-transparent px-0 py-px text-left text-(--text-secondary) transition-[color,opacity,background,box-shadow] duration-150 hover:text-(--text-primary) [&.IsOver]:text-(--text-primary) [&.Selected]:text-(--text-primary) [&.Selected_.BlueprintEditorTreeCount]:text-(--text-secondary) [&.Selected_.BlueprintEditorTreeIcon]:text-(--text-primary) [&:focus-within_.BlueprintEditorTreeActions]:opacity-100 [&:hover_.BlueprintEditorTreeActions]:opacity-100 [&:hover_.BlueprintEditorTreeIcon]:text-(--text-primary) ${selectedId === node.id ? 'Selected' : ''} ${isHidden ? 'IsCanvasHidden opacity-45' : ''} ${isOver ? 'IsOver' : ''} ${dropPlacement === 'before' ? 'DropBefore' : ''} ${dropPlacement === 'after' ? 'DropAfter' : ''} ${dropPlacement === 'child' ? 'DropChild bg-(--bg-raised) shadow-[inset_0_0_0_1px_var(--border-strong)]' : ''}`.trim()}
           style={style}
           onClick={(event) => {
             if (hasChildren && !isExpanded) {
@@ -214,11 +217,13 @@ export function BlueprintTreeNode({
           <TreeNodeActions
             nodeId={node.id}
             isRoot={isRoot}
+            isHidden={isHidden}
             isMenuOpen={openMenuId === node.id}
             onMenuAction={onMenuAction}
             onDelete={onDelete}
             onCopy={onCopy}
             onMove={onMove}
+            onToggleHidden={onToggleHidden}
           />
         </div>
       </div>
@@ -231,6 +236,7 @@ export function BlueprintTreeNode({
               depth={depth + 1}
               expandedKeys={expandedKeys}
               selectedId={selectedId}
+              hiddenNodeIds={hiddenNodeIds}
               dropHint={dropHint}
               rootId={rootId}
               parentId={node.id}
@@ -241,6 +247,7 @@ export function BlueprintTreeNode({
               onDelete={onDelete}
               onCopy={onCopy}
               onMove={onMove}
+              onToggleHidden={onToggleHidden}
               onOpenContextMenu={onOpenContextMenu}
             />
           ))}

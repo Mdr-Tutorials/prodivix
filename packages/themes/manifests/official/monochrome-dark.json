@@ -14,7 +14,7 @@
     "text": {
       "primary": "{palette.gray.0}",
       "secondary": "{palette.gray.4}",
-      "muted": "{palette.gray.7}",
+      "muted": "{palette.gray.6}",
       "inverse": "{palette.gray.13}"
     },
     "border": {

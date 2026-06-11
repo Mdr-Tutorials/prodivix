@@ -112,6 +112,7 @@ function BlueprintEditor() {
             isCollapsed={componentTree.isCollapsed}
             isTreeCollapsed={componentTree.isTreeCollapsed}
             selectedId={componentTree.selectedId}
+            hiddenNodeIds={componentTree.hiddenNodeIds}
             dropHint={componentTree.dropHint}
             onToggleCollapse={componentTree.onToggleCollapse}
             onSelectNode={componentTree.onSelectNode}
@@ -119,6 +120,7 @@ function BlueprintEditor() {
             onDeleteNode={componentTree.onDeleteNode}
             onCopyNode={componentTree.onCopyNode}
             onMoveNode={componentTree.onMoveNode}
+            onToggleNodeHidden={componentTree.onToggleNodeHidden}
           />
           <BlueprintEditorCanvas
             currentPath={addressBar.currentPath}
@@ -127,6 +129,7 @@ function BlueprintEditor() {
             zoom={canvas.zoom}
             pan={canvas.pan}
             selectedId={canvas.selectedId}
+            hiddenNodeIds={canvas.hiddenNodeIds}
             runtimeState={canvas.runtimeState}
             onPanChange={canvas.onPanChange}
             onZoomChange={canvas.onZoomChange}

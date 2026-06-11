@@ -5,6 +5,7 @@ export type BlueprintEditorCanvasProps = {
   zoom: number;
   pan: { x: number; y: number };
   selectedId?: string;
+  hiddenNodeIds: string[];
   runtimeState?: Record<string, unknown>;
   onPanChange: (pan: { x: number; y: number }) => void;
   onZoomChange: (value: number) => void;

@@ -18,7 +18,9 @@
       "projectSaved": "Saved to project.",
       "saved": "Saved.",
       "manualPending": "Unsaved changes. Click to save or press Ctrl+S.",
-      "idle": "Ready"
+      "idle": "Ready",
+      "localSaved": "Saved to local workspace.",
+      "readonlyCache": "Synced cache is read-only. Save a local copy to edit."
     },
     "messages": {
       "workspaceRetry": "Workspace save failed. Retrying on next change.",

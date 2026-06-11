@@ -31,6 +31,7 @@ export function BlueprintEditorComponentTree({
   isCollapsed,
   isTreeCollapsed = false,
   selectedId,
+  hiddenNodeIds,
   dropHint,
   onToggleCollapse,
   onSelectNode,
@@ -38,6 +39,7 @@ export function BlueprintEditorComponentTree({
   onDeleteNode,
   onCopyNode,
   onMoveNode,
+  onToggleNodeHidden,
 }: BlueprintEditorComponentTreeProps) {
   const { t } = useTranslation('blueprint');
   const pirDoc = useEditorStore((state) => state.pirDoc);
@@ -301,6 +303,7 @@ export function BlueprintEditorComponentTree({
               depth={0}
               expandedKeys={expandedKeys}
               selectedId={selectedId}
+              hiddenNodeIds={hiddenNodeIds}
               dropHint={dropHint}
               rootId={rootNode.id}
               openMenuId={openMenuId}
@@ -310,6 +313,7 @@ export function BlueprintEditorComponentTree({
               onDelete={onDeleteNode}
               onCopy={onCopyNode}
               onMove={onMoveNode}
+              onToggleHidden={onToggleNodeHidden}
               onOpenContextMenu={openContextMenu}
             />
           </div>

@@ -9,6 +9,14 @@ import { editorApi } from './editorApi';
 import { EditorShortcutProvider, useEditorShortcut } from './shortcuts';
 import { ApiError } from '@/auth/authApi';
 import { isAbortError } from '@/infra/api';
+import {
+  getLocalProject,
+  isLocalProjectId,
+  isSyncedLocalProject,
+  LOCAL_READONLY_WORKSPACE_CAPABILITIES,
+  LOCAL_WORKSPACE_CAPABILITIES,
+  saveLocalWorkspaceSnapshot,
+} from './localProjectStore';
 import { useEditorStore } from './store/useEditorStore';
 import { useSettingsStore } from './store/useSettingsStore';
 
@@ -131,15 +139,89 @@ function Editor() {
   const setWorkspaceCapabilities = useEditorStore(
     (state) => state.setWorkspaceCapabilities
   );
+  const setWorkspaceReadonly = useEditorStore(
+    (state) => state.setWorkspaceReadonly
+  );
   const hydrateWorkspaceSettings = useSettingsStore(
     (state) => state.hydrateWorkspaceSettings
   );
   const clearWorkspaceState = useEditorStore(
     (state) => state.clearWorkspaceState
   );
+  const workspaceId = useEditorStore((state) => state.workspaceId);
+  const workspaceRev = useEditorStore((state) => state.workspaceRev);
+  const routeRev = useEditorStore((state) => state.routeRev);
+  const opSeq = useEditorStore((state) => state.opSeq);
+  const treeRootId = useEditorStore((state) => state.treeRootId);
+  const treeById = useEditorStore((state) => state.treeById);
+  const workspaceDocumentsById = useEditorStore(
+    (state) => state.workspaceDocumentsById
+  );
+  const routeManifest = useEditorStore((state) => state.routeManifest);
+  const activeRouteNodeId = useEditorStore((state) => state.activeRouteNodeId);
+  const globalSettings = useSettingsStore((state) => state.global);
+  const projectGlobalById = useSettingsStore(
+    (state) => state.projectGlobalById
+  );
+  const workspaceReadonly = useEditorStore((state) => state.workspaceReadonly);
+
+  useEffect(() => {
+    if (!projectId) return;
+    if (!isLocalProjectId(projectId)) return;
+
+    let cancelled = false;
+    clearWorkspaceState();
+    setLoadError(null);
+
+    void getLocalProject(projectId)
+      .then((project) => {
+        if (cancelled) return;
+        if (!project) {
+          setLoadError('Local project not found.');
+          return;
+        }
+        const isReadonlyCache = isSyncedLocalProject(project);
+        setProject({
+          id: project.id,
+          name: project.name,
+          description: project.description,
+          type: project.resourceType,
+          isPublic: project.isPublic,
+          starsCount: project.starsCount,
+        });
+        hydrateWorkspaceSettings(project.workspace.settings);
+        setWorkspaceSnapshot(project.workspace);
+        setWorkspaceReadonly(isReadonlyCache);
+        setWorkspaceCapabilities(
+          project.workspace.id,
+          isReadonlyCache
+            ? LOCAL_READONLY_WORKSPACE_CAPABILITIES
+            : LOCAL_WORKSPACE_CAPABILITIES
+        );
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setLoadError(
+          error instanceof Error ? error.message : 'Could not load project.'
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    clearWorkspaceState,
+    hydrateWorkspaceSettings,
+    projectId,
+    setProject,
+    setWorkspaceCapabilities,
+    setWorkspaceReadonly,
+    setWorkspaceSnapshot,
+  ]);
 
   useEffect(() => {
     if (!projectId || !isAuthenticated || !token) return;
+    if (isLocalProjectId(projectId)) return;
     let cancelled = false;
     const controller =
       typeof AbortController === 'function' ? new AbortController() : null;
@@ -152,6 +234,7 @@ function Editor() {
       .getProject(token, projectId, requestOptions)
       .then(({ project }) => {
         if (cancelled) return;
+        setWorkspaceReadonly(false);
         setProject({
           id: project.id,
           name: project.name,
@@ -221,7 +304,64 @@ function Editor() {
     setPirDoc,
     setProject,
     setWorkspaceCapabilities,
+    setWorkspaceReadonly,
     setWorkspaceSnapshot,
+  ]);
+
+  useEffect(() => {
+    if (!projectId || !isLocalProjectId(projectId)) return;
+    if (workspaceReadonly) return;
+    if (workspaceId !== projectId || !treeRootId) return;
+    const documents = Object.values(workspaceDocumentsById);
+    if (!documents.length) return;
+
+    const timeoutId = window.setTimeout(() => {
+      void saveLocalWorkspaceSnapshot(projectId, {
+        id: workspaceId,
+        workspaceRev: workspaceRev ?? 1,
+        routeRev: routeRev ?? 1,
+        opSeq: opSeq ?? 1,
+        tree: {
+          treeRootId,
+          treeById,
+        },
+        documents,
+        routeManifest,
+        settings: { global: globalSettings, projectGlobalById },
+        activeRouteNodeId,
+      })
+        .then((saved) => {
+          if (!saved) return;
+          setProject({
+            id: saved.id,
+            name: saved.name,
+            description: saved.description,
+            type: saved.resourceType,
+            isPublic: saved.isPublic,
+            starsCount: saved.starsCount,
+          });
+        })
+        .catch((error: unknown) => {
+          console.warn('[editor] local workspace save failed', error);
+        });
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    activeRouteNodeId,
+    globalSettings,
+    projectId,
+    projectGlobalById,
+    routeManifest,
+    routeRev,
+    opSeq,
+    setProject,
+    treeById,
+    treeRootId,
+    workspaceDocumentsById,
+    workspaceId,
+    workspaceReadonly,
+    workspaceRev,
   ]);
 
   useEffect(() => {

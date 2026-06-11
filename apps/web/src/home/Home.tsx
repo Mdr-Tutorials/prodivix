@@ -63,14 +63,20 @@ function Home() {
     const nextTheme = themeMode === 'dark' ? 'light' : 'dark';
     setGlobalValue('theme', nextTheme); // ThemeSync will handle DOM update
   };
-  const brandLinkClassName =
+  const brandLockupClassName =
+    'inline-flex items-baseline gap-2.5';
+  const footerBrandLinkClassName =
     'inline-flex items-center no-underline transition-opacity duration-200 hover:opacity-70';
-  const brandWordmarkClassName =
-    'h-[30px] w-[170px] bg-(--home-logo) [mask:url("/prodivix-wordmark.svg")_center/contain_no-repeat] sm:h-[34px] sm:w-[210px]';
+  const brandIconClassName =
+    'h-8 w-8 shrink-0 translate-y-[1.5px] bg-(--home-logo) [mask:url("/prodivix.svg")_center/contain_no-repeat]';
+  const brandNameClassName =
+    'font-mono text-[26px] leading-none font-black text-(--home-logo)';
+  const heroWordmarkClassName =
+    'pointer-events-none absolute top-[44%] left-1/2 h-[132px] w-[140vw] min-w-[760px] -translate-x-1/2 -translate-y-1/2 bg-(--home-logo) opacity-[0.055] [mask:url("/prodivix-wordmark.svg")_center/contain_no-repeat] sm:h-[176px] sm:w-[132vw] lg:h-[220px] lg:w-[1280px]';
   const footerWordmarkClassName =
     'h-[28px] w-[166px] bg-(--home-logo) [mask:url("/prodivix-wordmark.svg")_center/contain_no-repeat]';
   const navIconClassName =
-    'inline-flex h-[36px] w-[36px] cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 text-(--home-nav-icon) no-underline transition-colors duration-200 ease-[ease] hover:bg-(--home-nav-icon-hover-bg) hover:text-(--home-nav-icon-hover-text)';
+    'inline-flex h-[36px] w-[36px] translate-y-[3.5px] cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 text-(--home-nav-icon) no-underline transition-colors duration-200 ease-[ease] hover:bg-(--home-nav-icon-hover-bg) hover:text-(--home-nav-icon-hover-text)';
   const profileLinkClassName =
     'inline-flex h-[36px] w-[36px] items-center justify-center rounded-full bg-(--home-profile-bg) no-underline transition-[box-shadow,transform] duration-200 ease-[ease] hover:-translate-y-px hover:shadow-(--home-profile-hover-shadow)';
 
@@ -85,21 +91,17 @@ function Home() {
     undefined;
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[1480px] flex-col items-center justify-start bg-(--bg-canvas) px-4 text-(--text-primary) sm:px-6 lg:px-10">
-      <PdxNav>
+    <div className="mx-auto flex min-h-screen w-full max-w-[1480px] flex-col items-center justify-start overflow-x-clip bg-(--bg-canvas) px-4 text-(--text-primary) sm:px-6 lg:px-10">
+      <PdxNav align="Baseline">
         <PdxNav.Left>
-          <PdxLink
-            to="/"
-            className={brandLinkClassName}
-            title={t('brand.name')}
-          >
-            <span className={brandWordmarkClassName} aria-hidden="true" />
-            <span className="sr-only">{t('brand.name')}</span>
-          </PdxLink>
+          <div className={brandLockupClassName} title={t('brand.name')}>
+            <span className={brandIconClassName} aria-hidden="true" />
+            <span className={brandNameClassName}>{t('brand.name')}</span>
+          </div>
         </PdxNav.Left>
         <PdxNav.Right>
-          <div className="flex items-center gap-2">
-            <div className="hidden items-center gap-8 pr-4 md:flex">
+          <div className="flex items-baseline gap-2">
+            <div className="hidden items-baseline gap-8 pr-4 md:flex">
               <PdxLink to="/community">{t('nav.community')}</PdxLink>
               <PdxLink to={`${docsSiteUrl}guide/getting-started`}>
                 {t('nav.tutorials')}
@@ -161,17 +163,23 @@ function Home() {
       </PdxNav>
 
       <main className="flex w-full flex-1 flex-col items-center px-2">
-        <section className="flex min-h-[calc(100vh-128px)] w-full max-w-[960px] flex-col items-center justify-center py-14 text-center md:py-18">
-          <div className="text-(length:--font-size-xs) font-medium tracking-[0.16em] text-(--text-muted) uppercase">
+        <section className="relative isolate flex min-h-[calc(100vh-128px)] w-full max-w-[1120px] flex-col items-center justify-center py-14 text-center md:py-18">
+          <div
+            className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 w-screen -translate-x-1/2 overflow-hidden"
+            aria-hidden="true"
+          >
+            <div className={heroWordmarkClassName} />
+          </div>
+          <div className="relative z-10 text-(length:--font-size-xs) font-medium tracking-[0.16em] text-(--text-muted) uppercase">
             {t('hero.eyebrow')}
           </div>
-          <h1 className="mt-6 max-w-[780px] text-[44px] leading-[1.04] font-semibold text-(--home-hero-text) sm:text-[60px] lg:text-[76px]">
+          <h1 className="relative z-10 mt-6 max-w-[780px] text-[44px] leading-[1.04] font-semibold text-(--home-hero-text) sm:text-[60px] lg:text-[76px]">
             {t('hero.title')}
           </h1>
-          <p className="mt-6 max-w-[680px] text-(length:--font-size-xl) leading-[1.6] text-(--home-subtitle)">
+          <p className="relative z-10 mt-6 max-w-[680px] text-(length:--font-size-xl) leading-[1.6] text-(--home-subtitle)">
             {t('hero.subtitle')}
           </p>
-          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
+          <div className="relative z-10 mt-8 flex flex-col items-center gap-3 sm:flex-row">
             <PdxButtonLink
               text={t('actions.enterEditor')}
               size="Big"
@@ -186,7 +194,7 @@ function Home() {
               to={docsSiteUrl}
             />
           </div>
-          <div className="mt-12 grid w-full max-w-[720px] gap-px overflow-hidden rounded-lg border border-(--border-subtle) bg-(--border-subtle) sm:grid-cols-3">
+          <div className="relative z-10 mt-12 grid w-full max-w-[720px] gap-px overflow-hidden rounded-lg border border-(--border-subtle) bg-(--border-subtle) sm:grid-cols-3">
             {heroPoints.map((key) => (
               <div
                 key={key}
@@ -258,14 +266,20 @@ function Home() {
           </div>
           <div className="mt-10 grid gap-px overflow-hidden rounded-lg border border-(--border-subtle) bg-(--border-subtle) md:grid-cols-4">
             {workflowSteps.map((key, index) => (
-              <article key={key} className="bg-(--bg-panel) p-6">
-                <div className="font-mono text-(length:--font-size-xs) text-(--text-muted)">
+              <article
+                key={key}
+                className="relative overflow-hidden bg-(--bg-panel) p-6"
+              >
+                <div
+                  className="pointer-events-none absolute top-4 left-5 text-[92px] leading-none font-black text-(--home-logo) italic opacity-[0.075] sm:text-[108px]"
+                  aria-hidden="true"
+                >
                   {String(index + 1).padStart(2, '0')}
                 </div>
-                <h3 className="mt-8 text-(length:--font-size-xl) font-medium text-(--text-primary)">
+                <h3 className="relative z-10 mt-14 text-(length:--font-size-xl) font-medium text-(--text-primary)">
                   {t(`workflow.steps.${key}.title`)}
                 </h3>
-                <p className="mt-3 text-(length:--font-size-sm) leading-[1.65] text-(--text-secondary)">
+                <p className="relative z-10 mt-3 text-(length:--font-size-sm) leading-[1.65] text-(--text-secondary)">
                   {t(`workflow.steps.${key}.body`)}
                 </p>
               </article>
@@ -316,15 +330,21 @@ function Home() {
               </p>
             </div>
             <div className="grid gap-4">
-              {audienceItems.map((key) => (
+              {audienceItems.map((key, index) => (
                 <article
                   key={key}
-                  className="rounded-lg border border-(--border-subtle) bg-(--bg-panel) p-5"
+                  className="relative overflow-hidden rounded-lg border border-(--border-subtle) bg-(--bg-panel) p-5"
                 >
-                  <h3 className="text-(length:--font-size-md) font-medium text-(--text-primary)">
+                  <div
+                    className="pointer-events-none absolute top-3 left-4 text-[72px] leading-none font-black text-(--home-logo) italic opacity-[0.075]"
+                    aria-hidden="true"
+                  >
+                    {String(index + 1).padStart(2, '0')}
+                  </div>
+                  <h3 className="relative z-10 mt-10 text-(length:--font-size-md) font-medium text-(--text-primary)">
                     {t(`audience.items.${key}.title`)}
                   </h3>
-                  <p className="mt-2 text-(length:--font-size-sm) leading-[1.65] text-(--text-secondary)">
+                  <p className="relative z-10 mt-2 text-(length:--font-size-sm) leading-[1.65] text-(--text-secondary)">
                     {t(`audience.items.${key}.body`)}
                   </p>
                 </article>
@@ -346,12 +366,21 @@ function Home() {
             </p>
           </div>
           <div className="grid gap-px overflow-hidden rounded-lg border border-(--border-subtle) bg-(--border-subtle)">
-            {developerNotes.map((key) => (
-              <article key={key} className="bg-(--bg-panel) p-5">
-                <h3 className="text-(length:--font-size-md) font-medium text-(--text-primary)">
+            {developerNotes.map((key, index) => (
+              <article
+                key={key}
+                className="relative overflow-hidden bg-(--bg-panel) p-5"
+              >
+                <div
+                  className="pointer-events-none absolute top-3 left-4 text-[72px] leading-none font-black text-(--home-logo) italic opacity-[0.075]"
+                  aria-hidden="true"
+                >
+                  {String(index + 1).padStart(2, '0')}
+                </div>
+                <h3 className="relative z-10 mt-10 text-(length:--font-size-md) font-medium text-(--text-primary)">
                   {t(`developer.notes.${key}.title`)}
                 </h3>
-                <p className="mt-2 text-(length:--font-size-sm) leading-[1.65] text-(--text-secondary)">
+                <p className="relative z-10 mt-2 text-(length:--font-size-sm) leading-[1.65] text-(--text-secondary)">
                   {t(`developer.notes.${key}.body`)}
                 </p>
               </article>
@@ -392,7 +421,7 @@ function Home() {
           <div className="max-w-[360px]">
             <PdxLink
               to="/"
-              className={brandLinkClassName}
+              className={footerBrandLinkClassName}
               title={t('brand.name')}
             >
               <span className={footerWordmarkClassName} aria-hidden="true" />

@@ -39,6 +39,18 @@ import type { BlueprintEditorCanvasProps, PanState } from './canvasTypes';
 import { CanvasSvgFilters } from './CanvasSvgFilters';
 import { createRouteCanvasDiagnostics } from './routeDiagnostics';
 import { useActiveRoutePreview } from './useActiveRoutePreview';
+
+const escapeCssAttributeValue = (value: string) =>
+  value.replace(/["\\\n\r\f]/g, (char) => `\\${char}`);
+
+const createCanvasHiddenLayerCss = (nodeIds: string[]) =>
+  nodeIds
+    .filter((nodeId) => nodeId.trim().length > 0)
+    .map(
+      (nodeId) =>
+        `[data-pir-node-id="${escapeCssAttributeValue(nodeId)}"] > * { opacity: 0 !important; pointer-events: none !important; }`
+    )
+    .join('\n');
 /**
  * 交互链路：
  * 节点点击 -> PIRRenderer -> onSelectNode -> controller；
@@ -51,6 +63,7 @@ export function BlueprintEditorCanvas({
   zoom,
   pan,
   selectedId,
+  hiddenNodeIds,
   runtimeState,
   onPanChange,
   onZoomChange,
@@ -160,6 +173,10 @@ export function BlueprintEditorCanvas({
         svgFilters: animationSvgFilters,
       }),
     [animationElapsedMs, animationSvgFilters, animationTimelines]
+  );
+  const hiddenLayerCss = useMemo(
+    () => createCanvasHiddenLayerCss(hiddenNodeIds),
+    [hiddenNodeIds]
   );
 
   useEffect(() => {
@@ -444,6 +461,11 @@ export function BlueprintEditorCanvas({
             >
               {animationPreview.cssText ? (
                 <style>{animationPreview.cssText}</style>
+              ) : null}
+              {hiddenLayerCss ? (
+                <style data-blueprint-author-hidden-layers>
+                  {hiddenLayerCss}
+                </style>
               ) : null}
               <CanvasSvgFilters filters={animationPreview.svgFilters} />
               {hasChildren ? (

@@ -4,6 +4,7 @@ import './PdxNav.scss';
 
 interface PdxNavSpecificProps {
   columns?: 2 | 3;
+  align?: 'Start' | 'Center' | 'End' | 'Baseline' | 'Stretch';
   canHide?: boolean;
   isFloat?: boolean;
   backgroundStyle?: 'Transparent' | 'Solid' | 'Blurred';
@@ -14,6 +15,7 @@ interface PdxNavProps extends PdxComponent, PdxNavSpecificProps {}
 
 function PdxNav({
   columns = 2,
+  align = 'Center',
   canHide = false,
   isFloat = false,
   backgroundStyle = 'Solid',
@@ -26,7 +28,7 @@ function PdxNav({
   as: Component = 'nav',
 }: PdxNavProps) {
   const fullClassName =
-    `PdxNav Columns-${columns} ${isFloat ? 'Float' : ''} ${canHide ? 'CanHide' : ''} ${backgroundStyle} ${className || ''}`.trim();
+    `PdxNav Columns-${columns} Align-${align} ${isFloat ? 'Float' : ''} ${canHide ? 'CanHide' : ''} ${backgroundStyle} ${className || ''}`.trim();
   const dataProps = { ...dataAttributes };
   const Element = Component as React.ElementType;
 

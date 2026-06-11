@@ -2,11 +2,13 @@ package workspace
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	backendauth "github.com/Prodivix/prodivix/apps/backend/internal/modules/auth"
+	backendproject "github.com/Prodivix/prodivix/apps/backend/internal/modules/project"
 	backendresponse "github.com/Prodivix/prodivix/apps/backend/internal/platform/http/response"
 	"github.com/gin-gonic/gin"
 )
@@ -25,6 +27,7 @@ func (handler *Handler) Routes(requireAuth gin.HandlerFunc) RouteHandlers {
 		RequireAuth:              requireAuth,
 		GetWorkspace:             handler.HandleGetWorkspace,
 		GetWorkspaceCapabilities: handler.HandleGetWorkspaceCapabilities,
+		ImportLocalProject:       handler.HandleImportLocalProject,
 		PatchWorkspaceDocument:   handler.HandlePatchWorkspaceDocument,
 		ApplyWorkspaceIntent:     handler.HandleApplyWorkspaceIntent,
 		ApplyWorkspaceBatch:      handler.HandleApplyWorkspaceBatch,
@@ -50,6 +53,25 @@ type snapshotResponse struct {
 	Documents     []documentResponse `json:"documents"`
 	RouteManifest json.RawMessage    `json:"routeManifest"`
 	Settings      json.RawMessage    `json:"settings"`
+}
+
+type importLocalProjectRequest struct {
+	Name         string                      `json:"name"`
+	Description  string                      `json:"description"`
+	ResourceType backendproject.ResourceType `json:"resourceType"`
+	Workspace    importWorkspaceRequest      `json:"workspace"`
+}
+
+type importWorkspaceRequest struct {
+	ID                string                          `json:"id"`
+	WorkspaceRev      int64                           `json:"workspaceRev"`
+	RouteRev          int64                           `json:"routeRev"`
+	OpSeq             int64                           `json:"opSeq"`
+	Tree              json.RawMessage                 `json:"tree"`
+	Documents         []WorkspaceImportDocumentRecord `json:"documents"`
+	RouteManifest     json.RawMessage                 `json:"routeManifest"`
+	Settings          json.RawMessage                 `json:"settings"`
+	ActiveRouteNodeID string                          `json:"activeRouteNodeId"`
 }
 
 type PatchDocumentRequest struct {
@@ -112,6 +134,113 @@ func toIntent(intent intentEnvelope) IntentEnvelope {
 	return IntentEnvelope{ID: intent.ID, Namespace: intent.Namespace, Type: intent.Type, Version: intent.Version, Payload: intent.Payload, IdempotencyKey: intent.IdempotencyKey, Actor: actor, IssuedAt: intent.IssuedAt}
 }
 
+func buildSnapshotResponse(snapshot *WorkspaceSnapshot) snapshotResponse {
+	if snapshot == nil {
+		return snapshotResponse{}
+	}
+	documents := make([]documentResponse, 0, len(snapshot.Documents))
+	for _, document := range snapshot.Documents {
+		documents = append(documents, documentResponse{ID: document.ID, Type: document.Type, Path: document.Path, ContentRev: document.ContentRev, MetaRev: document.MetaRev, Content: document.Content, UpdatedAt: document.UpdatedAt})
+	}
+	return snapshotResponse{ID: snapshot.Workspace.ID, WorkspaceRev: snapshot.Workspace.WorkspaceRev, RouteRev: snapshot.Workspace.RouteRev, OpSeq: snapshot.Workspace.OpSeq, Tree: snapshot.Workspace.Tree, Documents: documents, RouteManifest: snapshot.RouteManifest, Settings: snapshot.Settings}
+}
+
+func resolveImportCanonicalPIR(documents []WorkspaceImportDocumentRecord) (json.RawMessage, bool) {
+	for _, document := range documents {
+		if document.Type == WorkspaceDocumentTypePIRPage &&
+			(strings.TrimSpace(document.Path) == "/" || strings.TrimSpace(document.Path) == "/pir.json" || strings.TrimSpace(document.Path) == "") {
+			return document.Content, true
+		}
+	}
+	for _, document := range documents {
+		if document.Type == WorkspaceDocumentTypePIRPage {
+			return document.Content, true
+		}
+	}
+	for _, document := range documents {
+		if isPIRWorkspaceDocumentType(document.Type) {
+			return document.Content, true
+		}
+	}
+	return nil, false
+}
+
+func (handler *Handler) HandleImportLocalProject(c *gin.Context) {
+	user, ok := backendauth.GetAuthUser[backendauth.User](c)
+	if !ok {
+		backendresponse.Error(c, http.StatusUnauthorized, "API-2001", "Authentication required.")
+		return
+	}
+	if handler.module == nil || handler.module.projects == nil || handler.store == nil {
+		backendresponse.Error(c, http.StatusInternalServerError, "API-5001", "Workspace import is not available.")
+		return
+	}
+
+	var request importLocalProjectRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		failure := NewRequestFailure(http.StatusBadRequest, ErrorInvalidPayload, "Invalid request payload.", nil)
+		c.JSON(failure.Status, failure.Payload)
+		return
+	}
+	pir, ok := resolveImportCanonicalPIR(request.Workspace.Documents)
+	if !ok {
+		failure := NewRequestFailure(http.StatusUnprocessableEntity, ErrorInvalidPayload, "Workspace import requires a PIR page document.", nil)
+		c.JSON(failure.Status, failure.Payload)
+		return
+	}
+
+	resourceType := request.ResourceType
+	if strings.TrimSpace(string(resourceType)) == "" {
+		resourceType = backendproject.ResourceTypeProject
+	}
+	project, err := handler.module.projects.Create(
+		user.ID,
+		request.Name,
+		request.Description,
+		resourceType,
+		false,
+		pir,
+	)
+	if err != nil {
+		if errors.Is(err, backendproject.ErrInvalidResourceType) {
+			backendresponse.Error(c, http.StatusBadRequest, "API-4001", "Resource type is invalid.")
+			return
+		}
+		var syntaxErr *json.SyntaxError
+		if errors.As(err, &syntaxErr) {
+			backendresponse.Error(c, http.StatusBadRequest, ErrorPIRValidationFailed, "PIR document is invalid.")
+			return
+		}
+		backendresponse.Error(c, http.StatusInternalServerError, "API-5001", "Could not import local project.")
+		return
+	}
+
+	snapshot, err := handler.store.ImportWorkspaceSnapshot(c.Request.Context(), ImportWorkspaceSnapshotParams{
+		WorkspaceID:   project.ID,
+		ProjectID:     project.ID,
+		OwnerID:       user.ID,
+		Name:          project.Name,
+		WorkspaceRev:  request.Workspace.WorkspaceRev,
+		RouteRev:      request.Workspace.RouteRev,
+		OpSeq:         request.Workspace.OpSeq,
+		Tree:          request.Workspace.Tree,
+		RouteManifest: request.Workspace.RouteManifest,
+		Settings:      request.Workspace.Settings,
+		Documents:     request.Workspace.Documents,
+	})
+	if err != nil {
+		_ = handler.module.projects.Delete(user.ID, project.ID)
+		failure := MapStoreError(err)
+		c.JSON(failure.Status, failure.Payload)
+		return
+	}
+
+	c.JSON(http.StatusCreated, map[string]any{
+		"project":   backendproject.ProjectSummary{ID: project.ID, ResourceType: project.ResourceType, Name: project.Name, Description: project.Description, IsPublic: project.IsPublic, StarsCount: project.StarsCount, CreatedAt: project.CreatedAt, UpdatedAt: project.UpdatedAt},
+		"workspace": buildSnapshotResponse(snapshot),
+	})
+}
+
 func (handler *Handler) HandleGetWorkspace(c *gin.Context) {
 	workspaceID := strings.TrimSpace(c.Param("workspaceId"))
 	user, ok := backendauth.GetAuthUser[backendauth.User](c)
@@ -125,11 +254,7 @@ func (handler *Handler) HandleGetWorkspace(c *gin.Context) {
 		c.JSON(failure.Status, failure.Payload)
 		return
 	}
-	documents := make([]documentResponse, 0, len(snapshot.Documents))
-	for _, document := range snapshot.Documents {
-		documents = append(documents, documentResponse{ID: document.ID, Type: document.Type, Path: document.Path, ContentRev: document.ContentRev, MetaRev: document.MetaRev, Content: document.Content, UpdatedAt: document.UpdatedAt})
-	}
-	c.JSON(http.StatusOK, map[string]any{"workspace": snapshotResponse{ID: snapshot.Workspace.ID, WorkspaceRev: snapshot.Workspace.WorkspaceRev, RouteRev: snapshot.Workspace.RouteRev, OpSeq: snapshot.Workspace.OpSeq, Tree: snapshot.Workspace.Tree, Documents: documents, RouteManifest: snapshot.RouteManifest, Settings: snapshot.Settings}})
+	c.JSON(http.StatusOK, map[string]any{"workspace": buildSnapshotResponse(snapshot)})
 }
 
 func (handler *Handler) HandleGetWorkspaceCapabilities(c *gin.Context) {

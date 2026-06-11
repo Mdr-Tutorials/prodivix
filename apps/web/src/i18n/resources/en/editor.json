@@ -18,8 +18,21 @@
       "deleting": "Deleting...",
       "deleteConfirm": "Delete this project permanently?",
       "publishFailed": "Failed to publish project.",
-      "deleteFailed": "Failed to delete project."
-    }
+      "deleteFailed": "Failed to delete project.",
+      "localOnly": "Local only",
+      "publishLocalDisabledReason": "Sign in to publish local projects.",
+      "syncToCloud": "Sync to Cloud",
+      "syncing": "Syncing...",
+      "syncFailed": "Failed to sync local project.",
+      "syncSignInRequired": "Sign in to sync local projects.",
+      "syncedCache": "Synced cache",
+      "saveAsLocalCopy": "Save as Local Copy",
+      "duplicating": "Creating copy...",
+      "copyFailed": "Failed to create local copy.",
+      "localCopyName": "{{name}} (local copy)"
+    },
+    "localModeHint": "Local projects are saved in this browser. Synced caches are read-only while signed out; save a local copy to edit offline.",
+    "localLoadFailed": "Failed to load local projects."
   },
   "projectHome": {
     "title": "{{name}}",
