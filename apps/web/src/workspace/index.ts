@@ -16,8 +16,13 @@ export {
 } from './workspaceSelectors';
 export {
   applyWorkspaceCommand,
+  createWorkspaceDirectoryIntentRequest,
   createWorkspaceCodeDocumentCommand,
   createWorkspaceCodeDocumentIntentRequest,
+  deleteWorkspaceDirectoryIntentRequest,
+  deleteWorkspaceCodeDocumentIntentRequest,
+  renameWorkspaceDirectoryIntentRequest,
+  renameWorkspaceCodeDocumentIntentRequest,
 } from './workspaceCommand';
 export {
   canRedoWorkspaceHistory,
@@ -40,9 +45,19 @@ export type {
   WorkspaceCommandIssue,
   WorkspaceCommandIssueCode,
   WorkspacePatchOperation,
+  CreateWorkspaceDirectoryIntentInput,
   CreateWorkspaceCodeDocumentCommandInput,
   CreateWorkspaceCodeDocumentIntentInput,
+  DeleteWorkspaceDirectoryIntentInput,
+  DeleteWorkspaceCodeDocumentIntentInput,
+  RenameWorkspaceDirectoryIntentInput,
+  RenameWorkspaceCodeDocumentIntentInput,
+  WorkspaceDirectoryCreateIntentRequest,
+  WorkspaceDirectoryDeleteIntentRequest,
+  WorkspaceDirectoryRenameIntentRequest,
   WorkspaceCodeDocumentCreateIntentRequest,
+  WorkspaceCodeDocumentDeleteIntentRequest,
+  WorkspaceCodeDocumentRenameIntentRequest,
 } from './workspaceCommand';
 export type {
   WorkspaceHistoryDocumentDomain,

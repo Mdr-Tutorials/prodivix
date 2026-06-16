@@ -1,19 +1,19 @@
-// src/editor/features/export/CodeViewer.tsx
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-// 引入 VS Code 暗色风格主题
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
+const exportCodeFontFamily = 'var(--font-family-mono)';
+
 interface CodeViewerProps {
-  code: string; // 要显示的代码字符串
-  lang?: string; // 语言类型，比如 'typescript', 'javascript', 'html'
+  code: string;
+  lang?: string;
   className?: string;
 }
 
-export const CodeViewer: React.FC<CodeViewerProps> = ({
+export function CodeViewer({
   code,
   lang = 'typescript',
   className,
-}) => {
+}: CodeViewerProps) {
   return (
     <div
       className={className}
@@ -23,6 +23,7 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({
         borderRadius: '8px',
         fontSize: '14px',
         lineHeight: '1',
+        fontFamily: exportCodeFontFamily,
       }}
     >
       <SyntaxHighlighter
@@ -30,6 +31,11 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({
         style={oneLight}
         showLineNumbers
         showInlineLineNumbers={false}
+        codeTagProps={{
+          style: {
+            fontFamily: exportCodeFontFamily,
+          },
+        }}
         lineNumberContainerStyle={{
           float: 'left',
           minWidth: '40px',
@@ -40,6 +46,7 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({
           opacity: 0.72,
           textAlign: 'right',
           userSelect: 'none',
+          fontFamily: exportCodeFontFamily,
         }}
         lineNumberStyle={{
           display: 'block',
@@ -47,15 +54,17 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({
           paddingRight: 0,
           color: 'inherit',
           fontVariantNumeric: 'tabular-nums',
+          fontFamily: exportCodeFontFamily,
         }}
         customStyle={{
           margin: 0,
           padding: '20px',
           height: '100%',
+          fontFamily: exportCodeFontFamily,
         }}
       >
         {code}
       </SyntaxHighlighter>
     </div>
   );
-};
+}

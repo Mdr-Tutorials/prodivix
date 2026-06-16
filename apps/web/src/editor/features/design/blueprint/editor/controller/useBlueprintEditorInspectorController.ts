@@ -79,8 +79,8 @@ export const useBlueprintEditorInspectorController = () => {
     (state) => state.workspaceCapabilitiesLoaded
   );
   const workspaceReadonly = useEditorStore((state) => state.workspaceReadonly);
-  const setWorkspaceSnapshot = useEditorStore(
-    (state) => state.setWorkspaceSnapshot
+  const applyWorkspaceMutation = useEditorStore(
+    (state) => state.applyWorkspaceMutation
   );
   const routeManifest = useEditorStore((state) => state.routeManifest);
   const activeRouteNodeId = useEditorStore((state) => state.activeRouteNodeId);
@@ -567,23 +567,27 @@ export const useBlueprintEditorInspectorController = () => {
           typeof document.content.source === 'string'
             ? document.content.source
             : '';
-        await editorApi.patchWorkspaceDocument(token, workspaceId, documentId, {
-          expectedContentRev: document.contentRev,
-          command: {
-            id: createIntentId(),
-            namespace: 'core.code',
-            type: 'source.update',
-            version: '1.0',
-            issuedAt: new Date().toISOString(),
-            forwardOps: [{ op: 'replace', path: '/source', value: source }],
-            reverseOps: [
-              { op: 'replace', path: '/source', value: previousSource },
-            ],
-            target: { workspaceId, documentId },
-          },
-        });
-        const { workspace } = await editorApi.getWorkspace(token, workspaceId);
-        setWorkspaceSnapshot(workspace);
+        const mutation = await editorApi.patchWorkspaceDocument(
+          token,
+          workspaceId,
+          documentId,
+          {
+            expectedContentRev: document.contentRev,
+            command: {
+              id: createIntentId(),
+              namespace: 'core.code',
+              type: 'source.update',
+              version: '1.0',
+              issuedAt: new Date().toISOString(),
+              forwardOps: [{ op: 'replace', path: '/source', value: source }],
+              reverseOps: [
+                { op: 'replace', path: '/source', value: previousSource },
+              ],
+              target: { workspaceId, documentId },
+            },
+          }
+        );
+        applyWorkspaceMutation(mutation);
         return true;
       }
 
@@ -605,9 +609,12 @@ export const useBlueprintEditorInspectorController = () => {
           },
         },
       });
-      await editorApi.applyWorkspaceIntent(token, workspaceId, request);
-      const { workspace } = await editorApi.getWorkspace(token, workspaceId);
-      setWorkspaceSnapshot(workspace);
+      const mutation = await editorApi.applyWorkspaceIntent(
+        token,
+        workspaceId,
+        request
+      );
+      applyWorkspaceMutation(mutation);
       updateSelectedNode((current) =>
         upsertMountedCssBinding(current, {
           slotId: createMountedCssSlotId(current.id),
@@ -617,9 +624,9 @@ export const useBlueprintEditorInspectorController = () => {
       return true;
     },
     [
+      applyWorkspaceMutation,
       mountedCssEntries,
       selectedNode?.id,
-      setWorkspaceSnapshot,
       token,
       updateSelectedNode,
       workspaceCapabilities,

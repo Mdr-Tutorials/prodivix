@@ -452,7 +452,8 @@ WHERE workspace_id = $1
 ORDER BY path ASC`)
 	insertDocument := regexp.QuoteMeta(`INSERT INTO workspace_documents (
 	workspace_id, id, doc_type, name, path, content_rev, meta_rev, content_json, updated_at
-) VALUES ($1, $2, $3, $4, $5, 1, 1, $6::jsonb, NOW())`)
+) VALUES ($1, $2, $3, $4, $5, 1, 1, $6::jsonb, NOW())
+RETURNING workspace_id, id, doc_type, name, path, content_rev, meta_rev, content_json, updated_at`)
 	updateWorkspace := regexp.QuoteMeta(`UPDATE workspaces
 SET tree_json = $2::jsonb, workspace_rev = workspace_rev + 1, op_seq = op_seq + 1, updated_at = NOW()
 WHERE id = $1
@@ -470,7 +471,7 @@ VALUES ($1, $2, $3, $4, $5::jsonb, $6)`)
 		WillReturnRows(sqlmock.NewRows([]string{
 			"workspace_id", "id", "doc_type", "name", "path", "content_rev", "meta_rev", "content_json", "updated_at",
 		}))
-	mock.ExpectExec(insertDocument).
+	mock.ExpectQuery(insertDocument).
 		WithArgs(
 			"ws_1",
 			"code_mounted_css_button_1",
@@ -479,7 +480,19 @@ VALUES ($1, $2, $3, $4, $5::jsonb, $6)`)
 			"/styles/mounted/button-1.css",
 			`{"language":"css","metadata":{"slotKind":"mounted-css"},"source":"/* Mounted CSS */\n"}`,
 		).
-		WillReturnResult(sqlmock.NewResult(1, 1))
+		WillReturnRows(sqlmock.NewRows([]string{
+			"workspace_id", "id", "doc_type", "name", "path", "content_rev", "meta_rev", "content_json", "updated_at",
+		}).AddRow(
+			"ws_1",
+			"code_mounted_css_button_1",
+			"code",
+			"button-1.css",
+			"/styles/mounted/button-1.css",
+			1,
+			1,
+			[]byte(`{"language":"css","metadata":{"slotKind":"mounted-css"},"source":"/* Mounted CSS */\n"}`),
+			now,
+		))
 	mock.ExpectQuery(updateWorkspace).
 		WithArgs("ws_1", sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"workspace_rev", "route_rev", "op_seq"}).AddRow(10, 4, 35))
@@ -532,6 +545,22 @@ VALUES ($1, $2, $3, $4, $5::jsonb, $6)`)
 	}
 	if payload["workspaceRev"] != float64(10) || payload["opSeq"] != float64(35) {
 		t.Fatalf("unexpected mutation payload: %v", payload)
+	}
+	updatedDocuments, ok := payload["updatedDocuments"].([]any)
+	if !ok || len(updatedDocuments) != 1 {
+		t.Fatalf("missing updated document payload: %v", payload)
+	}
+	updatedDocument, ok := updatedDocuments[0].(map[string]any)
+	if !ok {
+		t.Fatalf("invalid updated document payload: %v", updatedDocuments[0])
+	}
+	content, ok := updatedDocument["content"].(map[string]any)
+	if !ok ||
+		updatedDocument["type"] != "code" ||
+		updatedDocument["path"] != "/styles/mounted/button-1.css" ||
+		content["language"] != "css" ||
+		content["source"] != "/* Mounted CSS */\n" {
+		t.Fatalf("unexpected updated document payload: %v", updatedDocument)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("sql expectations: %v", err)

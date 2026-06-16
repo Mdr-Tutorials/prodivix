@@ -351,9 +351,7 @@ Store 必须在一个事务中：
 }
 ```
 
-前端创建成功后重新拉取 workspace snapshot。
-
-长期建议扩展：
+创建和更新成功后，前端直接消费 mutation response 中的完整文档记录，不再为了 code document 内容同步重新拉取 workspace snapshot。
 
 ```ts
 {
@@ -361,14 +359,10 @@ Store 必须在一个事务中：
   workspaceRev: number;
   routeRev: number;
   opSeq: number;
-  updatedDocuments?: WorkspaceDocumentRevision[];
-  createdDocuments?: WorkspaceDocumentRecord[];
-  tree?: WorkspaceSnapshot['tree'];
+  updatedDocuments?: WorkspaceDocumentRecord[];
   acceptedMutationId?: string;
 }
 ```
-
-Phase 1 为了稳定，可以选择 refetch，而不是先发明半套增量 tree patch response。
 
 ## 前端实现
 

@@ -44,7 +44,7 @@ function AnimationPanelView() {
             {t('inspector.groups.animation.selectedNode', {
               defaultValue: 'Current node',
             })}
-            <span className="font-mono text-(--text-secondary)">
+            <span className="[font-family:var(--font-family-mono)] text-(--text-secondary)">
               {`: ${selectedNode.id}`}
             </span>
           </>

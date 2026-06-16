@@ -91,8 +91,53 @@ export type CreateWorkspaceCodeDocumentIntentInput = {
   issuedAt: string;
   documentId: WorkspaceDocumentId;
   nodeId?: WorkspaceVfsNodeId;
+  parentNodeId?: WorkspaceVfsNodeId;
   path: string;
   content: WorkspaceCodeDocumentContent;
+  clientMutationId?: string;
+};
+
+export type RenameWorkspaceCodeDocumentIntentInput = {
+  workspaceRev: number;
+  intentId: string;
+  issuedAt: string;
+  documentId: WorkspaceDocumentId;
+  path: string;
+  clientMutationId?: string;
+};
+
+export type DeleteWorkspaceCodeDocumentIntentInput = {
+  workspaceRev: number;
+  intentId: string;
+  issuedAt: string;
+  documentId: WorkspaceDocumentId;
+  clientMutationId?: string;
+};
+
+export type CreateWorkspaceDirectoryIntentInput = {
+  workspaceRev: number;
+  intentId: string;
+  issuedAt: string;
+  nodeId: WorkspaceVfsNodeId;
+  parentNodeId?: WorkspaceVfsNodeId;
+  name: string;
+  clientMutationId?: string;
+};
+
+export type RenameWorkspaceDirectoryIntentInput = {
+  workspaceRev: number;
+  intentId: string;
+  issuedAt: string;
+  nodeId: WorkspaceVfsNodeId;
+  name: string;
+  clientMutationId?: string;
+};
+
+export type DeleteWorkspaceDirectoryIntentInput = {
+  workspaceRev: number;
+  intentId: string;
+  issuedAt: string;
+  nodeId: WorkspaceVfsNodeId;
   clientMutationId?: string;
 };
 
@@ -106,8 +151,88 @@ export type WorkspaceCodeDocumentCreateIntentRequest = {
     payload: {
       documentId: WorkspaceDocumentId;
       nodeId?: WorkspaceVfsNodeId;
+      parentNodeId?: WorkspaceVfsNodeId;
       path: string;
       content: WorkspaceCodeDocumentContent;
+    };
+    issuedAt: string;
+  };
+  clientMutationId?: string;
+};
+
+export type WorkspaceCodeDocumentRenameIntentRequest = {
+  expectedWorkspaceRev: number;
+  intent: {
+    id: string;
+    namespace: 'core.workspace';
+    type: 'code-document.rename';
+    version: '1.0';
+    payload: {
+      documentId: WorkspaceDocumentId;
+      path: string;
+    };
+    issuedAt: string;
+  };
+  clientMutationId?: string;
+};
+
+export type WorkspaceCodeDocumentDeleteIntentRequest = {
+  expectedWorkspaceRev: number;
+  intent: {
+    id: string;
+    namespace: 'core.workspace';
+    type: 'code-document.delete';
+    version: '1.0';
+    payload: {
+      documentId: WorkspaceDocumentId;
+    };
+    issuedAt: string;
+  };
+  clientMutationId?: string;
+};
+
+export type WorkspaceDirectoryCreateIntentRequest = {
+  expectedWorkspaceRev: number;
+  intent: {
+    id: string;
+    namespace: 'core.workspace';
+    type: 'directory.create';
+    version: '1.0';
+    payload: {
+      nodeId: WorkspaceVfsNodeId;
+      parentNodeId?: WorkspaceVfsNodeId;
+      name: string;
+    };
+    issuedAt: string;
+  };
+  clientMutationId?: string;
+};
+
+export type WorkspaceDirectoryRenameIntentRequest = {
+  expectedWorkspaceRev: number;
+  intent: {
+    id: string;
+    namespace: 'core.workspace';
+    type: 'directory.rename';
+    version: '1.0';
+    payload: {
+      nodeId: WorkspaceVfsNodeId;
+      name: string;
+    };
+    issuedAt: string;
+  };
+  clientMutationId?: string;
+};
+
+export type WorkspaceDirectoryDeleteIntentRequest = {
+  expectedWorkspaceRev: number;
+  intent: {
+    id: string;
+    namespace: 'core.workspace';
+    type: 'directory.delete';
+    version: '1.0';
+    payload: {
+      nodeId: WorkspaceVfsNodeId;
     };
     issuedAt: string;
   };
@@ -249,8 +374,34 @@ const removeValue = (source: unknown, path: string): boolean => {
   return true;
 };
 
-const valuesEqual = (left: unknown, right: unknown): boolean =>
-  JSON.stringify(left) === JSON.stringify(right);
+const valuesEqual = (left: unknown, right: unknown): boolean => {
+  if (Object.is(left, right)) return true;
+
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right)) return false;
+    if (left.length !== right.length) return false;
+    return left.every((item, index) => valuesEqual(item, right[index]));
+  }
+
+  if (isObjectLike(left) || isObjectLike(right)) {
+    if (
+      !isObjectLike(left) ||
+      !isObjectLike(right) ||
+      Array.isArray(left) ||
+      Array.isArray(right)
+    ) {
+      return false;
+    }
+
+    const leftKeys = Object.keys(left).sort();
+    const rightKeys = Object.keys(right).sort();
+    if (!valuesEqual(leftKeys, rightKeys)) return false;
+
+    return leftKeys.every((key) => valuesEqual(left[key], right[key]));
+  }
+
+  return false;
+};
 
 const ROOT_PATH = '/';
 
@@ -584,6 +735,7 @@ export const createWorkspaceCodeDocumentIntentRequest = ({
   issuedAt,
   documentId,
   nodeId,
+  parentNodeId,
   path,
   content,
   clientMutationId,
@@ -597,8 +749,122 @@ export const createWorkspaceCodeDocumentIntentRequest = ({
     payload: {
       documentId,
       ...(nodeId ? { nodeId } : {}),
+      ...(parentNodeId ? { parentNodeId } : {}),
       path,
       content,
+    },
+    issuedAt,
+  },
+  ...(clientMutationId ? { clientMutationId } : {}),
+});
+
+export const renameWorkspaceCodeDocumentIntentRequest = ({
+  workspaceRev,
+  intentId,
+  issuedAt,
+  documentId,
+  path,
+  clientMutationId,
+}: RenameWorkspaceCodeDocumentIntentInput): WorkspaceCodeDocumentRenameIntentRequest => ({
+  expectedWorkspaceRev: workspaceRev,
+  intent: {
+    id: intentId,
+    namespace: 'core.workspace',
+    type: 'code-document.rename',
+    version: '1.0',
+    payload: {
+      documentId,
+      path,
+    },
+    issuedAt,
+  },
+  ...(clientMutationId ? { clientMutationId } : {}),
+});
+
+export const deleteWorkspaceCodeDocumentIntentRequest = ({
+  workspaceRev,
+  intentId,
+  issuedAt,
+  documentId,
+  clientMutationId,
+}: DeleteWorkspaceCodeDocumentIntentInput): WorkspaceCodeDocumentDeleteIntentRequest => ({
+  expectedWorkspaceRev: workspaceRev,
+  intent: {
+    id: intentId,
+    namespace: 'core.workspace',
+    type: 'code-document.delete',
+    version: '1.0',
+    payload: {
+      documentId,
+    },
+    issuedAt,
+  },
+  ...(clientMutationId ? { clientMutationId } : {}),
+});
+
+export const createWorkspaceDirectoryIntentRequest = ({
+  workspaceRev,
+  intentId,
+  issuedAt,
+  nodeId,
+  parentNodeId,
+  name,
+  clientMutationId,
+}: CreateWorkspaceDirectoryIntentInput): WorkspaceDirectoryCreateIntentRequest => ({
+  expectedWorkspaceRev: workspaceRev,
+  intent: {
+    id: intentId,
+    namespace: 'core.workspace',
+    type: 'directory.create',
+    version: '1.0',
+    payload: {
+      nodeId,
+      ...(parentNodeId ? { parentNodeId } : {}),
+      name,
+    },
+    issuedAt,
+  },
+  ...(clientMutationId ? { clientMutationId } : {}),
+});
+
+export const renameWorkspaceDirectoryIntentRequest = ({
+  workspaceRev,
+  intentId,
+  issuedAt,
+  nodeId,
+  name,
+  clientMutationId,
+}: RenameWorkspaceDirectoryIntentInput): WorkspaceDirectoryRenameIntentRequest => ({
+  expectedWorkspaceRev: workspaceRev,
+  intent: {
+    id: intentId,
+    namespace: 'core.workspace',
+    type: 'directory.rename',
+    version: '1.0',
+    payload: {
+      nodeId,
+      name,
+    },
+    issuedAt,
+  },
+  ...(clientMutationId ? { clientMutationId } : {}),
+});
+
+export const deleteWorkspaceDirectoryIntentRequest = ({
+  workspaceRev,
+  intentId,
+  issuedAt,
+  nodeId,
+  clientMutationId,
+}: DeleteWorkspaceDirectoryIntentInput): WorkspaceDirectoryDeleteIntentRequest => ({
+  expectedWorkspaceRev: workspaceRev,
+  intent: {
+    id: intentId,
+    namespace: 'core.workspace',
+    type: 'directory.delete',
+    version: '1.0',
+    payload: {
+      nodeId,
     },
     issuedAt,
   },

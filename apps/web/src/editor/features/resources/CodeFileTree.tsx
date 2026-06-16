@@ -11,8 +11,11 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { CodeResourceNode } from './codeTree';
-import { CODE_FILE_KINDS, type CodeFileKind } from './codeResourceModel';
+import {
+  CODE_FILE_KINDS,
+  type CodeFileKind,
+  type CodeResourceNode,
+} from './codeResourceModel';
 import { useEditorShortcut } from '@/editor/shortcuts';
 
 type CodeFileTreeProps = {
@@ -24,6 +27,8 @@ type CodeFileTreeProps = {
   onCreateCodeFile?: (parentId: string, kind?: CodeFileKind) => void;
   onRename?: (nodeId: string, nextName: string) => void;
   onDelete?: (nodeId: string) => void;
+  canCreateFolder?: boolean;
+  canCreateCodeFile?: boolean;
 };
 
 const buildInitialExpandedState = (node: CodeResourceNode) => {
@@ -60,6 +65,8 @@ export function CodeFileTree({
   onCreateCodeFile,
   onRename,
   onDelete,
+  canCreateFolder = Boolean(onCreateFolder),
+  canCreateCodeFile = Boolean(onCreateCodeFile),
 }: CodeFileTreeProps) {
   const { t } = useTranslation('editor');
   const [expanded, setExpanded] = useState<Record<string, boolean>>(
@@ -257,23 +264,29 @@ export function CodeFileTree({
           <div className="hidden items-center gap-1 group-hover:inline-flex">
             {isFolder ? (
               <>
+                {canCreateFolder ? (
+                  <button
+                    type="button"
+                    className="inline-flex h-6 w-6 items-center justify-center rounded border border-transparent text-(--text-secondary) hover:border-black/12 hover:text-(--text-primary)"
+                    aria-label={`create-folder-${node.id}`}
+                    title={t('resourceManager.tree.actions.newFolder')}
+                    onClick={() => {
+                      setExpanded((current) => ({
+                        ...current,
+                        [node.id]: true,
+                      }));
+                      onCreateFolder?.(node.id);
+                    }}
+                  >
+                    <FolderPlus size={12} />
+                  </button>
+                ) : null}
                 <button
                   type="button"
-                  className="inline-flex h-6 w-6 items-center justify-center rounded border border-transparent text-(--text-secondary) hover:border-black/12 hover:text-(--text-primary)"
-                  aria-label={`create-folder-${node.id}`}
-                  title={t('resourceManager.tree.actions.newFolder')}
-                  onClick={() => {
-                    setExpanded((current) => ({ ...current, [node.id]: true }));
-                    onCreateFolder?.(node.id);
-                  }}
-                >
-                  <FolderPlus size={12} />
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex h-6 w-6 items-center justify-center rounded border border-transparent text-(--text-secondary) hover:border-black/12 hover:text-(--text-primary)"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded border border-transparent text-(--text-secondary) hover:border-black/12 hover:text-(--text-primary) disabled:cursor-not-allowed disabled:opacity-40"
                   aria-label={`create-code-file-${node.id}`}
                   title={t('resourceManager.tree.actions.newCodeFile')}
+                  disabled={!canCreateCodeFile}
                   onClick={() => {
                     setExpanded((current) => ({ ...current, [node.id]: true }));
                     onCreateCodeFile?.(node.id);
@@ -283,26 +296,30 @@ export function CodeFileTree({
                 </button>
               </>
             ) : null}
-            {node.id !== tree.id ? (
+            {node.id !== tree.id && (onRename || onDelete) ? (
               <>
-                <button
-                  type="button"
-                  className="inline-flex h-6 w-6 items-center justify-center rounded border border-transparent text-(--text-secondary) hover:border-black/12 hover:text-(--text-primary)"
-                  aria-label={`rename-${node.id}`}
-                  title={t('resourceManager.tree.actions.renameF2')}
-                  onClick={() => startRenaming(node)}
-                >
-                  <Pencil size={12} />
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex h-6 w-6 items-center justify-center rounded border border-transparent text-(--text-secondary) hover:border-black/12 hover:text-(--text-primary)"
-                  aria-label={`delete-${node.id}`}
-                  title={t('resourceManager.tree.actions.delete')}
-                  onClick={() => onDelete?.(node.id)}
-                >
-                  <Trash2 size={12} />
-                </button>
+                {onRename ? (
+                  <button
+                    type="button"
+                    className="inline-flex h-6 w-6 items-center justify-center rounded border border-transparent text-(--text-secondary) hover:border-black/12 hover:text-(--text-primary)"
+                    aria-label={`rename-${node.id}`}
+                    title={t('resourceManager.tree.actions.renameF2')}
+                    onClick={() => startRenaming(node)}
+                  >
+                    <Pencil size={12} />
+                  </button>
+                ) : null}
+                {onDelete ? (
+                  <button
+                    type="button"
+                    className="inline-flex h-6 w-6 items-center justify-center rounded border border-transparent text-(--text-secondary) hover:border-black/12 hover:text-(--text-primary)"
+                    aria-label={`delete-${node.id}`}
+                    title={t('resourceManager.tree.actions.delete')}
+                    onClick={() => onDelete?.(node.id)}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                ) : null}
               </>
             ) : null}
           </div>
@@ -321,26 +338,29 @@ export function CodeFileTree({
           {t('resourceManager.tree.codeTree')}
         </p>
         <div className="inline-flex items-center gap-1">
+          {canCreateFolder ? (
+            <button
+              type="button"
+              className="inline-flex h-6 w-6 items-center justify-center rounded border border-transparent text-(--text-secondary) hover:border-black/12 hover:text-(--text-primary)"
+              aria-label="toolbar-create-folder"
+              title={t('resourceManager.tree.actions.newFolder')}
+              onClick={() => {
+                setExpanded((current) => ({
+                  ...current,
+                  [toolbarParentId]: true,
+                }));
+                onCreateFolder?.(toolbarParentId);
+              }}
+            >
+              <FolderPlus size={12} />
+            </button>
+          ) : null}
           <button
             type="button"
-            className="inline-flex h-6 w-6 items-center justify-center rounded border border-transparent text-(--text-secondary) hover:border-black/12 hover:text-(--text-primary)"
-            aria-label="toolbar-create-folder"
-            title={t('resourceManager.tree.actions.newFolder')}
-            onClick={() => {
-              setExpanded((current) => ({
-                ...current,
-                [toolbarParentId]: true,
-              }));
-              onCreateFolder?.(toolbarParentId);
-            }}
-          >
-            <FolderPlus size={12} />
-          </button>
-          <button
-            type="button"
-            className="inline-flex h-6 w-6 items-center justify-center rounded border border-transparent text-(--text-secondary) hover:border-black/12 hover:text-(--text-primary)"
+            className="inline-flex h-6 w-6 items-center justify-center rounded border border-transparent text-(--text-secondary) hover:border-black/12 hover:text-(--text-primary) disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="toolbar-create-code-file"
             title={t('resourceManager.tree.actions.newCodeFile')}
+            disabled={!canCreateCodeFile}
             onClick={() => {
               setExpanded((current) => ({
                 ...current,
@@ -372,7 +392,9 @@ export function CodeFileTree({
                     key={kind}
                     type="button"
                     className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left hover:bg-black/5"
+                    disabled={!canCreateCodeFile}
                     onClick={() => {
+                      if (!canCreateCodeFile) return;
                       setExpanded((current) => ({
                         ...current,
                         [targetParentId]: true,

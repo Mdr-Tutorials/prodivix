@@ -294,7 +294,7 @@ const DebugToggleButton = ({
         <div className="mb-1 text-[10px] font-medium text-(--text-muted) uppercase">
           {label}
         </div>
-        <div className="max-h-56 overflow-auto font-mono text-[11px] whitespace-pre-wrap text-(--text-secondary) select-text">
+        <div className="max-h-56 overflow-auto [font-family:var(--font-family-mono)] text-[11px] whitespace-pre-wrap text-(--text-secondary) select-text">
           {renderDebugValue(parseDebugContent(content))}
         </div>
       </div>

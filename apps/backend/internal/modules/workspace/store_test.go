@@ -58,7 +58,7 @@ FOR UPDATE OF d, w`)
 	updateDocument := regexp.QuoteMeta(`UPDATE workspace_documents
 SET content_json = $3::jsonb, content_rev = content_rev + 1, updated_at = NOW()
 WHERE workspace_id = $1 AND id = $2
-RETURNING content_rev, meta_rev`)
+RETURNING workspace_id, id, doc_type, name, path, content_rev, meta_rev, content_json, updated_at`)
 	bumpSequenceOnly := regexp.QuoteMeta(`UPDATE workspaces
 SET op_seq = op_seq + 1, updated_at = NOW()
 WHERE id = $1
@@ -72,7 +72,19 @@ VALUES ($1, $2, $3, $4, $5::jsonb, $6)`)
 		WillReturnRows(sqlmock.NewRows([]string{"content_rev", "meta_rev", "workspace_rev", "route_rev", "op_seq"}).AddRow(3, 1, 9, 4, 33))
 	mock.ExpectQuery(updateDocument).
 		WithArgs("ws_1", "doc_home", `{"title":"next"}`).
-		WillReturnRows(sqlmock.NewRows([]string{"content_rev", "meta_rev"}).AddRow(4, 1))
+		WillReturnRows(sqlmock.NewRows([]string{
+			"workspace_id", "id", "doc_type", "name", "path", "content_rev", "meta_rev", "content_json", "updated_at",
+		}).AddRow(
+			"ws_1",
+			"doc_home",
+			"pir-page",
+			"Home",
+			"/pages/home.pir.json",
+			4,
+			1,
+			[]byte(`{"title":"next"}`),
+			issuedAt.UTC(),
+		))
 	mock.ExpectQuery(bumpSequenceOnly).
 		WithArgs("ws_1").
 		WillReturnRows(sqlmock.NewRows([]string{"workspace_rev", "route_rev", "op_seq"}).AddRow(9, 4, 34))
@@ -97,7 +109,9 @@ VALUES ($1, $2, $3, $4, $5::jsonb, $6)`)
 	if result.RouteRev != 4 {
 		t.Fatalf("routeRev changed unexpectedly: got %d", result.RouteRev)
 	}
-	if len(result.UpdatedDocuments) != 1 || result.UpdatedDocuments[0].ContentRev != 4 {
+	if len(result.UpdatedDocuments) != 1 ||
+		result.UpdatedDocuments[0].ContentRev != 4 ||
+		string(result.UpdatedDocuments[0].Content) != `{"title":"next"}` {
 		t.Fatalf("unexpected updated documents: %+v", result.UpdatedDocuments)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -189,7 +203,7 @@ FOR UPDATE OF d, w`)
 	updateDocument := regexp.QuoteMeta(`UPDATE workspace_documents
 SET content_json = $3::jsonb, content_rev = content_rev + 1, updated_at = NOW()
 WHERE workspace_id = $1 AND id = $2
-RETURNING content_rev, meta_rev`)
+RETURNING workspace_id, id, doc_type, name, path, content_rev, meta_rev, content_json, updated_at`)
 	bumpSequenceOnly := regexp.QuoteMeta(`UPDATE workspaces
 SET op_seq = op_seq + 1, updated_at = NOW()
 WHERE id = $1
@@ -204,7 +218,19 @@ VALUES ($1, $2, $3, $4, $5::jsonb, $6)`)
 			AddRow("code", []byte(`{"language":"ts","source":"export function openDialog() {}"}`), 3, 1, 9, 4, 33))
 	mock.ExpectQuery(updateDocument).
 		WithArgs("ws_1", "code_open_dialog", `{"language":"ts","source":"export function openDialog(id) { return id; }"}`).
-		WillReturnRows(sqlmock.NewRows([]string{"content_rev", "meta_rev"}).AddRow(4, 1))
+		WillReturnRows(sqlmock.NewRows([]string{
+			"workspace_id", "id", "doc_type", "name", "path", "content_rev", "meta_rev", "content_json", "updated_at",
+		}).AddRow(
+			"ws_1",
+			"code_open_dialog",
+			"code",
+			"openDialog.ts",
+			"/src/actions/openDialog.ts",
+			4,
+			1,
+			[]byte(`{"language":"ts","source":"export function openDialog(id) { return id; }"}`),
+			issuedAt.UTC(),
+		))
 	mock.ExpectQuery(bumpSequenceOnly).
 		WithArgs("ws_1").
 		WillReturnRows(sqlmock.NewRows([]string{"workspace_rev", "route_rev", "op_seq"}).AddRow(9, 4, 34))
@@ -222,7 +248,9 @@ VALUES ($1, $2, $3, $4, $5::jsonb, $6)`)
 	if err != nil {
 		t.Fatalf("patch code document content: %v", err)
 	}
-	if len(result.UpdatedDocuments) != 1 || result.UpdatedDocuments[0].ContentRev != 4 {
+	if len(result.UpdatedDocuments) != 1 ||
+		result.UpdatedDocuments[0].ContentRev != 4 ||
+		string(result.UpdatedDocuments[0].Content) != `{"language":"ts","source":"export function openDialog(id) { return id; }"}` {
 		t.Fatalf("unexpected updated documents: %+v", result.UpdatedDocuments)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {

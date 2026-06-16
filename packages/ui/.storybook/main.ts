@@ -1,5 +1,9 @@
 import type { StorybookConfig } from '@storybook/react-vite';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import { mergeConfig, type UserConfig } from 'vite';
+
+const storybookDir = dirname(fileURLToPath(import.meta.url));
 
 function shouldIgnoreRollupWarning(warning: {
   code?: string;
@@ -26,6 +30,12 @@ const config: StorybookConfig = {
   },
   viteFinal: async (baseConfig) =>
     mergeConfig(baseConfig, {
+      resolve: {
+        alias: {
+          '@prodivix/shared': resolve(storybookDir, '../../shared/src'),
+          '@prodivix/themes': resolve(storybookDir, '../../themes/src'),
+        },
+      },
       build: {
         rollupOptions: {
           onwarn(warning, warn) {

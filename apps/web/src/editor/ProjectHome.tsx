@@ -171,7 +171,7 @@ function ProjectHome() {
           <span className="text-(--text-muted)">
             {t('projectHome.fields.id')}
           </span>
-          <span className="font-mono font-semibold text-(--text-primary)">
+          <span className="[font-family:var(--font-family-mono)] font-semibold text-(--text-primary)">
             {resolvedProjectId}
           </span>
         </div>
@@ -179,7 +179,7 @@ function ProjectHome() {
           <span className="text-(--text-muted)">
             {t('projectHome.fields.name')}
           </span>
-          <span className="font-mono font-semibold text-(--text-primary)">
+          <span className="[font-family:var(--font-family-mono)] font-semibold text-(--text-primary)">
             {projectName}
           </span>
         </div>

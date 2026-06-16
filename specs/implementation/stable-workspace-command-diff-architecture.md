@@ -875,8 +875,12 @@ PATCH /api/workspaces/:id/commands
   opSeq: number;
   updatedDocuments: Array<{
     id: DocumentId;
+    type: WorkspaceDocumentType;
+    path: string;
     contentRev: number;
     metaRev: number;
+    content: unknown;
+    updatedAt: string;
   }>;
 }
 ```

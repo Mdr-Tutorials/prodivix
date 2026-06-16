@@ -104,6 +104,12 @@ func BuildMutationSuccessPayload(result *WorkspaceMutationResult, acceptedMutati
 	if len(result.UpdatedDocuments) > 0 {
 		response["updatedDocuments"] = result.UpdatedDocuments
 	}
+	if len(result.RemovedDocumentIDs) > 0 {
+		response["removedDocumentIds"] = result.RemovedDocumentIDs
+	}
+	if len(result.Tree) > 0 {
+		response["tree"] = result.Tree
+	}
 	if acceptedMutationID != "" {
 		response["acceptedMutationId"] = acceptedMutationID
 	}
@@ -183,6 +189,11 @@ func DefaultCapabilities() map[string]bool {
 		"core.route.manifest.update@1.0":           true,
 		"core.settings.global.update@1.0":          true,
 		"core.workspace.code-document.create@1.0":  true,
+		"core.workspace.code-document.rename@1.0":  true,
+		"core.workspace.code-document.delete@1.0":  true,
+		"core.workspace.directory.create@1.0":      true,
+		"core.workspace.directory.rename@1.0":      true,
+		"core.workspace.directory.delete@1.0":      true,
 		"core.nodegraph.node.move@1.0":             false,
 		"core.nodegraph.edge.connect@1.0":          false,
 		"core.animation.timeline.keyframe.add@1.0": false,

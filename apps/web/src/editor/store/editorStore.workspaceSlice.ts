@@ -178,29 +178,64 @@ export const createWorkspaceSlice: StateCreator<
       }
 
       let nextDocumentsById = state.workspaceDocumentsById;
+      let nextPirDoc = state.pirDoc;
       if (mutation.updatedDocuments?.length) {
         nextDocumentsById = { ...state.workspaceDocumentsById };
-        mutation.updatedDocuments.forEach((documentRevision) => {
-          const previousDocument = nextDocumentsById[documentRevision.id];
-          if (!previousDocument) {
-            return;
-          }
-          nextDocumentsById[documentRevision.id] = {
+        mutation.updatedDocuments.forEach((document) => {
+          const previousDocument = nextDocumentsById[document.id];
+          const nextDocument = normalizeWorkspaceDocument({
             ...previousDocument,
-            contentRev: documentRevision.contentRev,
-            metaRev: documentRevision.metaRev,
-            ...(documentRevision.id === state.activeDocumentId
-              ? { content: state.pirDoc }
-              : null),
-          };
+            ...document,
+          });
+          nextDocumentsById[document.id] = nextDocument;
+          if (
+            document.id === state.activeDocumentId &&
+            isWorkspacePirDocument(nextDocument)
+          ) {
+            nextPirDoc = nextDocument.content;
+          }
         });
       }
+      if (mutation.removedDocumentIds?.length) {
+        nextDocumentsById =
+          nextDocumentsById === state.workspaceDocumentsById
+            ? { ...state.workspaceDocumentsById }
+            : nextDocumentsById;
+        mutation.removedDocumentIds.forEach((documentId) => {
+          delete nextDocumentsById[documentId];
+        });
+      }
+      const { treeRootId, treeById } = mutation.tree
+        ? normalizeWorkspaceTree(mutation.tree, nextDocumentsById)
+        : { treeRootId: state.treeRootId, treeById: state.treeById };
+      const nextActiveDocumentId =
+        state.activeDocumentId && nextDocumentsById[state.activeDocumentId]
+          ? state.activeDocumentId
+          : resolveCanonicalWorkspaceDocumentId(
+              Object.values(nextDocumentsById)
+            );
+      if (nextActiveDocumentId !== state.activeDocumentId) {
+        const nextActiveDocument = nextActiveDocumentId
+          ? nextDocumentsById[nextActiveDocumentId]
+          : undefined;
+        if (isWorkspacePirDocument(nextActiveDocument)) {
+          nextPirDoc = nextActiveDocument.content;
+        }
+      }
 
+      const pirDocChanged = nextPirDoc !== state.pirDoc;
       return {
         workspaceRev: mutation.workspaceRev,
         routeRev: mutation.routeRev,
         opSeq: mutation.opSeq,
         workspaceDocumentsById: nextDocumentsById,
+        treeRootId,
+        treeById,
+        activeDocumentId: nextActiveDocumentId,
+        pirDoc: nextPirDoc,
+        pirDocRevision: pirDocChanged
+          ? state.pirDocRevision + 1
+          : state.pirDocRevision,
       };
     }),
   markLocalWorkspaceDocumentSaved: (workspaceId, documentId) =>

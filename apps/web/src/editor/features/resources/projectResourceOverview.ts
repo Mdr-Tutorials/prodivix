@@ -12,12 +12,16 @@ import {
   flattenPublicFiles,
   readPublicTree,
 } from './publicTree';
-import { flattenCodeFiles, readCodeTree } from './codeTree';
 import { collectLocaleMissingStats, readI18nStore } from './i18nStore';
 import {
   flattenEnabledProjectFiles,
   readProjectFiles,
 } from './projectFileStore';
+import type { WorkspaceDocumentRecord } from '@/editor/editorApi';
+import {
+  buildCodeResourceFilesFromWorkspaceDocuments,
+  buildCodeResourceTreeFromWorkspaceDocuments,
+} from './workspaceCodeResources';
 
 export type SectionId =
   | 'overview'
@@ -77,7 +81,7 @@ export const resolveLatestUpdatedAt = (values: Array<string | undefined>) => {
 };
 
 export const formatUpdatedAt = (value: string | null) => {
-  if (!value) return '—';
+  if (!value) return '-';
   return value.replace('T', ' ').slice(0, 16);
 };
 
@@ -115,7 +119,10 @@ export type OverviewSnapshot = {
   };
 };
 
-export const buildOverviewSnapshot = (projectId?: string): OverviewSnapshot => {
+export const buildOverviewSnapshot = (
+  projectId?: string,
+  workspaceDocumentsById: Record<string, WorkspaceDocumentRecord> = {}
+): OverviewSnapshot => {
   const publicTree = readPublicTree(projectId);
   const publicFiles = flattenPublicFiles(publicTree);
   const publicHints = publicFiles.reduce(
@@ -128,8 +135,12 @@ export const buildOverviewSnapshot = (projectId?: string): OverviewSnapshot => {
     { warnings: 0, infos: 0 }
   );
 
-  const codeTree = readCodeTree(projectId);
-  const codeFiles = flattenCodeFiles(codeTree);
+  const codeTree = buildCodeResourceTreeFromWorkspaceDocuments(
+    workspaceDocumentsById
+  );
+  const codeFiles = buildCodeResourceFilesFromWorkspaceDocuments(
+    workspaceDocumentsById
+  );
   const codeCounts = codeFiles.reduce(
     (acc, file) => {
       const segment = file.path.split('/')[1] ?? '';

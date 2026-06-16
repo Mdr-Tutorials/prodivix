@@ -4,15 +4,9 @@ import type {
   ProdivixDiagnostic,
   SourceSpan,
 } from '@/diagnostics';
+import type { WorkspaceCodeDocumentLanguage } from '@/workspace/types';
 
-export type CodeArtifactLanguage =
-  | 'ts'
-  | 'js'
-  | 'css'
-  | 'scss'
-  | 'glsl'
-  | 'wgsl'
-  | 'expr';
+export type CodeArtifactLanguage = WorkspaceCodeDocumentLanguage;
 
 export type CodeArtifactOwner =
   | { kind: 'pir-node'; documentId: string; nodeId: string }

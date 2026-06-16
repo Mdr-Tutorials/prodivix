@@ -4,12 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"strings"
 )
 
-// IntentHandler dispatches a single (namespace, type) pair. New intent
-// categories should be added by registering a new handler in
-// defaultIntentHandlers rather than extending ApplyIntentMutation switch.
 type IntentHandler interface {
 	CanHandle(intent IntentEnvelope) bool
 	Handle(
@@ -116,60 +112,4 @@ func (workspaceSettingsUpdateHandler) Handle(
 		return nil, MapStoreError(err)
 	}
 	return result, nil
-}
-
-type workspaceCodeDocumentCreateHandler struct{}
-
-func (workspaceCodeDocumentCreateHandler) CanHandle(intent IntentEnvelope) bool {
-	return intent.Namespace == "core.workspace" && intent.Type == "code-document.create"
-}
-
-func (workspaceCodeDocumentCreateHandler) Handle(
-	ctx context.Context,
-	store *WorkspaceStore,
-	workspaceID string,
-	request ApplyIntentRequest,
-	_ IntentEnvelope,
-	command WorkspaceCommandEnvelope,
-) (*WorkspaceMutationResult, *RequestFailure) {
-	var payload struct {
-		DocumentID string          `json:"documentId"`
-		NodeID     string          `json:"nodeId"`
-		Path       string          `json:"path"`
-		Content    json.RawMessage `json:"content"`
-	}
-	if len(request.Intent.Payload) == 0 ||
-		json.Unmarshal(request.Intent.Payload, &payload) != nil ||
-		strings.TrimSpace(payload.DocumentID) == "" ||
-		strings.TrimSpace(payload.Path) == "" ||
-		len(payload.Content) == 0 {
-		return nil, NewRequestFailure(
-			http.StatusUnprocessableEntity,
-			ErrorInvalidPayload,
-			"intent payload.documentId, payload.path and payload.content are required.",
-			nil,
-		)
-	}
-	command.Target.DocumentID = strings.TrimSpace(payload.DocumentID)
-	result, err := store.CreateCodeDocument(ctx, CreateCodeDocumentMutationParams{
-		WorkspaceID:          workspaceID,
-		ExpectedWorkspaceRev: request.ExpectedWorkspaceRev,
-		DocumentID:           payload.DocumentID,
-		NodeID:               payload.NodeID,
-		Path:                 payload.Path,
-		Content:              payload.Content,
-		Command:              command,
-	})
-	if err != nil {
-		return nil, MapStoreError(err)
-	}
-	return result, nil
-}
-
-func defaultIntentHandlers() []IntentHandler {
-	return []IntentHandler{
-		routeManifestUpdateHandler{},
-		workspaceSettingsUpdateHandler{},
-		workspaceCodeDocumentCreateHandler{},
-	}
 }

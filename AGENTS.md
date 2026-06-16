@@ -210,6 +210,7 @@ MFE 是 Blueprint、NodeGraph、Animation 三编辑器架构。`specs/decisions/
 13. 依赖安装或更新导致锁文件变化时，无需手动修改锁文件，接受包管理器自然生成的锁文件变更。
 14. 文档语言按目标读者、已有文件语境和同一文档语言一致性决定。根 `README.md` 使用英文，`README.zh-CN.md` 使用简体中文。
 15. 任何 code-owned 能力都要优先接入 Code Authoring Environment，不要让三编辑器直接保存任意代码字符串，也不要绕过 Authoring Symbol Environment 自行扫描其他编辑器内部状态。
+16. 项目处于 alpha 阶段，有重大更改时尽量做彻底重构，不要留兼容层，也没有把旧数据转换为新数据的义务。
 
 ## 工具入口文件关系
 

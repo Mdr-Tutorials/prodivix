@@ -7,27 +7,21 @@ import { I18nResourcePage } from './I18nResourcePage';
 import { ProjectFileManager } from './ProjectFileManager';
 import { ResourceOverviewPanel } from './ResourceOverviewPanel';
 import { PublicResourcePage } from './PublicResourcePage';
-import {
-  createCodeFile,
-  findCodeNodeById,
-  readCodeTree,
-  writeCodeTree,
-} from './codeTree';
-import {
-  createTemplateForCodeFolder,
-  resolveCreatedNodeId,
-} from './codeResourceCreate';
-import { getResourceManagerCodeSelectionStorageKey } from './codeResourceModel';
+import { getResourceManagerCodeCreateRequestStorageKey } from './codeResourceModel';
 import {
   buildOverviewSnapshot,
   getResourceManagerViewStorageKey,
   sectionMetas,
   type SectionId,
 } from './projectResourceOverview';
+import { useEditorStore } from '@/editor/store/useEditorStore';
 
 export function ProjectResources() {
   const { t } = useTranslation('editor');
   const { projectId } = useParams();
+  const workspaceDocumentsById = useEditorStore(
+    (state) => state.workspaceDocumentsById
+  );
   const [activeSection, setActiveSection] = useState<SectionId>(() => {
     if (typeof window === 'undefined') return 'overview';
     const raw = window.localStorage.getItem(
@@ -56,41 +50,15 @@ export function ProjectResources() {
 
   const overviewSnapshot = useMemo(() => {
     if (activeSection !== 'overview') return null;
-    return buildOverviewSnapshot(projectId);
-  }, [activeSection, projectId]);
+    return buildOverviewSnapshot(projectId, workspaceDocumentsById);
+  }, [activeSection, projectId, workspaceDocumentsById]);
 
   const createCodeAssetAndOpen = (folder: 'scripts' | 'styles' | 'shaders') => {
     if (typeof window === 'undefined') return;
-    const currentTree = readCodeTree(projectId);
-    const template = createTemplateForCodeFolder(folder);
-    const parentId =
-      folder === 'scripts'
-        ? 'code-scripts'
-        : folder === 'styles'
-          ? 'code-styles'
-          : 'code-shaders';
-    const resolvedParentId =
-      findCodeNodeById(currentTree, parentId)?.type === 'folder'
-        ? parentId
-        : currentTree.id;
-    const contentRef = `data:${template.mime};charset=utf-8,${encodeURIComponent(template.content)}`;
-    const size = new TextEncoder().encode(template.content).length;
-    const nextTree = createCodeFile(currentTree, resolvedParentId, {
-      name: template.name,
-      mime: template.mime,
-      size,
-      textContent: template.content,
-      contentRef,
-      category: 'document',
-    });
-    writeCodeTree(projectId, nextTree);
-    const createdNodeId = resolveCreatedNodeId(currentTree, nextTree);
-    if (createdNodeId) {
-      window.localStorage.setItem(
-        getResourceManagerCodeSelectionStorageKey(projectId),
-        createdNodeId
-      );
-    }
+    window.localStorage.setItem(
+      getResourceManagerCodeCreateRequestStorageKey(projectId),
+      folder
+    );
     setActiveSection('code');
   };
 

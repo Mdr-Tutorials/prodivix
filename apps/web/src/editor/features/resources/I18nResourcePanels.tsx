@@ -274,7 +274,7 @@ export function I18nResourceTable({
                   <div className="flex min-w-0 items-center gap-1">
                     <button
                       type="button"
-                      className="min-w-0 flex-1 truncate text-left font-mono text-[11px] text-(--text-primary)"
+                      className="min-w-0 flex-1 truncate text-left [font-family:var(--font-family-mono)] text-[11px] text-(--text-primary)"
                       onClick={() => onSelectKey(row.key)}
                     >
                       {row.key}

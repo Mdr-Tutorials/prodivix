@@ -93,18 +93,16 @@ export type WorkspaceSnapshot = {
   activeRouteNodeId?: string;
 };
 
-export type WorkspaceMutationDocumentRevision = {
-  id: string;
-  contentRev: number;
-  metaRev: number;
-};
+export type WorkspaceMutationDocumentRecord = WorkspaceDocumentRecord;
 
 export type WorkspaceMutationResponse = {
   workspaceId: string;
   workspaceRev: number;
   routeRev: number;
   opSeq: number;
-  updatedDocuments?: WorkspaceMutationDocumentRevision[];
+  tree?: Record<string, unknown>;
+  updatedDocuments?: WorkspaceMutationDocumentRecord[];
+  removedDocumentIds?: string[];
   acceptedMutationId?: string;
 };
 

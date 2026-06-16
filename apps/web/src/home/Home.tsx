@@ -69,7 +69,7 @@ function Home() {
   const brandIconClassName =
     'h-8 w-8 shrink-0 translate-y-[1.5px] bg-(--home-logo) [mask:url("/prodivix.svg")_center/contain_no-repeat]';
   const brandNameClassName =
-    'font-mono text-[26px] leading-none font-black text-(--home-logo)';
+    '[font-family:var(--font-family-mono)] text-[26px] leading-none font-black text-(--home-logo)';
   const heroWordmarkClassName =
     'pointer-events-none absolute top-[44%] left-1/2 h-[132px] w-[140vw] min-w-[760px] -translate-x-1/2 -translate-y-1/2 bg-(--home-logo) opacity-[0.055] [mask:url("/prodivix-wordmark.svg")_center/contain_no-repeat] sm:h-[176px] sm:w-[132vw] lg:h-[220px] lg:w-[1280px]';
   const footerWordmarkClassName =

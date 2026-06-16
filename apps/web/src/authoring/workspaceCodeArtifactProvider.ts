@@ -1,7 +1,6 @@
 import type {
   AuthoringContext,
   CodeArtifact,
-  CodeArtifactLanguage,
   CodeArtifactProvider,
 } from '@/authoring/authoring.types';
 import type {
@@ -25,7 +24,7 @@ const toCodeArtifact = (
   return {
     id: document.id,
     path: document.path,
-    language: document.content.language as CodeArtifactLanguage,
+    language: document.content.language,
     owner: { kind: 'workspace-module', documentId: document.id },
     source: document.content.source,
     revision: String(document.contentRev),

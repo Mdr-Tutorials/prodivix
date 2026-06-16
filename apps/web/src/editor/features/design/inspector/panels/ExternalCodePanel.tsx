@@ -5,10 +5,8 @@ import { Code2 } from 'lucide-react';
 import type { ComponentNode } from '@/core/types/engine.types';
 import { useInspectorContext } from '@/editor/features/design/inspector/InspectorContext';
 import { InspectorRow } from '@/editor/features/design/inspector/components/InspectorRow';
-import {
-  flattenCodeFiles,
-  readCodeTree,
-} from '@/editor/features/resources/codeTree';
+import { buildCodeResourceFilesFromWorkspaceDocuments } from '@/editor/features/resources/workspaceCodeResources';
+import { useEditorStore } from '@/editor/store/useEditorStore';
 import type {
   InspectorPanelDefinition,
   InspectorPanelRenderProps,
@@ -85,15 +83,18 @@ function ExternalCodePanelView({
 }: InspectorPanelRenderProps) {
   const navigate = useNavigate();
   const { t, projectId } = useInspectorContext();
+  const workspaceDocumentsById = useEditorStore(
+    (state) => state.workspaceDocumentsById
+  );
   const externalCode = readExternalCodeConfig(node) ?? {};
   const isMounted = externalCode.enabled === true;
   const selectedLanguage = externalCode.language ?? 'ts';
   const codeResourceFiles = useMemo(
     () =>
-      flattenCodeFiles(readCodeTree(projectId)).filter(
-        (item) => item.path !== 'code'
-      ),
-    [projectId]
+      buildCodeResourceFilesFromWorkspaceDocuments(
+        workspaceDocumentsById
+      ).filter((item) => item.path !== 'code'),
+    [workspaceDocumentsById]
   );
   const compatibleResourceOptions = useMemo(() => {
     const matchedFiles = codeResourceFiles.filter((item) =>

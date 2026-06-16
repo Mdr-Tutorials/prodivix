@@ -424,14 +424,24 @@ components:
           type: array
           items:
             type: object
-            required: [id, contentRev, metaRev]
+            required: [id, type, path, contentRev, metaRev, content, updatedAt]
             properties:
               id:
+                type: string
+              type:
+                $ref: '#/components/schemas/WorkspaceDocumentType'
+              path:
                 type: string
               contentRev:
                 type: integer
               metaRev:
                 type: integer
+              content:
+                type: object
+                additionalProperties: true
+              updatedAt:
+                type: string
+                format: date-time
             additionalProperties: false
         opSeq:
           type: integer

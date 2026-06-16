@@ -26,8 +26,15 @@ type workspaceVFSTree struct {
 type codeDocumentMount struct {
 	DocumentID string
 	NodeID     string
+	ParentID   string
 	Path       string
 	Name       string
+}
+
+type workspaceDirectoryMount struct {
+	NodeID   string
+	ParentID string
+	Name     string
 }
 
 var nonIdentifierPathChars = regexp.MustCompile(`[^a-zA-Z0-9_-]+`)
@@ -58,6 +65,14 @@ func workspacePathName(value string) string {
 		return ""
 	}
 	return name
+}
+
+func normalizeWorkspaceDirectoryName(value string) (string, error) {
+	name := strings.TrimSpace(strings.ReplaceAll(value, "\\", "/"))
+	if name == "" || strings.Contains(name, "/") || name == "." || name == ".." {
+		return "", fmt.Errorf("%w: directory name is invalid", ErrWorkspaceVFSInvalid)
+	}
+	return name, nil
 }
 
 func makeTreeString(value string) *string {
@@ -153,94 +168,4 @@ func (tree workspaceVFSTree) marshal() (json.RawMessage, error) {
 		return nil, err
 	}
 	return json.RawMessage(payload), nil
-}
-
-func (tree workspaceVFSTree) addDocument(mount codeDocumentMount) error {
-	normalizedPath, err := normalizeWorkspacePath(mount.Path)
-	if err != nil {
-		return err
-	}
-	segments := strings.Split(strings.Trim(normalizedPath, "/"), "/")
-	fileName := strings.TrimSpace(mount.Name)
-	if fileName == "" {
-		fileName = segments[len(segments)-1]
-	}
-	if fileName != segments[len(segments)-1] {
-		return fmt.Errorf("%w: document name must match path base name", ErrWorkspaceVFSInvalid)
-	}
-
-	parentID, err := tree.ensureDirectories(segments[:len(segments)-1])
-	if err != nil {
-		return err
-	}
-	parent := tree.TreeByID[parentID]
-	if parent.Kind != "dir" {
-		return fmt.Errorf("%w: parent node must be a directory", ErrWorkspaceVFSInvalid)
-	}
-	for _, childID := range parent.Children {
-		child := tree.TreeByID[childID]
-		if child.Name == fileName {
-			return fmt.Errorf("%w: workspace path already exists", ErrWorkspaceVFSInvalid)
-		}
-	}
-	nodeID := strings.TrimSpace(mount.NodeID)
-	if nodeID == "" {
-		nodeID = makePathNodeID("doc", segments)
-	}
-	if _, exists := tree.TreeByID[nodeID]; exists {
-		return fmt.Errorf("%w: node id already exists", ErrWorkspaceVFSInvalid)
-	}
-	tree.TreeByID[nodeID] = workspaceVFSNode{
-		ID:       nodeID,
-		Kind:     "doc",
-		Name:     fileName,
-		ParentID: makeTreeString(parentID),
-		DocID:    strings.TrimSpace(mount.DocumentID),
-	}
-	parent.Children = append(parent.Children, nodeID)
-	tree.TreeByID[parentID] = parent
-	return nil
-}
-
-func (tree workspaceVFSTree) ensureDirectories(segments []string) (string, error) {
-	currentID := tree.TreeRootID
-	for index, segment := range segments {
-		name := strings.TrimSpace(segment)
-		if name == "" {
-			return "", fmt.Errorf("%w: directory name is required", ErrWorkspaceVFSInvalid)
-		}
-		current := tree.TreeByID[currentID]
-		if current.Kind != "dir" {
-			return "", fmt.Errorf("%w: parent node must be a directory", ErrWorkspaceVFSInvalid)
-		}
-		var nextID string
-		for _, childID := range current.Children {
-			child := tree.TreeByID[childID]
-			if child.Name != name {
-				continue
-			}
-			if child.Kind != "dir" {
-				return "", fmt.Errorf("%w: path segment already exists as a document", ErrWorkspaceVFSInvalid)
-			}
-			nextID = childID
-			break
-		}
-		if nextID == "" {
-			nextID = makePathNodeID("dir", segments[:index+1])
-			if _, exists := tree.TreeByID[nextID]; exists {
-				return "", fmt.Errorf("%w: directory node id already exists", ErrWorkspaceVFSInvalid)
-			}
-			tree.TreeByID[nextID] = workspaceVFSNode{
-				ID:       nextID,
-				Kind:     "dir",
-				Name:     name,
-				ParentID: makeTreeString(currentID),
-				Children: []string{},
-			}
-			current.Children = append(current.Children, nextID)
-			tree.TreeByID[currentID] = current
-		}
-		currentID = nextID
-	}
-	return currentID, nil
 }

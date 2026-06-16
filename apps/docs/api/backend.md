@@ -708,8 +708,12 @@ PUT /api/workspaces/:workspaceId/documents/:documentId
   "updatedDocuments": [
     {
       "id": "doc_root",
+      "type": "pir-page",
+      "path": "/pir.json",
       "contentRev": 6,
-      "metaRev": 2
+      "metaRev": 2,
+      "content": { "...": "..." },
+      "updatedAt": "2026-06-16T08:00:00Z"
     }
   ],
   "acceptedMutationId": "mutation_123"
@@ -868,11 +872,19 @@ interface ProjectSummary {
 ```typescript
 interface WorkspaceDocument {
   id: string;
-  type: 'pir_page' | 'pir_component' | 'pir_nodegraph';
+  type:
+    | 'pir-page'
+    | 'pir-layout'
+    | 'pir-component'
+    | 'pir-graph'
+    | 'pir-animation'
+    | 'code'
+    | 'asset'
+    | 'project-config';
   path: string;
   contentRev: number;
   metaRev: number;
-  content: PIRDocument;
+  content: PIRDocument | WorkspaceCodeDocumentContent | unknown;
   updatedAt: string;
 }
 ```

@@ -12,7 +12,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "dev:web": "turbo run dev --filter=@prodivix/web",
-    "dev:backend": "cd apps/backend && (air -c .air.toml || go run ./cmd/server)",
+    "dev:backend": "node scripts/start-dev-backend.mjs",
     "dev:backend:hot": "cd apps/backend && air -c .air.toml",
     "dev:docs": "turbo run dev --filter=@prodivix/docs",
     "dev:cli": "turbo run dev --filter=@prodivix/cli",

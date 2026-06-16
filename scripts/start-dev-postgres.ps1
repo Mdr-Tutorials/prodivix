@@ -6,21 +6,14 @@ $logDir = Join-Path $repoDir '.tmp\logs'
 $pgBin = $env:PRODIVIX_PG_BIN
 
 if (-not $pgBin) {
-  $candidates = @(
-    'D:\Software\PGSQL\bin',
-    'C:\Program Files\PostgreSQL\17\bin',
-    'C:\Program Files\PostgreSQL\16\bin'
-  )
-
-  foreach ($candidate in $candidates) {
-    if (Test-Path (Join-Path $candidate 'pg_ctl.exe')) {
-      $pgBin = $candidate
-      break
-    }
-  }
+  $pgBin = [Environment]::GetEnvironmentVariable('PRODIVIX_PG_BIN', 'User')
 }
 
 if (-not $pgBin) {
+  $pgBin = [Environment]::GetEnvironmentVariable('PRODIVIX_PG_BIN', 'Machine')
+}
+
+if (-not $pgBin -or -not (Test-Path (Join-Path $pgBin 'pg_ctl.exe'))) {
   throw 'Could not find PostgreSQL bin directory. Set PRODIVIX_PG_BIN to the folder containing pg_ctl.exe.'
 }
 
@@ -28,6 +21,10 @@ $initdb = Join-Path $pgBin 'initdb.exe'
 $pgCtl = Join-Path $pgBin 'pg_ctl.exe'
 $createdb = Join-Path $pgBin 'createdb.exe'
 $psql = Join-Path $pgBin 'psql.exe'
+
+$env:PGCLIENTENCODING = 'UTF8'
+$env:LC_MESSAGES = 'C'
+$env:LANG = 'C'
 
 New-Item -ItemType Directory -Path $dataDir, $logDir -Force | Out-Null
 
@@ -65,9 +62,13 @@ if ($LASTEXITCODE -ne 0) {
   Write-Host '[dev-db] PostgreSQL is already running.'
 }
 
-& $createdb -h 127.0.0.1 -p 55432 -U postgres prodivix 2>$null
+$databaseExists = & $psql -h 127.0.0.1 -p 55432 -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'prodivix';"
 if ($LASTEXITCODE -ne 0) {
-  & $psql -h 127.0.0.1 -p 55432 -U postgres -d postgres -v ON_ERROR_STOP=1 -c "SELECT 1 FROM pg_database WHERE datname = 'prodivix';" | Out-Null
+  throw "database existence check failed with exit code $LASTEXITCODE"
+}
+
+if ($databaseExists.Trim() -ne '1') {
+  & $createdb -h 127.0.0.1 -p 55432 -U postgres prodivix
   if ($LASTEXITCODE -ne 0) {
     throw "createdb failed with exit code $LASTEXITCODE"
   }
