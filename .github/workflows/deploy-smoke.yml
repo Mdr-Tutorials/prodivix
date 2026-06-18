@@ -1,0 +1,66 @@
+name: Deploy Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: GHCR image tag to deploy
+        required: false
+        default: latest
+  push:
+    branches:
+      - main
+    paths:
+      - deploy/**
+      - .github/workflows/deploy-smoke.yml
+
+concurrency:
+  group: deploy-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run deployment script
+        working-directory: deploy
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag || 'latest' }}
+        run: |
+          chmod +x ./start-app.sh
+          ./start-app.sh --yes --tag "$IMAGE_TAG"
+
+      - name: Check backend health
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/api/ping; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f deploy/docker-compose.ghcr.yml --env-file deploy/.env logs backend
+          exit 1
+
+      - name: Check web response
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fsSI http://127.0.0.1:4173/ | grep -qi '^HTTP/.* 200'; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f deploy/docker-compose.ghcr.yml --env-file deploy/.env logs web
+          exit 1
+
+      - name: Show service status
+        if: always()
+        run: docker compose -f deploy/docker-compose.ghcr.yml --env-file deploy/.env ps
+
+      - name: Stop deployment
+        if: always()
+        run: docker compose -f deploy/docker-compose.ghcr.yml --env-file deploy/.env down --remove-orphans

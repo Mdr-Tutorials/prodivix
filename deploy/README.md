@@ -10,7 +10,27 @@
   - `ghcr.io/<owner>/prodivix-web`
 - 同时打 `latest`（默认分支）、`sha-*`、`tag` 三种标签。
 
-## 2) 服务器上拉取并启动（无需本地构建）
+## 2) 服务器上交互式部署（无需本地构建）
+
+GHCR 包当前是公开的，裸服务器只需要 Docker 和 Docker Compose v2：
+
+```bash
+cd deploy
+chmod +x ./start-app.sh
+./start-app.sh
+```
+
+脚本会交互式生成或更新 `.env`，拉取公开镜像并启动服务。常用非交互参数：
+
+```bash
+./start-app.sh --yes --tag latest
+./start-app.sh --tag sha-95bd22e
+./start-app.sh --skip-pull
+```
+
+默认数据库端口只绑定 `127.0.0.1:5432`，避免直接暴露到公网。
+
+## 3) 手动拉取并启动
 
 ```bash
 cd deploy
@@ -19,7 +39,7 @@ cp .env.example .env
 docker compose -f docker-compose.ghcr.yml --env-file .env up -d
 ```
 
-## 3) 关键配置说明
+## 4) 关键配置说明
 
 - `deploy/docker-compose.ghcr.yml`
   - `web` 使用 Nginx 托管前端，并将 `/api/*` 反向代理到 `backend`。
@@ -31,11 +51,3 @@ docker compose -f docker-compose.ghcr.yml --env-file .env up -d
   - 通过 `VITE_API_BASE=/` 构建前端，运行时走同域 `/api`。
 - `apps/backend/Dockerfile`
   - 构建入口改为 `./cmd/server`，输出可运行的后端二进制。
-
-## 4) 首次启用 GHCR 拉取权限（私有仓库常见）
-
-如果镜像是私有的，需要在服务器先登录：
-
-```bash
-echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-username> --password-stdin
-```
