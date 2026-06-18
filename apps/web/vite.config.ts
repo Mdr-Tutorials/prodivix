@@ -16,7 +16,7 @@ export default defineConfig({
     }),
   ],
   define: {
-    'process.cwd': '(() => "/")',
+    process: { cwd: () => '/' },
     'process.env': {},
     'process.platform': JSON.stringify('browser'),
     global: 'globalThis',

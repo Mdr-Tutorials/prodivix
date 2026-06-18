@@ -50,13 +50,11 @@ import {
   RESOURCE_ROOTS,
 } from './workspaceResourceDocuments';
 
-type ExternalLibraryManagerProps = Record<string, never>;
-
 const stringArraysEqual = (left: string[], right: string[]) =>
   left.length === right.length &&
   left.every((item, index) => item === right[index]);
 
-export function ExternalLibraryManager({}: ExternalLibraryManagerProps) {
+export function ExternalLibraryManager() {
   const { t } = useTranslation('editor');
   const token = useAuthStore((state) => state.token);
   const workspaceId = useEditorStore((state) => state.workspaceId);
