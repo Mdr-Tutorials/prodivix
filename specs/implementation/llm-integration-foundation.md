@@ -11,9 +11,9 @@
 
 ## 目标
 
-本实现说明记录 MFE LLM 基础层的首批代码边界。当前目标不是一次性实现完整 AI 助手，而是先建立多端可复用、轻后端、Local First 的 AI runtime 基础。
+本实现说明记录 Prodivix LLM 基础层的首批代码边界。当前目标不是一次性实现完整 AI 助手，而是先建立多端可复用、轻后端、Local First 的 AI runtime 基础。
 
-MFE 的 AI 能力应优先作为前端编辑器和本地工具链能力存在，后端只作为协作、GitHub、社区、企业策略、代理或长任务的可选增强层。
+Prodivix 的 AI 能力应优先作为前端编辑器和本地工具链能力存在，后端只作为协作、GitHub、社区、企业策略、代理或长任务的可选增强层。
 
 ## 当前分层
 
@@ -45,7 +45,7 @@ MFE 的 AI 能力应优先作为前端编辑器和本地工具链能力存在，
 - 不持有用户密钥。
 - 不理解具体 app UI 状态。
 
-`@prodivix/shared` 的边界应保持很薄。它回答“LLM 任务在 MFE 中如何被描述和约束”，不回答“某个环境如何调用模型”。
+`@prodivix/shared` 的边界应保持很薄。它回答“LLM 任务在 Prodivix 中如何被描述和约束”，不回答“某个环境如何调用模型”。
 
 ### `@prodivix/ai`
 
@@ -72,7 +72,7 @@ MFE 的 AI 能力应优先作为前端编辑器和本地工具链能力存在，
 
 ## 为什么新增 `@prodivix/ai`
 
-MFE 不只有 Web 编辑器，还包含 CLI、VSCode 插件、文档、后端和未来 MCP 集成。如果把 AI runtime 放进 `apps/web/src/ai`，会导致 CLI 和 VSCode 复用困难。如果全部塞进 `@prodivix/shared`，又会让 shared 从协议包膨胀成运行时大杂烩。
+Prodivix 不只有 Web 编辑器，还包含 CLI、VSCode 插件、文档、后端和未来 MCP 集成。如果把 AI runtime 放进 `apps/web/src/ai`，会导致 CLI 和 VSCode 复用困难。如果全部塞进 `@prodivix/shared`，又会让 shared 从协议包膨胀成运行时大杂烩。
 
 因此采用两层：
 
@@ -187,18 +187,22 @@ VSCode 层负责：
 
 当前基础层覆盖 ADR 22 的以下方向：
 
-- LLM 输出分为 PIR commands、Node Graph operations、Code artifacts。
+- LLM 输出暂时分为 PIR commands、Node Graph operations、Code artifacts。
 - 内部存在统一 Gateway。
 - Context Builder 支持最小上下文构造。
-- Tool Registry 支持 MFE 语义工具注册。
+- Tool Registry 支持 Prodivix 语义工具注册。
 - Trace Store 有最小接口。
 - Provider 与模型供应商解耦。
+
+需要注意：三类 `LlmOutputChannel` 是当前 foundation 的临时最小集合，不是长期产品边界。ADR 22 已将目标模型提升为 target-scoped Workspace Action Proposal。后续实现应在 Web editor AI runtime 中先增加 action target / operation validator，再决定是否把 `workspace-action`、`route-intent`、`resource-operation`、`settings-patch`、`export-action` 等能力提升到 `@prodivix/shared` 协议层。
 
 尚未实现：
 
 - 完整 dry-run / apply 工具。
 - PIR command validator。
 - Node Graph operation validator。
+- Workspace action validator。
+- Route intent / resource / settings / export action dry-run。
 - repair loop。
 - eval/replay 存储。
 - MCP Server。
@@ -211,4 +215,5 @@ VSCode 层负责：
 3. 先用 mock provider 打通 Web / CLI 入口。
 4. 再接 OpenAI-compatible provider。
 5. 等 BlueprintEditor 重构稳定后，再接编辑器上下文和 UI。
-6. 写测试时避免过早锁死 provider 输出细节，优先覆盖稳定协议和安全边界。
+6. 将 AI 写操作收敛到 Workspace Action Proposal，避免只围绕 Blueprint/PIR command 继续扩张。
+7. 写测试时避免过早锁死 provider 输出细节，优先覆盖稳定协议和安全边界。

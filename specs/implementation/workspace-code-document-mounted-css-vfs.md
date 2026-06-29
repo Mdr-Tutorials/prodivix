@@ -645,8 +645,8 @@ Phase 1 可先只保留文件，不实现诊断。
 VFS tab 显示完整 workspace 文件树，应包含：
 
 ```text
-/.mfe/workspace.json
-/.mfe/route-manifest.json
+/.prodivix/workspace.json
+/.prodivix/route-manifest.json
 /pir.json
 /styles/mounted/<node-id>.css
 ```

@@ -9,7 +9,7 @@ import {
 } from '@prodivix/prodivix-compiler';
 import { validatePirDocument } from '@/pir/validator/validator';
 import {
-  projectWorkspaceToMfeFiles,
+  projectWorkspaceToProdivixFiles,
   type StableWorkspaceSnapshot,
   type WorkspaceProjectionIssue,
 } from '@/workspace';
@@ -271,7 +271,7 @@ export function ExportCode() {
     { files: ExportCodeFile[]; issues: WorkspaceProjectionIssue[] } | undefined
   >(() => {
     if (!workspaceSnapshot) return undefined;
-    const projected = projectWorkspaceToMfeFiles(workspaceSnapshot);
+    const projected = projectWorkspaceToProdivixFiles(workspaceSnapshot);
     if (projected.ok === false) {
       return { files: [], issues: projected.issues };
     }

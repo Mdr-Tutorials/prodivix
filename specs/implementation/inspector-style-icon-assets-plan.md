@@ -60,7 +60,7 @@ apps/web/src/assets/
 - Grid justify-content / align-content
 - spacing / margin / padding
 - width / height / gap
-- MFE 自有状态语义，如 mounted / unmounted
+- Prodivix 自有状态语义，如 mounted / unmounted
 
 原因：
 

@@ -196,13 +196,13 @@ flowchart TD
 
 ## Code Authoring Environment 与作者态符号环境
 
-MFE 是 Blueprint、NodeGraph、Animation 三编辑器架构。`specs/decisions/28.code-authoring-environment.md` 定义的 Code Authoring Environment 是三编辑器共享的代码作者态底座。
+Prodivix 是 Blueprint、NodeGraph、Animation 三编辑器架构。`specs/decisions/28.code-authoring-environment.md` 定义的 Code Authoring Environment 是三编辑器共享的代码作者态底座。
 
 - code-owned 内容由 Code Authoring Environment 承载，包括 event handler、custom executor、animation function、mounted CSS、shader、external library adapter 和普通 Workspace 代码文件。
 - 三编辑器通过 code slot 连接代码能力。slot 需要声明 owner、输入、输出、能力约束和诊断落点；slot 的绑定值应是 `CodeReference` 或 `CodeArtifact` owner，不应是散落在 UI 局部状态里的裸代码字符串。
 - `specs/decisions/25.authoring-symbol-environment.md` 定义的 Authoring Symbol Environment 是 Code Authoring Environment 的索引与查询层，负责 `CodeArtifact`、`CodeSymbol`、`CodeScope`、`DiagnosticTargetRef`、`SourceSpan`、引用、补全和诊断。
 - PIR 可以引用代码，但不吞并代码源码和复杂库内部状态。复杂库按 Native / Adapted / Embedded / Code-only 能力等级接入，不逐库承诺完整可视化编辑。
-- code-owned 不等于黑盒放弃。MFE 仍应该提供编辑、引用、诊断、定位、预览和 AI patch 能力，并能从 Issues、Inspector、画布、节点图、动画轨道跳转到对应代码上下文。
+- code-owned 不等于黑盒放弃。Prodivix 仍应该提供编辑、引用、诊断、定位、预览和 AI patch 能力，并能从 Issues、Inspector、画布、节点图、动画轨道跳转到对应代码上下文。
 - 三编辑器、Inspector、Resources、AI 和 Issues 面板需要符号或诊断时，应通过 Code Authoring Environment 或其稳定查询接口，不直接扫描其他编辑器内部结构。
 
 ## 代码规范

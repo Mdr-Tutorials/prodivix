@@ -13,7 +13,7 @@
 
 本文记录 Authoring Environment 后续应保留的长期稳定结构，并区分“当前应实现”“当前只定义轻类型”“当前只保留文档”的边界。
 
-MFE 的 Blueprint、NodeGraph、Animation、Code Editor、Inspector 和 Issues 面板会长期共享同一套作者态环境。为了避免过早绑定具体编辑器内部结构，所有跨编辑器数据来源都应通过 provider 或 resolver contract 接入。
+Prodivix 的 Blueprint、NodeGraph、Animation、Code Editor、Inspector 和 Issues 面板会长期共享同一套作者态环境。为了避免过早绑定具体编辑器内部结构，所有跨编辑器数据来源都应通过 provider 或 resolver contract 接入。
 
 ## 当前已落地结构
 

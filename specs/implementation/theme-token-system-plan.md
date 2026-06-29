@@ -199,7 +199,7 @@ Runtime CSS Variables
 
 规则：
 
-- 产品 token 允许更贴近 MFE 业务语义。
+- 产品 token 允许更贴近 Prodivix 业务语义。
 - 组件内部不应反复硬编码 `--bg-canvas` / `--text-primary`，应逐步迁移到 semantic/product token。
 
 ### 4. Runtime CSS Variables

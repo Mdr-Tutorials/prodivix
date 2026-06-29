@@ -13,7 +13,7 @@ export interface CreateProdivixAiProviderOptions {
 }
 
 const defaultMockOutput: LlmStructuredOutput = {
-  goal: 'Draft an MFE AI task plan',
+  goal: 'Draft an Prodivix AI task plan',
   assumptions: ['Use the current editor context summary only.'],
   milestones: [
     {

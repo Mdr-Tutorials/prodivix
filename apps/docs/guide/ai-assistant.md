@@ -1,6 +1,6 @@
 # AI 助手
 
-MFE 的 AI 助手是一个浏览器端优先的 LLM 集成入口。当前实现聚焦在蓝图编辑器右下角的小窗口，用自然语言生成结构化计划，并保留 Prompt 与原始返回用于调试。
+Prodivix 的 AI 助手是一个浏览器端优先的 LLM 集成入口。当前实现聚焦在蓝图编辑器右下角的小窗口，用自然语言生成结构化计划，并保留 Prompt 与原始返回用于调试。
 
 ## 使用入口
 
@@ -17,7 +17,7 @@ AI 助手会读取最小蓝图上下文：
 
 ## Provider 设置
 
-AI 设置以弹窗形式出现在 AI 助手标题栏的设置按钮中。配置保存在浏览器本地状态中，符合 MFE 重前端、轻后端的使用方式。
+AI 设置以弹窗形式出现在 AI 助手标题栏的设置按钮中。配置保存在浏览器本地状态中，符合 Prodivix 重前端、轻后端的使用方式。
 
 | 字段              | 说明                                                  |
 | ----------------- | ----------------------------------------------------- |
@@ -39,7 +39,7 @@ Mock provider 不会请求外部模型，适合本地验证 UI 闭环。OpenAI-c
 GET {baseURL}/models
 ```
 
-发现函数兼容常见的 `data` 或 `models` 数组返回，并只读取模型的基础信息，例如 `id`、`ownedBy`、`createdAt` 和原始对象。MFE 不根据模型 ID 推断 JSON mode、tool calling 或上下文长度能力，因为这些规则变化很快，应由用户或 provider 元数据显式配置。
+发现函数兼容常见的 `data` 或 `models` 数组返回，并只读取模型的基础信息，例如 `id`、`ownedBy`、`createdAt` 和原始对象。Prodivix 不根据模型 ID 推断 JSON mode、tool calling 或上下文长度能力，因为这些规则变化很快，应由用户或 provider 元数据显式配置。
 
 ## 调试入口
 
@@ -50,7 +50,7 @@ AI 助手在生成后会显示两个轻量图标按钮：
 | 查看 Prompt  | Hover 时展示实际发送给 OpenAI-compatible provider 的 messages |
 | 查看原始返回 | Hover 时展示模型原始文本返回                                  |
 
-原始返回来自 OpenAI-compatible 响应的 `choices[0].message.content`。如果模型返回了 token 但结构化解析失败，错误信息会展示在面板内，同时仍保留原始返回，方便排查模型是否包了 Markdown、返回了非 JSON 文本或字段结构不符合 MFE 协议。
+原始返回来自 OpenAI-compatible 响应的 `choices[0].message.content`。如果模型返回了 token 但结构化解析失败，错误信息会展示在面板内，同时仍保留原始返回，方便排查模型是否包了 Markdown、返回了非 JSON 文本或字段结构不符合 Prodivix 协议。
 
 ## 当前输出协议
 
@@ -83,7 +83,7 @@ AI 能力拆在共享协议、跨端运行时和 Web UI 三层：
 | `apps/web/src/ai`                   | Web 端 AI 设置持久化                                      |
 | `apps/web/src/editor/.../Assistant` | Blueprint 右下角 AI 助手 UI 与设置弹窗                    |
 
-这种划分让未来的 CLI、VS Code 扩展或其他 MFE app 可以复用 `packages/shared` 与 `packages/ai`，只在各自 app 中实现环境相关能力，例如 fetcher、密钥保存策略和 UI。
+这种划分让未来的 CLI、VS Code 扩展或其他 Prodivix app 可以复用 `packages/shared` 与 `packages/ai`，只在各自 app 中实现环境相关能力，例如 fetcher、密钥保存策略和 UI。
 
 ## 限制与后续方向
 

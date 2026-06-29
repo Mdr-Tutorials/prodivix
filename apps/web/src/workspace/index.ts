@@ -1,6 +1,6 @@
 export {
-  projectWorkspaceToMfeFiles,
-  readWorkspaceFromMfeFiles,
+  projectWorkspaceToProdivixFiles,
+  readWorkspaceFromProdivixFiles,
 } from './workspaceProjection';
 export { isWorkspaceCodeDocumentContent } from './workspaceCodeDocument';
 export {

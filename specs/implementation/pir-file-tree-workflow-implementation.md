@@ -80,10 +80,10 @@ WorkspaceSnapshot
 
 ### 2.2 保存形态
 
-MFE 项目源文件树固定为：
+Prodivix 项目源文件树固定为：
 
 ```txt
-.mfe/
+.prodivix/
   workspace.json
   route-manifest.json
   documents/
@@ -128,7 +128,7 @@ updatePirDoc
 1. 用户可自由拖拽的文件树管理器。
 2. 完整 Git provider UI。
 3. 完整 undo/redo 实现。
-4. 完整 MFE diff UI。
+4. 完整 Prodivix diff UI。
 5. NodeGraph/Animation 完整编辑器重构。
 6. 旧 PIR 多版本兼容运行态。
 7. 旧单 PIR 项目迁移。
@@ -192,11 +192,11 @@ WorkspaceDocument.path
 
 ### 5.3 Git 文件树是投影
 
-`.mfe/**` 是 Workspace 的 Git 投影，不是编辑器内部唯一数据结构。
+`.prodivix/**` 是 Workspace 的 Git 投影，不是编辑器内部唯一数据结构。
 
 ```txt
-WorkspaceSnapshot -> .mfe/** files
-.mfe/** files -> WorkspaceSnapshot
+WorkspaceSnapshot -> .prodivix/** files
+.prodivix/** files -> WorkspaceSnapshot
 ```
 
 二者必须 round-trip 保持稳定身份。
@@ -215,7 +215,7 @@ PIR 文档只负责本 document 内部的 `ui.graph`、`logic`、`animation` 等
 
 ## 6. 文件树格式
 
-### 6.1 `.mfe/workspace.json`
+### 6.1 `.prodivix/workspace.json`
 
 保存 Workspace 元数据和 VFS。
 
@@ -261,7 +261,7 @@ PIR 文档只负责本 document 内部的 `ui.graph`、`logic`、`animation` 等
       "type": "pir-page",
       "name": "Home",
       "path": "/pages/home.pir.json",
-      "contentPath": ".mfe/documents/pages/home.pir.json",
+      "contentPath": ".prodivix/documents/pages/home.pir.json",
       "contentRev": 3,
       "metaRev": 1,
       "updatedAt": "2026-05-10T10:00:00.000Z"
@@ -275,12 +275,12 @@ PIR 文档只负责本 document 内部的 `ui.graph`、`logic`、`animation` 等
 规则：
 
 1. `workspace.json` 不嵌入 document content。
-2. `documents[documentId].contentPath` 指向 `.mfe/documents/**` 文件。
+2. `documents[documentId].contentPath` 指向 `.prodivix/documents/**` 文件。
 3. `documents[documentId].path` 是 VFS 派生路径。
 4. `treeById` 是内部组织结构。
 5. `contentRev/metaRev` 保留，不能用 Git commit 替代。
 
-### 6.2 `.mfe/route-manifest.json`
+### 6.2 `.prodivix/route-manifest.json`
 
 保存 route manifest。
 
@@ -304,22 +304,22 @@ PIR 文档只负责本 document 内部的 `ui.graph`、`logic`、`animation` 等
 规则：
 
 1. Route 只引用 `DocumentId`。
-2. Route 不引用 `.mfe/documents/**` 路径。
+2. Route 不引用 `.prodivix/documents/**` 路径。
 3. 路由路径是 route manifest 的派生结果。
 
-### 6.3 `.mfe/documents/**`
+### 6.3 `.prodivix/documents/**`
 
 按文档类型保存内容。
 
 ```txt
-.mfe/documents/pages/*.pir.json       -> pir-page
-.mfe/documents/layouts/*.pir.json     -> pir-layout
-.mfe/documents/components/*.pir.json  -> pir-component
-.mfe/documents/graphs/*.graph.json    -> pir-graph
-.mfe/documents/animations/*.anim.json -> pir-animation
-.mfe/documents/code/**                -> code
-.mfe/documents/assets/**              -> asset metadata or references
-.mfe/documents/config/**              -> project-config
+.prodivix/documents/pages/*.pir.json       -> pir-page
+.prodivix/documents/layouts/*.pir.json     -> pir-layout
+.prodivix/documents/components/*.pir.json  -> pir-component
+.prodivix/documents/graphs/*.graph.json    -> pir-graph
+.prodivix/documents/animations/*.anim.json -> pir-animation
+.prodivix/documents/code/**                -> code
+.prodivix/documents/assets/**              -> asset metadata or references
+.prodivix/documents/config/**              -> project-config
 ```
 
 PIR 文件必须是 v1.3 graph-only：
@@ -365,7 +365,7 @@ type WorkspaceSourceFile = {
 ### 7.2 写投影
 
 ```ts
-function projectWorkspaceToMfeFiles(
+function projectWorkspaceToProdivixFiles(
   snapshot: WorkspaceSnapshot
 ): WorkspaceSourceFile[];
 ```
@@ -375,9 +375,9 @@ function projectWorkspaceToMfeFiles(
 1. 校验 Workspace VFS。
 2. 校验 route manifest。
 3. 校验每个 PIR document。
-4. 生成 `.mfe/workspace.json`。
-5. 生成 `.mfe/route-manifest.json`。
-6. 生成 `.mfe/documents/**`。
+4. 生成 `.prodivix/workspace.json`。
+5. 生成 `.prodivix/route-manifest.json`。
+6. 生成 `.prodivix/documents/**`。
 7. 保持 JSON 输出稳定排序。
 
 稳定排序：
@@ -391,7 +391,7 @@ function projectWorkspaceToMfeFiles(
 ### 7.3 读投影
 
 ```ts
-function readWorkspaceFromMfeFiles(
+function readWorkspaceFromProdivixFiles(
   files: WorkspaceSourceFile[]
 ): WorkspaceProjectionReadResult;
 ```
@@ -412,8 +412,8 @@ type WorkspaceProjectionReadResult =
 
 职责：
 
-1. 读取 `.mfe/workspace.json`。
-2. 读取 `.mfe/route-manifest.json`。
+1. 读取 `.prodivix/workspace.json`。
+2. 读取 `.prodivix/route-manifest.json`。
 3. 按 `contentPath` 读取所有 document content。
 4. 还原 `docsById`。
 5. 校验 VFS。
@@ -426,8 +426,8 @@ type WorkspaceProjectionReadResult =
 
 ```txt
 snapshot
-  -> projectWorkspaceToMfeFiles
-  -> readWorkspaceFromMfeFiles
+  -> projectWorkspaceToProdivixFiles
+  -> readWorkspaceFromProdivixFiles
   -> snapshot'
 ```
 
@@ -610,7 +610,7 @@ Workspace 是项目编辑真相源。
 
 `projects.pir_json` 不属于 workspace-only API 合同。数据库字段物理删除前，服务端也不得把它暴露为活跃编辑读模型或保存目标。
 
-### 10.3 后端输出 `.mfe` 投影
+### 10.3 后端输出 `.prodivix` 投影
 
 建议增加内部服务：
 
@@ -646,7 +646,7 @@ func ReadWorkspaceSnapshotFromSourceFiles(files []WorkspaceSourceFile) (*Workspa
 
 ```txt
 WorkspaceSnapshot
-  -> projectWorkspaceToMfeFiles
+  -> projectWorkspaceToProdivixFiles
   -> write browser git workdir
   -> git status
   -> raw git diff preview
@@ -660,10 +660,10 @@ WorkspaceSnapshot
 
 ```txt
 git ref
-  -> read .mfe/** blobs
-  -> readWorkspaceFromMfeFiles
+  -> read .prodivix/** blobs
+  -> readWorkspaceFromProdivixFiles
   -> validate workspace
-  -> MFE diff
+  -> Prodivix diff
 ```
 
 ### 11.3 Git diff 的位置
@@ -686,13 +686,13 @@ Export 页面主要基于当前 `pirDoc` 生成 React 项目。
 
 Export 页面分两类输出：
 
-1. MFE Source Export。
+1. Prodivix Source Export。
 2. Generated App Export。
 
-MFE Source Export：
+Prodivix Source Export：
 
 ```txt
-.mfe/**
+.prodivix/**
 ```
 
 Generated App Export：
@@ -705,9 +705,9 @@ index.html
 
 ### 12.3 Export 规则
 
-1. Git push 默认提交 MFE Source。
+1. Git push 默认提交 Prodivix Source。
 2. Generated App 是独立可选输出，不反向写入 Workspace。
-3. 历史版本比较基于 MFE Source。
+3. 历史版本比较基于 Prodivix Source。
 4. Generated App 从 workspace 多文档生成。
 
 ## 13. Command 切换
@@ -754,10 +754,10 @@ state.pirDoc = ...
 
 ### 14.1 Projection 验收
 
-1. 当前 workspace 可以生成 `.mfe/workspace.json`。
-2. 当前 workspace 可以生成 `.mfe/route-manifest.json`。
-3. 每个 workspace document 都有 `.mfe/documents/**` 文件。
-4. `.mfe/**` 可以还原成 workspace snapshot。
+1. 当前 workspace 可以生成 `.prodivix/workspace.json`。
+2. 当前 workspace 可以生成 `.prodivix/route-manifest.json`。
+3. 每个 workspace document 都有 `.prodivix/documents/**` 文件。
+4. `.prodivix/**` 可以还原成 workspace snapshot。
 5. round-trip 后 `documentId` 不变。
 6. round-trip 后 `treeById` 不变。
 7. round-trip 后 `routeManifest` 不变。
@@ -780,9 +780,9 @@ state.pirDoc = ...
 
 ### 14.4 Git 验收
 
-1. Git workdir 中能看到 `.mfe/**`。
-2. 修改页面节点会改变对应 `.mfe/documents/pages/*.pir.json`。
-3. 新建页面会改变 `.mfe/workspace.json`、`.mfe/route-manifest.json` 和新增 page PIR 文件。
+1. Git workdir 中能看到 `.prodivix/**`。
+2. 修改页面节点会改变对应 `.prodivix/documents/pages/*.pir.json`。
+3. 新建页面会改变 `.prodivix/workspace.json`、`.prodivix/route-manifest.json` 和新增 page PIR 文件。
 4. 查看历史时可从 Git ref 还原 workspace。
 
 ## 15. 推荐实施顺序
@@ -792,8 +792,8 @@ state.pirDoc = ...
 新增：
 
 ```txt
-apps/web/src/workspace/projectWorkspaceToMfeFiles.ts
-apps/web/src/workspace/readWorkspaceFromMfeFiles.ts
+apps/web/src/workspace/projectWorkspaceToProdivixFiles.ts
+apps/web/src/workspace/readWorkspaceFromProdivixFiles.ts
 apps/web/src/workspace/workspaceSourceFile.types.ts
 ```
 
@@ -821,7 +821,7 @@ apps/web/src/editor/store/editorStore.selectors.ts
 apps/web/src/editor/features/export/ExportPirPage.tsx
 ```
 
-新增 `.mfe/**` 展示，不影响现有 React export。
+新增 `.prodivix/**` 展示，不影响现有 React export。
 
 ### Step 4：Command 写入入口
 
@@ -839,9 +839,9 @@ dispatchCommand(command)
 
 ### Step 6：Git bridge
 
-把 `.mfe/**` projection 写入 browser git workdir。
+把 `.prodivix/**` projection 写入 browser git workdir。
 
-### Step 7：MFE diff
+### Step 7：Prodivix diff
 
 从两个 workspace snapshot 做 diff。
 
@@ -867,14 +867,14 @@ dispatchCommand(command)
 2. path 只作为派生字段。
 3. projection reader 必须保留 id。
 
-### 16.3 `.mfe/workspace.json` 过大
+### 16.3 `.prodivix/workspace.json` 过大
 
 风险：把 document content 嵌进 workspace manifest。
 
 止损：
 
 1. workspace manifest 只保存 metadata 和 VFS。
-2. document content 必须拆到 `.mfe/documents/**`。
+2. document content 必须拆到 `.prodivix/documents/**`。
 
 ### 16.4 旧 `pirDoc` 回流
 
@@ -890,11 +890,11 @@ dispatchCommand(command)
 
 完成后，用户创建和编辑项目时，系统内部必须满足：
 
-1. 项目可以导出完整 `.mfe/**` 源文件树。
-2. `.mfe/**` 可以还原 workspace。
+1. 项目可以导出完整 `.prodivix/**` 源文件树。
+2. `.prodivix/**` 可以还原 workspace。
 3. 页面、布局、组件都是独立 workspace document。
 4. route manifest 只引用 document id。
 5. active document 是编辑器当前工作对象。
 6. 单个 `pirDoc` 不再代表整个项目。
-7. Git history 可以读取 `.mfe/**` 并还原 workspace。
-8. 后续 MFE diff、undo/redo、Git push 都基于 workspace 文件树。
+7. Git history 可以读取 `.prodivix/**` 并还原 workspace。
+8. 后续 Prodivix diff、undo/redo、Git push 都基于 workspace 文件树。

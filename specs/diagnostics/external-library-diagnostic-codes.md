@@ -14,7 +14,7 @@
 
 统一 external library 链路的错误码与阶段映射，保障错误可观察、可定位、可重试。
 
-本文件是 MFE Diagnostics 体系下的 `ELIB-xxxx` 域码表。统一诊断结构、严重程度和跨域规则见 `specs/diagnostics/README.md`。
+本文件是 Prodivix Diagnostics 体系下的 `ELIB-xxxx` 域码表。统一诊断结构、严重程度和跨域规则见 `specs/diagnostics/README.md`。
 
 ## 2. 统一结构
 

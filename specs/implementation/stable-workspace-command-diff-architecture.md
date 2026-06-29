@@ -1,4 +1,4 @@
-# Stable Workspace, Command History, MFE Diff Implementation Plan
+# Stable Workspace, Command History, Prodivix Diff Implementation Plan
 
 ## 状态
 
@@ -24,14 +24,14 @@
 
 ## 1. 目标
 
-本文档定义一组长期稳定的核心能力，作为后续 Git 支持、MFE diff、三编辑器历史、撤销重做和工作区结构重构的共同基础。
+本文档定义一组长期稳定的核心能力，作为后续 Git 支持、Prodivix diff、三编辑器历史、撤销重做和工作区结构重构的共同基础。
 
 核心目标：
 
 1. 建立稳定的 Workspace 逻辑文件树，承载多文档、路由、内部结构和导出投影。
 2. 建立统一 Command History，让 PIR、Workspace VFS、Route Manifest、NodeGraph 和 Animation 的修改都可撤销、可重做、可同步、可审计。
-3. 建立 MFE Diff 语义模型，用于三编辑器查看历史版本和当前开发过程差异。
-4. 建立 Git 版本读取与投影边界，让 Git 负责版本、文件、远程同步，MFE 负责语义解释。
+3. 建立 Prodivix Diff 语义模型，用于三编辑器查看历史版本和当前开发过程差异。
+4. 建立 Git 版本读取与投影边界，让 Git 负责版本、文件、远程同步，Prodivix 负责语义解释。
 5. 保持 PIR `ui.graph` 的唯一真相源地位，不让文本 diff、导出文件树或派生树模型反向支配 PIR。
 
 ## 2. 非目标
@@ -64,7 +64,7 @@
 1. `materializeUiTree(ui.graph)`，用于渲染、预览和代码生成。
 2. `WorkspaceTreeView`，用于内部调试或面包屑显示。
 3. `GitWorkspaceProjection`，用于导出、提交和推送。
-4. `MfeDiffViewModel`，用于三编辑器可视化 diff。
+4. `ProdivixDiffViewModel`，用于三编辑器可视化 diff。
 
 禁止把派生读模型作为长期写入来源。
 
@@ -93,11 +93,11 @@
 
 ### 3.4 Diff 的语义来源必须是模型
 
-1. MFE diff 的输入是两个合法 `WorkspaceSnapshot` 或两个合法 `PIRDocument`。
+1. Prodivix diff 的输入是两个合法 `WorkspaceSnapshot` 或两个合法 `PIRDocument`。
 2. Git diff 的输入是文本文件。
-3. Git diff 可以辅助定位 changed files，但不能作为 PIR/MFE 语义 diff 的真相源。
+3. Git diff 可以辅助定位 changed files，但不能作为 PIR/Prodivix 语义 diff 的真相源。
 4. 代码编辑器历史使用文本 diff。
-5. 三编辑器历史使用 MFE diff。
+5. 三编辑器历史使用 Prodivix diff。
 
 ## 4. 稳定分层
 
@@ -131,7 +131,7 @@ Editor Layer
 
 ### 5.1 角色
 
-Workspace VFS 是 MFE 内部的逻辑文件树，负责组织项目中的长期文档。
+Workspace VFS 是 Prodivix 内部的逻辑文件树，负责组织项目中的长期文档。
 
 它不是：
 
@@ -337,17 +337,17 @@ Git Layer 不负责：
 长期应有两个投影：
 
 ```txt
-MFE Source Projection
-  用于保存 MFE 项目本身，可被 Git 版本化。
+Prodivix Source Projection
+  用于保存 Prodivix 项目本身，可被 Git 版本化。
 
 Generated App Projection
   用于导出编译生成代码，可被 Git 版本化。
 ```
 
-MFE Source Projection 建议结构：
+Prodivix Source Projection 建议结构：
 
 ```txt
-.mfe/
+.prodivix/
   workspace.json
   route-manifest.json
   documents/
@@ -364,9 +364,9 @@ MFE Source Projection 建议结构：
 
 说明：
 
-1. `.mfe/workspace.json` 存 workspace metadata、VFS tree、revision 摘要、document registry。
-2. `.mfe/route-manifest.json` 存 route manifest。
-3. `.mfe/documents/**` 存各文档 content。
+1. `.prodivix/workspace.json` 存 workspace metadata、VFS tree、revision 摘要、document registry。
+2. `.prodivix/route-manifest.json` 存 route manifest。
+3. `.prodivix/documents/**` 存各文档 content。
 4. document path 来自 VFS 派生路径。
 5. `docsById` 仍然以 `DocumentId` 为稳定身份，路径只用于组织和 Git 可读性。
 
@@ -382,18 +382,18 @@ package.json
 index.html
 ```
 
-### 6.3 Git 历史读取到 MFE Diff
+### 6.3 Git 历史读取到 Prodivix Diff
 
 三编辑器历史查看流程：
 
 ```txt
 select base ref + target ref
-  -> Git Layer read files from .mfe/**
+  -> Git Layer read files from .prodivix/**
   -> parse WorkspaceSnapshot projection
   -> validate WorkspaceSnapshot
   -> parse documents
   -> validate PIR / NodeGraph / Animation documents
-  -> compute MFE diff
+  -> compute Prodivix diff
   -> editor-specific view model
 ```
 
@@ -410,7 +410,7 @@ Export / Push 页面流程：
 
 ```txt
 current workspace
-  -> materialize MFE Source Projection
+  -> materialize Prodivix Source Projection
   -> write browser git workdir
   -> show raw git status/diff
   -> commit/push
@@ -594,11 +594,11 @@ global:<workspaceId>
 3. 跨文档 transaction 属于 workspace/global 作用域。
 4. UI 必须标注跨文档 undo 的影响范围。
 
-## 8. MFE Diff
+## 8. Prodivix Diff
 
 ### 8.1 角色
 
-MFE Diff 是 MFE 模型级差异，不是文本差异。
+Prodivix Diff 是 Prodivix 模型级差异，不是文本差异。
 
 它用于：
 
@@ -606,12 +606,12 @@ MFE Diff 是 MFE 模型级差异，不是文本差异。
 2. 当前工作区与 Git ref 比较。
 3. AI apply 前预览。
 4. Command dry-run 后预览。
-5. 导出前检查 MFE 源变化。
+5. 导出前检查 Prodivix 源变化。
 
 ### 8.2 Diff 输入
 
 ```ts
-type MfeDiffInput =
+type ProdivixDiffInput =
   | {
       kind: 'workspace';
       base: WorkspaceSnapshot;
@@ -635,7 +635,7 @@ type MfeDiffInput =
 ### 8.3 Diff 输出
 
 ```ts
-type MfeDiffChange = {
+type ProdivixDiffChange = {
   id: string;
   domain: 'workspace' | 'route' | 'pir' | 'nodegraph' | 'animation' | 'code';
   kind: string;
@@ -993,12 +993,12 @@ selectRedoAvailability(scope);
 1. 本文档。
 2. `WorkspaceSnapshot` 类型对齐。
 3. `CommandEnvelope` 类型对齐。
-4. `MfeDiffChange` 类型草案。
+4. `ProdivixDiffChange` 类型草案。
 
 验收：
 
 1. spec 无互相冲突字段。
-2. 新文档能解释 Git diff 与 MFE diff 边界。
+2. 新文档能解释 Git diff 与 Prodivix diff 边界。
 3. 新文档能解释撤销重做栈为什么不能只围绕 `pirDoc`。
 
 ### Phase 2：Workspace VFS Validator 与 Projection
@@ -1006,8 +1006,8 @@ selectRedoAvailability(scope);
 目标：
 
 1. 实现 VFS 不变量校验。
-2. 实现 workspace snapshot 到 `.mfe/**` 的投影。
-3. 实现 `.mfe/**` 到 workspace snapshot 的读取。
+2. 实现 workspace snapshot 到 `.prodivix/**` 的投影。
+3. 实现 `.prodivix/**` 到 workspace snapshot 的读取。
 
 交付：
 
@@ -1019,8 +1019,8 @@ apps/web/src/workspace/readWorkspaceFromGitFiles.ts
 
 验收：
 
-1. 可从当前 workspace 生成稳定 `.mfe/**` 文件。
-2. 可从 `.mfe/**` 还原 workspace。
+1. 可从当前 workspace 生成稳定 `.prodivix/**` 文件。
+2. 可从 `.prodivix/**` 还原 workspace。
 3. round-trip 后核心 id 不变。
 
 ### Phase 3：Command Executor MVP
@@ -1048,7 +1048,7 @@ apps/web/src/editor/commands/patch.ts
 4. workspace document create 可撤销。
 5. reverseOps 无效时拒绝入栈。
 
-### Phase 4：MFE Diff MVP
+### Phase 4：Prodivix Diff MVP
 
 目标：
 
@@ -1060,11 +1060,11 @@ apps/web/src/editor/commands/patch.ts
 交付：
 
 ```txt
-apps/web/src/mfe-diff/types.ts
-apps/web/src/mfe-diff/diffWorkspace.ts
-apps/web/src/mfe-diff/diffRouteManifest.ts
-apps/web/src/mfe-diff/diffPirGraph.ts
-apps/web/src/mfe-diff/diffWorkspaceSnapshot.ts
+apps/web/src/Prodivix-diff/types.ts
+apps/web/src/Prodivix-diff/diffWorkspace.ts
+apps/web/src/Prodivix-diff/diffRouteManifest.ts
+apps/web/src/Prodivix-diff/diffPirGraph.ts
+apps/web/src/Prodivix-diff/diffWorkspaceSnapshot.ts
 ```
 
 验收：
@@ -1080,7 +1080,7 @@ apps/web/src/mfe-diff/diffWorkspaceSnapshot.ts
 
 1. 用 browser git client 读取 ref。
 2. 从 Git ref 还原 workspace snapshot。
-3. 将两个 snapshot 输入 MFE diff。
+3. 将两个 snapshot 输入 Prodivix diff。
 
 交付：
 
@@ -1091,8 +1091,8 @@ apps/web/src/editor/history/compareWorkspaceRefs.ts
 
 验收：
 
-1. 可以比较两个 Git ref 中的 `.mfe/**`。
-2. 三编辑器拿到 MFE diff change list。
+1. 可以比较两个 Git ref 中的 `.prodivix/**`。
+2. 三编辑器拿到 Prodivix diff change list。
 3. 代码文件仍走 text diff。
 
 ### Phase 6：编辑器接入
@@ -1102,7 +1102,7 @@ apps/web/src/editor/history/compareWorkspaceRefs.ts
 1. Blueprint 使用 command helper 写入。
 2. Inspector 使用 command helper 写入。
 3. Route 操作使用 command helper 写入。
-4. 初版 MFE diff 在 Blueprint 中展示。
+4. 初版 Prodivix diff 在 Blueprint 中展示。
 
 验收：
 
@@ -1136,7 +1136,7 @@ apps/web/src/editor/history/compareWorkspaceRefs.ts
 3. Patch apply/invert。
 4. Command executor。
 5. Undo/Redo。
-6. MFE diff。
+6. Prodivix diff。
 7. Git ref workspace loader。
 
 ### 13.2 集成测试
@@ -1198,7 +1198,7 @@ apps/web/src/editor/history/compareWorkspaceRefs.ts
 
 处理：
 
-1. MFE diff 输入必须是 validated model。
+1. Prodivix diff 输入必须是 validated model。
 2. raw git diff 只用于 export/push 和高级查看。
 3. 三编辑器不消费 raw git diff。
 
@@ -1222,7 +1222,7 @@ apps/web/src/editor/history/compareWorkspaceRefs.ts
 4. 所有可撤销操作都走 command。
 5. Undo/Redo 不依赖组件闭包。
 6. Git ref 可还原 workspace snapshot。
-7. MFE diff 可解释三编辑器变化。
+7. Prodivix diff 可解释三编辑器变化。
 8. Code editor 仍可直接使用文本 diff。
 9. Export / Push 页面可展示 raw git diff。
 10. PIR `ui.graph` 仍是 UI 结构唯一真相源。
@@ -1231,7 +1231,7 @@ apps/web/src/editor/history/compareWorkspaceRefs.ts
 
 立即下一步不应先做 UI，而应按以下顺序做小步落地：
 
-1. 新增稳定类型文件，集中定义 `WorkspaceSnapshot`、`CommandEnvelope`、`MfeDiffChange`。
+1. 新增稳定类型文件，集中定义 `WorkspaceSnapshot`、`CommandEnvelope`、`ProdivixDiffChange`。
 2. 实现 Workspace VFS validator。
 3. 实现 Workspace Git Projection round-trip。
 4. 实现 Command Executor MVP。

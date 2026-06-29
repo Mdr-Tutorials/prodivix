@@ -66,7 +66,7 @@ export type BrowserGitDiffEntry = {
   status: 'added' | 'deleted' | 'modified' | 'unchanged' | 'untracked';
 };
 
-const DEFAULT_FS_NAME = 'mfe-browser-git';
+const DEFAULT_FS_NAME = 'prodivix-browser-git';
 
 const toText = (content: Uint8Array): string =>
   new TextDecoder().decode(content);

@@ -13,7 +13,7 @@
 
 ## 1. 范围
 
-`UX-xxxx` 覆盖 MFE 项目产物和作者态画布中的用户体验质量诊断，包括可访问性、交互可用性、响应式布局、内容语义、视觉反馈、动效舒适性和体验检查器自身异常。
+`UX-xxxx` 覆盖 Prodivix 项目产物和作者态画布中的用户体验质量诊断，包括可访问性、交互可用性、响应式布局、内容语义、视觉反馈、动效舒适性和体验检查器自身异常。
 
 包括：
 
@@ -740,7 +740,7 @@ type UxDiagnosticStage =
 - Retryable: false
 - Trigger: 大量字段、操作或数据在同一区域内缺少分组、分隔、标题或空间节奏
 - User action: 使用 panel、group、divider、heading、tabs 或 progressive disclosure 组织内容
-- Developer notes: MFE 的 Inspector 和工作台允许高密度，但仍需要稳定扫描结构
+- Developer notes: Prodivix 的 Inspector 和工作台允许高密度，但仍需要稳定扫描结构
 
 ### `UX-5009` Skeleton 或占位内容与最终布局差异过大
 

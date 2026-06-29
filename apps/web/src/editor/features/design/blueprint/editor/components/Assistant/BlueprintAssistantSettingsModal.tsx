@@ -247,7 +247,7 @@ export function BlueprintAssistantSettingsModal({
                     <input
                       className="h-9 border border-(--border-default) bg-(--bg-panel) px-2 text-sm text-(--text-primary)"
                       value={draft.model}
-                      list="mfe-ai-discovered-models"
+                      list="Prodivix-ai-discovered-models"
                       onChange={(event) =>
                         updateDraft({ model: event.target.value })
                       }
@@ -267,7 +267,7 @@ export function BlueprintAssistantSettingsModal({
                     {t('assistant.settings.discovery.action')}
                   </button>
                 </div>
-                <datalist id="mfe-ai-discovered-models">
+                <datalist id="Prodivix-ai-discovered-models">
                   {models.map((model) => (
                     <option key={model.id} value={model.id} />
                   ))}

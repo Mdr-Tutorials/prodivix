@@ -41,7 +41,7 @@ Phase 2 的目标是固定以下长期边界：
 
 1. 后端 `WorkspaceDocumentType` 未包含 `code`。
 2. 后端 workspace document content 仍按 JSON 文档保存，还没有 code document 内容模型。
-3. Workspace projection 当前偏内部 `.mfe/documents/...` 投影，尚未把 VFS path 作为用户代码路径。
+3. Workspace projection 当前偏内部 `.prodivix/documents/...` 投影，尚未把 VFS path 作为用户代码路径。
 4. 当前 `CodeReference` 仍是轻量 `{ name, scopeId }` 查询形态，不适合作为持久化引用。
 5. 尚未定义 CodeSlotContract、CodeSlotProvider、CodeSlotRegistry。
 6. 尚未定义 TriggerBinding / ActionContract 的正式落地位置。
@@ -108,14 +108,14 @@ WorkspaceDocument 的 path 必须反映用户心智路径。
 3. 移动或重命名只改变 path，不改变 document id。
 4. Git 导出、文件树展示、错误文案和 Code Editor tab 使用 path。
 5. CodeReference、SourceSpan、diagnostic target 和 command target 使用 id。
-6. `.mfe/...` 仅保存 workspace manifest、route manifest、索引和内部投影数据。
+6. `.prodivix/...` 仅保存 workspace manifest、route manifest、索引和内部投影数据。
 
 Projection 要求：
 
-1. `projectWorkspaceToMfeFiles` 输出用户代码文件时应使用 `WorkspaceDocument.path`。
-2. `.mfe/workspace.json` 继续保存 document id、type、path、revision 和必要 metadata。
-3. 对 code document，projection 可以输出源文件本体和 `.mfe` 中的 document metadata。
-4. 读取 projection 时必须能用 `.mfe/workspace.json` 恢复 document id；不能通过 path 重新生成稳定 id。
+1. `projectWorkspaceToProdivixFiles` 输出用户代码文件时应使用 `WorkspaceDocument.path`。
+2. `.prodivix/workspace.json` 继续保存 document id、type、path、revision 和必要 metadata。
+3. 对 code document，projection 可以输出源文件本体和 `.prodivix` 中的 document metadata。
+4. 读取 projection 时必须能用 `.prodivix/workspace.json` 恢复 document id；不能通过 path 重新生成稳定 id。
 
 ### 3. CodeArtifact 投影
 

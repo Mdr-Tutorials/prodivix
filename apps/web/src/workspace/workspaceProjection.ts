@@ -84,16 +84,18 @@ type WorkspaceManifest = {
   activeRouteNodeId?: StableWorkspaceSnapshot['activeRouteNodeId'];
 };
 
-const WORKSPACE_MANIFEST_PATH = '.mfe/workspace.json';
-const ROUTE_MANIFEST_PATH = '.mfe/route-manifest.json';
-const DOCUMENT_ROOT_PATH = '.mfe/documents';
+const WORKSPACE_MANIFEST_PATH = '.prodivix/workspace.json';
+const ROUTE_MANIFEST_PATH = '.prodivix/route-manifest.json';
+const DOCUMENT_ROOT_PATH = '.prodivix/documents';
 
 const normalizeSourcePath = (path: string): string =>
   path.replaceAll('\\', '/').replace(/^\/+/, '');
 
-const toMfeSourcePath = (path: string): string => {
+const toProdivixSourcePath = (path: string): string => {
   const normalized = normalizeSourcePath(path);
-  return normalized.startsWith('.mfe/') ? normalized : `.mfe/${normalized}`;
+  return normalized.startsWith('.prodivix/')
+    ? normalized
+    : `.prodivix/${normalized}`;
 };
 
 const createSourceFileMap = (
@@ -103,7 +105,7 @@ const createSourceFileMap = (
   files.forEach((file) => {
     const normalized = normalizeSourcePath(file.path);
     filesByPath.set(normalized, file);
-    filesByPath.set(toMfeSourcePath(normalized), file);
+    filesByPath.set(toProdivixSourcePath(normalized), file);
   });
   return filesByPath;
 };
@@ -239,7 +241,7 @@ const createManifest = (
   };
 };
 
-export const projectWorkspaceToMfeFiles = (
+export const projectWorkspaceToProdivixFiles = (
   snapshot: StableWorkspaceSnapshot
 ): WorkspaceProjectionWriteResult => {
   const validation = validateStableWorkspaceSnapshot(snapshot);
@@ -307,7 +309,7 @@ export const projectWorkspaceToMfeFiles = (
   };
 };
 
-export const readWorkspaceFromMfeFiles = (
+export const readWorkspaceFromProdivixFiles = (
   files: WorkspaceSourceFile[]
 ): WorkspaceProjectionReadResult => {
   const issues: WorkspaceProjectionIssue[] = [];

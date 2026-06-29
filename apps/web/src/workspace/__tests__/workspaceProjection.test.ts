@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultPirDoc } from '@/pir/resolvePirDocument';
 import {
-  projectWorkspaceToMfeFiles,
-  readWorkspaceFromMfeFiles,
+  projectWorkspaceToProdivixFiles,
+  readWorkspaceFromProdivixFiles,
   type StableWorkspaceSnapshot,
 } from '..';
 
@@ -95,16 +95,16 @@ const createWorkspace = (): StableWorkspaceSnapshot => ({
 });
 
 describe('workspace projection', () => {
-  it('projects a workspace to .mfe source files with stable paths', () => {
-    const result = projectWorkspaceToMfeFiles(createWorkspace());
+  it('projects a workspace to .prodivix source files with stable paths', () => {
+    const result = projectWorkspaceToProdivixFiles(createWorkspace());
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
     expect(result.files.map((file) => file.path)).toEqual([
-      '.mfe/documents/pages/home.pir.json',
-      '.mfe/route-manifest.json',
-      '.mfe/workspace.json',
+      '.prodivix/documents/pages/home.pir.json',
+      '.prodivix/route-manifest.json',
+      '.prodivix/workspace.json',
       'src/index.ts',
     ]);
     expect(
@@ -122,12 +122,12 @@ describe('workspace projection', () => {
     });
     expect(
       result.files
-        .find((file) => file.path === '.mfe/workspace.json')
+        .find((file) => file.path === '.prodivix/workspace.json')
         ?.content.includes('"codeContent"')
     ).toBe(true);
     expect(
       result.files
-        .find((file) => file.path === '.mfe/workspace.json')
+        .find((file) => file.path === '.prodivix/workspace.json')
         ?.content.includes('export const value = 1;')
     ).toBe(false);
   });
@@ -175,7 +175,7 @@ describe('workspace projection', () => {
       },
     };
 
-    const result = projectWorkspaceToMfeFiles(workspace);
+    const result = projectWorkspaceToProdivixFiles(workspace);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -189,13 +189,13 @@ describe('workspace projection', () => {
     );
   });
 
-  it('round-trips .mfe source files back into a workspace snapshot', () => {
+  it('round-trips .prodivix source files back into a workspace snapshot', () => {
     const workspace = createWorkspace();
-    const projected = projectWorkspaceToMfeFiles(workspace);
+    const projected = projectWorkspaceToProdivixFiles(workspace);
     expect(projected.ok).toBe(true);
     if (!projected.ok) return;
 
-    const read = readWorkspaceFromMfeFiles(projected.files);
+    const read = readWorkspaceFromProdivixFiles(projected.files);
 
     expect(read.ok).toBe(true);
     if (!read.ok) return;
@@ -210,7 +210,7 @@ describe('workspace projection', () => {
     codeDocument.name = 'openDialog.ts';
     workspace.treeById['code-index-node'].name = 'openDialog.ts';
 
-    const projected = projectWorkspaceToMfeFiles(workspace);
+    const projected = projectWorkspaceToProdivixFiles(workspace);
     expect(projected.ok).toBe(true);
     if (!projected.ok) return;
 
@@ -218,7 +218,7 @@ describe('workspace projection', () => {
       'src/openDialog.ts'
     );
 
-    const read = readWorkspaceFromMfeFiles(projected.files);
+    const read = readWorkspaceFromProdivixFiles(projected.files);
 
     expect(read.ok).toBe(true);
     if (!read.ok) return;
@@ -240,7 +240,7 @@ describe('workspace projection', () => {
     const workspace = createWorkspace();
     workspace.docsById['page-home'].path = '/wrong/home.pir.json';
 
-    const result = projectWorkspaceToMfeFiles(workspace);
+    const result = projectWorkspaceToProdivixFiles(workspace);
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -257,7 +257,7 @@ describe('workspace projection', () => {
     const workspace = createWorkspace();
     workspace.docsById['code-index'].content = 'export const value = 1;';
 
-    const result = projectWorkspaceToMfeFiles(workspace);
+    const result = projectWorkspaceToProdivixFiles(workspace);
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -272,11 +272,11 @@ describe('workspace projection', () => {
   });
 
   it('rejects missing declared document files while reading', () => {
-    const projected = projectWorkspaceToMfeFiles(createWorkspace());
+    const projected = projectWorkspaceToProdivixFiles(createWorkspace());
     expect(projected.ok).toBe(true);
     if (!projected.ok) return;
 
-    const read = readWorkspaceFromMfeFiles(
+    const read = readWorkspaceFromProdivixFiles(
       projected.files.filter((file) => file.documentId !== 'page-home')
     );
 

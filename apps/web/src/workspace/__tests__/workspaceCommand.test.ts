@@ -4,7 +4,7 @@ import {
   applyWorkspaceCommand,
   createWorkspaceCodeDocumentCommand,
   createWorkspaceCodeDocumentIntentRequest,
-  projectWorkspaceToMfeFiles,
+  projectWorkspaceToProdivixFiles,
   type StableWorkspaceSnapshot,
   type WorkspaceCommandEnvelope,
 } from '..';
@@ -239,7 +239,7 @@ describe('applyWorkspaceCommand', () => {
       },
     });
 
-    const projected = projectWorkspaceToMfeFiles(result.snapshot);
+    const projected = projectWorkspaceToProdivixFiles(result.snapshot);
     expect(projected.ok).toBe(true);
     if (!projected.ok) return;
 

@@ -25,7 +25,7 @@
 1. 不一次性实现完整 WCAG checker。
 2. 不把 `ux-diagnostic-codes.md` 中所有码位都写成空 checker。
 3. 不为 definition 映射或文档同步增加低价值测试。
-4. 不把外部工具编号作为 MFE 主 `code`。
+4. 不把外部工具编号作为 Prodivix 主 `code`。
 5. 不在本阶段改变 Inspector、Canvas 或 Issues 的视觉设计。
 
 ## Phase 1：稳定诊断协议
@@ -233,5 +233,5 @@ Gate 策略：
 
 1. 一次性实现过多 checker 会产生低质量误报。
 2. 缺少 `targetRef` 的 UX 诊断会变成无法修复的噪音。
-3. 把外部工具 code 当主 code 会破坏 MFE 长期稳定语义。
+3. 把外部工具 code 当主 code 会破坏 Prodivix 长期稳定语义。
 4. Preview/interaction checker 如果不记录 viewport、theme、revision，会产生不可复现结果。

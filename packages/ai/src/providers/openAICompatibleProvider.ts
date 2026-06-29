@@ -167,11 +167,11 @@ export class OpenAICompatibleProvider implements LlmProvider {
   }
 
   /**
-   * 把 MFE 内部的 LlmProviderRequest 翻译为 OpenAI-compatible 请求，
-   * 再把模型返回的 JSON 解析回 MFE 结构化输出并执行通道校验。
+   * 把 Prodivix 内部的 LlmProviderRequest 翻译为 OpenAI-compatible 请求，
+   * 再把模型返回的 JSON 解析回 Prodivix 结构化输出并执行通道校验。
    *
-   * Translates MFE's LlmProviderRequest into an OpenAI-compatible request, then
-   * parses the model JSON response back into MFE structured output and validates
+   * Translates Prodivix's LlmProviderRequest into an OpenAI-compatible request, then
+   * parses the model JSON response back into Prodivix structured output and validates
    * the requested output channel.
    */
   async generate(

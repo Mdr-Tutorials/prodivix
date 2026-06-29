@@ -22,7 +22,7 @@
 
 ## 1. 目标
 
-本文档把 Workspace/PIR 文件树上的撤销重做、协同、Git 历史、MFE diff 和各编辑器写入入口拆成 10 个长期稳定层。
+本文档把 Workspace/PIR 文件树上的撤销重做、协同、Git 历史、Prodivix diff 和各编辑器写入入口拆成 10 个长期稳定层。
 
 目标不是做短期兼容层，而是明确：
 
@@ -30,7 +30,7 @@
 2. 一次用户动作如何跨多个文档原子提交。
 3. `forwardOps/reverseOps` 如何成为可回放、可同步、可审计的底层差异。
 4. 代码编辑器为什么需要 text edit command，而不是直接套用 PIR JSON Patch。
-5. Git diff 和 MFE diff 各自在哪一层工作。
+5. Git diff 和 Prodivix diff 各自在哪一层工作。
 
 ## 2. 总体分层
 
@@ -41,11 +41,11 @@ Editor Binding Layer
 Code Text History Layer
   text edit / selection / cursor / merge window
 
-MFE Diff Layer
+Prodivix Diff Layer
   workspace diff / PIR graph diff / route diff / nodegraph diff / animation diff
 
 Git Projection Layer
-  WorkspaceSnapshot <-> .mfe/** files
+  WorkspaceSnapshot <-> .prodivix/** files
 
 Outbox Sync Layer
   pending command transaction / expected rev / server ack / conflict
@@ -74,7 +74,7 @@ Command Apply Layer
 当前已经开始实现：
 
 1. Workspace VFS validator。
-2. `.mfe/**` projection round-trip。
+2. `.prodivix/**` projection round-trip。
 3. Workspace selectors。
 4. `applyWorkspaceCommand` 的最小模型层。
 
@@ -85,7 +85,7 @@ Command Apply Layer
 3. Domain command helpers。
 4. NodeGraph/Animation/Code 专用 validators。
 5. Conflict/revision/outbox。
-6. MFE diff。
+6. Prodivix diff。
 7. Editor shortcut binding。
 
 ## 3. Layer 1：Command Apply Layer
@@ -676,7 +676,7 @@ type OutboxItem = {
 ```txt
 OutboxItem(status=conflicted)
 Workspace shows conflict badge
-User opens MFE diff/merge
+User opens Prodivix diff/merge
 ```
 
 ### 9.4 Outbox 顺序
@@ -691,12 +691,12 @@ User opens MFE diff/merge
 
 ### 10.1 职责
 
-Git Projection Layer 把 Workspace 保存为 `.mfe/**`，并从 Git ref 还原 Workspace。
+Git Projection Layer 把 Workspace 保存为 `.prodivix/**`，并从 Git ref 还原 Workspace。
 
 它负责：
 
-1. `WorkspaceSnapshot -> .mfe/** files`。
-2. `.mfe/** files -> WorkspaceSnapshot`。
+1. `WorkspaceSnapshot -> .prodivix/** files`。
+2. `.prodivix/** files -> WorkspaceSnapshot`。
 3. Git ref/blob 读取。
 4. Export/push 前 raw git diff。
 
@@ -709,7 +709,7 @@ Git Projection Layer 把 Workspace 保存为 `.mfe/**`，并从 Git ref 还原 W
 ### 10.2 保存形态
 
 ```txt
-.mfe/
+.prodivix/
   workspace.json
   route-manifest.json
   documents/
@@ -725,12 +725,12 @@ Git Projection Layer 把 Workspace 保存为 `.mfe/**`，并从 Git ref 还原 W
 
 ```txt
 select baseRef + targetRef
-  -> read .mfe/** blobs at baseRef
-  -> read .mfe/** blobs at targetRef
-  -> readWorkspaceFromMfeFiles(baseFiles)
-  -> readWorkspaceFromMfeFiles(targetFiles)
+  -> read .prodivix/** blobs at baseRef
+  -> read .prodivix/** blobs at targetRef
+  -> readWorkspaceFromProdivixFiles(baseFiles)
+  -> readWorkspaceFromProdivixFiles(targetFiles)
   -> validate both
-  -> MFE diff
+  -> Prodivix diff
 ```
 
 Git raw diff 只用于 source view：
@@ -739,17 +739,17 @@ Git raw diff 只用于 source view：
 home.pir.json changed line 32
 ```
 
-三编辑器看到的是 MFE diff：
+三编辑器看到的是 Prodivix diff：
 
 ```txt
 Button "Submit" text changed from "Save" to "Submit"
 ```
 
-## 11. Layer 9：MFE Diff Layer
+## 11. Layer 9：Prodivix Diff Layer
 
 ### 11.1 职责
 
-MFE Diff Layer 把两个合法模型比较为用户可理解的变化。
+Prodivix Diff Layer 把两个合法模型比较为用户可理解的变化。
 
 它负责：
 
@@ -763,7 +763,7 @@ MFE Diff Layer 把两个合法模型比较为用户可理解的变化。
 ### 11.2 稳定输出
 
 ```ts
-type MfeDiffChange = {
+type ProdivixDiffChange = {
   id: string;
   domain: 'workspace' | 'route' | 'pir' | 'nodegraph' | 'animation' | 'code';
   kind: string;
@@ -788,7 +788,7 @@ Raw JSON:
 + "childIdsById": { "root": ["b", "a"] }
 ```
 
-MFE diff：
+Prodivix diff：
 
 ```ts
 {
@@ -832,7 +832,7 @@ WorkspaceDocument.type === 'code'
 documentId === 'code_index'
 ```
 
-Code editor 历史可以显示 Monaco diff，而不是 MFE graph diff。
+Code editor 历史可以显示 Monaco diff，而不是 Prodivix graph diff。
 
 ## 12. Layer 10：Code Text History Layer
 
@@ -1084,19 +1084,19 @@ apps/web/src/workspace/workspaceOutbox.ts
 2. ack 后更新 rev。
 3. conflict 后进入结构化状态。
 
-### Phase F：Git Projection + MFE Diff
+### Phase F：Git Projection + Prodivix Diff
 
 交付：
 
 ```txt
 apps/web/src/workspace/readWorkspaceAtRef.ts
-apps/web/src/mfe-diff/*
+apps/web/src/Prodivix-diff/*
 ```
 
 验收：
 
 1. 两个 Git ref 可还原 workspace。
-2. MFE diff 输出 editor-friendly change list。
+2. Prodivix diff 输出 editor-friendly change list。
 3. Code diff 走 text diff。
 
 ### Phase G：Editor Binding
@@ -1127,7 +1127,7 @@ Code editor undo binding
 3. reverseOps restore original。
 4. validator failure blocks history entry。
 5. outbox status transition。
-6. MFE diff change kinds。
+6. Prodivix diff change kinds。
 
 不应该测试：
 
@@ -1165,7 +1165,7 @@ Code editor undo binding
 4. 所有 command 都有可验证的 `forwardOps/reverseOps`。
 5. 所有 domain 都有自己的 validator。
 6. 本地 outbox 可离线排队并与后端 revision 对齐。
-7. Git ref 可还原 workspace 并进入 MFE diff。
-8. 三编辑器消费 MFE diff，代码编辑器消费 text diff。
+7. Git ref 可还原 workspace 并进入 Prodivix diff。
+8. 三编辑器消费 Prodivix diff，代码编辑器消费 text diff。
 9. Code editor 保留自然文本编辑体验。
 10. 旧 `pirDoc`、`ui.root`、project PIR fallback 不进入新链路。

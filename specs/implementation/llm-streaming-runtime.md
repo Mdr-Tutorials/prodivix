@@ -52,7 +52,7 @@ BlueprintAssistantPanel
 
 ### 1. Streaming 是传输层能力
 
-流式 delta 只代表模型正在输出文本，不代表输出已经符合 MFE 协议。系统必须等完整响应结束后再解析 JSON、校验通道、写 trace 并返回最终 `LlmTaskResult`。
+流式 delta 只代表模型正在输出文本，不代表输出已经符合 Prodivix 协议。系统必须等完整响应结束后再解析 JSON、校验通道、写 trace 并返回最终 `LlmTaskResult`。
 
 ```text
 SSE delta

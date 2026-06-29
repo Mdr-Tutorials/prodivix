@@ -13,7 +13,7 @@
 
 ## 1. 范围
 
-`COD-xxxx` 覆盖用户在 MFE 中编写、挂载、引用和执行的代码片段，以及这些代码片段依赖的共享符号环境。
+`COD-xxxx` 覆盖用户在 Prodivix 中编写、挂载、引用和执行的代码片段，以及这些代码片段依赖的共享符号环境。
 
 包括：
 
@@ -30,7 +30,7 @@
 3. NodeGraph 结构、端口连线和执行计划本身，使用 `NGR-xxxx`。
 4. Animation timeline、binding、track 和 keyframe 结构本身，使用 `ANI-xxxx`。
 5. 目标框架项目代码生成和导出产物，使用 `GEN-xxxx`。
-6. MFE 自身前端应用崩溃。后续如需稳定分类，应新增独立应用运行时域。
+6. Prodivix 自身前端应用崩溃。后续如需稳定分类，应新增独立应用运行时域。
 
 ## 2. 阶段
 
@@ -289,7 +289,7 @@ type CodeDiagnosticStage =
 - Retryable: false
 - Trigger: 代码片段尝试写入只读 props、route param、computed input、graph input、PIR snapshot 或受控注入上下文
 - User action: 改为返回新值、发出允许的 command，或写入当前宿主声明为可变的状态位置
-- Developer notes: ESLint 或自定义 lint 的只读写入规则可进入 `meta.upstream`；主码应指向 MFE 作者态上下文契约
+- Developer notes: ESLint 或自定义 lint 的只读写入规则可进入 `meta.upstream`；主码应指向 Prodivix 作者态上下文契约
 
 ### `COD-4001` 用户代码运行时抛错
 

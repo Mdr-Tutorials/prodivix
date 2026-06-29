@@ -82,10 +82,10 @@ interface GatewayRunContext {
 }
 
 /**
- * LLM Gateway 是 MFE 内部 AI 调用链路的统一入口：先按任务挑选允许的工具，
+ * LLM Gateway 是 Prodivix 内部 AI 调用链路的统一入口：先按任务挑选允许的工具，
  * 再调用 provider，随后校验输出通道并写入 trace，最后返回可 dry-run 或可计划化的结果。
  *
- * LlmGateway is the unified MFE AI execution entrypoint: it picks task-allowed
+ * LlmGateway is the unified Prodivix AI execution entrypoint: it picks task-allowed
  * tools, calls the provider, validates the output channel, records trace data,
  * and returns a result ready for planning or dry-run handling.
  */

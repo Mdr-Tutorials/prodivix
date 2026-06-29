@@ -11,7 +11,7 @@
 
 ## 1. 范围
 
-`AI-xxxx` 覆盖 AI Provider、模型发现、Prompt 组装、结构化响应解析、计划生成、AI command dry-run 和 LLM 辅助编辑链路。
+`AI-xxxx` 覆盖 AI Provider、模型发现、Prompt 组装、结构化响应解析、计划生成、Workspace Action dry-run 和 LLM 辅助编辑链路。
 
 不覆盖：
 
@@ -133,14 +133,59 @@ type AiDiagnosticStage =
 - User action: 重试请求；如果持续复现，切换到非流式 Provider 或检查运行环境
 - Developer notes: Web fetcher 应透传 `response.body`；不应让 UI 组件直接解析 SSE
 
-### `AI-5001` AI Command dry-run 失败
+### `AI-5001` AI Action dry-run 失败
 
 - Severity: `error`
 - Stage: `command`
 - Retryable: false
-- Trigger: AI 生成的 command 在应用前 dry-run 失败
+- Trigger: AI 生成的 action / command 在应用前 dry-run 失败
 - User action: 不应用该计划，重新生成或手动调整
 - Developer notes: dry-run 失败应携带下游 `PIR-xxxx` 或 `WKS-xxxx` code
+
+### `AI-5002` AI Action 目标越界
+
+- Severity: `error`
+- Stage: `command`
+- Retryable: false
+- Trigger: AI 输出尝试修改当前 action scope 以外的 route、document、node、resource、settings 或 export target
+- User action: 缩小或重新选择 AI 操作目标
+- Developer notes: UI trigger 必须携带 target scope；validator 应拒绝模型自造 target id
+
+### `AI-5003` AI Action 编辑字段未授权
+
+- Severity: `error`
+- Stage: `command`
+- Retryable: false
+- Trigger: AI 输出尝试修改 action capability 未允许的字段或 operation
+- User action: 使用更具体的 AI 操作，或手动编辑该字段
+- Developer notes: capability summary 应列出 allowedOperationTypes 和 editable fields
+
+### `AI-5004` Code-owned 输出未使用 CodeArtifact
+
+- Severity: `error`
+- Stage: `command`
+- Retryable: false
+- Trigger: AI 输出 handler、executor、route loader、mounted CSS、shader 或 adapter 代码，但试图写入组件局部状态或裸字符串字段
+- User action: 重新生成，并要求创建代码文件或代码引用
+- Developer notes: code-owned 能力必须接入 Code Authoring Environment
+
+### `AI-5005` AI Action 需要的 domain validator 缺失
+
+- Severity: `error`
+- Stage: `command`
+- Retryable: false
+- Trigger: AI action 指向 route、resource、settings、export、NodeGraph 或 Animation 等 domain，但当前环境没有注册对应 dry-run validator
+- User action: 暂时手动完成该操作，或切换到已支持的 AI 操作
+- Developer notes: 禁止在 validator 缺失时降级为直接 apply
+
+### `AI-5006` AI Apply token 缺失或过期
+
+- Severity: `error`
+- Stage: `command`
+- Retryable: true
+- Trigger: 用户尝试应用 AI patch，但 dry-run 生成的 apply token 不存在、已过期或对应 workspace revision 已变化
+- User action: 重新 dry-run 后再应用
+- Developer notes: apply token 应绑定 action id、target scope、workspace rev 和 dry-run diff
 
 ### `AI-9001` AI 未知异常
 
