@@ -24,8 +24,7 @@ interface PdxRadioGroupSpecificProps {
 }
 
 export interface PdxRadioGroupProps
-  extends PdxComponent,
-    PdxRadioGroupSpecificProps {}
+  extends PdxComponent, PdxRadioGroupSpecificProps {}
 
 function PdxRadioGroup({
   label,

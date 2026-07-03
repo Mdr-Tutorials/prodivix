@@ -1,12 +1,7 @@
 import { parseHttpUrl } from './url.js';
 
 export type SafeEmbedType =
-  | 'YouTube'
-  | 'Vimeo'
-  | 'Twitter'
-  | 'Instagram'
-  | 'Facebook'
-  | 'Custom';
+  'YouTube' | 'Vimeo' | 'Twitter' | 'Instagram' | 'Facebook' | 'Custom';
 
 const isDigitsOnly = (value: string) => {
   for (const char of value) {

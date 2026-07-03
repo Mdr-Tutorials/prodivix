@@ -21,8 +21,7 @@ interface PdxImageUploadSpecificProps {
 }
 
 export interface PdxImageUploadProps
-  extends PdxComponent,
-    PdxImageUploadSpecificProps {}
+  extends PdxComponent, PdxImageUploadSpecificProps {}
 
 function PdxImageUpload({
   label,

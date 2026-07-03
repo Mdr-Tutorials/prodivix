@@ -9,8 +9,7 @@ interface PdxSpinnerSpecificProps {
 }
 
 export interface PdxSpinnerProps
-  extends PdxComponent,
-    PdxSpinnerSpecificProps {}
+  extends PdxComponent, PdxSpinnerSpecificProps {}
 
 function PdxSpinner({
   size = 'Medium',

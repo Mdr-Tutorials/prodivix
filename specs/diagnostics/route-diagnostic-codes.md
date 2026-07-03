@@ -25,11 +25,7 @@
 
 ```ts
 type RouteDiagnosticStage =
-  | 'manifest'
-  | 'resolve'
-  | 'outlet'
-  | 'navigate'
-  | 'runtime';
+  'manifest' | 'resolve' | 'outlet' | 'navigate' | 'runtime';
 ```
 
 ## 3. 编码分段

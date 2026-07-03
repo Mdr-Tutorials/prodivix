@@ -21,8 +21,7 @@ interface PdxRegexInputSpecificProps {
 }
 
 export interface PdxRegexInputProps
-  extends PdxComponent,
-    PdxRegexInputSpecificProps {}
+  extends PdxComponent, PdxRegexInputSpecificProps {}
 
 function PdxRegexInput({
   label,

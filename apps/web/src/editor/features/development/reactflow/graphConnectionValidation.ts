@@ -16,8 +16,7 @@ export type ConnectionValidationReason =
   | 'target-occupied';
 
 export type ConnectionValidationResult =
-  | { valid: true }
-  | { valid: false; reason: ConnectionValidationReason };
+  { valid: true } | { valid: false; reason: ConnectionValidationReason };
 
 export const CONNECTION_HINT_BY_REASON: Record<
   ConnectionValidationReason,

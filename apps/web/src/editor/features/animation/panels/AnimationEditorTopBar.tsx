@@ -25,7 +25,7 @@ export const AnimationEditorTopBar = ({
         {t('animationEditor.topBar.title')}
       </div>
 
-      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex min-w-0 flex-1 [scrollbar-width:none] items-center gap-1 overflow-auto [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {timelines.map((timeline, index) => {
           const active = timeline.id === activeTimelineId;
           return (

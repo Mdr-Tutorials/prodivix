@@ -11,8 +11,7 @@ interface PdxProgressSpecificProps {
 }
 
 export interface PdxProgressProps
-  extends PdxComponent,
-    PdxProgressSpecificProps {}
+  extends PdxComponent, PdxProgressSpecificProps {}
 
 function PdxProgress({
   value,

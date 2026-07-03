@@ -72,7 +72,7 @@ const readInitialPosition = (): FloatingPosition => {
     if (storedPosition) {
       const parsed = JSON.parse(storedPosition) as Partial<FloatingPosition>;
       if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
-        return clampPosition(parsed);
+        return clampPosition({ x: parsed.x, y: parsed.y });
       }
     }
   } catch {

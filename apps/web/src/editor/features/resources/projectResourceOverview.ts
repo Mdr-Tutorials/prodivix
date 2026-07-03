@@ -22,12 +22,7 @@ import { buildI18nResourceValueFromWorkspace } from './workspaceI18nResources';
 import { buildExternalLibrariesValueFromWorkspace } from './workspaceExternalLibraries';
 
 export type SectionId =
-  | 'overview'
-  | 'public'
-  | 'code'
-  | 'i18n'
-  | 'external'
-  | 'projectFiles';
+  'overview' | 'public' | 'code' | 'i18n' | 'external' | 'projectFiles';
 
 export type SectionMeta = {
   id: SectionId;

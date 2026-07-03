@@ -36,12 +36,7 @@
 
 ```ts
 type CodeDiagnosticStage =
-  | 'parse'
-  | 'symbol'
-  | 'binding'
-  | 'runtime'
-  | 'compile'
-  | 'environment';
+  'parse' | 'symbol' | 'binding' | 'runtime' | 'compile' | 'environment';
 ```
 
 ## 3. 编码分段

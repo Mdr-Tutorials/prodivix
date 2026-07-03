@@ -10,7 +10,7 @@ export function InspectorCodeTab() {
     : [];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 pt-2 pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0">
+    <div className="flex min-h-0 flex-1 [scrollbar-width:none] flex-col gap-2 overflow-y-auto px-4 pt-2 pb-3 [-ms-overflow-style:none] [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0">
       {panels.map((panel) => {
         const isExpanded = expandedPanels[panel.key] ?? true;
         const panelTitle = t(`inspector.panels.${panel.key}.title`, {

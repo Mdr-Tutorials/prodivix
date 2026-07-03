@@ -7,8 +7,4 @@ export type ProjectHomeItem = ProjectSummary & {
 };
 
 export type ProjectBusyState =
-  | 'publishing'
-  | 'deleting'
-  | 'renaming'
-  | 'syncing'
-  | 'duplicating';
+  'publishing' | 'deleting' | 'renaming' | 'syncing' | 'duplicating';

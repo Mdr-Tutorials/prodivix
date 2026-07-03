@@ -15,10 +15,7 @@ import type {
 } from './projectFileStore';
 
 export type LicenseTemplateCategory =
-  | 'permissive'
-  | 'weakCopyleft'
-  | 'strongCopyleft'
-  | 'networkCopyleft';
+  'permissive' | 'weakCopyleft' | 'strongCopyleft' | 'networkCopyleft';
 
 export type LicenseTemplateProfile = {
   category: LicenseTemplateCategory;

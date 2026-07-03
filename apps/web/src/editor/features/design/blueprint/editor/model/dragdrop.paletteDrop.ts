@@ -40,7 +40,7 @@ export const applyPaletteItemDrop = (
     (dropKind === 'canvas' ? (context.selectedId ?? 'root') : 'root');
 
   const createId = createNodeIdFactory(doc);
-  let newNode = createNodeFromPaletteItem(
+  const newNode = createNodeFromPaletteItem(
     itemId,
     createId,
     variantProps,

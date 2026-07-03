@@ -52,7 +52,7 @@ export function SidebarComponentList({
   onStatusCycleStop,
 }: SidebarComponentListProps) {
   return (
-    <div className="BlueprintEditorComponentList grid overflow-auto px-3 pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0">
+    <div className="BlueprintEditorComponentList grid [scrollbar-width:none] overflow-auto px-3 pb-3 [-ms-overflow-style:none] [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0">
       {groups.map((group, groupIndex) => {
         const isGroupCollapsed = collapsedGroups[group.id] ?? groupIndex > 0;
         const groupTitle = translate(

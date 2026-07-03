@@ -18,8 +18,7 @@ interface PdxParagraphSpecificProps {
 }
 
 export interface PdxParagraphProps
-  extends PdxComponent,
-    PdxParagraphSpecificProps {}
+  extends PdxComponent, PdxParagraphSpecificProps {}
 
 function PdxParagraph({
   children,

@@ -141,10 +141,7 @@ export const DATA_GROUP: ComponentGroup = {
           size={(size ?? 'Medium') as 'Small' | 'Medium' | 'Large'}
           status={
             (status ?? 'Default') as
-              | 'Default'
-              | 'Success'
-              | 'Warning'
-              | 'Danger'
+              'Default' | 'Success' | 'Warning' | 'Danger'
           }
         />
       ),

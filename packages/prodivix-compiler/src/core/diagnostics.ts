@@ -1,11 +1,7 @@
 ﻿export type DiagnosticSeverity = 'error' | 'warning' | 'info';
 
 export type DiagnosticSource =
-  | 'canonical-ir'
-  | 'adapter'
-  | 'codegen'
-  | 'export'
-  | 'route';
+  'canonical-ir' | 'adapter' | 'codegen' | 'export' | 'route';
 
 export interface CompileDiagnostic {
   code: string;

@@ -16,12 +16,7 @@ export type ExportTarget = {
 };
 
 export type ExportRootKind =
-  | 'app'
-  | 'route'
-  | 'page'
-  | 'component'
-  | 'nodegraph'
-  | 'animation';
+  'app' | 'route' | 'page' | 'component' | 'nodegraph' | 'animation';
 
 export type ExportModuleKind =
   | 'react-component'
@@ -49,11 +44,7 @@ export type ExportFileKind =
   | 'documentation';
 
 export type ExportImportKind =
-  | 'default'
-  | 'named'
-  | 'namespace'
-  | 'side-effect'
-  | 'asset-url';
+  'default' | 'named' | 'namespace' | 'side-effect' | 'asset-url';
 
 export type ExportSourceOriginKind =
   | 'generated'
@@ -64,28 +55,16 @@ export type ExportSourceOriginKind =
   | 'remote-url';
 
 export type ExportSourceOwner =
-  | 'prodivix'
-  | 'workspace'
-  | 'plugin'
-  | 'third-party';
+  'prodivix' | 'workspace' | 'plugin' | 'third-party';
 
 export type ExportWritePolicy =
-  | 'generated'
-  | 'preserve-user-edits'
-  | 'copy'
-  | 'reference-only';
+  'generated' | 'preserve-user-edits' | 'copy' | 'reference-only';
 
 export type ExportUpdatePolicy =
-  | 'regenerate'
-  | 'pin'
-  | 'manual'
-  | 'follow-package';
+  'regenerate' | 'pin' | 'manual' | 'follow-package';
 
 export type ExportAssetDeliveryPolicy =
-  | 'copy'
-  | 'reference'
-  | 'vendor'
-  | 'public';
+  'copy' | 'reference' | 'vendor' | 'public';
 
 export type ExportArtifactKind =
   | 'source'
@@ -200,16 +179,10 @@ export type ExportAssetContribution = {
 export type ExportProgramMetadata = Record<string, unknown>;
 
 export type StaticDeploymentTarget =
-  | 'github-pages'
-  | 'vercel'
-  | 'netlify'
-  | 'static-hosting';
+  'github-pages' | 'vercel' | 'netlify' | 'static-hosting';
 
 export type ExportDeploymentTarget =
-  | 'nginx'
-  | 'cloudflare-pages'
-  | StaticDeploymentTarget
-  | string;
+  'nginx' | 'cloudflare-pages' | StaticDeploymentTarget | string;
 
 export type ExportDeploymentContribution = {
   id: string;
@@ -480,10 +453,7 @@ export type ExportProgramContribution = {
 };
 
 export type ExportFileImportMode =
-  | 'module'
-  | 'side-effect'
-  | 'asset-url'
-  | 'copy-only';
+  'module' | 'side-effect' | 'asset-url' | 'copy-only';
 
 export type ExportFile = {
   id?: string;

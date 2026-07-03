@@ -185,8 +185,7 @@ export class OpenAICompatibleProvider implements LlmProvider {
       },
       body: this.createRequestBody(request),
       signal: request.task.providerMetadata?.abortSignal as
-        | AbortSignal
-        | undefined,
+        AbortSignal | undefined,
     });
 
     if (!response.ok) {
@@ -235,8 +234,7 @@ export class OpenAICompatibleProvider implements LlmProvider {
       },
       body: this.createRequestBody(request, { stream: true }),
       signal: request.task.providerMetadata?.abortSignal as
-        | AbortSignal
-        | undefined,
+        AbortSignal | undefined,
     });
 
     if (!response.ok) {

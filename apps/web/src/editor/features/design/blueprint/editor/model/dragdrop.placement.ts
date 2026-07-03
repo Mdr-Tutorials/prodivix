@@ -26,10 +26,10 @@ export const resolveTreePlacement = (options: {
   const { canNest, overData, overRect, activeCenterY } = options;
   const hasGeometry = Boolean(
     overRect &&
-      Number.isFinite(overRect.top) &&
-      Number.isFinite(overRect.height) &&
-      overRect.height > 0 &&
-      Number.isFinite(activeCenterY)
+    Number.isFinite(overRect.top) &&
+    Number.isFinite(overRect.height) &&
+    overRect.height > 0 &&
+    Number.isFinite(activeCenterY)
   );
   if (hasGeometry && overRect) {
     return getTreeDropPlacement({

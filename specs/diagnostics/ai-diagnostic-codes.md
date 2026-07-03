@@ -23,11 +23,7 @@
 
 ```ts
 type AiDiagnosticStage =
-  | 'provider'
-  | 'models'
-  | 'prompt'
-  | 'response'
-  | 'command';
+  'provider' | 'models' | 'prompt' | 'response' | 'command';
 ```
 
 ## 3. 编码分段

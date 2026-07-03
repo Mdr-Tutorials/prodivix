@@ -49,11 +49,7 @@ export type ThemeMotionTokens = ThemeTokenTree;
 export type ThemeFontFormat = 'woff2' | 'woff';
 
 export type ThemeFontDisplay =
-  | 'auto'
-  | 'block'
-  | 'swap'
-  | 'fallback'
-  | 'optional';
+  'auto' | 'block' | 'swap' | 'fallback' | 'optional';
 
 export type ThemeFontSource = {
   url: string;

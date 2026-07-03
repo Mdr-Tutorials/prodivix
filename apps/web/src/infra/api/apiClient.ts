@@ -136,7 +136,7 @@ export const apiRequest = async <T>(
 export const isAbortError = (error: unknown): boolean =>
   Boolean(
     error &&
-      typeof error === 'object' &&
-      'name' in error &&
-      (error as { name?: string }).name === 'AbortError'
+    typeof error === 'object' &&
+    'name' in error &&
+    (error as { name?: string }).name === 'AbortError'
   );

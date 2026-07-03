@@ -9,8 +9,7 @@ interface PdxTooltipSpecificProps {
 }
 
 export interface PdxTooltipProps
-  extends PdxComponent,
-    PdxTooltipSpecificProps {}
+  extends PdxComponent, PdxTooltipSpecificProps {}
 
 function PdxTooltip({
   content,

@@ -6,11 +6,7 @@ export type LibraryEntry = {
 export type LibraryScope = 'component' | 'icon' | 'utility';
 export type LibraryMode = 'locked' | 'latest' | 'dev';
 export type LibraryStatus =
-  | 'idle'
-  | 'loading'
-  | 'success'
-  | 'warning'
-  | 'error';
+  'idle' | 'loading' | 'success' | 'warning' | 'error';
 
 export type PackageSizeThresholds = {
   cautionKb: number;

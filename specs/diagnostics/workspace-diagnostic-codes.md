@@ -25,12 +25,7 @@
 
 ```ts
 type WorkspaceDiagnosticStage =
-  | 'load'
-  | 'capability'
-  | 'document'
-  | 'sync'
-  | 'intent'
-  | 'snapshot';
+  'load' | 'capability' | 'document' | 'sync' | 'intent' | 'snapshot';
 ```
 
 ## 3. 编码分段

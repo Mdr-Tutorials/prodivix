@@ -6,14 +6,7 @@ export type CodeResourceNode = Omit<PublicResourceNode, 'children'> & {
 };
 
 export type CodeFileKind =
-  | 'ts'
-  | 'tsx'
-  | 'js'
-  | 'css'
-  | 'scss'
-  | 'json'
-  | 'wgsl'
-  | 'glsl';
+  'ts' | 'tsx' | 'js' | 'css' | 'scss' | 'json' | 'wgsl' | 'glsl';
 
 export type CodeFileTemplate = {
   name: string;

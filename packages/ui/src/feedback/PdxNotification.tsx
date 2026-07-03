@@ -13,8 +13,7 @@ interface PdxNotificationSpecificProps {
 }
 
 export interface PdxNotificationProps
-  extends PdxComponent,
-    PdxNotificationSpecificProps {}
+  extends PdxComponent, PdxNotificationSpecificProps {}
 
 function PdxNotification({
   title,

@@ -19,8 +19,7 @@ interface PdxSidebarSpecificProps {
 }
 
 export interface PdxSidebarProps
-  extends PdxComponent,
-    PdxSidebarSpecificProps {}
+  extends PdxComponent, PdxSidebarSpecificProps {}
 
 function PdxSidebar({
   title,

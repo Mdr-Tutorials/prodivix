@@ -11,9 +11,9 @@
     "./types": "./src/index.ts"
   },
   "dependencies": {
-    "i18next": "^23.11.5"
+    "i18next": "^26.3.4"
   },
   "devDependencies": {
-    "typescript": "~5.9.3"
+    "typescript": "~6.0.3"
   }
 }

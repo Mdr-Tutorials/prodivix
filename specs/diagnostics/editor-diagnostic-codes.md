@@ -25,12 +25,7 @@
 
 ```ts
 type EditorDiagnosticStage =
-  | 'selection'
-  | 'dragdrop'
-  | 'inspector'
-  | 'canvas'
-  | 'command'
-  | 'autosave';
+  'selection' | 'dragdrop' | 'inspector' | 'canvas' | 'command' | 'autosave';
 ```
 
 ## 3. 编码分段

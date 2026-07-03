@@ -32,10 +32,7 @@ let latestDiagnostics: ExternalLibraryDiagnostic[] = [];
 let isLoadingExternalLibraries = false;
 let configuredExternalLibraryIds = [...DEFAULT_LIBRARY_IDS];
 export type ExternalLibraryLoadStatus =
-  | 'idle'
-  | 'loading'
-  | 'success'
-  | 'error';
+  'idle' | 'loading' | 'success' | 'error';
 export type ExternalLibraryRuntimeState = {
   libraryId: string;
   status: ExternalLibraryLoadStatus;

@@ -21,8 +21,7 @@ interface PdxVerificationCodeSpecificProps {
 }
 
 export interface PdxVerificationCodeProps
-  extends PdxComponent,
-    PdxVerificationCodeSpecificProps {}
+  extends PdxComponent, PdxVerificationCodeSpecificProps {}
 
 function PdxVerificationCode({
   label,

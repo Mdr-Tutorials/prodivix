@@ -14,8 +14,7 @@ interface PdxTimelineSpecificProps {
 }
 
 export interface PdxTimelineProps
-  extends PdxComponent,
-    PdxTimelineSpecificProps {}
+  extends PdxComponent, PdxTimelineSpecificProps {}
 
 function PdxTimeline({
   items,

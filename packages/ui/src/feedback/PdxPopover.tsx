@@ -16,8 +16,7 @@ interface PdxPopoverSpecificProps {
 }
 
 export interface PdxPopoverProps
-  extends PdxComponent,
-    PdxPopoverSpecificProps {}
+  extends PdxComponent, PdxPopoverSpecificProps {}
 
 function PdxPopover({
   title,

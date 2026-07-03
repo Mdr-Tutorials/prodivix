@@ -14,10 +14,7 @@ export const BUILT_IN_META_NAMESPACES = {
 } as const;
 
 export type InspectorFieldSource =
-  | 'props'
-  | 'style'
-  | 'text'
-  | 'dataAttributes';
+  'props' | 'style' | 'text' | 'dataAttributes';
 
 export type BuiltInInspectorControlType =
   | 'text'
@@ -36,14 +33,7 @@ export type BuiltInInspectorOption = {
 };
 
 export type BuiltInVisibilityOperator =
-  | 'eq'
-  | 'neq'
-  | 'in'
-  | 'notIn'
-  | 'truthy'
-  | 'falsy'
-  | 'exists'
-  | 'notExists';
+  'eq' | 'neq' | 'in' | 'notIn' | 'truthy' | 'falsy' | 'exists' | 'notExists';
 
 export type BuiltInVisibilityCondition = {
   path: string;

@@ -22,11 +22,7 @@
 
 ```ts
 type AnimationDiagnosticStage =
-  | 'timeline'
-  | 'binding'
-  | 'track'
-  | 'keyframe'
-  | 'preview';
+  'timeline' | 'binding' | 'track' | 'keyframe' | 'preview';
 ```
 
 ## 3. 编码分段

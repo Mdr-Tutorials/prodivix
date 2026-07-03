@@ -24,8 +24,7 @@ interface PdxDatePickerSpecificProps {
 }
 
 export interface PdxDatePickerProps
-  extends PdxComponent,
-    PdxDatePickerSpecificProps {}
+  extends PdxComponent, PdxDatePickerSpecificProps {}
 
 function PdxDatePicker({
   label,

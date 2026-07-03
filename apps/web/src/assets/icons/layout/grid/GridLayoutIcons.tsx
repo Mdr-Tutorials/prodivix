@@ -3,13 +3,7 @@ import { layoutIconDefaults, type LayoutIconProps } from '../iconProps';
 type Axis = 'x' | 'y';
 type Align = 'start' | 'center' | 'end' | 'stretch' | 'baseline';
 type Content =
-  | 'start'
-  | 'center'
-  | 'end'
-  | 'between'
-  | 'around'
-  | 'evenly'
-  | 'stretch';
+  'start' | 'center' | 'end' | 'between' | 'around' | 'evenly' | 'stretch';
 
 function GridIconFrame({ children, ...props }: LayoutIconProps) {
   return (

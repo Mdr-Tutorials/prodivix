@@ -27,8 +27,7 @@ interface PdxRichTextEditorSpecificProps {
 }
 
 export interface PdxRichTextEditorProps
-  extends PdxComponent,
-    PdxRichTextEditorSpecificProps {}
+  extends PdxComponent, PdxRichTextEditorSpecificProps {}
 
 function PdxRichTextEditor({
   label,

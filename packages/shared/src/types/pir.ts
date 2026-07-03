@@ -24,10 +24,7 @@ import type {
 export type PIRVersion = GeneratedPIRDocument['version'];
 
 export type ScopeSourceReference =
-  | ParamReference
-  | StateReference
-  | DataReference
-  | ItemReference;
+  ParamReference | StateReference | DataReference | ItemReference;
 
 export type ValueOrRef =
   | unknown

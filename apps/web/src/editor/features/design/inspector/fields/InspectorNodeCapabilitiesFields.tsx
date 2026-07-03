@@ -46,8 +46,8 @@ export function InspectorNodeCapabilitiesFields() {
   );
   const canBindActiveOutletRoute = Boolean(
     selectedNode?.type === 'PdxOutlet' &&
-      activeRouteNodeId &&
-      activeRouteNodeId !== outletRouteNodeId
+    activeRouteNodeId &&
+    activeRouteNodeId !== outletRouteNodeId
   );
   const outletRouteStatus = selectedOutletRoute
     ? t('inspector.fields.outletRoute.boundTo', {

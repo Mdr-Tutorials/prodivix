@@ -95,9 +95,8 @@ describe('ensureExternalLibrary', () => {
   });
 
   it('dedupes concurrent ensure calls for the same library', async () => {
-    const { ensureExternalLibrary } = await import(
-      '@/editor/features/design/blueprint/external/runtime/engine'
-    );
+    const { ensureExternalLibrary } =
+      await import('@/editor/features/design/blueprint/external/runtime/engine');
     const profile = createProfile();
 
     await Promise.all([
@@ -113,9 +112,8 @@ describe('ensureExternalLibrary', () => {
   });
 
   it('re-registers runtime groups after a completed ensure cycle', async () => {
-    const { ensureExternalLibrary } = await import(
-      '@/editor/features/design/blueprint/external/runtime/engine'
-    );
+    const { ensureExternalLibrary } =
+      await import('@/editor/features/design/blueprint/external/runtime/engine');
     const profile = createProfile();
 
     await ensureExternalLibrary(profile);

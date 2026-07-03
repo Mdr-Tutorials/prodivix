@@ -25,8 +25,7 @@ interface PdxImageGallerySpecificProps {
 }
 
 export interface PdxImageGalleryProps
-  extends PdxComponent,
-    PdxImageGallerySpecificProps {}
+  extends PdxComponent, PdxImageGallerySpecificProps {}
 
 function PdxImageGallery({
   images,

@@ -72,13 +72,7 @@ type CodeArtifact = {
 };
 
 type CodeArtifactLanguage =
-  | 'ts'
-  | 'js'
-  | 'css'
-  | 'scss'
-  | 'glsl'
-  | 'wgsl'
-  | 'expr';
+  'ts' | 'js' | 'css' | 'scss' | 'glsl' | 'wgsl' | 'expr';
 
 type CodeArtifactOwner =
   | { kind: 'pir-node'; documentId: string; nodeId: string }

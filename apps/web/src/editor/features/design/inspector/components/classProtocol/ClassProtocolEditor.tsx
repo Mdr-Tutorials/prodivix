@@ -515,7 +515,7 @@ export function ClassProtocolEditor({
       </div>
       {draft.trim() && suggestions.length ? (
         <div
-          className="absolute top-[calc(100%+2px)] right-0 left-0 z-20 grid max-h-56 gap-0.5 overflow-y-auto rounded-md border border-(--border-default) bg-(--bg-canvas) p-1 shadow-(--shadow-md) [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0"
+          className="absolute top-[calc(100%+2px)] right-0 left-0 z-20 grid max-h-56 [scrollbar-width:none] gap-0.5 overflow-y-auto rounded-md border border-(--border-default) bg-(--bg-canvas) p-1 shadow-(--shadow-md) [-ms-overflow-style:none] [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0"
           role="listbox"
           data-testid="inspector-classname-suggestions"
         >

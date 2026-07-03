@@ -7,8 +7,7 @@ export interface ProdivixAiBaseSettings {
   provider: ProdivixAiProviderKind;
 }
 
-export interface ProdivixAiOpenAICompatibleSettings
-  extends ProdivixAiBaseSettings {
+export interface ProdivixAiOpenAICompatibleSettings extends ProdivixAiBaseSettings {
   provider: 'openai-compatible';
   baseURL: string;
   apiKey?: string;
@@ -22,8 +21,7 @@ export interface ProdivixAiMockSettings extends ProdivixAiBaseSettings {
 }
 
 export type ProdivixAiSettings =
-  | ProdivixAiMockSettings
-  | ProdivixAiOpenAICompatibleSettings;
+  ProdivixAiMockSettings | ProdivixAiOpenAICompatibleSettings;
 
 export const createDefaultProdivixAiSettings = (): ProdivixAiSettings => ({
   enabled: true,

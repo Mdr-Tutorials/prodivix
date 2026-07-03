@@ -44,7 +44,8 @@ type PdxIframeNativeProps = Omit<
 >;
 
 export interface PdxIframeProps
-  extends Omit<PdxComponent, 'as'>,
+  extends
+    Omit<PdxComponent, 'as'>,
     PdxIframeSpecificProps,
     PdxIframeNativeProps {
   onLoad?: React.ReactEventHandler<HTMLIFrameElement>;

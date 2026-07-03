@@ -57,12 +57,7 @@ export type WorkspaceCommandEnvelope = {
   mergeKey?: string;
   label?: string;
   domainHint?:
-    | 'pir'
-    | 'workspace'
-    | 'route'
-    | 'nodegraph'
-    | 'animation'
-    | 'code';
+    'pir' | 'workspace' | 'route' | 'nodegraph' | 'animation' | 'code';
 };
 
 export type WorkspaceIntentEnvelope = {

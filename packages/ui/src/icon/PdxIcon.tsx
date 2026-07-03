@@ -15,8 +15,7 @@ interface IconSpecificProps {
 }
 
 export interface PdxIconProps
-  extends Omit<PdxComponent, 'as'>,
-    IconSpecificProps {}
+  extends Omit<PdxComponent, 'as'>, IconSpecificProps {}
 
 const isComponentIcon = (
   value: unknown

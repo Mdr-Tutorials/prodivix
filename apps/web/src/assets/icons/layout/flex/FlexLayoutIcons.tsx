@@ -3,12 +3,7 @@ import { layoutIconDefaults, type LayoutIconProps } from '../iconProps';
 
 type Axis = 'x' | 'y';
 type Distribution =
-  | 'start'
-  | 'center'
-  | 'end'
-  | 'between'
-  | 'around'
-  | 'evenly';
+  'start' | 'center' | 'end' | 'between' | 'around' | 'evenly';
 type Alignment = 'start' | 'center' | 'end' | 'stretch' | 'baseline';
 type Direction = 'row' | 'row-reverse' | 'column' | 'column-reverse';
 

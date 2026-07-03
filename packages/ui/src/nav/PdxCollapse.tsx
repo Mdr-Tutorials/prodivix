@@ -20,8 +20,7 @@ interface PdxCollapseSpecificProps {
 }
 
 export interface PdxCollapseProps
-  extends PdxComponent,
-    PdxCollapseSpecificProps {}
+  extends PdxComponent, PdxCollapseSpecificProps {}
 
 function PdxCollapse({
   items,

@@ -6,12 +6,7 @@ import type React from 'react';
 interface PdxTagSpecificProps {
   text?: string;
   color?:
-    | 'Default'
-    | 'Primary'
-    | 'Secondary'
-    | 'Success'
-    | 'Warning'
-    | 'Danger';
+    'Default' | 'Primary' | 'Secondary' | 'Success' | 'Warning' | 'Danger';
   size?: 'Small' | 'Medium' | 'Large';
   variant?: 'Solid' | 'Outline' | 'Soft';
   closable?: boolean;

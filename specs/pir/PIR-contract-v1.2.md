@@ -53,20 +53,14 @@ type ValueOrRef =
 
 type NodeDataScope = {
   source?:
-    | { $param: string }
-    | { $state: string }
-    | DataReference
-    | ItemReference;
+    { $param: string } | { $state: string } | DataReference | ItemReference;
   pick?: string;
   extend?: Record<string, ValueOrRef>;
 };
 
 type NodeListRender = {
   source:
-    | { $param: string }
-    | { $state: string }
-    | DataReference
-    | ItemReference;
+    { $param: string } | { $state: string } | DataReference | ItemReference;
   itemAs?: string; // default: item
   indexAs?: string; // default: index
   keyBy?: string;

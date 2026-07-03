@@ -104,8 +104,7 @@ export const HOLY_GRAIL_LAYOUT_PATTERN: LayoutPatternDefinition<{
           const contentRole =
             (
               contentChild.props?.dataAttributes as
-                | Record<string, string>
-                | undefined
+                Record<string, string> | undefined
             )?.['data-layout-role'] ?? '';
           if (contentRole === 'sidebar') {
             return {

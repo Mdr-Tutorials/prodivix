@@ -24,8 +24,7 @@ interface PdxTimePickerSpecificProps {
 }
 
 export interface PdxTimePickerProps
-  extends PdxComponent,
-    PdxTimePickerSpecificProps {}
+  extends PdxComponent, PdxTimePickerSpecificProps {}
 
 function PdxTimePicker({
   label,

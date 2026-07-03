@@ -149,7 +149,7 @@ export const useAnimationEditorState = () => {
   useEffect(() => {
     const hasActive = Boolean(
       activeTimelineId &&
-        animation.timelines.some((timeline) => timeline.id === activeTimelineId)
+      animation.timelines.some((timeline) => timeline.id === activeTimelineId)
     );
     if (hasActive) return;
     const fallbackId = animation.timelines[0]?.id;

@@ -24,9 +24,7 @@ export type ScopeSourceRef = ParamRef | StateRef | DataRef | ItemRef;
 export type Identifier = string;
 export type AnimationIterations = number | 'infinite';
 export type AnimationTrack =
-  | AnimationStyleTrack
-  | AnimationCssFilterTrack
-  | AnimationSvgFilterAttrTrack;
+  AnimationStyleTrack | AnimationCssFilterTrack | AnimationSvgFilterAttrTrack;
 export type StyleTrackProperty =
   | 'opacity'
   | 'transform.translateX'

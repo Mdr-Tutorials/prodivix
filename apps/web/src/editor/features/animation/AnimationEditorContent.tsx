@@ -66,10 +66,8 @@ export const AnimationEditorContent = () => {
       const nextTimelineId = activeTimeline.id;
       const bindingExists = Boolean(
         prev.timelineId === nextTimelineId &&
-          prev.bindingId &&
-          activeTimeline.bindings.some(
-            (binding) => binding.id === prev.bindingId
-          )
+        prev.bindingId &&
+        activeTimeline.bindings.some((binding) => binding.id === prev.bindingId)
       );
       const nextBindingId = bindingExists
         ? prev.bindingId
@@ -83,7 +81,7 @@ export const AnimationEditorContent = () => {
 
       const trackExists = Boolean(
         prev.trackId &&
-          nextBinding?.tracks.some((track) => track.id === prev.trackId)
+        nextBinding?.tracks.some((track) => track.id === prev.trackId)
       );
       const nextTrackId = trackExists
         ? prev.trackId

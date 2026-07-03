@@ -14,8 +14,8 @@
     "@vscode/debugprotocol": "^1.68.0"
   },
   "devDependencies": {
-    "@types/node": "^20.19.24",
-    "typescript": "^5.9.3",
-    "vitest": "^1.6.1"
+    "@types/node": "^26.1.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   }
 }

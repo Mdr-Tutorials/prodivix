@@ -23,8 +23,7 @@ interface PdxDataGridSpecificProps<T = Record<string, unknown>> {
 }
 
 export interface PdxDataGridProps<T = Record<string, unknown>>
-  extends PdxComponent,
-    PdxDataGridSpecificProps<T> {}
+  extends PdxComponent, PdxDataGridSpecificProps<T> {}
 
 function PdxDataGrid<T extends Record<string, unknown>>({
   data,

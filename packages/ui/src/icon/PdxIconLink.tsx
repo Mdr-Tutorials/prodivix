@@ -5,8 +5,7 @@ import PdxLink from '../link/PdxLink';
 import './PdxIconLink.scss';
 
 export interface PdxIconLinkSpecificProps
-  extends PdxIconProps,
-    React.RefAttributes<HTMLAnchorElement> {
+  extends PdxIconProps, React.RefAttributes<HTMLAnchorElement> {
   to: To;
   replace?: boolean;
   state?: unknown;

@@ -1,11 +1,7 @@
 import tailwindColors from 'tailwindcss/colors';
 
 export type ClassTokenColorKind =
-  | 'text'
-  | 'background'
-  | 'border'
-  | 'vector'
-  | 'accent';
+  'text' | 'background' | 'border' | 'vector' | 'accent';
 
 export type ClassTokenColorSwatch = {
   color: string;

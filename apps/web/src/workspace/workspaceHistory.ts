@@ -42,8 +42,7 @@ export type WorkspaceHistoryState = {
 };
 
 export type WorkspaceHistoryIssueCode =
-  | 'WKS_HISTORY_ENTRY_NOT_FOUND'
-  | 'WKS_HISTORY_COMMAND_FAILED';
+  'WKS_HISTORY_ENTRY_NOT_FOUND' | 'WKS_HISTORY_COMMAND_FAILED';
 
 export type WorkspaceHistoryIssue = {
   code: WorkspaceHistoryIssueCode;

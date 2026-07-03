@@ -453,12 +453,7 @@ type CommandEnvelope = {
   mergeKey?: string;
   label?: string;
   domainHint?:
-    | 'pir'
-    | 'workspace'
-    | 'route'
-    | 'nodegraph'
-    | 'animation'
-    | 'code';
+    'pir' | 'workspace' | 'route' | 'nodegraph' | 'animation' | 'code';
 };
 ```
 

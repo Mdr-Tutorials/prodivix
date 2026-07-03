@@ -24,8 +24,7 @@ interface PdxTableSpecificProps<T = Record<string, unknown>> {
 }
 
 export interface PdxTableProps<T = Record<string, unknown>>
-  extends PdxComponent,
-    PdxTableSpecificProps<T> {}
+  extends PdxComponent, PdxTableSpecificProps<T> {}
 
 function PdxTable<T extends Record<string, unknown>>({
   data,

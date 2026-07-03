@@ -16,8 +16,7 @@ interface PdxColorPickerSpecificProps {
 }
 
 export interface PdxColorPickerProps
-  extends PdxComponent,
-    PdxColorPickerSpecificProps {}
+  extends PdxComponent, PdxColorPickerSpecificProps {}
 
 const normalizeColor = (value: string) => {
   if (!value) return '#000000';

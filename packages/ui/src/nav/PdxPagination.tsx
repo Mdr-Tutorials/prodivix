@@ -10,8 +10,7 @@ interface PdxPaginationSpecificProps {
 }
 
 export interface PdxPaginationProps
-  extends PdxComponent,
-    PdxPaginationSpecificProps {}
+  extends PdxComponent, PdxPaginationSpecificProps {}
 
 function PdxPagination({
   page,

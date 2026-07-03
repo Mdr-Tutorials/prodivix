@@ -7,12 +7,7 @@ interface PdxDivSpecificProps {
   display?: 'Block' | 'Inline' | 'InlineBlock' | 'Flex' | 'Grid';
   flexDirection?: 'Row' | 'Column' | 'RowReverse' | 'ColumnReverse';
   justifyContent?:
-    | 'Start'
-    | 'Center'
-    | 'End'
-    | 'SpaceBetween'
-    | 'SpaceAround'
-    | 'SpaceEvenly';
+    'Start' | 'Center' | 'End' | 'SpaceBetween' | 'SpaceAround' | 'SpaceEvenly';
   alignItems?: 'Start' | 'Center' | 'End' | 'Stretch' | 'Baseline';
   gap?: string | number;
   padding?: string | number;

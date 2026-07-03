@@ -139,11 +139,9 @@ export type GraphNodeData = {
   debounceMs?: string;
   subGraphId?: string;
   inputBindings?:
-    | NodeKeyValueItem[]
-    | Array<{ id?: string; key?: string; value?: string }>;
+    NodeKeyValueItem[] | Array<{ id?: string; key?: string; value?: string }>;
   outputBindings?:
-    | NodeKeyValueItem[]
-    | Array<{ id?: string; key?: string; value?: string }>;
+    NodeKeyValueItem[] | Array<{ id?: string; key?: string; value?: string }>;
   name?: string;
   type?: string;
   required?: string;
@@ -172,8 +170,7 @@ export type GraphNodeData = {
   statusCodes?: FetchStatusItem[] | string[];
   branches?: NodeBranchItem[] | string[];
   keyValueEntries?:
-    | NodeKeyValueItem[]
-    | Array<{ id?: string; key?: string; value?: string }>;
+    NodeKeyValueItem[] | Array<{ id?: string; key?: string; value?: string }>;
   onPortContextMenu?: (
     event: MouseEvent,
     nodeId: string,

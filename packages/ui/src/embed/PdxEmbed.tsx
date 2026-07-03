@@ -35,9 +35,7 @@ type PdxEmbedNativeProps = Omit<
 >;
 
 export interface PdxEmbedProps
-  extends Omit<PdxComponent, 'as'>,
-    PdxEmbedSpecificProps,
-    PdxEmbedNativeProps {
+  extends Omit<PdxComponent, 'as'>, PdxEmbedSpecificProps, PdxEmbedNativeProps {
   onLoad?: React.ReactEventHandler<HTMLIFrameElement>;
   onError?: React.ReactEventHandler<HTMLIFrameElement>;
 }

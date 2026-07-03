@@ -10,8 +10,7 @@ interface PdxMessageSpecificProps {
 }
 
 export interface PdxMessageProps
-  extends PdxComponent,
-    PdxMessageSpecificProps {}
+  extends PdxComponent, PdxMessageSpecificProps {}
 
 function PdxMessage({
   text,

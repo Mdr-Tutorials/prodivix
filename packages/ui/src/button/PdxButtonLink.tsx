@@ -4,8 +4,7 @@ import PdxButton, { type PdxButtonProps } from './PdxButton';
 import PdxLink from '../link/PdxLink';
 
 export interface PdxButtonLinkSpecificProps
-  extends PdxButtonProps,
-    React.RefAttributes<HTMLAnchorElement> {
+  extends PdxButtonProps, React.RefAttributes<HTMLAnchorElement> {
   to: To;
   replace?: boolean;
   state?: unknown;

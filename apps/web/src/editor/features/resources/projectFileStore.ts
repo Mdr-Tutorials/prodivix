@@ -31,12 +31,7 @@ export type ProjectFileTemplateId =
   | 'env-example';
 
 export type ProjectGitignoreSnippetId =
-  | 'dependencies'
-  | 'buildOutput'
-  | 'localEnv'
-  | 'logs'
-  | 'editor'
-  | 'testCache';
+  'dependencies' | 'buildOutput' | 'localEnv' | 'logs' | 'editor' | 'testCache';
 
 export type ProjectFileTemplate = {
   id: ProjectFileTemplateId;

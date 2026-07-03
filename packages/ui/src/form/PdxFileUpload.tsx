@@ -18,8 +18,7 @@ interface PdxFileUploadSpecificProps {
 }
 
 export interface PdxFileUploadProps
-  extends PdxComponent,
-    PdxFileUploadSpecificProps {}
+  extends PdxComponent, PdxFileUploadSpecificProps {}
 
 function PdxFileUpload({
   label,

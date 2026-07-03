@@ -15,12 +15,12 @@
   },
   "devDependencies": {
     "@types/eslint": "^9.6.1",
-    "@types/estree": "^1.0.8",
-    "@types/node": "^20.19.24",
-    "@typescript-eslint/parser": "^8.0.0",
-    "eslint": "^9.39.1",
-    "typescript": "^5.9.3",
-    "vitest": "^1.6.1"
+    "@types/estree": "^1.0.9",
+    "@types/node": "^26.1.0",
+    "@typescript-eslint/parser": "^8.62.1",
+    "eslint": "^9.39.4",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   },
   "keywords": [
     "eslint",

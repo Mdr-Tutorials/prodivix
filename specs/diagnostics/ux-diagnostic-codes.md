@@ -37,12 +37,7 @@
 
 ```ts
 type UxDiagnosticStage =
-  | 'accessibility'
-  | 'interaction'
-  | 'layout'
-  | 'content'
-  | 'visual'
-  | 'checker';
+  'accessibility' | 'interaction' | 'layout' | 'content' | 'visual' | 'checker';
 ```
 
 ## 3. 编码分段

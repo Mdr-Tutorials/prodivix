@@ -82,8 +82,7 @@ export type DiagnosticLocationPreference =
   | 'operation';
 
 export type DiagnosticPresentationLocationKind =
-  | DiagnosticTargetRef['kind']
-  | 'source-span';
+  DiagnosticTargetRef['kind'] | 'source-span';
 
 export type DiagnosticLocationPresentation = {
   id: string;

@@ -12,8 +12,7 @@ interface PdxSectionSpecificProps {
 }
 
 export interface PdxSectionProps
-  extends PdxComponent,
-    PdxSectionSpecificProps {}
+  extends PdxComponent, PdxSectionSpecificProps {}
 
 function PdxSection({
   children,

@@ -30,12 +30,7 @@ export type RouteManifestItem = {
 
 export type RouteManifestIssue = {
   code:
-    | 'RTE-1001'
-    | 'RTE-1002'
-    | 'RTE-1010'
-    | 'RTE-2001'
-    | 'RTE-2010'
-    | 'RTE-2011';
+    'RTE-1001' | 'RTE-1002' | 'RTE-1010' | 'RTE-2001' | 'RTE-2010' | 'RTE-2011';
   routeNodeId: string;
   message: string;
   artifactId?: string;

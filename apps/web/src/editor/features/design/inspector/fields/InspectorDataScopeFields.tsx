@@ -20,8 +20,7 @@ export function InspectorDataScopeFields() {
   const { t, selectedNode, updateSelectedNode, expandedPanels, togglePanel } =
     useInspectorContext();
   const selectedNodeData = selectedNode?.data as
-    | Record<string, unknown>
-    | undefined;
+    Record<string, unknown> | undefined;
   const panelKey = 'basic-data-model';
   const isExpanded = expandedPanels[panelKey] ?? true;
 

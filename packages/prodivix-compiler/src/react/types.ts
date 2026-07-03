@@ -16,12 +16,7 @@ import type {
 } from '#src/export/types';
 
 export type ExportResourceType =
-  | 'project'
-  | 'component'
-  | 'page'
-  | 'route'
-  | 'nodegraph'
-  | 'animation';
+  'project' | 'component' | 'page' | 'route' | 'nodegraph' | 'animation';
 
 export type ReactExportFile = ExportFile;
 

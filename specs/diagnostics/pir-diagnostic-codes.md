@@ -24,11 +24,7 @@
 
 ```ts
 type PirDiagnosticStage =
-  | 'schema'
-  | 'graph'
-  | 'value-ref'
-  | 'materialize'
-  | 'runtime';
+  'schema' | 'graph' | 'value-ref' | 'materialize' | 'runtime';
 ```
 
 ## 3. 编码分段

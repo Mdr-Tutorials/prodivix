@@ -14,8 +14,7 @@ interface PdxBreadcrumbSpecificProps {
 }
 
 export interface PdxBreadcrumbProps
-  extends PdxComponent,
-    PdxBreadcrumbSpecificProps {}
+  extends PdxComponent, PdxBreadcrumbSpecificProps {}
 
 function PdxBreadcrumb({
   items,

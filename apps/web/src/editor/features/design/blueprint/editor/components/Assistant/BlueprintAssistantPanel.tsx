@@ -81,9 +81,9 @@ const isParsedDebugJsonString = (
 ): value is ParsedDebugJsonString =>
   Boolean(
     value &&
-      typeof value === 'object' &&
-      !Array.isArray(value) &&
-      parsedDebugJsonStringKey in value
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    parsedDebugJsonStringKey in value
   );
 
 const parseDebugJsonValue = (value: unknown, depth = 0): DebugJsonValue => {

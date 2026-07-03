@@ -26,8 +26,7 @@ interface PdxTextareaSpecificProps {
 }
 
 export interface PdxTextareaProps
-  extends PdxComponent,
-    PdxTextareaSpecificProps {}
+  extends PdxComponent, PdxTextareaSpecificProps {}
 
 function PdxTextarea({
   size = 'Medium',

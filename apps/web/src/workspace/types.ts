@@ -27,13 +27,7 @@ export type StableWorkspaceDocument = {
 };
 
 export type WorkspaceCodeDocumentLanguage =
-  | 'ts'
-  | 'js'
-  | 'css'
-  | 'scss'
-  | 'glsl'
-  | 'wgsl'
-  | 'expr';
+  'ts' | 'js' | 'css' | 'scss' | 'glsl' | 'wgsl' | 'expr';
 
 export type WorkspaceCodeDocumentContent = {
   language: WorkspaceCodeDocumentLanguage;

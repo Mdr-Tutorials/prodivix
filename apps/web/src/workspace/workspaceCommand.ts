@@ -41,12 +41,7 @@ export type WorkspaceCommandEnvelope = {
   mergeKey?: string;
   label?: string;
   domainHint?:
-    | 'pir'
-    | 'workspace'
-    | 'route'
-    | 'nodegraph'
-    | 'animation'
-    | 'code';
+    'pir' | 'workspace' | 'route' | 'nodegraph' | 'animation' | 'code';
 };
 
 export type WorkspaceCommandDomain = NonNullable<
@@ -337,8 +332,7 @@ type DocumentPatchDomain = Exclude<
   'workspace' | 'route'
 >;
 type PatchApplyResult =
-  | { ok: true; value: unknown }
-  | { ok: false; path: string };
+  { ok: true; value: unknown } | { ok: false; path: string };
 
 const isPatchFailure = (
   result: PatchApplyResult

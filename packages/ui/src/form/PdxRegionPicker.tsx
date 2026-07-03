@@ -35,8 +35,7 @@ interface PdxRegionPickerSpecificProps {
 }
 
 export interface PdxRegionPickerProps
-  extends PdxComponent,
-    PdxRegionPickerSpecificProps {}
+  extends PdxComponent, PdxRegionPickerSpecificProps {}
 
 const findLabel = (options: PdxRegionOption[], value?: string) => {
   if (!value) return undefined;

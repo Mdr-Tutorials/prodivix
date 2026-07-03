@@ -23,11 +23,7 @@
 
 ```ts
 type CodegenDiagnosticStage =
-  | 'canonical-ir'
-  | 'adapter'
-  | 'dependency'
-  | 'emit'
-  | 'export';
+  'canonical-ir' | 'adapter' | 'dependency' | 'emit' | 'export';
 ```
 
 ## 3. 编码分段

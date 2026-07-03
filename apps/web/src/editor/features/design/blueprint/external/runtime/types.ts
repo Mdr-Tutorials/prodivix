@@ -3,11 +3,7 @@ import type { ComponentAdapter } from '@/pir/renderer/registry';
 
 export type ExternalLibraryDiagnosticLevel = 'info' | 'warning' | 'error';
 export type ExternalLibraryDiagnosticStage =
-  | 'load'
-  | 'scan'
-  | 'register'
-  | 'render'
-  | 'codegen';
+  'load' | 'scan' | 'register' | 'render' | 'codegen';
 
 export type ExternalLibraryDiagnostic = {
   code: string;

@@ -18,8 +18,7 @@ interface PdxCheckListSpecificProps {
 }
 
 export interface PdxCheckListProps
-  extends PdxComponent,
-    PdxCheckListSpecificProps {}
+  extends PdxComponent, PdxCheckListSpecificProps {}
 
 function PdxCheckList({
   items,

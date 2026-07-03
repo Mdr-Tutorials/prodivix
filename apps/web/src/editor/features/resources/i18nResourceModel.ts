@@ -8,10 +8,7 @@ export type I18nSelection = {
 };
 
 export type TranslationStatus =
-  | 'sourceMissing'
-  | 'missing'
-  | 'translated'
-  | 'reviewed';
+  'sourceMissing' | 'missing' | 'translated' | 'reviewed';
 
 export type TranslationRow = {
   id: string;

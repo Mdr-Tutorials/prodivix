@@ -10,8 +10,7 @@ interface PdxSkeletonSpecificProps {
 }
 
 export interface PdxSkeletonProps
-  extends PdxComponent,
-    PdxSkeletonSpecificProps {}
+  extends PdxComponent, PdxSkeletonSpecificProps {}
 
 function PdxSkeleton({
   variant = 'Text',

@@ -7,11 +7,7 @@ export const isPlainObject = (
 
 export type SpacingKey = 'margin' | 'padding';
 export type LayoutValueKey =
-  | 'width'
-  | 'height'
-  | 'backgroundColor'
-  | 'border'
-  | 'borderRadius';
+  'width' | 'height' | 'backgroundColor' | 'border' | 'borderRadius';
 export type BoxSpacing = {
   top: string;
   right: string;

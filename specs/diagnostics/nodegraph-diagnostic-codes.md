@@ -23,11 +23,7 @@
 
 ```ts
 type NodeGraphDiagnosticStage =
-  | 'schema'
-  | 'port'
-  | 'edge'
-  | 'execute'
-  | 'debug';
+  'schema' | 'port' | 'edge' | 'execute' | 'debug';
 ```
 
 ## 3. 编码分段

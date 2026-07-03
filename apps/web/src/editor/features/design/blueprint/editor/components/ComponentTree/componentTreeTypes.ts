@@ -55,10 +55,7 @@ export type TreeContextMenuState = {
 };
 
 export type TreeContextMenuAction =
-  | 'expand'
-  | 'expandRecursive'
-  | 'collapse'
-  | 'collapseRecursive';
+  'expand' | 'expandRecursive' | 'collapse' | 'collapseRecursive';
 
 export type TreeContextMenuAvailability = {
   canExpand: boolean;

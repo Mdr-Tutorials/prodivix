@@ -19,8 +19,7 @@ interface PdxPasswordStrengthSpecificProps {
 }
 
 export interface PdxPasswordStrengthProps
-  extends PdxComponent,
-    PdxPasswordStrengthSpecificProps {}
+  extends PdxComponent, PdxPasswordStrengthSpecificProps {}
 
 const calculateScore = (value: string, minLength: number) => {
   let score = 0;

@@ -14,8 +14,7 @@ interface PdxStatisticSpecificProps {
 }
 
 export interface PdxStatisticProps
-  extends PdxComponent,
-    PdxStatisticSpecificProps {}
+  extends PdxComponent, PdxStatisticSpecificProps {}
 
 function PdxStatistic({
   title,

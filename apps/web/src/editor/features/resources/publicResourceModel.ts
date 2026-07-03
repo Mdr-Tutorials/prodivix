@@ -20,9 +20,9 @@ export const isSvgFileNode = (node?: PublicResourceNode) =>
 export const isTextLikeNode = (node?: PublicResourceNode) =>
   Boolean(
     node?.type === 'file' &&
-      (node.mime?.startsWith('text/') ||
-        node.mime?.includes('json') ||
-        node.mime?.includes('svg'))
+    (node.mime?.startsWith('text/') ||
+      node.mime?.includes('json') ||
+      node.mime?.includes('svg'))
   );
 
 export const getDefaultPublicFileTemplate = (name: string) => {

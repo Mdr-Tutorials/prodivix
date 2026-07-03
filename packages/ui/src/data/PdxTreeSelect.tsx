@@ -22,8 +22,7 @@ interface PdxTreeSelectSpecificProps {
 }
 
 export interface PdxTreeSelectProps
-  extends PdxComponent,
-    PdxTreeSelectSpecificProps {}
+  extends PdxComponent, PdxTreeSelectSpecificProps {}
 
 const flattenOptions = (
   options: PdxTreeSelectOption[],

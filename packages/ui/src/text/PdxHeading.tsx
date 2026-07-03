@@ -18,8 +18,7 @@ interface PdxHeadingSpecificProps {
 }
 
 export interface PdxHeadingProps
-  extends PdxComponent,
-    PdxHeadingSpecificProps {}
+  extends PdxComponent, PdxHeadingSpecificProps {}
 
 function PdxHeading({
   children,

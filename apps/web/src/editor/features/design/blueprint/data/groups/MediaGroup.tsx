@@ -49,11 +49,7 @@ export const MEDIA_GROUP: ComponentGroup = {
           src={PLACEHOLDER_AVATAR}
           size={
             (size ?? 'Medium') as
-              | 'ExtraSmall'
-              | 'Small'
-              | 'Medium'
-              | 'Large'
-              | 'ExtraLarge'
+              'ExtraSmall' | 'Small' | 'Medium' | 'Large' | 'ExtraLarge'
           }
         />
       ),

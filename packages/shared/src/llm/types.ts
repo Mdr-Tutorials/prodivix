@@ -1,7 +1,5 @@
 export type LlmOutputChannel =
-  | 'pir-command'
-  | 'node-graph-operation'
-  | 'code-artifact';
+  'pir-command' | 'node-graph-operation' | 'code-artifact';
 
 export type LlmRiskLevel = 'low' | 'medium' | 'high';
 

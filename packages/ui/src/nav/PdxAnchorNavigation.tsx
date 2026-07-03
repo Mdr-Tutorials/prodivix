@@ -15,8 +15,7 @@ interface PdxAnchorNavigationSpecificProps {
 }
 
 export interface PdxAnchorNavigationProps
-  extends PdxComponent,
-    PdxAnchorNavigationSpecificProps {}
+  extends PdxComponent, PdxAnchorNavigationSpecificProps {}
 
 function PdxAnchorNavigation({
   items,

@@ -509,9 +509,9 @@ const isFontAwesomeDefinition = (
 ): value is FontAwesomeIconDefinition =>
   Boolean(
     value &&
-      typeof value === 'object' &&
-      typeof (value as FontAwesomeIconDefinition).iconName === 'string' &&
-      typeof (value as FontAwesomeIconDefinition).prefix === 'string'
+    typeof value === 'object' &&
+    typeof (value as FontAwesomeIconDefinition).iconName === 'string' &&
+    typeof (value as FontAwesomeIconDefinition).prefix === 'string'
   );
 
 const buildFontAwesomeLookupKeys = (value: string) => {

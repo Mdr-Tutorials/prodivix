@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { ArrowRight, Github, Languages, Moon, Sun } from 'lucide-react';
+import { ArrowRight, GitBranch, Languages, Moon, Sun } from 'lucide-react';
 import { PdxAvatar, PdxButtonLink, PdxLink, PdxNav } from '@prodivix/ui';
 import { useSettingsStore } from '@/editor/store/useSettingsStore';
 import { useAuthStore } from '@/auth/useAuthStore';
@@ -116,7 +116,7 @@ function Home() {
               aria-label={t('nav.github')}
               title={t('nav.github')}
             >
-              <Github size={18} />
+              <GitBranch size={18} />
             </a>
             <button
               type="button"
