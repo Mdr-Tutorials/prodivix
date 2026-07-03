@@ -34,6 +34,10 @@ const BALL_SIZE = 40;
 const EDGE_PADDING = 12;
 const DRAG_THRESHOLD = 4;
 const POSITION_STORAGE_KEY = 'prodivix.editorDebugFloatingBall.position';
+const DEBUG_ENABLED_STORAGE_KEY =
+  'prodivix.editorDebugFloatingBall.debugEnabled';
+const CAPSULE_VISIBLE_STORAGE_KEY =
+  'prodivix.editorDebugFloatingBall.capsuleVisible';
 
 const readViewportSize = (): ViewportSize => ({
   width: typeof window === 'undefined' ? 0 : window.innerWidth,
@@ -86,6 +90,27 @@ const persistPosition = (position: FloatingPosition) => {
   }
 };
 
+const readStoredBoolean = (key: string, fallback: boolean) => {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const value = window.localStorage.getItem(key);
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+  } catch {
+    return fallback;
+  }
+  return fallback;
+};
+
+const persistBoolean = (key: string, value: boolean) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(key, value ? 'true' : 'false');
+  } catch {
+    return;
+  }
+};
+
 const readDebugMetrics = (): DebugMetrics => {
   const snapshot: RouteDebugSnapshot | undefined =
     window.__PRODIVIX_ROUTE_DEBUG_SNAPSHOT__?.();
@@ -111,9 +136,13 @@ const areDebugMetricsEqual = (a: DebugMetrics, b: DebugMetrics) =>
   a.interactionMode === b.interactionMode;
 
 export function EditorDebugFloatingBall() {
-  const [isEnabled, setIsEnabled] = useState(false);
+  const [isEnabled, setIsEnabled] = useState(() =>
+    readStoredBoolean(DEBUG_ENABLED_STORAGE_KEY, false)
+  );
   const [isDragging, setIsDragging] = useState(false);
-  const [isCapsuleVisible, setIsCapsuleVisible] = useState(true);
+  const [isCapsuleVisible, setIsCapsuleVisible] = useState(() =>
+    readStoredBoolean(CAPSULE_VISIBLE_STORAGE_KEY, true)
+  );
   const [position, setPosition] = useState<FloatingPosition>(() =>
     readInitialPosition()
   );
@@ -141,10 +170,15 @@ export function EditorDebugFloatingBall() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     window.__PRODIVIX_DEBUG_ROUTE__ = isEnabled;
+    persistBoolean(DEBUG_ENABLED_STORAGE_KEY, isEnabled);
     return () => {
       window.__PRODIVIX_DEBUG_ROUTE__ = false;
     };
   }, [isEnabled]);
+
+  useEffect(() => {
+    persistBoolean(CAPSULE_VISIBLE_STORAGE_KEY, isCapsuleVisible);
+  }, [isCapsuleVisible]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -269,7 +303,7 @@ export function EditorDebugFloatingBall() {
     >
       {isCapsuleVisible ? (
         <div
-          className={`pointer-events-none absolute flex h-9 items-center gap-2 whitespace-nowrap rounded-full border border-(--border-default) bg-(--bg-panel) px-3 font-medium shadow-(--shadow-lg) tabular-nums ${capsulePlacementClass}`}
+          className={`pointer-events-none absolute flex h-9 items-center gap-2 rounded-full border border-(--border-default) bg-(--bg-panel) px-3 font-medium whitespace-nowrap tabular-nums shadow-(--shadow-lg) ${capsulePlacementClass}`}
         >
           <span>DOM {metrics.elementCount.toLocaleString()}</span>
           <span className="text-(--border-strong)">·</span>
@@ -286,7 +320,7 @@ export function EditorDebugFloatingBall() {
       ) : null}
       <button
         type="button"
-        className={`inline-flex h-10 w-10 touch-none select-none items-center justify-center rounded-full border shadow-(--shadow-lg) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-color) ${
+        className={`inline-flex h-10 w-10 touch-none items-center justify-center rounded-full border shadow-(--shadow-lg) select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-color) ${
           isEnabled
             ? 'border-(--accent-color) bg-(--accent-color) text-white'
             : 'border-(--border-default) bg-(--bg-panel) text-(--text-secondary) hover:border-(--border-strong) hover:bg-(--bg-raised) hover:text-(--text-primary)'

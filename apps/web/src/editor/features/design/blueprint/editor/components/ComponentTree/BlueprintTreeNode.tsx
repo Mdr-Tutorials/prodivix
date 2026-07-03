@@ -34,6 +34,7 @@ export function BlueprintTreeNode({
   onCopy,
   onMove,
   onToggleHidden,
+  onOpenRoutePath,
   onOpenContextMenu,
 }: TreeNodeProps) {
   const children = node.children ?? [];
@@ -205,7 +206,19 @@ export function BlueprintTreeNode({
                 {nodeTypeLabel}
               </span>
               {outletRoutePath ? (
-                <span className="BlueprintEditorTreeRoutePath min-w-0 truncate text-[10px] font-medium text-(--text-muted) tabular-nums">
+                <span
+                  className="BlueprintEditorTreeRoutePath min-w-0 cursor-pointer truncate rounded-sm px-0.5 text-[10px] font-medium text-(--text-muted) tabular-nums hover:bg-(--bg-raised) hover:text-(--text-primary)"
+                  title={`Double-click to open ${outletRoutePath}`}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onDoubleClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onOpenRoutePath(outletRoutePath);
+                  }}
+                >
                   {outletRoutePath}
                 </span>
               ) : null}
@@ -259,6 +272,7 @@ export function BlueprintTreeNode({
               onCopy={onCopy}
               onMove={onMove}
               onToggleHidden={onToggleHidden}
+              onOpenRoutePath={onOpenRoutePath}
               onOpenContextMenu={onOpenContextMenu}
             />
           ))}

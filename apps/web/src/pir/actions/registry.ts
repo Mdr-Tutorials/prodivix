@@ -98,11 +98,12 @@ export const resolveInternalNavigatePath = (to: string): string => {
   return normalizeRoutePath(to);
 };
 
-const openExternalNavigateTarget = (
+export const openExternalNavigateTarget = (
   url: string,
-  options: { target: NavigateTarget; replace: boolean }
+  options: { target: NavigateTarget; replace: boolean; debugLabel?: string }
 ) => {
-  logRouteDebug('built-in external navigation requested', {
+  const debugLabel = options.debugLabel ?? 'built-in external';
+  logRouteDebug(`${debugLabel} navigation requested`, {
     url,
     target: options.target,
     replace: options.replace,
@@ -112,34 +113,24 @@ const openExternalNavigateTarget = (
     try {
       opened = window.open(url, '_blank', 'noopener,noreferrer');
     } catch (error) {
-      logRouteDebug('built-in external window.open threw', {
+      logRouteDebug(`${debugLabel} window.open threw`, {
         url,
         error: error instanceof Error ? error.message : String(error),
       });
     }
-    logRouteDebug('built-in external window.open result', {
+    logRouteDebug(`${debugLabel} window.open result`, {
       url,
       opened: Boolean(opened),
       closed: opened?.closed,
     });
-    if (opened) return;
-    logRouteDebug('built-in external anchor fallback requested', { url });
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.target = '_blank';
-    anchor.rel = 'noopener noreferrer';
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    logRouteDebug('built-in external anchor fallback clicked', { url });
     return;
   }
   if (options.replace) {
-    logRouteDebug('built-in external navigation via location.replace', { url });
+    logRouteDebug(`${debugLabel} navigation via location.replace`, { url });
     window.location.replace(url);
     return;
   }
-  logRouteDebug('built-in external navigation via location.assign', { url });
+  logRouteDebug(`${debugLabel} navigation via location.assign`, { url });
   window.location.assign(url);
 };
 

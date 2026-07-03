@@ -17,6 +17,7 @@ export type BlueprintEditorComponentTreeProps = {
   onCopyNode: (nodeId: string) => void;
   onMoveNode: (nodeId: string, direction: 'up' | 'down') => void;
   onToggleNodeHidden: (nodeId: string) => void;
+  onOpenRoutePath: (path: string) => void;
 };
 
 export type TreeNodeProps = {
@@ -40,6 +41,7 @@ export type TreeNodeProps = {
   onCopy: (nodeId: string) => void;
   onMove: (nodeId: string, direction: 'up' | 'down') => void;
   onToggleHidden: (nodeId: string) => void;
+  onOpenRoutePath: (path: string) => void;
   onOpenContextMenu: (
     node: ComponentNode,
     event: ReactMouseEvent<HTMLDivElement>

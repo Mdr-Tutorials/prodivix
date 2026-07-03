@@ -27,7 +27,7 @@ import {
   resolvePdxRouteRendererProps,
   shouldRenderPdxOutletChildren,
 } from './PIRRenderer.routeContext';
-import { logRouteDebug } from './routeDebug';
+import { getRouteDebugEventDetail, logRouteDebug } from './routeDebug';
 
 const preventDefaultPayload = (payload: unknown) => {
   const event =
@@ -185,6 +185,7 @@ export const PIRNode: React.FC<{
           eventKey,
           params: resolvedParams,
           interactionMode: scopedContext.interactionMode,
+          event: getRouteDebugEventDetail(payload),
         });
         if (
           eventDef.action &&
@@ -221,6 +222,7 @@ export const PIRNode: React.FC<{
             ? resolvedProps[linkCapability.targetProp]
             : undefined,
           currentPath: scopedContext.routeRuntimeContext?.currentPath,
+          event: getRouteDebugEventDetail(payload),
         });
         scopedContext.dispatchBuiltInAction('navigate', {
           params: {

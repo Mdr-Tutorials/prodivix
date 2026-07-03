@@ -35,7 +35,8 @@ export type {
 } from './PIRRenderer.types';
 
 const readPirNodeId = (element: Element) =>
-  element.getAttribute('data-pir-node-id') ?? element.getAttribute('data-pir-id');
+  element.getAttribute('data-pir-node-id') ??
+  element.getAttribute('data-pir-id');
 
 const findNearestPirNodeId = (target: Element) => {
   const matched = target.closest('[data-pir-node-id], [data-pir-id]');
@@ -226,7 +227,9 @@ export const PIRRenderer: React.FC<PIRRendererProps> = ({
       const shouldDeferSelection = isInteractiveTarget && !wasSelected;
 
       if (shouldDeferSelection) {
-        deferSelectionNotification(() => onNodeSelect?.(selectionNodeId, event));
+        deferSelectionNotification(() =>
+          onNodeSelect?.(selectionNodeId, event)
+        );
       } else {
         onNodeSelect?.(selectionNodeId, event);
       }
@@ -236,12 +239,7 @@ export const PIRRenderer: React.FC<PIRRendererProps> = ({
         deferred: shouldDeferSelection,
       });
     },
-    [
-      nodesById,
-      onNodeSelect,
-      interactionMode,
-      selectedId,
-    ]
+    [nodesById, onNodeSelect, interactionMode, selectedId]
   );
 
   const context = useMemo(

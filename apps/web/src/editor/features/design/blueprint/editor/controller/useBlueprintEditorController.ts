@@ -31,9 +31,13 @@ import {
   removeNodeById,
 } from '@/editor/features/design/blueprint/editor/model/tree';
 import { normalizeAnimationDefinition } from '@/editor/features/animation/animationEditorModel';
-import { resolveNavigateTarget as resolveBrowserNavigateTarget } from '@/pir/actions/registry';
+import {
+  openExternalNavigateTarget,
+  resolveNavigateTarget as resolveBrowserNavigateTarget,
+} from '@/pir/actions/registry';
 import {
   createRouteDebugSnapshot,
+  getRouteDebugEventDetail,
   logRouteDebug,
 } from '@/pir/renderer/routeDebug';
 import {
@@ -71,52 +75,40 @@ const createIntentId = () => {
   return `intent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 };
 
-const openExternalPreviewUrl = (
-  url: string,
-  options: { target: string; replace: boolean }
+type BlueprintInteractionMode = 'design' | 'interactive';
+
+const getBlueprintInteractionModeStorageKey = (blueprintKey: string) =>
+  `prodivix.blueprint.${blueprintKey}.interactionMode`;
+
+const readStoredInteractionMode = (
+  blueprintKey: string
+): BlueprintInteractionMode => {
+  if (typeof window === 'undefined') {
+    return DEFAULT_BLUEPRINT_STATE.interactionMode;
+  }
+  try {
+    const value = window.localStorage.getItem(
+      getBlueprintInteractionModeStorageKey(blueprintKey)
+    );
+    return value === 'interactive' ? 'interactive' : 'design';
+  } catch {
+    return DEFAULT_BLUEPRINT_STATE.interactionMode;
+  }
+};
+
+const persistInteractionMode = (
+  blueprintKey: string,
+  mode: BlueprintInteractionMode
 ) => {
   if (typeof window === 'undefined') return;
-  logRouteDebug('external preview navigation requested', {
-    url,
-    target: options.target,
-    replace: options.replace,
-  });
-  if (options.target === '_self') {
-    if (options.replace) {
-      logRouteDebug('external preview navigation via location.replace', {
-        url,
-      });
-      window.location.replace(url);
-      return;
-    }
-    logRouteDebug('external preview navigation via location.assign', { url });
-    window.location.assign(url);
+  try {
+    window.localStorage.setItem(
+      getBlueprintInteractionModeStorageKey(blueprintKey),
+      mode
+    );
+  } catch {
     return;
   }
-  let opened: Window | null = null;
-  try {
-    opened = window.open(url, '_blank', 'noopener,noreferrer');
-  } catch (error) {
-    logRouteDebug('external preview window.open threw', {
-      url,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-  logRouteDebug('external preview window.open result', {
-    url,
-    opened: Boolean(opened),
-    closed: opened?.closed,
-  });
-  if (opened) return;
-  logRouteDebug('external preview anchor fallback requested', { url });
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.target = '_blank';
-  anchor.rel = 'noopener noreferrer';
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  logRouteDebug('external preview anchor fallback clicked', { url });
 };
 
 type InteractionRequest = {
@@ -124,6 +116,7 @@ type InteractionRequest = {
   nodeId: string;
   trigger: string;
   eventKey: string;
+  payload?: unknown;
 };
 
 /**
@@ -225,10 +218,11 @@ export const useBlueprintEditorController = () => {
       ...DEFAULT_BLUEPRINT_STATE,
       viewportWidth: defaultViewportWidth,
       viewportHeight: defaultViewportHeight,
+      interactionMode: readStoredInteractionMode(blueprintKey),
     }),
-    [defaultViewportWidth, defaultViewportHeight]
+    [blueprintKey, defaultViewportWidth, defaultViewportHeight]
   );
-  const resolvedBlueprintState = blueprintState ?? DEFAULT_BLUEPRINT_STATE;
+  const resolvedBlueprintState = blueprintState ?? initialBlueprintState;
   const { viewportWidth, viewportHeight, zoom, pan, selectedId } =
     resolvedBlueprintState;
   const hiddenNodeIds = resolvedBlueprintState.hiddenNodeIds ?? [];
@@ -544,6 +538,7 @@ export const useBlueprintEditorController = () => {
       to,
       previewPath,
       previewActiveRouteNodeId: previewRuntimeContext.activeRouteNodeId,
+      event: getRouteDebugEventDetail(options.payload),
     });
     if (!to) {
       logRouteDebug('navigate request ignored: empty target', {
@@ -606,10 +601,12 @@ export const useBlueprintEditorController = () => {
         nodeId: options.nodeId,
         trigger: options.trigger,
         eventKey: options.eventKey,
+        event: getRouteDebugEventDetail(options.payload),
       });
-      openExternalPreviewUrl(navigationResult.url, {
+      openExternalNavigateTarget(navigationResult.url, {
         target: effectiveTarget,
         replace,
+        debugLabel: 'external preview',
       });
       return;
     }
@@ -751,9 +748,8 @@ export const useBlueprintEditorController = () => {
     setBlueprintState(blueprintKey, { pan: nextPan });
   };
 
-  const handleInteractionModeChange = (
-    mode: 'design' | 'interactive'
-  ) => {
+  const handleInteractionModeChange = (mode: BlueprintInteractionMode) => {
+    persistInteractionMode(blueprintKey, mode);
     setBlueprintState(blueprintKey, { interactionMode: mode });
   };
 
@@ -1042,6 +1038,7 @@ export const useBlueprintEditorController = () => {
       onCopyNode: handleCopyNode,
       onMoveNode: handleMoveNode,
       onToggleNodeHidden: handleToggleNodeHidden,
+      onOpenRoutePath: setPreviewPath,
     },
     canvas: {
       interactionMode,

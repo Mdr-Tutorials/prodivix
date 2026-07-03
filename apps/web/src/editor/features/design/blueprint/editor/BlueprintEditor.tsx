@@ -136,6 +136,7 @@ function BlueprintEditor() {
             onCopyNode={componentTree.onCopyNode}
             onMoveNode={componentTree.onMoveNode}
             onToggleNodeHidden={componentTree.onToggleNodeHidden}
+            onOpenRoutePath={componentTree.onOpenRoutePath}
           />
           <BlueprintEditorCanvas
             currentPath={addressBar.currentPath}

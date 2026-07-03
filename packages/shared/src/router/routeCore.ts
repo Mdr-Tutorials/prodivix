@@ -889,9 +889,7 @@ export const resolveRouteRuntimeContext = (
   if (exactPathRouteNodeId) {
     matchChain = toResolvedRouteMatchChain(
       manifest,
-      toRouteNodeEntries(
-        resolveRouteMatchChain(manifest, exactPathRouteNodeId)
-      )
+      toRouteNodeEntries(resolveRouteMatchChain(manifest, exactPathRouteNodeId))
     );
   }
   const requestedRouteNodeId = input.routeNodeId?.trim();

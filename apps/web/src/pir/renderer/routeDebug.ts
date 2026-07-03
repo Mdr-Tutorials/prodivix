@@ -17,6 +17,76 @@ type RouteDebugSnapshotInput = {
   outletContentNodeId?: string | null;
 };
 
+type EventDebugDetail = {
+  eventDebugId?: number;
+  type?: string;
+  targetTagName?: string;
+  currentTargetTagName?: string;
+  defaultPrevented?: boolean;
+  propagationStopped?: boolean;
+};
+
+let nextEventDebugId = 1;
+const eventDebugIds =
+  typeof WeakMap === 'undefined' ? null : new WeakMap<object, number>();
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object'
+    ? (value as Record<string, unknown>)
+    : null;
+
+const readElementTagName = (value: unknown) => {
+  if (
+    value &&
+    typeof value === 'object' &&
+    'tagName' in value &&
+    typeof (value as { tagName?: unknown }).tagName === 'string'
+  ) {
+    return (value as { tagName: string }).tagName.toLowerCase();
+  }
+  return undefined;
+};
+
+export const getRouteDebugEventDetail = (
+  payload: unknown
+): EventDebugDetail => {
+  const eventRecord = asRecord(payload);
+  if (!eventRecord) return {};
+  const nativeEvent = asRecord(eventRecord.nativeEvent);
+  const eventIdentity = nativeEvent ?? eventRecord;
+  let eventDebugId: number | undefined;
+  if (eventDebugIds) {
+    eventDebugId = eventDebugIds.get(eventIdentity);
+    if (!eventDebugId) {
+      eventDebugId = nextEventDebugId;
+      nextEventDebugId += 1;
+      eventDebugIds.set(eventIdentity, eventDebugId);
+    }
+  }
+  const propagationReader = eventRecord.isPropagationStopped;
+  return {
+    eventDebugId,
+    type:
+      typeof eventRecord.type === 'string'
+        ? eventRecord.type
+        : typeof nativeEvent?.type === 'string'
+          ? nativeEvent.type
+          : undefined,
+    targetTagName: readElementTagName(eventRecord.target),
+    currentTargetTagName: readElementTagName(eventRecord.currentTarget),
+    defaultPrevented:
+      typeof eventRecord.defaultPrevented === 'boolean'
+        ? eventRecord.defaultPrevented
+        : typeof nativeEvent?.defaultPrevented === 'boolean'
+          ? nativeEvent.defaultPrevented
+          : undefined,
+    propagationStopped:
+      typeof propagationReader === 'function'
+        ? Boolean(propagationReader.call(payload))
+        : undefined,
+  };
+};
+
 export type RouteDebugSnapshot = {
   timestamp: string;
   locationHref?: string;

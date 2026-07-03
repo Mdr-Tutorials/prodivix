@@ -44,6 +44,7 @@ export function BlueprintEditorComponentTree({
   onCopyNode,
   onMoveNode,
   onToggleNodeHidden,
+  onOpenRoutePath,
 }: BlueprintEditorComponentTreeProps) {
   const { t } = useTranslation('blueprint');
   const pirDoc = useEditorStore((state) => state.pirDoc);
@@ -336,6 +337,7 @@ export function BlueprintEditorComponentTree({
               onCopy={onCopyNode}
               onMove={onMoveNode}
               onToggleHidden={onToggleNodeHidden}
+              onOpenRoutePath={onOpenRoutePath}
               onOpenContextMenu={openContextMenu}
             />
           </div>
