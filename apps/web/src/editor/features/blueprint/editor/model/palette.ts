@@ -17,7 +17,7 @@ import {
   TIMELINE_ITEMS,
   TREE_DATA,
   TREE_SELECT_OPTIONS,
-} from '@/editor/features/blueprint/data/sampleData';
+} from '@/editor/features/blueprint/catalog/sampleData';
 import type { ComponentNode, PIRDocument } from '@prodivix/shared/types/pir';
 import { materializePirRoot } from '@/pir/graph';
 import { createRadixNodeFromPaletteItem } from '@/editor/features/blueprint/editor/model/radix';

@@ -5,7 +5,7 @@ import {
   VIEWPORT_DEVICE_PRESETS,
   VIEWPORT_QUICK_PRESETS,
   VIEWPORT_ZOOM_RANGE,
-} from '@/editor/features/blueprint/data/viewport';
+} from '@/editor/features/blueprint/editor/model/viewport';
 import type { BlueprintCanvasInteractionMode } from '../canvas';
 
 type BlueprintEditorViewportBarProps = {

@@ -16,13 +16,12 @@ import {
 } from '@prodivix/ui';
 import { Sparkles } from 'lucide-react';
 import type { ComponentGroup } from '@/editor/features/blueprint/editor/model/types';
-import { buildVariants } from '@/editor/features/blueprint/data/helpers';
-import {
-  PROGRESS_STATUSES,
-  SIZE_OPTIONS,
-  STEPS_DIRECTIONS,
-  TAG_VARIANTS,
-} from '@/editor/features/blueprint/data/options';
+import { buildVariants } from '@/editor/features/blueprint/catalog/helpers';
+import { SIZE_OPTIONS } from '@/editor/features/blueprint/catalog/sizeOptions';
+
+const TAG_VARIANTS = ['Soft', 'Outline', 'Solid'] as const;
+const PROGRESS_STATUSES = ['Default', 'Success', 'Warning', 'Danger'] as const;
+const STEPS_DIRECTIONS = ['Horizontal', 'Vertical'] as const;
 import {
   CHECKLIST_ITEMS,
   GRID_COLUMNS,
@@ -34,7 +33,7 @@ import {
   TIMELINE_ITEMS,
   TREE_DATA,
   TREE_SELECT_OPTIONS,
-} from '@/editor/features/blueprint/data/sampleData';
+} from '@/editor/features/blueprint/catalog/sampleData';
 
 export const DATA_GROUP: ComponentGroup = {
   id: 'data',

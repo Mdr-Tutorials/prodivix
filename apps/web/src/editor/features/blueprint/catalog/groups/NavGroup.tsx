@@ -13,11 +13,10 @@ import {
   PdxText,
 } from '@prodivix/ui';
 import type { ComponentGroup } from '@/editor/features/blueprint/editor/model/types';
-import { buildVariants } from '@/editor/features/blueprint/data/helpers';
-import {
-  NAV_COLUMNS,
-  SIZE_OPTIONS,
-} from '@/editor/features/blueprint/data/options';
+import { buildVariants } from '@/editor/features/blueprint/catalog/helpers';
+import { SIZE_OPTIONS } from '@/editor/features/blueprint/catalog/sizeOptions';
+
+const NAV_COLUMNS = [2, 3] as const;
 import {
   ANCHOR_ITEMS,
   BREADCRUMB_ITEMS,
@@ -25,7 +24,7 @@ import {
   NAVBAR_ITEMS,
   SIDEBAR_ITEMS,
   TAB_ITEMS,
-} from '@/editor/features/blueprint/data/sampleData';
+} from '@/editor/features/blueprint/catalog/sampleData';
 
 export const NAV_GROUP: ComponentGroup = {
   id: 'nav',

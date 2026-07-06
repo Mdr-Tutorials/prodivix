@@ -10,14 +10,23 @@ import {
 } from '@prodivix/ui';
 import { Sparkles } from 'lucide-react';
 import type { ComponentGroup } from '@/editor/features/blueprint/editor/model/types';
-import { buildVariants } from '@/editor/features/blueprint/data/helpers';
+import { buildVariants } from '@/editor/features/blueprint/catalog/helpers';
 import {
-  BUTTON_CATEGORIES,
   BUTTON_SIZE_OPTIONS,
-  HEADING_LEVELS,
   SIZE_OPTIONS,
   TEXT_SIZE_OPTIONS,
-} from '@/editor/features/blueprint/data/options';
+} from '@/editor/features/blueprint/catalog/sizeOptions';
+
+const HEADING_LEVELS = [1, 2, 3, 4, 5, 6] as const;
+const BUTTON_CATEGORIES = [
+  'Primary',
+  'Secondary',
+  'Danger',
+  'SubtleDanger',
+  'Warning',
+  'SubtleWarning',
+  'Ghost',
+] as const;
 
 export const BASE_GROUP: ComponentGroup = {
   id: 'base',

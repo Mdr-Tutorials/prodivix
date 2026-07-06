@@ -2,7 +2,7 @@ import type {
   ComponentGroup,
   ComponentPreviewItem,
 } from '@/editor/features/blueprint/editor/model/types';
-import { COMPONENT_GROUPS as DEFAULT_COMPONENT_GROUPS } from './data/ComponentGroups';
+import { COMPONENT_GROUPS as DEFAULT_COMPONENT_GROUPS } from './catalog/ComponentGroups';
 
 const componentGroups: ComponentGroup[] = [];
 

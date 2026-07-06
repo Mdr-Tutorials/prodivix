@@ -9,7 +9,7 @@ import {
 import { PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
-import { VIEWPORT_ZOOM_RANGE } from '@/editor/features/blueprint/data/viewport';
+import { VIEWPORT_ZOOM_RANGE } from '@/editor/features/blueprint/editor/model/viewport';
 import { useBlueprintAutosave } from '@/editor/features/blueprint/editor/model/autosave';
 import { useBlueprintDragDrop } from '@/editor/features/blueprint/editor/model/dragdrop';
 import { executeBlueprintGraph } from '@/editor/features/blueprint/editor/model/graphExecutor';

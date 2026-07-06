@@ -11,15 +11,14 @@ import {
   PdxTooltip,
 } from '@prodivix/ui';
 import type { ComponentGroup } from '@/editor/features/blueprint/editor/model/types';
-import { buildVariants } from '@/editor/features/blueprint/data/helpers';
-import {
-  DRAWER_PLACEMENTS,
-  MESSAGE_TYPES,
-  NOTIFICATION_TYPES,
-  SKELETON_VARIANTS,
-  SIZE_OPTIONS,
-  TOOLTIP_PLACEMENTS,
-} from '@/editor/features/blueprint/data/options';
+import { buildVariants } from '@/editor/features/blueprint/catalog/helpers';
+import { SIZE_OPTIONS } from '@/editor/features/blueprint/catalog/sizeOptions';
+
+const DRAWER_PLACEMENTS = ['Left', 'Right', 'Top', 'Bottom'] as const;
+const TOOLTIP_PLACEMENTS = ['Top', 'Right', 'Bottom', 'Left'] as const;
+const MESSAGE_TYPES = ['Info', 'Success', 'Warning', 'Danger'] as const;
+const NOTIFICATION_TYPES = ['Info', 'Success', 'Warning', 'Danger'] as const;
+const SKELETON_VARIANTS = ['Text', 'Circle', 'Rect'] as const;
 
 export const FEEDBACK_GROUP: ComponentGroup = {
   id: 'feedback',

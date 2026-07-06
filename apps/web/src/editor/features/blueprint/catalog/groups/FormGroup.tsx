@@ -18,8 +18,8 @@ import {
   PdxVerificationCode,
 } from '@prodivix/ui';
 import type { ComponentGroup } from '@/editor/features/blueprint/editor/model/types';
-import { SIZE_OPTIONS } from '@/editor/features/blueprint/data/options';
-import { REGION_OPTIONS } from '@/editor/features/blueprint/data/sampleData';
+import { SIZE_OPTIONS } from '@/editor/features/blueprint/catalog/sizeOptions';
+import { REGION_OPTIONS } from '@/editor/features/blueprint/catalog/sampleData';
 
 export const FORM_GROUP: ComponentGroup = {
   id: 'form',

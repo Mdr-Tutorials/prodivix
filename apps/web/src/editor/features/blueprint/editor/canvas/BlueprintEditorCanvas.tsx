@@ -23,7 +23,7 @@ import {
 } from '@/pir/renderer/registry';
 import { normalizeAnimationDefinition } from '@/editor/features/animation/animationEditorModel';
 import { buildAnimationPreviewSnapshotFromTimelines } from '@/editor/features/animation/preview/animationPreview';
-import { VIEWPORT_ZOOM_RANGE } from '@/editor/features/blueprint/data/viewport';
+import { VIEWPORT_ZOOM_RANGE } from '@/editor/features/blueprint/editor/model/viewport';
 import { CanvasPlaceholder } from './CanvasPlaceholder';
 import { CanvasRouteDiagnostics } from './CanvasRouteDiagnostics';
 import {

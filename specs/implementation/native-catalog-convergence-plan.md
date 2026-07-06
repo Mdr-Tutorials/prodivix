@@ -12,6 +12,17 @@
 - **Rule 4**：包内用 `@/...` 绝对路径 import。
 - **Rule 6**：文件过长则拆分。
 
+## 执行结果（2026-07-06）
+
+已执行并通过 tsc / lint / vitest（36 文件 / 142 用例）。实际范围与原计划的**一处偏差**：
+
+- **`sampleData.tsx` 保留，不溶解。** 原计划 Phase 2 拟溶解 `sampleData.tsx`（内联进 group）。执行 Phase 0 全仓消费方核查时发现：`sampleData.tsx` 同时被 4 个 group（预览）**与 `editor/model/palette.ts`（`PALETTE_NODE_DEFAULTS` 建节点默认值）**消费——它是连贯的共享 demo 数据（类比 `placeholders.ts`），不是 grab-bag。强行溶解会让 palette 反向依赖 group 文件（错误耦合）。故保留为共享文件（现 `catalog/sampleData.tsx`）。
+- `options.ts` 按计划溶解：`SIZE_*` 抽到 `catalog/sizeOptions.ts`，组件特有变体枚举内联进各自 group。
+- `viewport.ts` 迁至 `editor/model/viewport.ts`。
+- `data/` → `catalog/` 重命名完成。
+
+ADR 29「收敛产物」与 ADR 33 非目标已同步修正。
+
 ## 范围边界（关键事实，已核实）
 
 **类型层已统一，无需新类型。** 外部 profile（`external/libraries/antdProfile.tsx:3`）已 import 并返回 `ComponentPreviewItem`（定义于 `editor/model/types.ts`）。内置 group 与外部库组件**已经是同一个 `ComponentPreviewItem` 形态**。故本收敛**不发明 `PaletteContribution` 新类型**——`ComponentPreviewItem` 即事实贡献契约，收敛只重组数据归属。
@@ -20,7 +31,7 @@
 - `SIZE_OPTIONS` / `BUTTON_SIZE_OPTIONS` / `TEXT_SIZE_OPTIONS` / `AVATAR_SIZE_OPTIONS`——**真跨 group 共享**（FormGroup 给 ~10 个组件复用 `SIZE_OPTIONS`）→ 归 `catalog/sizeOptions.ts`
 - `HEADING_LEVELS` / `BUTTON_CATEGORIES` / `CARD_VARIANTS` / `TAG_VARIANTS` / `NAV_COLUMNS` / `PROGRESS_STATUSES` / `DRAWER_PLACEMENTS` / `TOOLTIP_PLACEMENTS` / `MESSAGE_TYPES` / `NOTIFICATION_TYPES` / `SKELETON_VARIANTS` / `STEPS_DIRECTIONS`——**组件特有变体枚举** → 内联进各自 group
 
-**`sampleData.tsx` 全是组件特有 demo 数据**（`REGION_OPTIONS`→Form、`TABLE_DATA`→Data、`NAVBAR_ITEMS`→Nav…）→ 内联进各自 group。
+**`sampleData.tsx` 保留为共享 demo 数据**（不内联）——见上方"执行结果"：全仓核查发现它同时被 group 预览与 `palette.ts` 建节点默认值消费，是连贯共享类别。
 
 ## 迁移前基线（已核实）
 
@@ -99,7 +110,9 @@ blueprint/
 - `data/viewport.ts` 不存在，`VIEWPORT_*` 在 `editor/model/viewport.ts`
 - tsc / vitest / lint 通过
 
-### Phase 2：溶解 options.ts 与 sampleData.tsx（group 自包含）
+### Phase 2：溶解 options.ts（组件特有变体内联进 group）
+
+> 注：`sampleData.tsx` 经全仓核查确认是共享 demo 数据（palette.ts 亦消费），**保留不溶解**。见"执行结果"。本 Phase 只溶解 `options.ts`。
 
 目标：每个 group 文件内联其组件特有的变体枚举与 demo 数据，删除两个横切大文件。
 
@@ -162,19 +175,19 @@ refactor(blueprint): converge native catalog to self-contained groups
 
 ## 验收标准
 
-- [ ] `data/options.ts` 与 `data/sampleData.tsx` 不存在（彻底溶解，无 shim）
-- [ ] 每个 group 文件自包含（定义 + 其组件特有 options + 其 demo 数据）
-- [ ] 跨 group 共享数据仅在 `catalog/sizeOptions.ts` / `catalog/helpers.ts` / `catalog/placeholders.ts`
-- [ ] `viewport.ts` 迁至 `editor/model/viewport.ts`，3 个消费方 import 更新
-- [ ] `blueprint/data/` 重命名为 `blueprint/catalog/`，仓库内 `data` 前缀引用归零
-- [ ] `ComponentPreviewItem` / `ComponentGroup` 类型未改
-- [ ] `ComponentGroups.tsx` 聚合与 `source` tag 未改
-- [ ] PIR 写入链路（`createNodeFromPaletteItem` 等）未改
-- [ ] 所有 import 使用 `@/...` 绝对路径（AGENTS Rule 4）
-- [ ] `pnpm --filter @prodivix/web exec tsc -b --pretty false` 通过
-- [ ] workspace vitest 通过
-- [ ] `pnpm lint` 通过
-- [ ] ADR 29 相关验收项勾选、索引表实现状态更新
+- [x] `data/options.ts` 不存在（彻底溶解，无 shim）；`sampleData.tsx` 保留为共享 demo 数据（`catalog/sampleData.tsx`，见执行结果）
+- [x] 每个 group 自包含其组件特有变体枚举（`options.ts` 的变体内联）；demo 数据因被 palette 共享而保留为共享文件
+- [x] 跨 group 共享数据集中在 `catalog/sizeOptions.ts` / `catalog/helpers.ts` / `catalog/placeholders.ts` / `catalog/sampleData.tsx`
+- [x] `viewport.ts` 迁至 `editor/model/viewport.ts`，3 个消费方 import 更新
+- [x] `blueprint/data/` 重命名为 `blueprint/catalog/`，仓库内 `data` 前缀引用归零
+- [x] `ComponentPreviewItem` / `ComponentGroup` 类型未改
+- [x] `ComponentGroups.tsx` 聚合与 `source` tag 未改
+- [x] PIR 写入链路（`createNodeFromPaletteItem` 等）未改
+- [x] 所有 import 使用 `@/...` 绝对路径（AGENTS Rule 4）
+- [x] `pnpm --filter @prodivix/web exec tsc -b --pretty false` 通过
+- [x] workspace vitest 通过（36 文件 / 142 用例）
+- [x] `pnpm lint` 通过
+- [x] ADR 29 相关验收项更新、索引表实现状态推进为 Partial（内置侧收敛）
 
 ## 非目标
 

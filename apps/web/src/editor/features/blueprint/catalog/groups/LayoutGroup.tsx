@@ -1,11 +1,10 @@
 import { PdxCard, PdxDiv, PdxPanel, PdxSection, PdxText } from '@prodivix/ui';
 import type { ComponentGroup } from '@/editor/features/blueprint/editor/model/types';
-import { buildVariants } from '@/editor/features/blueprint/data/helpers';
-import {
-  CARD_VARIANTS,
-  PANEL_VARIANTS,
-  SIZE_OPTIONS,
-} from '@/editor/features/blueprint/data/options';
+import { buildVariants } from '@/editor/features/blueprint/catalog/helpers';
+import { SIZE_OPTIONS } from '@/editor/features/blueprint/catalog/sizeOptions';
+
+const CARD_VARIANTS = ['Default', 'Bordered', 'Elevated', 'Flat'] as const;
+const PANEL_VARIANTS = ['Default', 'Bordered', 'Filled'] as const;
 
 export const LAYOUT_GROUP: ComponentGroup = {
   id: 'layout',

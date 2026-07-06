@@ -4,7 +4,7 @@ import {
   getDefaultSizeId,
   getDefaultStatusIndex,
   isWideComponent,
-} from '@/editor/features/blueprint/data/helpers';
+} from '@/editor/features/blueprint/catalog/helpers';
 import { COMPACT_PREVIEW_SCALE, getPreviewScale } from './previewScale';
 import type { ComponentGroup } from '@/editor/features/blueprint/editor/model/types';
 import {

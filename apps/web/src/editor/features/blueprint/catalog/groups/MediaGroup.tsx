@@ -8,19 +8,19 @@ import {
   PdxVideo,
 } from '@prodivix/ui';
 import type { ComponentGroup } from '@/editor/features/blueprint/editor/model/types';
-import { buildVariants } from '@/editor/features/blueprint/data/helpers';
+import { buildVariants } from '@/editor/features/blueprint/catalog/helpers';
 import {
   AVATAR_SIZE_OPTIONS,
   SIZE_OPTIONS,
-} from '@/editor/features/blueprint/data/options';
-import { GALLERY_IMAGES } from '@/editor/features/blueprint/data/sampleData';
+} from '@/editor/features/blueprint/catalog/sizeOptions';
+import { GALLERY_IMAGES } from '@/editor/features/blueprint/catalog/sampleData';
 import {
   EMBED_PLACEHOLDER_URL,
   PLACEHOLDER_AVATAR,
   PLACEHOLDER_IFRAME,
   PLACEHOLDER_IMAGE,
   PLACEHOLDER_VIDEO,
-} from '@/editor/features/blueprint/data/placeholders';
+} from '@/editor/features/blueprint/catalog/placeholders';
 
 export const MEDIA_GROUP: ComponentGroup = {
   id: 'media',
