@@ -1,15 +1,8 @@
 import type {
   QuickViewportPreset,
-  RouteItem,
   ViewportPreset,
 } from '@/editor/features/blueprint/editor/model/types';
 import { Laptop, Monitor, Smartphone, Tablet, Watch } from 'lucide-react';
-
-export const DEFAULT_ROUTES: RouteItem[] = [
-  { id: 'home', path: '/' },
-  { id: 'product', path: '/product/:id' },
-  { id: 'search', path: '/search?q=:keyword' },
-];
 
 export const VIEWPORT_QUICK_PRESETS: QuickViewportPreset[] = [
   {
@@ -152,6 +145,3 @@ export const VIEWPORT_ZOOM_RANGE = {
   step: 5,
   default: 100,
 };
-
-export const DEFAULT_PREVIEW_SCALE = 0.72;
-export const COMPACT_PREVIEW_SCALE = 0.6;

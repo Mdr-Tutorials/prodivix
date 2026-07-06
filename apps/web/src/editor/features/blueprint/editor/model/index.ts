@@ -1,6 +1,5 @@
 export * from './autosave';
 export * from './blueprintText';
-export * from './data';
 export * from './dragdrop';
 export * from './graphExecutor';
 export * from './palette';

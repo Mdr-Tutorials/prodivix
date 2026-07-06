@@ -1,12 +1,11 @@
 import type { KeyboardEvent } from 'react';
 import { ChevronDown } from 'lucide-react';
 import {
-  COMPACT_PREVIEW_SCALE,
   getDefaultSizeId,
   getDefaultStatusIndex,
-  getPreviewScale,
   isWideComponent,
-} from '@/editor/features/blueprint/editor/model/data';
+} from '@/editor/features/blueprint/data/helpers';
+import { COMPACT_PREVIEW_SCALE, getPreviewScale } from './previewScale';
 import type { ComponentGroup } from '@/editor/features/blueprint/editor/model/types';
 import {
   DraggablePreviewCard,

@@ -6,9 +6,7 @@ import type {
   ComponentPreviewStatus,
   ComponentPreviewVariant,
 } from '@/editor/features/blueprint/editor/model/types';
-import { DEFAULT_PREVIEW_SCALE } from './viewport';
 
-const WIDE_PREVIEW_SCALE_BOOST = 1.18;
 const WIDE_GROUP_IDS = new Set([
   'navigation',
   'layout',
@@ -66,15 +64,6 @@ export const getDefaultStatusIndex = (
     if (index >= 0) return index;
   }
   return 0;
-};
-
-export const getPreviewScale = (
-  baseScale: number | undefined,
-  isWide: boolean
-) => {
-  const resolved = baseScale ?? DEFAULT_PREVIEW_SCALE;
-  if (!isWide) return resolved;
-  return Math.min(resolved * WIDE_PREVIEW_SCALE_BOOST, 0.95);
 };
 
 export const isWideComponent = (

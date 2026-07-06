@@ -67,8 +67,9 @@
     - `specs/diagnostics/codegen-diagnostic-codes.md`
     - `specs/diagnostics/api-diagnostic-codes.md`
     - `specs/diagnostics/ai-diagnostic-codes.md`
-18. **编辑器 Feature 目录结构**
+18. **Blueprint Feature 结构与数据层**
     - `specs/decisions/32.blueprint-editor-feature-layout.md`
+    - `specs/decisions/33.blueprint-data-layer-cleanup.md`
 
 ## 实施主计划
 
@@ -84,6 +85,7 @@
 - `specs/implementation/route-system-unification-plan.md`
 - `specs/implementation/production-export-planner-implementation.md`
 - `specs/implementation/blueprint-editor-feature-layout-migration.md`
+- `specs/implementation/blueprint-data-layer-cleanup-migration.md`
 - `specs/codegen/react-production-policy-v1.md`
 - `specs/external/canonical-external-ir-v1.md`
 - `specs/diagnostics/external-library-diagnostic-codes.md`
@@ -114,3 +116,4 @@ ADR 的 `状态` 描述决策成熟度，不等同于代码完成度。实现完
 | `30.react-flow-nodegraph-editor.md`                 | Accepted                | Implemented / Stabilizing           | React Flow 编辑器、PIR 序列化、运行时执行器和 NodeGraph export contribution 已存在。                                                                         | 继续收敛所有 NodeGraph 写入到 Workspace Command / Intent / Patch，并补插件边界。                                 |
 | `31.production-export-planner.md`                   | Draft                   | Implemented / Stabilizing           | `ExportProgram`、`ExportProgramBuilder`、`ProductionExportPlanner`、artifact/source/origin/license/deployment metadata 与 `.prodivix/*` 审计文件已落地。     | 保持 Draft 继续扩展多 framework target、source map、tree shaking、code splitting 和 License UI。                 |
 | `32.blueprint-editor-feature-layout.md`             | Draft                   | Implemented                         | `features/blueprint/` 已与 `animation/`、`development/` 平级；`design/` 已移除；inspector 迁入 `blueprint/editor/inspector/`；`editor/components/` 已拍平为 camelCase；tsc / vitest / lint 通过。 | —                                                                                                               |
+| `33.blueprint-data-layer-cleanup.md`                | Draft                   | Implemented                         | `editor/model/data.ts` barrel 已删除（5/8 死转发清零）；`data/viewport.ts` 收敛为纯视口配置，死代码 `DEFAULT_ROUTES` 删除；preview-scale 常量与 `getPreviewScale` 迁入 `editor/sidebar/previewScale.ts`；6 个消费者直连源；tsc / vitest / lint 通过。 | —                                                                                                               |
