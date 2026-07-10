@@ -23,6 +23,8 @@ export const PLUGIN_DIAGNOSTIC_CODES = {
   MISSING_RUNTIME_ENTRYPOINT: 'PLG-2014',
   INVALID_RESOURCE_PATH: 'PLG-2015',
   DUPLICATE_UI_ENTRYPOINT: 'PLG-2016',
+  INVALID_CONTRIBUTION_REFERENCE: 'PLG-2020',
+  CONTRIBUTION_OWNERSHIP_MISMATCH: 'PLG-2021',
   REQUIRED_CAPABILITY_DENIED: 'PLG-3001',
   CAPABILITY_POLICY_FAILED: 'PLG-3002',
   CONTRIBUTION_IDENTITY_CONFLICT: 'PLG-3010',
@@ -65,6 +67,10 @@ export const PLUGIN_DIAGNOSTIC_CODES = {
   SANDBOX_HEARTBEAT_TIMEOUT: 'PLG-4041',
   SANDBOX_TERMINATED: 'PLG-4042',
   GATEWAY_QUOTA_EXCEEDED: 'PLG-4043',
+  OFFICIAL_IMPLEMENTATION_NOT_ATTESTED: 'PLG-4050',
+  OFFICIAL_IMPLEMENTATION_NOT_FOUND: 'PLG-4051',
+  OFFICIAL_IMPLEMENTATION_KIND_MISMATCH: 'PLG-4052',
+  OFFICIAL_IMPLEMENTATION_BINDING_CONFLICT: 'PLG-4053',
   GATEWAY_AUDIT_UNAVAILABLE: 'PLG-4060',
   GATEWAY_AUDIT_WRITE_FAILED: 'PLG-4061',
 } as const;
@@ -279,6 +285,18 @@ export const PLUGIN_DIAGNOSTIC_DEFINITIONS = {
     'semantic',
     'Use a unique id for every UI entrypoint.'
   ),
+  [PLUGIN_DIAGNOSTIC_CODES.INVALID_CONTRIBUTION_REFERENCE]:
+    definePluginDiagnostic(
+      PLUGIN_DIAGNOSTIC_CODES.INVALID_CONTRIBUTION_REFERENCE,
+      'semantic',
+      'Reference a library, runtime type, package, export, or implementation declared by the same plugin contribution batch.'
+    ),
+  [PLUGIN_DIAGNOSTIC_CODES.CONTRIBUTION_OWNERSHIP_MISMATCH]:
+    definePluginDiagnostic(
+      PLUGIN_DIAGNOSTIC_CODES.CONTRIBUTION_OWNERSHIP_MISMATCH,
+      'semantic',
+      'Keep cross-point references within the plugin owner that declares the external library.'
+    ),
   [PLUGIN_DIAGNOSTIC_CODES.REQUIRED_CAPABILITY_DENIED]: definePluginDiagnostic(
     PLUGIN_DIAGNOSTIC_CODES.REQUIRED_CAPABILITY_DENIED,
     'permission',
@@ -519,6 +537,30 @@ export const PLUGIN_DIAGNOSTIC_DEFINITIONS = {
     'quota',
     'Reduce Gateway request rate or concurrency before retrying.'
   ),
+  [PLUGIN_DIAGNOSTIC_CODES.OFFICIAL_IMPLEMENTATION_NOT_ATTESTED]:
+    definePluginDiagnostic(
+      PLUGIN_DIAGNOSTIC_CODES.OFFICIAL_IMPLEMENTATION_NOT_ATTESTED,
+      'registry',
+      'Install the exact build-attested official package or remove the privileged host implementation reference.'
+    ),
+  [PLUGIN_DIAGNOSTIC_CODES.OFFICIAL_IMPLEMENTATION_NOT_FOUND]:
+    definePluginDiagnostic(
+      PLUGIN_DIAGNOSTIC_CODES.OFFICIAL_IMPLEMENTATION_NOT_FOUND,
+      'registry',
+      'Use a host implementation id exported by the attested official module.'
+    ),
+  [PLUGIN_DIAGNOSTIC_CODES.OFFICIAL_IMPLEMENTATION_KIND_MISMATCH]:
+    definePluginDiagnostic(
+      PLUGIN_DIAGNOSTIC_CODES.OFFICIAL_IMPLEMENTATION_KIND_MISMATCH,
+      'registry',
+      'Reference a host implementation with the contract-required implementation kind.'
+    ),
+  [PLUGIN_DIAGNOSTIC_CODES.OFFICIAL_IMPLEMENTATION_BINDING_CONFLICT]:
+    definePluginDiagnostic(
+      PLUGIN_DIAGNOSTIC_CODES.OFFICIAL_IMPLEMENTATION_BINDING_CONFLICT,
+      'registry',
+      'Keep each owner and generation binding attached to one attested implementation identity.'
+    ),
   [PLUGIN_DIAGNOSTIC_CODES.GATEWAY_AUDIT_UNAVAILABLE]: definePluginDiagnostic(
     PLUGIN_DIAGNOSTIC_CODES.GATEWAY_AUDIT_UNAVAILABLE,
     'audit',

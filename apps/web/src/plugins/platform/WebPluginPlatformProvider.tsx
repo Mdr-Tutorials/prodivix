@@ -169,3 +169,15 @@ export const usePaletteRegistrySnapshot = () => {
 };
 
 export const usePaletteGroups = () => usePaletteRegistrySnapshot().groups;
+
+export const useWebExtensionRegistrySnapshot = () => {
+  const extensions = useWebPluginQueries().extensions;
+  return useSyncExternalStore(
+    extensions.subscribe,
+    extensions.getSnapshot,
+    extensions.getSnapshot
+  );
+};
+
+export const useCodegenPolicySnapshot = () =>
+  useWebExtensionRegistrySnapshot().codegenPolicy;

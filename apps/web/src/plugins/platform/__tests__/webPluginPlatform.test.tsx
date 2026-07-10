@@ -1,23 +1,19 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  createPluginDiagnostic,
-  PLUGIN_DIAGNOSTIC_CODES,
-  type JsonValue,
-} from '@prodivix/plugin-contracts';
-import {
-  defineContributionContract,
-  pluginHostFailure,
-  pluginHostSuccess,
-} from '@prodivix/plugin-host';
+import { afterEach, describe, expect, it } from 'vitest';
+import { PLUGIN_DIAGNOSTIC_CODES } from '@prodivix/plugin-contracts';
 import type { ComponentGroup } from '@/editor/features/blueprint/editor/model/types';
 import { createPaletteContributionDescriptor } from '@/editor/features/blueprint/palette';
 import {
   createWebPluginPlatform,
   installNativeCorePlugin,
-  type TrustedWebPluginInput,
-  type WebContributionPointMap,
+  type OfficialHostModuleCatalogEntry,
   type WebPluginPlatform,
 } from '@/plugins/platform';
+import {
+  createNeutralOfficialHostCatalog,
+  createNeutralOfficialPlugin,
+  NEUTRAL_OFFICIAL_HOST_MODULE,
+  NEUTRAL_PACKAGE_DIGEST,
+} from '@/plugins/platform/__tests__/neutralOfficialPlugin.fixture';
 
 const platforms = new Set<WebPluginPlatform>();
 
@@ -29,80 +25,14 @@ const createDeferred = () => {
   return Object.freeze({ promise, resolve });
 };
 
-type TestRenderPolicyDescriptor = Readonly<{
-  label: string;
-  fail?: boolean;
-}>;
-
-type RenderPolicyContractControl = Readonly<{
-  beforePrepare?: (
-    descriptor: TestRenderPolicyDescriptor,
-    signal: AbortSignal
-  ) => Promise<void>;
-}>;
-
-const createRenderPolicyContract = (
-  control: RenderPolicyContractControl = {}
-) =>
-  defineContributionContract<
-    WebContributionPointMap,
-    'renderPolicy',
-    TestRenderPolicyDescriptor
-  >({
-    point: 'renderPolicy',
-    contractVersion: '1.0',
-    validateDescriptor: (input) => {
-      if (
-        typeof input === 'object' &&
-        input !== null &&
-        !Array.isArray(input) &&
-        typeof input.label === 'string' &&
-        (input.fail === undefined || typeof input.fail === 'boolean') &&
-        Object.keys(input).every((key) => key === 'label' || key === 'fail')
-      ) {
-        return pluginHostSuccess(
-          Object.freeze({
-            label: input.label,
-            ...(input.fail === undefined ? {} : { fail: input.fail }),
-          })
-        );
-      }
-      return pluginHostFailure([
-        createPluginDiagnostic(
-          PLUGIN_DIAGNOSTIC_CODES.CONTRIBUTION_SCHEMA_VIOLATION,
-          'Test Render Policy requires a closed descriptor with a label.',
-          { contributionPoint: 'renderPolicy', contractVersion: '1.0' }
-        ),
-      ]);
-    },
-    prepare: async ({ descriptor, signal }) => {
-      await control.beforePrepare?.(descriptor, signal);
-      if (descriptor.fail) {
-        return pluginHostFailure([
-          createPluginDiagnostic(
-            PLUGIN_DIAGNOSTIC_CODES.CONTRIBUTION_RESOLVER_FAILED,
-            'Test Render Policy preparation failed.',
-            { contributionPoint: 'renderPolicy', contractVersion: '1.0' }
-          ),
-        ]);
-      }
-      return pluginHostSuccess({
-        value: Object.freeze({}) as WebContributionPointMap['renderPolicy'],
-        lifetime: 'installation',
-        dependsOnCapabilities: [],
-      });
-    },
-  });
-
 const createPlatform = (
-  contracts: Parameters<typeof createWebPluginPlatform>[0]['contracts'] = []
+  officialHostModules: readonly OfficialHostModuleCatalogEntry[] = createNeutralOfficialHostCatalog()
 ) => {
   const result = createWebPluginPlatform({
     workspaceId: `web-platform-test-${platforms.size + 1}`,
-    contracts,
+    officialHostModules,
     integrityService: {
-      digestSha256: async () =>
-        'sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+      digestSha256: async () => NEUTRAL_PACKAGE_DIGEST,
     },
   });
   if (result.ok === false) {
@@ -147,44 +77,6 @@ const registerGroup = (
     groups: [group],
     order: 500,
   });
-
-const createMultiPointPlugin = (input: {
-  pluginId: string;
-  version: string;
-  group: ComponentGroup;
-  policy: TestRenderPolicyDescriptor;
-  policyFirst?: boolean;
-}): TrustedWebPluginInput => {
-  const paletteContribution = Object.freeze({
-    id: 'test.palette',
-    point: 'paletteContribution' as const,
-    contractVersion: '1.0',
-    descriptor: createPaletteContributionDescriptor([
-      input.group,
-    ]) as unknown as Readonly<Record<string, JsonValue>>,
-    paletteProjection: Object.freeze({ groups: [input.group] }),
-  });
-  const renderPolicyContribution = Object.freeze({
-    id: 'test.render-policy',
-    point: 'renderPolicy' as const,
-    contractVersion: '1.0',
-    descriptor: input.policy,
-  });
-  const contributions = input.policyFirst
-    ? [renderPolicyContribution, paletteContribution]
-    : [paletteContribution, renderPolicyContribution];
-
-  return Object.freeze({
-    pluginId: input.pluginId,
-    displayName: 'Multi-point test plugin',
-    version: input.version,
-    publisher: 'prodivix',
-    installationId: `test:${input.pluginId}`,
-    trustLevel: 'core',
-    publisherVerified: true,
-    contributions,
-  });
-};
 
 afterEach(async () => {
   await Promise.all([...platforms].map((platform) => platform.shutdown()));
@@ -329,63 +221,65 @@ describe('workspace Web Plugin Platform', () => {
   });
 
   it('publishes all contribution points in one registry transaction', async () => {
-    const platform = createPlatform([createRenderPolicyContract()]);
+    const platform = createPlatform();
     const committedBatches: string[][] = [];
     const subscription = platform.runtime.packages.contributions.subscribe(
       (event) => {
         committedBatches.push(event.added.map((record) => record.point));
       }
     );
-    const group = createGroup(
-      'test-multi-point-group',
-      'test-multi-point-item',
-      'Multi-point'
-    );
-
     const result = await platform.runtime.packages.install(
-      createMultiPointPlugin({
-        pluginId: '@prodivix/test.multi-point',
-        version: '1.0.0',
-        group,
-        policy: { label: 'Test policy' },
+      createNeutralOfficialPlugin({
+        label: 'Multi-point',
+        groupId: 'test-multi-point-group',
+        itemId: 'test-multi-point-item',
       })
     );
 
     subscription.dispose();
     expect(result.ok).toBe(true);
-    expect(committedBatches).toEqual([['paletteContribution', 'renderPolicy']]);
+    expect(committedBatches).toEqual([
+      [
+        'externalLibrary',
+        'paletteContribution',
+        'renderPolicy',
+        'codegenPolicy',
+        'iconProvider',
+      ],
+    ]);
     expect(
       platform.runtime.packages.contributions.list('renderPolicy')
     ).toHaveLength(1);
     expect(
       platform.queries.palette.getItemById('test-multi-point-item')?.name
-    ).toBe('Multi-point');
+    ).toBe('Multi-point Button');
     const owners = [
       ...platform.runtime.packages.contributions.list('paletteContribution'),
+      ...platform.runtime.packages.contributions.list('externalLibrary'),
       ...platform.runtime.packages.contributions.list('renderPolicy'),
+      ...platform.runtime.packages.contributions.list('codegenPolicy'),
+      ...platform.runtime.packages.contributions.list('iconProvider'),
     ].map((record) => record.owner);
     expect(new Set(owners.map((owner) => owner.generation))).toEqual(
       new Set([1])
     );
     expect(new Set(owners.map((owner) => owner.installationId))).toEqual(
-      new Set(['test:@prodivix/test.multi-point'])
+      new Set(['fixture:@prodivix/plugin-neutral-fixture'])
+    );
+    expect(platform.queries.extensions.getSnapshot().revision).toBe(
+      platform.queries.palette.getSnapshot().revision
     );
   });
 
   it('rolls back every point and releases Palette claims when one resolver fails', async () => {
-    const platform = createPlatform([createRenderPolicyContract()]);
-    const group = createGroup(
-      'test-rollback-group',
-      'test-rollback-item',
-      'Rollback'
-    );
+    const platform = createPlatform();
 
     const failed = await platform.runtime.packages.install(
-      createMultiPointPlugin({
-        pluginId: '@prodivix/test.multi-point-failure',
-        version: '1.0.0',
-        group,
-        policy: { label: 'Failing policy', fail: true },
+      createNeutralOfficialPlugin({
+        label: 'Rollback',
+        groupId: 'test-rollback-group',
+        itemId: 'test-rollback-item',
+        iconImplementationId: 'neutral.missing-icons',
       })
     );
 
@@ -396,68 +290,64 @@ describe('workspace Web Plugin Platform', () => {
     expect(
       platform.runtime.packages.contributions.list('renderPolicy')
     ).toEqual([]);
+    expect(
+      platform.runtime.packages.contributions.list('externalLibrary')
+    ).toEqual([]);
+    expect(
+      platform.runtime.packages.contributions.list('codegenPolicy')
+    ).toEqual([]);
+    expect(
+      platform.runtime.packages.contributions.list('iconProvider')
+    ).toEqual([]);
     expect(platform.runtime.packages.contributions.getRevision()).toBe(0);
+    expect(platform.listOfficialImplementationBindings()).toEqual([]);
     expect(
       platform.queries.palette.getItemById('test-rollback-item')
     ).toBeUndefined();
 
-    const retry = await registerGroup(
-      platform,
-      '@prodivix/test.palette-after-rollback',
-      group
+    const retry = await platform.runtime.packages.install(
+      createNeutralOfficialPlugin({
+        label: 'Rollback',
+        groupId: 'test-rollback-group',
+        itemId: 'test-rollback-item',
+      })
     );
     expect(retry.ok).toBe(true);
     expect(
       platform.queries.palette.getItemById('test-rollback-item')?.name
-    ).toBe('Rollback');
+    ).toBe('Rollback Button');
   });
 
   it('keeps concurrent replacement projections bound to their package attestation', async () => {
     const firstPrepareStarted = createDeferred();
     const releaseFirstPrepare = createDeferred();
-    let firstSignal: AbortSignal | undefined;
-    const contract = createRenderPolicyContract({
-      beforePrepare: async (descriptor, signal) => {
-        if (descriptor.label !== 'First policy') return;
-        firstSignal = signal;
+    const platform = createPlatform(
+      createNeutralOfficialHostCatalog(async () => {
         firstPrepareStarted.resolve(undefined);
         await releaseFirstPrepare.promise;
-      },
-    });
-    const platform = createPlatform([contract]);
-    const pluginId = '@prodivix/test.concurrent-replacement';
-    const firstGroup = createGroup(
-      'test-concurrent-first-group',
-      'test-concurrent-first-item',
-      'First projection'
-    );
-    const secondGroup = createGroup(
-      'test-concurrent-second-group',
-      'test-concurrent-second-item',
-      'Second projection'
+        return NEUTRAL_OFFICIAL_HOST_MODULE;
+      })
     );
 
     const firstInstall = platform.runtime.packages.install(
-      createMultiPointPlugin({
-        pluginId,
+      createNeutralOfficialPlugin({
         version: '1.0.0',
-        group: firstGroup,
-        policy: { label: 'First policy' },
-        policyFirst: true,
+        label: 'First projection',
+        groupId: 'test-concurrent-first-group',
+        itemId: 'test-concurrent-first-item',
       })
     );
     await firstPrepareStarted.promise;
 
     const secondInstall = platform.runtime.packages.install(
-      createMultiPointPlugin({
-        pluginId,
+      createNeutralOfficialPlugin({
         version: '1.1.0',
-        group: secondGroup,
-        policy: { label: 'Second policy' },
-        policyFirst: true,
+        label: 'Second projection',
+        groupId: 'test-concurrent-second-group',
+        itemId: 'test-concurrent-second-item',
       })
     );
-    await vi.waitFor(() => expect(firstSignal?.aborted).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 0));
     releaseFirstPrepare.resolve(undefined);
 
     const [firstResult, secondResult] = await Promise.all([
@@ -478,6 +368,11 @@ describe('workspace Web Plugin Platform', () => {
     ).toBeUndefined();
     expect(
       platform.queries.palette.getItemById('test-concurrent-second-item')?.name
-    ).toBe('Second projection');
+    ).toBe('Second projection Button');
+    expect(
+      platform
+        .listOfficialImplementationBindings()
+        .every((binding) => binding.owner.generation === 2)
+    ).toBe(true);
   });
 });

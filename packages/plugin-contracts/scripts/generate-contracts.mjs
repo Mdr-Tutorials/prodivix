@@ -3,31 +3,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compile } from 'json-schema-to-typescript';
 import { format, resolveConfig } from 'prettier';
+import { CONTRACT_CATALOG } from './contractCatalog.mjs';
 
 const packageRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const repositoryRoot = path.resolve(packageRoot, '../..');
 const checkOnly = process.argv.includes('--check');
 
-const contracts = [
-  {
-    schemaFile: 'plugin-manifest-v1.schema.json',
-    rootType: 'PluginManifestV1',
-    typesFile: 'pluginManifest.generated.ts',
-    schemaModuleFile: 'pluginManifestSchema.generated.ts',
-    schemaConstant: 'PLUGIN_MANIFEST_V1_SCHEMA',
-  },
-  {
-    schemaFile: 'palette-contribution-v1.schema.json',
-    rootType: 'PaletteContributionV1',
-    typesFile: 'paletteContribution.generated.ts',
-    schemaModuleFile: 'paletteContributionSchema.generated.ts',
-    schemaConstant: 'PALETTE_CONTRIBUTION_V1_SCHEMA',
-  },
-];
-
 const outputs = [];
 
-for (const contract of contracts) {
+for (const contract of CONTRACT_CATALOG) {
   const schemaPath = path.join(
     repositoryRoot,
     'specs/plugins',

@@ -20,6 +20,7 @@ import {
 } from '@/authoring';
 import { flattenPublicFiles } from '@/editor/features/resources/publicTree';
 import { flattenEnabledProjectFiles } from '@/editor/features/resources/projectFileStore';
+import { useCodegenPolicySnapshot } from '@/plugins/platform';
 import { buildPublicResourceTreeFromWorkspace } from '@/editor/features/resources/workspacePublicResources';
 import { buildProjectFilesFromWorkspace } from '@/editor/features/resources/workspaceProjectFiles';
 import {
@@ -81,6 +82,7 @@ const reactExportFileToCodeFile = (file: ReactExportFile): ExportCodeFile => {
 export function ExportCode() {
   const { t } = useTranslation('export');
   const { projectId } = useParams();
+  const codegenPolicySnapshot = useCodegenPolicySnapshot();
   const pirDoc = useEditorStore((state) => state.pirDoc);
   const projectName = useEditorStore((state) =>
     projectId ? state.projectsById[projectId]?.name : undefined
@@ -229,6 +231,7 @@ export function ExportCode() {
         packageResolver: {
           strategy: 'npm',
         },
+        codegenPolicySnapshot,
         codeArtifacts,
         exportContributions,
       });
@@ -272,6 +275,7 @@ export function ExportCode() {
     pirValidation.issues,
     projectType,
     codeArtifacts,
+    codegenPolicySnapshot,
     exportContributions,
     t,
   ]);

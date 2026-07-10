@@ -14,6 +14,10 @@ export interface AdapterResolution {
   element: string;
   imports?: AdapterImportSpec[];
   diagnostics?: CompileDiagnostic[];
+  props?: Record<string, unknown>;
+  style?: Record<string, unknown>;
+  textMode?: 'preserve' | 'omit';
+  childrenMode?: 'preserve' | 'omit';
 }
 
 export interface TargetAdapter {

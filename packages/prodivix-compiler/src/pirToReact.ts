@@ -51,6 +51,7 @@ const bundleFactories: Record<ExportResourceType, BundleFactory> = {
       compilePirToReactComponent(pirDoc, {
         componentName: options?.componentName || 'App',
         adapter: options?.adapter,
+        codegenPolicySnapshot: options?.codegenPolicySnapshot,
         packageResolver: options?.packageResolver,
         codeArtifacts: options?.codeArtifacts,
         includeWorkspaceCodeArtifacts:

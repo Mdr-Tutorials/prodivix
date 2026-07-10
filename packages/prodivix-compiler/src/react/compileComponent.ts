@@ -5,6 +5,11 @@ import { buildCanonicalIR } from '#src/core/canonicalIR';
 import type { AdapterImportSpec } from '#src/core/adapter';
 import { createDiagnosticBag } from '#src/core/diagnostics';
 import { resolvePackageImport } from '#src/core/packageResolver';
+import {
+  createCodegenPolicyTargetAdapter,
+  getCodegenPolicyPackageMetadata,
+  getCodegenPolicyPackageVersions,
+} from '#src/core/codegenPolicy';
 import { createExportPackageOrigin } from '#src/export/packageOriginResolver';
 import { resolveRemoteExportSource } from '#src/export/sourceResolver';
 import {
@@ -692,7 +697,25 @@ export const compilePirToReactComponent = (
   const hasState = Boolean(
     canonical.logic?.state && Object.keys(canonical.logic.state).length > 0
   );
-  const adapter = options?.adapter ?? reactAdapter;
+  const fallbackAdapter = options?.adapter ?? reactAdapter;
+  const adapter = options?.codegenPolicySnapshot
+    ? createCodegenPolicyTargetAdapter(
+        options.codegenPolicySnapshot,
+        fallbackAdapter
+      )
+    : fallbackAdapter;
+  const packageResolver = options?.codegenPolicySnapshot
+    ? {
+        ...options.packageResolver,
+        packageVersions: {
+          ...options.packageResolver?.packageVersions,
+          ...getCodegenPolicyPackageVersions(options.codegenPolicySnapshot),
+        },
+      }
+    : options?.packageResolver;
+  const packageMetadata = options?.codegenPolicySnapshot
+    ? getCodegenPolicyPackageMetadata(options.codegenPolicySnapshot)
+    : undefined;
   const runtimeRequirementsById = new Map<string, ExportRuntimeRequirement>();
   const requireEventRuntime = (nodeId: string, eventKey: string) => {
     const id = `event-runtime:${moduleId}`;
@@ -725,7 +748,9 @@ export const compilePirToReactComponent = (
     if (adapterResult.diagnostics?.length) {
       bag.diagnostics.push(...adapterResult.diagnostics);
     }
-    node.children.forEach(collectAdapterArtifacts);
+    if (adapterResult.childrenMode !== 'omit') {
+      node.children.forEach(collectAdapterArtifacts);
+    }
   };
   collectAdapterArtifacts(canonical.root);
 
@@ -733,7 +758,7 @@ export const compilePirToReactComponent = (
     adapterImports
   ).map((item) => ({
     ...item,
-    resolution: resolvePackageImport(item.source, options?.packageResolver),
+    resolution: resolvePackageImport(item.source, packageResolver),
   }));
   const importLocalByKey = assignImportLocals(resolvedImports);
   const findCanonicalNodeById = (
@@ -854,8 +879,10 @@ ${indent}))`;
       adapterResult.imports,
       importLocalByKey
     );
-    const staticIconRef = readStaticIconRef(node.props?.iconRef);
-    const sanitizedProps = sanitizeNodePropsForExport(node.props);
+    const adaptedProps = adapterResult.props ?? node.props;
+    const adaptedStyle = adapterResult.style ?? node.style;
+    const staticIconRef = readStaticIconRef(adaptedProps?.iconRef);
+    const sanitizedProps = sanitizeNodePropsForExport(adaptedProps);
     if (staticIconRef && NATIVE_ICON_PROVIDERS.has(staticIconRef.provider)) {
       delete sanitizedProps.iconRef;
     }
@@ -866,7 +893,9 @@ ${indent}))`;
     }
 
     const baseStyleExpr =
-      Object.keys(node.style).length > 0 ? stringifyLiteral(node.style) : null;
+      Object.keys(adaptedStyle).length > 0
+        ? stringifyLiteral(adaptedStyle)
+        : null;
     if (
       nativeIconSize !== undefined &&
       staticIconRef &&
@@ -898,6 +927,7 @@ ${indent}))`;
 
     const shouldMapTextToProp =
       TEXT_PROP_ONLY_COMPONENTS.has(tag) &&
+      adapterResult.textMode !== 'omit' &&
       node.text !== undefined &&
       !Object.prototype.hasOwnProperty.call(sanitizedProps, 'text');
     if (shouldMapTextToProp) {
@@ -953,11 +983,15 @@ ${indent}))`;
     const allProps = propsArray.length ? ` ${propsArray.join(' ')}` : '';
     const textContent = shouldMapTextToProp
       ? ''
-      : compileTextContent(node.text, scopeVar);
+      : adapterResult.textMode === 'omit'
+        ? ''
+        : compileTextContent(node.text, scopeVar);
     const childJsx =
-      node.children
-        .map((child) => compileNode(child, `${indent}  `, scopeVar))
-        .join('\n') || '';
+      adapterResult.childrenMode === 'omit'
+        ? ''
+        : node.children
+            .map((child) => compileNode(child, `${indent}  `, scopeVar))
+            .join('\n') || '';
 
     if (!childJsx && !textContent) {
       return `${indent}<${tag}${allProps} />`;
@@ -1080,6 +1114,7 @@ ${rootJsx}
       packageVersion ?? 'latest',
       {
         updatePolicy: 'follow-package',
+        ...(packageMetadata ? { metadata: packageMetadata } : {}),
       }
     );
     return acc;

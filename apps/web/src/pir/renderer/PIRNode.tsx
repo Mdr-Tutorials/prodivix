@@ -129,6 +129,7 @@ export const PIRNode: React.FC<{
       resolvedProps,
       resolvedStyle,
       resolvedText: renderedText as React.ReactNode,
+      isSelected: scopedContext.selectedId === node.id,
     };
     return (
       resolvedComponent.adapter.mapProps?.(adapterContext) ?? {
@@ -417,14 +418,16 @@ export const PIRNode: React.FC<{
         {adapterResult.children}
         {outletChildren ??
           (shouldRenderNodeChildren
-            ? node.children?.map((child) => (
-                <PIRNode
-                  key={child.id}
-                  node={child}
-                  context={scopedContext}
-                  registry={registry}
-                />
-              ))
+            ? adapterResult.renderNodeChildren === false
+              ? null
+              : node.children?.map((child) => (
+                  <PIRNode
+                    key={child.id}
+                    node={child}
+                    context={scopedContext}
+                    registry={registry}
+                  />
+                ))
             : null)}
       </Component>
     </span>

@@ -46,6 +46,26 @@ export type {
   Status as PaletteStatusDescriptor,
   Variant as PaletteVariantDescriptor,
 } from '#contracts/generated/paletteContribution.generated';
+export type {
+  Component as ExternalLibraryComponentDescriptor,
+  Dependency as ExternalLibraryDependencyDescriptor,
+  ExternalLibraryContributionV1,
+  ExportDiscovery as ExternalLibraryExportDiscovery,
+  PackageCoordinate as ExternalLibraryPackageCoordinate,
+} from '#contracts/generated/externalLibraryContribution.generated';
+export type {
+  RenderPolicyContributionV1,
+  Rule as RenderPolicyRuleDescriptor,
+} from '#contracts/generated/renderPolicyContribution.generated';
+export type {
+  CodegenPolicyContributionV1,
+  Dependency as CodegenPolicyDependencyDescriptor,
+  Rule as CodegenPolicyRuleDescriptor,
+} from '#contracts/generated/codegenPolicyContribution.generated';
+export type {
+  IconProviderContributionV1,
+  Variant as IconProviderVariantDescriptor,
+} from '#contracts/generated/iconProviderContribution.generated';
 export {
   PLUGIN_MANIFEST_V1_SCHEMA,
   PLUGIN_MANIFEST_V1_SCHEMA_ID,
@@ -56,6 +76,26 @@ export {
   PALETTE_CONTRIBUTION_V1_SCHEMA_ID,
   PALETTE_CONTRIBUTION_V1_SCHEMA_VERSION,
 } from '#contracts/generated/paletteContributionSchema.generated';
+export {
+  EXTERNAL_LIBRARY_CONTRIBUTION_V1_SCHEMA,
+  EXTERNAL_LIBRARY_CONTRIBUTION_V1_SCHEMA_ID,
+  EXTERNAL_LIBRARY_CONTRIBUTION_V1_SCHEMA_VERSION,
+} from '#contracts/generated/externalLibraryContributionSchema.generated';
+export {
+  RENDER_POLICY_CONTRIBUTION_V1_SCHEMA,
+  RENDER_POLICY_CONTRIBUTION_V1_SCHEMA_ID,
+  RENDER_POLICY_CONTRIBUTION_V1_SCHEMA_VERSION,
+} from '#contracts/generated/renderPolicyContributionSchema.generated';
+export {
+  CODEGEN_POLICY_CONTRIBUTION_V1_SCHEMA,
+  CODEGEN_POLICY_CONTRIBUTION_V1_SCHEMA_ID,
+  CODEGEN_POLICY_CONTRIBUTION_V1_SCHEMA_VERSION,
+} from '#contracts/generated/codegenPolicyContributionSchema.generated';
+export {
+  ICON_PROVIDER_CONTRIBUTION_V1_SCHEMA,
+  ICON_PROVIDER_CONTRIBUTION_V1_SCHEMA_ID,
+  ICON_PROVIDER_CONTRIBUTION_V1_SCHEMA_VERSION,
+} from '#contracts/generated/iconProviderContributionSchema.generated';
 export {
   DEFAULT_JSON_VALUE_MAX_DEPTH,
   DEFAULT_JSON_VALUE_MAX_NODES,
@@ -91,3 +131,23 @@ export {
   type ValidatePaletteContributionOptions,
   type ValidatePaletteContributionResult,
 } from '#contracts/validatePaletteContribution';
+export {
+  validateExternalLibraryContribution,
+  type ValidateExternalLibraryContributionOptions,
+  type ValidateExternalLibraryContributionResult,
+} from '#contracts/validateExternalLibraryContribution';
+export {
+  validateRenderPolicyContribution,
+  type ValidateRenderPolicyContributionOptions,
+  type ValidateRenderPolicyContributionResult,
+} from '#contracts/validateRenderPolicyContribution';
+export {
+  validateCodegenPolicyContribution,
+  type ValidateCodegenPolicyContributionOptions,
+  type ValidateCodegenPolicyContributionResult,
+} from '#contracts/validateCodegenPolicyContribution';
+export {
+  validateIconProviderContribution,
+  type ValidateIconProviderContributionOptions,
+  type ValidateIconProviderContributionResult,
+} from '#contracts/validateIconProviderContribution';

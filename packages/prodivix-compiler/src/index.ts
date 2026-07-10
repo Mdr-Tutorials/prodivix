@@ -132,5 +132,18 @@ export type {
 } from '#src/export';
 export type { StaticDeploymentPresetOptions } from '#src/export';
 export type { TargetAdapter } from '#src/core/adapter';
+export {
+  createCodegenPolicyTargetAdapter,
+  getCodegenPolicyPackageMetadata,
+  getCodegenPolicyPackageVersions,
+  type CodegenLibraryPolicy,
+  type CodegenPolicyChildren,
+  type CodegenPolicyDependency,
+  type CodegenPolicyPropsTransform,
+  type CodegenPolicyRule,
+  type CodegenPolicySnapshot,
+  type CodegenPolicySource,
+  type IconCodegenPolicy,
+} from '#src/core/codegenPolicy';
 export type { CompileDiagnostic } from '#src/core/diagnostics';
 export type { PIRDocument } from '@prodivix/shared/types/pir';

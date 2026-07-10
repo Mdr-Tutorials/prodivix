@@ -1,0 +1,187 @@
+/**
+ * Generated from specs/plugins/external-library-contribution-v1.schema.json.
+ * DO NOT EDIT. Run `pnpm --filter @prodivix/plugin-contracts generate`.
+ */
+
+export const EXTERNAL_LIBRARY_CONTRIBUTION_V1_SCHEMA_ID =
+  'https://prodivix.dev/schemas/external-library-contribution-v1.schema.json';
+export const EXTERNAL_LIBRARY_CONTRIBUTION_V1_SCHEMA_VERSION = '1.0';
+export const EXTERNAL_LIBRARY_CONTRIBUTION_V1_SCHEMA: object = {
+  $schema: 'https://json-schema.org/draft/2020-12/schema',
+  $id: 'https://prodivix.dev/schemas/external-library-contribution-v1.schema.json',
+  title: 'ExternalLibraryContributionV1',
+  description:
+    'Serializable external component library identity and Canonical External IR enhancement contract.',
+  $comment:
+    'Executable URLs, module objects, callbacks, and React values are forbidden. The host resolves the exact package coordinate through its build-attested implementation catalog.',
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'schemaVersion',
+    'libraryId',
+    'displayName',
+    'package',
+    'hostImplementationId',
+    'exportDiscovery',
+    'components',
+    'dependencies',
+  ],
+  properties: {
+    $schema: {
+      const:
+        'https://prodivix.dev/schemas/external-library-contribution-v1.schema.json',
+    },
+    schemaVersion: { const: '1.0' },
+    libraryId: { $ref: '#/$defs/localId' },
+    displayName: { $ref: '#/$defs/label' },
+    package: { $ref: '#/$defs/packageCoordinate' },
+    hostImplementationId: { $ref: '#/$defs/localId' },
+    exportDiscovery: { $ref: '#/$defs/exportDiscovery' },
+    components: {
+      type: 'array',
+      minItems: 1,
+      maxItems: 1024,
+      items: { $ref: '#/$defs/component' },
+    },
+    dependencies: {
+      type: 'array',
+      maxItems: 128,
+      items: { $ref: '#/$defs/dependency' },
+    },
+  },
+  $defs: {
+    localId: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 160,
+      pattern: '^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$',
+    },
+    label: { type: 'string', minLength: 1, maxLength: 120, pattern: '\\S' },
+    packageName: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 214,
+      pattern: '^(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$',
+    },
+    semver: {
+      type: 'string',
+      maxLength: 120,
+      pattern:
+        '^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$',
+    },
+    license: { type: 'string', minLength: 1, maxLength: 120, pattern: '\\S' },
+    packageCoordinate: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['name', 'version', 'license'],
+      properties: {
+        name: { $ref: '#/$defs/packageName' },
+        version: { $ref: '#/$defs/semver' },
+        license: { $ref: '#/$defs/license' },
+      },
+    },
+    exportName: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 200,
+      pattern: '^[A-Za-z_$][A-Za-z0-9_$]*$',
+    },
+    runtimeType: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 200,
+      pattern: '^[A-Za-z][A-Za-z0-9._:-]*$',
+    },
+    propertyName: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 120,
+      pattern: '^[A-Za-z_$][A-Za-z0-9_$-]*$',
+    },
+    exportDiscovery: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['strategy'],
+      properties: {
+        strategy: { enum: ['declared', 'named-react-components'] },
+        include: {
+          type: 'array',
+          maxItems: 1024,
+          items: { $ref: '#/$defs/exportName' },
+        },
+        exclude: {
+          type: 'array',
+          maxItems: 1024,
+          items: { $ref: '#/$defs/exportName' },
+        },
+      },
+    },
+    prop: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['name', 'valueType'],
+      properties: {
+        name: { $ref: '#/$defs/propertyName' },
+        valueType: {
+          enum: [
+            'string',
+            'number',
+            'boolean',
+            'object',
+            'array',
+            'event',
+            'unknown',
+          ],
+        },
+        required: { type: 'boolean' },
+        description: {
+          type: 'string',
+          minLength: 1,
+          maxLength: 500,
+          pattern: '\\S',
+        },
+      },
+    },
+    slot: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['name', 'cardinality'],
+      properties: {
+        name: { $ref: '#/$defs/propertyName' },
+        cardinality: { enum: ['zero-or-one', 'exactly-one', 'many'] },
+      },
+    },
+    component: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['exportName', 'componentName', 'runtimeType'],
+      properties: {
+        exportName: { $ref: '#/$defs/exportName' },
+        componentName: { $ref: '#/$defs/label' },
+        runtimeType: { $ref: '#/$defs/runtimeType' },
+        props: {
+          type: 'array',
+          maxItems: 256,
+          items: { $ref: '#/$defs/prop' },
+        },
+        slots: { type: 'array', maxItems: 64, items: { $ref: '#/$defs/slot' } },
+        behaviorTags: {
+          type: 'array',
+          maxItems: 64,
+          items: { $ref: '#/$defs/localId' },
+        },
+      },
+    },
+    dependency: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['name', 'version', 'kind', 'license'],
+      properties: {
+        name: { $ref: '#/$defs/packageName' },
+        version: { $ref: '#/$defs/semver' },
+        kind: { enum: ['dependency', 'peerDependency'] },
+        license: { $ref: '#/$defs/license' },
+      },
+    },
+  },
+};

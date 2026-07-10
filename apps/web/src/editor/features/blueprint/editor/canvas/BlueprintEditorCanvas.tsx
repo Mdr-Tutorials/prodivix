@@ -21,6 +21,10 @@ import {
   parseResolverOrder,
   runtimeRegistryUpdatedEvent,
 } from '@/pir/renderer/registry';
+import {
+  createRendererProjectionRegistry,
+  useWebExtensionRegistrySnapshot,
+} from '@/plugins/platform';
 import { normalizeAnimationDefinition } from '@/editor/features/animation/animationEditorModel';
 import { buildAnimationPreviewSnapshotFromTimelines } from '@/editor/features/animation/preview/animationPreview';
 import { VIEWPORT_ZOOM_RANGE } from '@/editor/features/blueprint/editor/model/viewport';
@@ -90,6 +94,7 @@ export function BlueprintEditorCanvas({
   const [runtimeRegistryRevision, setRuntimeRegistryRevision] = useState(() =>
     getRuntimeRegistryRevision()
   );
+  const extensionRegistry = useWebExtensionRegistrySnapshot();
   const pirDoc = useEditorStore((state) => state.pirDoc);
   const workspaceDocumentsById = useEditorStore(
     (state) => state.workspaceDocumentsById
@@ -172,8 +177,12 @@ export function BlueprintEditorCanvas({
   );
   const [animationElapsedMs, setAnimationElapsedMs] = useState(0);
   const registry = useMemo(
-    () => createOrderedComponentRegistry(parseResolverOrder(resolverOrder)),
-    [resolverOrder, runtimeRegistryRevision]
+    () =>
+      createOrderedComponentRegistry(
+        parseResolverOrder(resolverOrder),
+        createRendererProjectionRegistry(extensionRegistry)
+      ),
+    [extensionRegistry, resolverOrder, runtimeRegistryRevision]
   );
   const animationPreview = useMemo(
     () =>

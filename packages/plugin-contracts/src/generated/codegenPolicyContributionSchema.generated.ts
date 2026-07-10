@@ -1,0 +1,212 @@
+/**
+ * Generated from specs/plugins/codegen-policy-contribution-v1.schema.json.
+ * DO NOT EDIT. Run `pnpm --filter @prodivix/plugin-contracts generate`.
+ */
+
+export const CODEGEN_POLICY_CONTRIBUTION_V1_SCHEMA_ID =
+  'https://prodivix.dev/schemas/codegen-policy-contribution-v1.schema.json';
+export const CODEGEN_POLICY_CONTRIBUTION_V1_SCHEMA_VERSION = '1.0';
+export const CODEGEN_POLICY_CONTRIBUTION_V1_SCHEMA: object = {
+  $schema: 'https://json-schema.org/draft/2020-12/schema',
+  $id: 'https://prodivix.dev/schemas/codegen-policy-contribution-v1.schema.json',
+  title: 'CodegenPolicyContributionV1',
+  description:
+    'Serializable React Vite code generation policy for a contributed external library.',
+  $comment:
+    'The compiler consumes an immutable host snapshot derived from this descriptor. It never imports the Plugin Host or reads browser state.',
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'schemaVersion',
+    'targetPreset',
+    'libraryId',
+    'dependencies',
+    'rules',
+    'unsupported',
+  ],
+  properties: {
+    $schema: {
+      const:
+        'https://prodivix.dev/schemas/codegen-policy-contribution-v1.schema.json',
+    },
+    schemaVersion: { const: '1.0' },
+    targetPreset: { const: 'react-vite' },
+    libraryId: { $ref: '#/$defs/localId' },
+    dependencies: {
+      type: 'array',
+      minItems: 1,
+      maxItems: 128,
+      items: { $ref: '#/$defs/dependency' },
+    },
+    rules: {
+      type: 'array',
+      minItems: 1,
+      maxItems: 1024,
+      items: { $ref: '#/$defs/rule' },
+    },
+    unsupported: { $ref: '#/$defs/unsupported' },
+  },
+  $defs: {
+    localId: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 160,
+      pattern: '^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$',
+    },
+    runtimeType: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 200,
+      pattern: '^[A-Za-z][A-Za-z0-9._:-]*$',
+    },
+    identifier: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 120,
+      pattern: '^[A-Za-z_$][A-Za-z0-9_$]*$',
+    },
+    propertyName: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 120,
+      pattern: '^[A-Za-z_$][A-Za-z0-9_$-]*$',
+    },
+    packageName: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 214,
+      pattern: '^(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$',
+    },
+    packageSubpath: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 240,
+      pattern: '^[A-Za-z0-9_][A-Za-z0-9._-]*(?:/[A-Za-z0-9_][A-Za-z0-9._-]*)*$',
+    },
+    semver: {
+      type: 'string',
+      maxLength: 120,
+      pattern:
+        '^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$',
+    },
+    license: { type: 'string', minLength: 1, maxLength: 120, pattern: '\\S' },
+    label: { type: 'string', minLength: 1, maxLength: 500, pattern: '\\S' },
+    jsonValue: {
+      oneOf: [
+        { type: 'null' },
+        { type: 'boolean' },
+        { type: 'number' },
+        { type: 'string', maxLength: 2000 },
+        { type: 'array', maxItems: 256, items: { $ref: '#/$defs/jsonValue' } },
+        {
+          type: 'object',
+          maxProperties: 256,
+          additionalProperties: { $ref: '#/$defs/jsonValue' },
+        },
+      ],
+    },
+    jsonObject: {
+      type: 'object',
+      maxProperties: 256,
+      propertyNames: { $ref: '#/$defs/propertyName' },
+      additionalProperties: { $ref: '#/$defs/jsonValue' },
+    },
+    dependency: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['name', 'version', 'kind', 'license'],
+      properties: {
+        name: { $ref: '#/$defs/packageName' },
+        version: { $ref: '#/$defs/semver' },
+        kind: { enum: ['dependency', 'peerDependency'] },
+        license: { $ref: '#/$defs/license' },
+      },
+    },
+    import: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['packageName', 'kind', 'imported'],
+      properties: {
+        packageName: { $ref: '#/$defs/packageName' },
+        subpath: { $ref: '#/$defs/packageSubpath' },
+        kind: { enum: ['default', 'named', 'namespace'] },
+        imported: { $ref: '#/$defs/identifier' },
+        local: { $ref: '#/$defs/identifier' },
+      },
+    },
+    rename: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['from', 'to'],
+      properties: {
+        from: { $ref: '#/$defs/propertyName' },
+        to: { $ref: '#/$defs/propertyName' },
+      },
+    },
+    propsTransform: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        defaults: { $ref: '#/$defs/jsonObject' },
+        rename: {
+          type: 'array',
+          maxItems: 128,
+          items: { $ref: '#/$defs/rename' },
+        },
+        omit: {
+          type: 'array',
+          maxItems: 128,
+          items: { $ref: '#/$defs/propertyName' },
+        },
+      },
+    },
+    children: {
+      oneOf: [
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['mode'],
+          properties: {
+            mode: { enum: ['preserve', 'text-only', 'children-only', 'none'] },
+          },
+        },
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['mode', 'prop'],
+          properties: {
+            mode: { const: 'text-prop' },
+            prop: { $ref: '#/$defs/propertyName' },
+          },
+        },
+      ],
+    },
+    rule: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['id', 'runtimeType', 'elementPath', 'import', 'children'],
+      properties: {
+        id: { $ref: '#/$defs/localId' },
+        runtimeType: { $ref: '#/$defs/runtimeType' },
+        elementPath: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 8,
+          items: { $ref: '#/$defs/identifier' },
+        },
+        import: { $ref: '#/$defs/import' },
+        props: { $ref: '#/$defs/propsTransform' },
+        children: { $ref: '#/$defs/children' },
+      },
+    },
+    unsupported: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['behavior'],
+      properties: {
+        behavior: { enum: ['passthrough', 'warning', 'error'] },
+        message: { $ref: '#/$defs/label' },
+      },
+    },
+  },
+};

@@ -24,8 +24,21 @@ import {
 } from '@prodivix/plugin-host';
 import { createPaletteProjectionResolver } from '@/editor/features/blueprint/palette/projectionResolver';
 import { createPaletteQueryService } from '@/plugins/platform/paletteQueryService';
+import { createWebExtensionQueryService } from '@/plugins/platform/extensionQueryService';
+import { createIconProviderRegistryBridge } from '@/plugins/platform/iconProviderBridge';
 import { createPluginAuditJournal } from '@/plugins/platform/pluginAuditJournal';
 import { createTrustedPackageSource } from '@/plugins/platform/trustedPackageSource';
+import {
+  BUILT_IN_OFFICIAL_HOST_MODULE_CATALOG,
+  createLibraryArtifactResolver,
+  createOfficialHostImplementationRegistry,
+  type OfficialHostModuleCatalogEntry,
+} from '@/plugins/platform/officialHostImplementations';
+import { validateWebContributionBatch } from '@/plugins/platform/contributions/contributionBatchValidator';
+import { createExternalLibraryContributionResolver } from '@/plugins/platform/contributions/externalLibraryResolver';
+import { createRenderPolicyContributionResolver } from '@/plugins/platform/contributions/renderPolicyResolver';
+import { createCodegenPolicyContributionResolver } from '@/plugins/platform/contributions/codegenPolicyResolver';
+import { createIconProviderContributionResolver } from '@/plugins/platform/contributions/iconProviderResolver';
 import type {
   TrustedPaletteContributionInput,
   WebContributionPointMap,
@@ -83,6 +96,8 @@ export type CreateWebPluginPlatformOptions = Readonly<{
   integrityService?: PluginResourceIntegrityService;
   clock?: PluginClock;
   idFactory?: PluginIdFactory;
+  officialHostModules?: readonly OfficialHostModuleCatalogEntry[];
+  allowDevelopmentHostImplementations?: boolean;
   onShutdown?: () => void | Promise<void>;
 }>;
 
@@ -113,9 +128,30 @@ export const createWebPluginPlatform = (
     options.integrityService ?? createSha256ResourceIntegrityService();
   const auditJournal = createPluginAuditJournal();
   const paletteResolver = createPaletteProjectionResolver();
+  const implementationRegistryResult = createOfficialHostImplementationRegistry(
+    options.officialHostModules ?? BUILT_IN_OFFICIAL_HOST_MODULE_CATALOG,
+    {
+      allowDevelopment: options.allowDevelopmentHostImplementations,
+    }
+  );
+  if (implementationRegistryResult.ok === false) {
+    return pluginHostFailure(implementationRegistryResult.diagnostics);
+  }
+  const implementationRegistry = implementationRegistryResult.value;
+  const libraryArtifacts = createLibraryArtifactResolver(
+    implementationRegistry
+  );
   const hostResult = createPluginHost<WebContributionPointMap>({
     hostVersion: WEB_PLUGIN_HOST_VERSION,
-    contracts: [paletteResolver.contract, ...(options.contracts ?? [])],
+    contracts: [
+      paletteResolver.contract,
+      createExternalLibraryContributionResolver(libraryArtifacts),
+      createRenderPolicyContributionResolver(implementationRegistry),
+      createCodegenPolicyContributionResolver(),
+      createIconProviderContributionResolver(libraryArtifacts),
+      ...(options.contracts ?? []),
+    ],
+    validateContributionBatch: validateWebContributionBatch,
     capabilityPolicy:
       options.capabilityPolicy ?? createDefaultCapabilityPolicy(),
     runtimeAdapter: options.runtimeAdapter ?? createUnavailableRuntimeAdapter(),
@@ -129,6 +165,7 @@ export const createWebPluginPlatform = (
   }
   const host = hostResult.value;
   const paletteQuery = createPaletteQueryService(host.contributions);
+  const extensionQuery = createWebExtensionQueryService(host.contributions);
 
   const install = async (
     input: Parameters<WebPluginPlatform['runtime']['packages']['install']>[0],
@@ -273,6 +310,8 @@ export const createWebPluginPlatform = (
       },
     });
   };
+  const iconProviderBridge = createIconProviderRegistryBridge(extensionQuery);
+  registerCleanup(() => iconProviderBridge.dispose());
 
   let shutdownPromise: Promise<PluginHostResult<void>> | undefined;
   const shutdown = () => {
@@ -335,7 +374,11 @@ export const createWebPluginPlatform = (
   return pluginHostSuccess(
     Object.freeze({
       workspaceId,
-      queries: Object.freeze({ workspaceId, palette: paletteQuery }),
+      queries: Object.freeze({
+        workspaceId,
+        palette: paletteQuery,
+        extensions: extensionQuery,
+      }),
       runtime: Object.freeze({
         workspaceId,
         packages,
@@ -343,6 +386,7 @@ export const createWebPluginPlatform = (
         registerCleanup,
       }),
       getAuditEvents: auditJournal.list,
+      listOfficialImplementationBindings: implementationRegistry.listBindings,
       shutdown,
     })
   );

@@ -20,6 +20,26 @@
       "import": "./dist/generated/paletteContributionSchema.generated.js"
     },
     "./schema/palette-contribution-v1.json": "./dist/schema/palette-contribution-v1.schema.json",
+    "./schema/external-library-contribution-v1": {
+      "types": "./dist/generated/externalLibraryContributionSchema.generated.d.ts",
+      "import": "./dist/generated/externalLibraryContributionSchema.generated.js"
+    },
+    "./schema/external-library-contribution-v1.json": "./dist/schema/external-library-contribution-v1.schema.json",
+    "./schema/render-policy-contribution-v1": {
+      "types": "./dist/generated/renderPolicyContributionSchema.generated.d.ts",
+      "import": "./dist/generated/renderPolicyContributionSchema.generated.js"
+    },
+    "./schema/render-policy-contribution-v1.json": "./dist/schema/render-policy-contribution-v1.schema.json",
+    "./schema/codegen-policy-contribution-v1": {
+      "types": "./dist/generated/codegenPolicyContributionSchema.generated.d.ts",
+      "import": "./dist/generated/codegenPolicyContributionSchema.generated.js"
+    },
+    "./schema/codegen-policy-contribution-v1.json": "./dist/schema/codegen-policy-contribution-v1.schema.json",
+    "./schema/icon-provider-contribution-v1": {
+      "types": "./dist/generated/iconProviderContributionSchema.generated.d.ts",
+      "import": "./dist/generated/iconProviderContributionSchema.generated.js"
+    },
+    "./schema/icon-provider-contribution-v1.json": "./dist/schema/icon-provider-contribution-v1.schema.json",
     "./package.json": "./package.json"
   },
   "imports": {

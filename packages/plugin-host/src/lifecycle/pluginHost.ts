@@ -4,7 +4,10 @@ import type { CapabilityPolicy } from '#host/capability/capabilityPolicy';
 import type { RegisteredContributionContract } from '#host/contribution/contributionContract';
 import type { ContributionRegistryReader } from '#host/contribution/contributionRegistry';
 import type { HostContributionPointMap } from '#host/contribution/contribution.types';
-import type { PluginContributionResourceLimits } from '#host/contribution/contributionPreparation';
+import type {
+  ContributionBatchValidator,
+  PluginContributionResourceLimits,
+} from '#host/contribution/contributionPreparation';
 import type { PluginResourceIntegrityService } from '#host/contribution/resourceIntegrity';
 import type {
   Disposable,
@@ -60,4 +63,5 @@ export type CreatePluginHostOptions<TMap extends HostContributionPointMap> =
     contributionResourceLimits?: Partial<PluginContributionResourceLimits>;
     runtimeArtifactLimits?: Partial<PluginRuntimeArtifactLimits>;
     runtimeTimeoutMs?: number;
+    validateContributionBatch?: ContributionBatchValidator<TMap>;
   }>;

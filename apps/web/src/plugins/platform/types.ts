@@ -1,8 +1,14 @@
 import type {
+  CodegenPolicyContributionV1,
+  ExternalLibraryContributionV1,
+  IconProviderContributionV1,
   JsonValue,
   PaletteContributionV1,
   PluginManifestV1,
+  RenderPolicyContributionV1,
 } from '@prodivix/plugin-contracts';
+import type { CodegenPolicySnapshot } from '@prodivix/prodivix-compiler';
+import type { ElementType } from 'react';
 import type {
   ContributionRegistryReader,
   Disposable,
@@ -20,26 +26,49 @@ import type {
   PaletteRuntimeProjection,
   ResolvedPaletteContribution,
 } from '@/editor/features/blueprint/palette/types';
-
-declare const externalLibraryContributionBrand: unique symbol;
-declare const renderPolicyContributionBrand: unique symbol;
-declare const codegenPolicyContributionBrand: unique symbol;
-declare const iconProviderContributionBrand: unique symbol;
+import type { ComponentAdapter } from '@/pir/renderer/registry';
+import type { IconProviderRegistration } from '@/pir/renderer/iconRegistry';
+import type { OfficialHostImplementationBindingSnapshot } from '@/plugins/platform/officialHostImplementations';
 
 export type ResolvedExternalLibraryContribution = Readonly<{
-  [externalLibraryContributionBrand]: true;
+  descriptor: ExternalLibraryContributionV1;
+  libraryId: string;
+  package: Readonly<{ name: string; version: string; license: string }>;
+  components: readonly Readonly<{
+    exportName: string;
+    componentName: string;
+    runtimeType: string;
+    component: ElementType;
+  }>[];
 }>;
 
 export type ResolvedRenderPolicyContribution = Readonly<{
-  [renderPolicyContributionBrand]: true;
+  descriptor: RenderPolicyContributionV1;
+  libraryId: string;
+  rules: readonly Readonly<{
+    id: string;
+    runtimeType: string;
+    componentExport: string;
+    portalMode: 'inline' | 'host-overlay' | 'disabled';
+    adapter: ComponentAdapter;
+    wrapComponent?: (component: ElementType) => ElementType;
+    fallback: Readonly<{
+      behavior: 'placeholder' | 'omit' | 'error';
+      message?: string;
+    }>;
+  }>[];
 }>;
 
 export type ResolvedCodegenPolicyContribution = Readonly<{
-  [codegenPolicyContributionBrand]: true;
+  descriptor: CodegenPolicyContributionV1;
+  libraryId: string;
 }>;
 
 export type ResolvedIconProviderContribution = Readonly<{
-  [iconProviderContributionBrand]: true;
+  descriptor: IconProviderContributionV1;
+  libraryId: string;
+  providerId: string;
+  runtime: IconProviderRegistration;
 }>;
 
 export type WebContributionPointMap = {
@@ -64,9 +93,30 @@ export type PaletteQueryService = Readonly<{
   subscribe(listener: () => void): () => void;
 }>;
 
+export type RendererComponentProjection = Readonly<{
+  libraryId: string;
+  runtimeType: string;
+  component: ElementType;
+  adapter: ComponentAdapter;
+}>;
+
+export type WebExtensionRegistrySnapshot = Readonly<{
+  revision: number;
+  externalLibraries: readonly ResolvedExternalLibraryContribution[];
+  rendererComponents: readonly RendererComponentProjection[];
+  iconProviders: readonly ResolvedIconProviderContribution[];
+  codegenPolicy: CodegenPolicySnapshot;
+}>;
+
+export type WebExtensionQueryService = Readonly<{
+  getSnapshot(): WebExtensionRegistrySnapshot;
+  subscribe(listener: () => void): () => void;
+}>;
+
 export type WebPluginQueryServices = Readonly<{
   workspaceId: string;
   palette: PaletteQueryService;
+  extensions: WebExtensionQueryService;
 }>;
 
 export type TrustedWebContributionInput = Readonly<{
@@ -141,6 +191,7 @@ export type WebPluginPlatform = Readonly<{
   queries: WebPluginQueryServices;
   runtime: WebPluginRuntimeServices;
   getAuditEvents(): readonly PluginAuditEvent[];
+  listOfficialImplementationBindings(): readonly OfficialHostImplementationBindingSnapshot[];
   shutdown(): Promise<PluginHostResult<void>>;
 }>;
 

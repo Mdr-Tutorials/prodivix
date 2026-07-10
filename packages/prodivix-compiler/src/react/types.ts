@@ -3,6 +3,7 @@ import type { TargetAdapter } from '#src/core/adapter';
 import type { CompileDiagnostic } from '#src/core/diagnostics';
 import type { CanonicalIRDocument } from '#src/core/canonicalIR';
 import type { PackageResolverOptions } from '#src/core/packageResolver';
+import type { CodegenPolicySnapshot } from '#src/core/codegenPolicy';
 import type {
   ExportBundle,
   ExportArtifactContribution,
@@ -43,6 +44,7 @@ export type ReactGeneratorOptions = {
   resourceType?: ExportResourceType;
   componentName?: string;
   adapter?: TargetAdapter;
+  codegenPolicySnapshot?: CodegenPolicySnapshot;
   packageResolver?: PackageResolverOptions;
   codeArtifacts?: ReactGeneratorCodeArtifact[];
   includeWorkspaceCodeArtifacts?: boolean;
@@ -53,6 +55,7 @@ export type ReactCompileOptions = Pick<
   ReactGeneratorOptions,
   | 'componentName'
   | 'adapter'
+  | 'codegenPolicySnapshot'
   | 'packageResolver'
   | 'codeArtifacts'
   | 'includeWorkspaceCodeArtifacts'

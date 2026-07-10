@@ -5,7 +5,10 @@ import {
 } from '@prodivix/plugin-contracts';
 import { createPluginAuditDispatcher } from '#host/audit/auditSink';
 import type { PluginAuditOutcome } from '#host/audit/audit.types';
-import type { PermissionSnapshot } from '#host/capability/permissionSnapshot';
+import {
+  createPermissionSnapshotReader,
+  type PermissionSnapshot,
+} from '#host/capability/permissionSnapshot';
 import {
   createContributionContractRegistry,
   type ContributionContractRegistry,
@@ -581,6 +584,36 @@ export const createPluginHostContext = <TMap extends HostContributionPointMap>(
         signal: operation.controller.signal,
       });
       if (!loaded.ok) return loaded;
+      let batchValidation: PluginHostResult<void> =
+        pluginHostSuccess(undefined);
+      if (options.validateContributionBatch) {
+        try {
+          batchValidation = await options.validateContributionBatch({
+            owner: record.owner,
+            attestation: record.source.attestation,
+            manifest: record.manifest,
+            permission: createPermissionSnapshotReader(record.permission),
+            descriptors: loaded.value,
+            operationId: operation.operationId,
+            signal: operation.controller.signal,
+          });
+        } catch {
+          batchValidation = pluginHostFailure([
+            createPluginDiagnostic(
+              PLUGIN_DIAGNOSTIC_CODES.CONTRIBUTION_SCHEMA_VIOLATION,
+              'Contribution batch semantic validation failed unexpectedly.',
+              {
+                pluginId: record.owner.pluginId,
+                pluginVersion: record.manifest.version,
+                installationId: record.owner.installationId,
+                generation: record.owner.generation,
+                operationId: operation.operationId,
+              }
+            ),
+          ]);
+        }
+        if (!batchValidation.ok) return batchValidation;
+      }
       const prepared = await prepareValidatedContributions({
         owner: record.owner,
         attestation: record.source.attestation,
@@ -598,7 +631,11 @@ export const createPluginHostContext = <TMap extends HostContributionPointMap>(
           installation: split.installation,
           activation: split.activation,
         }),
-        [...loaded.diagnostics, ...prepared.diagnostics]
+        [
+          ...loaded.diagnostics,
+          ...batchValidation.diagnostics,
+          ...prepared.diagnostics,
+        ]
       );
     };
 

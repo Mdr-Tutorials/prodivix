@@ -42,6 +42,8 @@ export type {
 export type { ContributionRegistryReader } from '#host/contribution/contributionRegistry';
 export {
   DEFAULT_PLUGIN_CONTRIBUTION_RESOURCE_LIMITS,
+  type ContributionBatchValidationContext,
+  type ContributionBatchValidator,
   type PluginContributionResourceLimits,
   type ValidatedContributionDescriptor,
 } from '#host/contribution/contributionPreparation';

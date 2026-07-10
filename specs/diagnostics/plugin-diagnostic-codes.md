@@ -223,6 +223,24 @@
 - User action: 为每个隔离 UI surface 分配唯一 id
 - Developer notes: UI entrypoint id 在单个插件内唯一，不依赖路径是否不同
 
+### `PLG-2020` Contribution 跨点引用无效
+
+- Severity: `error`
+- Stage: `semantic`
+- Retryable: false
+- Trigger: External Library、Palette、Render Policy、Codegen Policy 或 Icon Provider 引用了未声明的 library、runtime type、package、export 或不兼容的 host implementation identity
+- User action: 让同一插件批次中的扩展点引用精确匹配的 library、runtime type、package coordinate、export 和 implementation id
+- Developer notes: 批次语义校验必须在所有 point-specific Schema 通过后、任何 resolver prepare 或 implementation bind 前执行
+
+### `PLG-2021` Contribution library owner 不一致
+
+- Severity: `error`
+- Stage: `semantic`
+- Retryable: false
+- Trigger: Render Policy、Codegen Policy、Icon Provider 或外部 Palette group 引用了不属于当前插件 owner 的 External Library
+- User action: 在同一插件 package 中声明被引用的 External Library，或移除跨 owner 引用
+- Developer notes: official 与 community package 都不能借用另一 owner 的 library identity 绕过生命周期和 cleanup
+
 ### `PLG-3001` Required capability 被拒绝
 
 - Severity: `error`
@@ -600,6 +618,42 @@
 - Trigger: 单 session 或 method 的 request rate/concurrency 超出 Host policy
 - User action: 降低 Gateway 调用频率或等待当前请求结束
 - Developer notes: quota 状态按 session/method 隔离，不跨 plugin generation 复用
+
+### `PLG-4050` Official host implementation 未通过构建证明
+
+- Severity: `error`
+- Stage: `registry`
+- Retryable: false
+- Trigger: package trust、publisher verification、plugin id、package digest 或 package coordinate 与 Web build 中的 official catalog 不一致
+- User action: 安装与当前 Prodivix build 匹配的官方插件 package，或移除 privileged host implementation 引用
+- Developer notes: community/verified package 默认 denied；development 仅允许显式本地 build mode，不能进入 production policy
+
+### `PLG-4051` Official host implementation 不存在
+
+- Severity: `error`
+- Stage: `registry`
+- Retryable: false
+- Trigger: build-attested Official Host Module 无法加载，或未导出 descriptor 引用的 exact implementation id
+- User action: 使用当前 Host catalog 中存在的 implementation id，并确认官方 build chunk 完整
+- Developer notes: 不从 plugin bytes、URL、Gateway 或 browser singleton 回退加载实现
+
+### `PLG-4052` Official host implementation 类型不匹配
+
+- Severity: `error`
+- Stage: `registry`
+- Retryable: false
+- Trigger: descriptor 需要 component-library、render-policy 或 icon-provider，但 implementation id 指向另一 kind
+- User action: 引用 contract 所需类型的 host implementation
+- Developer notes: kind exact match 在 callback/component 暴露给 resolved registry 前完成
+
+### `PLG-4053` Official host implementation 绑定冲突
+
+- Severity: `error`
+- Stage: `registry`
+- Retryable: false
+- Trigger: official catalog 重复声明相同 plugin/digest，或同一 owner/generation/implementation id 尝试绑定不同实现
+- User action: 修复 build catalog 或 contribution identity，确保单一确定的实现绑定
+- Developer notes: lease 按 owner/generation 计数并 exactly-once release；generation replacement 不复用旧 owner binding
 
 ### `PLG-4060` Required Gateway audit 不可用
 

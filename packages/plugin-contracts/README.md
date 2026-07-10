@@ -4,7 +4,9 @@ JSON-only contracts and validation for Prodivix plugins. This package has no Rea
 
 ## Source Of Truth
 
-`specs/plugins/plugin-manifest-v1.schema.json` and `specs/plugins/palette-contribution-v1.schema.json` are the manually maintained contract schemas. Generated TypeScript types and runtime Schema modules are committed so consumers do not need a code generator at runtime.
+The manually maintained contract schemas live in `specs/plugins/`: Plugin Manifest, Palette, External Library, Render Policy, Codegen Policy, and Icon Provider v1. Generated TypeScript types and runtime Schema modules are committed so consumers do not need a code generator at runtime.
+
+`scripts/contractCatalog.mjs` is the single catalog used by type/runtime-Schema generation and build-time JSON Schema copying. Add each new versioned contract there once instead of maintaining divergent script lists.
 
 ```bash
 pnpm --filter @prodivix/plugin-contracts generate
@@ -20,7 +22,9 @@ pnpm --filter @prodivix/plugin-contracts check:generated
 - `PLUGIN_MANIFEST_V1_SCHEMA` exposes the runtime Schema object.
 - `BUILT_IN_CONTRIBUTION_POINTS` exposes the current authoring catalog; well-formed future point ids remain parseable and are accepted only when the Host registers an exact point/version contract.
 - `validatePaletteContribution` validates the Blueprint component Palette v1 descriptor and its stable identity semantics.
+- `validateExternalLibraryContribution`, `validateRenderPolicyContribution`, `validateCodegenPolicyContribution`, and `validateIconProviderContribution` validate the four exact official component plugin contracts.
 - `PALETTE_CONTRIBUTION_V1_SCHEMA` exposes the Palette runtime Schema object.
+- Each Phase 4.5 contract exports its generated runtime Schema object and original `.json` package subpath.
 - `@prodivix/plugin-contracts/schema/plugin-manifest-v1.json` exports the original JSON Schema from the built package.
 - `@prodivix/plugin-contracts/schema/palette-contribution-v1.json` exports the original Palette JSON Schema.
 

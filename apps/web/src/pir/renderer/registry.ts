@@ -12,6 +12,7 @@ export type AdapterContext = {
   resolvedProps: Record<string, unknown>;
   resolvedStyle: Record<string, unknown>;
   resolvedText: React.ReactNode;
+  isSelected: boolean;
 };
 
 export type AdapterResult = {
@@ -19,6 +20,7 @@ export type AdapterResult = {
   children?: React.ReactNode;
   supportsChildren?: boolean;
   isVoid?: boolean;
+  renderNodeChildren?: boolean;
 };
 
 export type ComponentAdapter = {
@@ -511,6 +513,12 @@ const registerRuntimeEntries = (registry: ComponentRegistry) => {
   runtimeEntries.forEach((entry, type) => {
     registry.register(type, entry.component, entry.adapter);
   });
+};
+
+export const createRuntimeComponentRegistry = () => {
+  const registry = createComponentRegistry();
+  registerRuntimeEntries(registry);
+  return registry;
 };
 
 export const createNativeRegistry = () => {

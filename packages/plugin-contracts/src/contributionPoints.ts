@@ -5,6 +5,7 @@ export const BUILT_IN_CONTRIBUTION_POINTS = Object.freeze([
   'externalLibrary',
   'renderPolicy',
   'codegenPolicy',
+  'iconProvider',
   'inspectorContribution',
   'paletteContribution',
   'animationExtension',

@@ -10,7 +10,7 @@ import {
 export type IconRef = {
   provider: string;
   name: string;
-  variant?: 'outline' | 'solid';
+  variant?: string;
 };
 
 /**
@@ -22,12 +22,12 @@ export type IconRef = {
  * boundary.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- see comment above
-type IconComponent = React.ComponentType<any>;
+export type IconComponent = React.ComponentType<any>;
 
 type IconResolver = (name: string, iconRef?: IconRef) => IconComponent | null;
 type IconNameProvider = () => string[];
 
-type IconProviderRegistration = {
+export type IconProviderRegistration = {
   label?: string;
   resolve: IconResolver;
   listIcons?: IconNameProvider;
@@ -281,6 +281,17 @@ export const registerIconProvider = (
     status: normalizedRegistration.ensureReady ? 'idle' : 'ready',
     loadPromise: null,
     error: null,
+  });
+  notifyRegistryChanged();
+};
+
+export const unregisterIconProvider = (provider: string) => {
+  const normalizedId = normalizeProvider(provider);
+  if (!iconProviders.delete(normalizedId)) return;
+  iconFallbackComponentCache.forEach((_component, key) => {
+    if (key.startsWith(`${normalizedId}:`)) {
+      iconFallbackComponentCache.delete(key);
+    }
   });
   notifyRegistryChanged();
 };

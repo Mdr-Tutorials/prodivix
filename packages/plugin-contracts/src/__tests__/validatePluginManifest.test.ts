@@ -35,7 +35,7 @@ describe('validatePluginManifest structure', () => {
     });
   });
 
-  it('accepts a well-formed future contribution point without changing the Manifest Schema', () => {
+  it('accepts the built-in Icon Provider point without coupling it to the Manifest Schema', () => {
     const manifest = createValidManifest();
     manifest.capabilities[0] = {
       id: 'extension.register',
@@ -57,7 +57,8 @@ describe('validatePluginManifest structure', () => {
     const result = validatePluginManifest(manifest);
 
     expect(result.ok).toBe(true);
-    expect(isBuiltInContributionPoint('iconProvider')).toBe(false);
+    expect(isBuiltInContributionPoint('iconProvider')).toBe(true);
+    expect(BUILT_IN_CONTRIBUTION_POINTS).toContain('iconProvider');
     expect(BUILT_IN_CONTRIBUTION_POINTS).toContain('paletteContribution');
   });
 

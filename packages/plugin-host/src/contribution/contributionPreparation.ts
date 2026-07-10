@@ -17,6 +17,7 @@ import {
   isCapabilityGranted,
   requestedCapabilityKeys,
   type PermissionSnapshot,
+  type PermissionSnapshotReader,
 } from '#host/capability/permissionSnapshot';
 import type { ContributionContractRegistry } from '#host/contribution/contributionContractRegistry';
 import type { RegisteredContributionContract } from '#host/contribution/contributionContract';
@@ -60,6 +61,23 @@ export type ValidatedContributionDescriptor<
   descriptor: JsonValue;
   contract: RegisteredContributionContract<TMap>;
 }>;
+
+export type ContributionBatchValidationContext<
+  TMap extends HostContributionPointMap,
+> = Readonly<{
+  owner: PluginOwnerRef;
+  attestation: PluginPackageAttestation;
+  manifest: PluginManifestV1;
+  permission: PermissionSnapshotReader;
+  descriptors: readonly ValidatedContributionDescriptor<TMap>[];
+  operationId: string;
+  signal: AbortSignal;
+}>;
+
+export type ContributionBatchValidator<TMap extends HostContributionPointMap> =
+  (
+    context: ContributionBatchValidationContext<TMap>
+  ) => PluginHostResult<void> | Promise<PluginHostResult<void>>;
 
 type DescriptorLoadContext<TMap extends HostContributionPointMap> = Readonly<{
   owner: PluginOwnerRef;

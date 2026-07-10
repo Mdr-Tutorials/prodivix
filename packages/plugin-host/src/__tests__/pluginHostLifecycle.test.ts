@@ -10,6 +10,7 @@ import { resolvePermissionSnapshot } from '#host/capability/permissionResolution
 import type { PermissionSnapshot } from '#host/capability/permissionSnapshot';
 import { defineContributionContract } from '#host/contribution/contributionContract';
 import { createPluginHost } from '#host/lifecycle/createPluginHost';
+import type { CreatePluginHostOptions } from '#host/lifecycle/pluginHost';
 import type { PluginPackageSource } from '#host/host.types';
 import type {
   PluginRuntimeActivationInput,
@@ -206,6 +207,7 @@ const createHarness = (
     runtimeArtifactMaxBytes?: number;
     runtimeTimeoutMs?: number;
     deactivationFails?: boolean;
+    validateContributionBatch?: CreatePluginHostOptions<TestContributionMap>['validateContributionBatch'];
   } = {}
 ) => {
   const manifest = createManifest(options.runtime ?? true);
@@ -294,6 +296,7 @@ const createHarness = (
       },
     },
     runtimeTimeoutMs: options.runtimeTimeoutMs ?? 1_000,
+    validateContributionBatch: options.validateContributionBatch,
     runtimeArtifactLimits: options.runtimeArtifactMaxBytes
       ? { maxBytes: options.runtimeArtifactMaxBytes }
       : undefined,
@@ -312,6 +315,31 @@ const createHarness = (
 };
 
 describe('Plugin Host lifecycle', () => {
+  it('runs batch semantic validation after descriptor validation and before publication', async () => {
+    const observed: string[] = [];
+    const harness = createHarness({
+      runtime: false,
+      validateContributionBatch: (context) => {
+        observed.push(
+          `${context.owner.pluginId}/${context.descriptors[0]?.declaration.id}`
+        );
+        return pluginHostFailure([
+          createPluginDiagnostic(
+            PLUGIN_DIAGNOSTIC_CODES.INVALID_CONTRIBUTION_REFERENCE,
+            'Test batch reference is invalid.'
+          ),
+        ]);
+      },
+    });
+
+    const discovered = await harness.host.discover(harness.source);
+
+    expect(discovered.ok).toBe(false);
+    expect(discovered.diagnostics[0]?.code).toBe('PLG-2020');
+    expect(observed).toEqual(['@prodivix/plugin-host-test/static.palette']);
+    expect(harness.host.contributions.list('paletteContribution')).toEqual([]);
+  });
+
   it('discovers a declarative plugin and removes installation contributions on disable', async () => {
     const harness = createHarness({ runtime: false });
 
