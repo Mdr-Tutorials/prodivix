@@ -1,5 +1,6 @@
 ﻿import './PdxImageUpload.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { Image as ImageIcon, ImageUp, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import {
@@ -39,15 +40,14 @@ function PdxImageUpload({
   id,
   dataAttributes = {},
 }: PdxImageUploadProps) {
-  const [files, setFiles] = useState<File[]>(defaultValue || []);
+  const [internalFiles, setInternalFiles] = useState<File[]>(
+    defaultValue || []
+  );
   const [previews, setPreviews] = useState<string[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (value) {
-      setFiles(value);
-    }
-  }, [value]);
+  const files = value ?? internalFiles;
+  const inputId = id ? `${id}-input` : undefined;
 
   useEffect(() => {
     let isActive = true;
@@ -77,34 +77,41 @@ function PdxImageUpload({
   }, [files]);
 
   const updateFiles = (nextFiles: File[]) => {
-    if (!value) {
-      setFiles(nextFiles);
+    if (value === undefined) {
+      setInternalFiles(nextFiles);
     }
-    if (onChange) {
-      onChange(nextFiles);
-    }
+    onChange?.(nextFiles);
   };
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const nextFiles = Array.from(event.target.files || []);
+    const selectedFiles = Array.from(event.target.files || []);
+    const nextFiles = multiple ? selectedFiles : selectedFiles.slice(0, 1);
     updateFiles(nextFiles);
+    event.target.value = '';
   };
 
-  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = (event: React.DragEvent<HTMLButtonElement>) => {
     event.preventDefault();
+    setIsDragging(false);
     if (disabled) return;
-    const nextFiles = Array.from(event.dataTransfer.files || []);
+    const droppedFiles = Array.from(event.dataTransfer.files || []);
+    const nextFiles = multiple ? droppedFiles : droppedFiles.slice(0, 1);
     updateFiles(nextFiles);
   };
 
-  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (event: React.DragEvent<HTMLButtonElement>) => {
     event.preventDefault();
+    if (!disabled) setIsDragging(true);
   };
 
-  const handleSelectClick = () => {
-    if (!disabled) {
-      inputRef.current?.click();
+  const handleDragLeave = (event: React.DragEvent<HTMLButtonElement>) => {
+    if (
+      event.relatedTarget instanceof Node &&
+      event.currentTarget.contains(event.relatedTarget)
+    ) {
+      return;
     }
+    setIsDragging(false);
   };
 
   const fullClassName =
@@ -120,33 +127,69 @@ function PdxImageUpload({
     >
       {label && (
         <div className="PdxFieldHeader">
-          <label className="PdxFieldLabel">{label}</label>
+          <label className="PdxFieldLabel" htmlFor={inputId}>
+            {label}
+          </label>
           {required && <span className="PdxFieldRequired">*</span>}
         </div>
       )}
       {description && <div className="PdxFieldDescription">{description}</div>}
-      <div
-        className="PdxImageUploadDropzone"
-        onClick={handleSelectClick}
+      <button
+        className={`PdxImageUploadDropzone ${isDragging ? 'Dragging' : ''}`}
+        disabled={disabled}
+        onClick={() => inputRef.current?.click()}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        type="button"
       >
-        <div className="PdxImageUploadText">Click or drag images to upload</div>
-      </div>
+        <span className="PdxImageUploadIcon">
+          <ImageUp aria-hidden="true" size={18} strokeWidth={1.8} />
+        </span>
+        <span className="PdxImageUploadText">
+          Choose {multiple ? 'images' : 'an image'}
+          <span> or drag and drop</span>
+        </span>
+        <span className="PdxImageUploadHint">{accept}</span>
+      </button>
       <input
         ref={inputRef}
+        aria-label={label || 'Upload images'}
         className="PdxImageUploadInput"
-        type="file"
         accept={accept}
-        multiple={multiple}
         disabled={disabled}
+        id={inputId}
+        multiple={multiple}
         onChange={handleInputChange}
+        required={required}
+        type="file"
       />
       {previews.length > 0 && (
         <div className="PdxImageUploadGrid">
           {previews.map((src, index) => (
             <div key={`${src}-${index}`} className="PdxImageUploadItem">
-              <img src={src} alt={`Preview ${index + 1}`} />
+              <img
+                src={src}
+                alt={files[index]?.name || `Preview ${index + 1}`}
+              />
+              <span className="PdxImageUploadName">
+                <ImageIcon aria-hidden="true" size={14} />
+                <span>{files[index]?.name || `Image ${index + 1}`}</span>
+              </span>
+              <button
+                aria-label={`Remove ${files[index]?.name || `image ${index + 1}`}`}
+                className="PdxImageUploadRemove"
+                disabled={disabled}
+                onClick={() =>
+                  updateFiles(
+                    files.filter((_, fileIndex) => fileIndex !== index)
+                  )
+                }
+                title={`Remove ${files[index]?.name || `image ${index + 1}`}`}
+                type="button"
+              >
+                <X aria-hidden="true" size={15} />
+              </button>
             </div>
           ))}
         </div>

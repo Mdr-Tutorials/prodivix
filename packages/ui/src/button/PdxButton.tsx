@@ -1,100 +1,178 @@
 import './PdxButton.scss';
-import { type PdxComponent } from '@prodivix/shared';
-import type React from 'react';
+import {
+  getDataAttributes,
+  mergeClassNames,
+  type PdxControlSize,
+  type PdxNativeProps,
+} from '../foundation/component';
+import { forwardRef, type ReactNode } from 'react';
 
-interface PdxButtonSpecificProps {
+export type PdxButtonVariant = 'Primary' | 'Secondary' | 'Ghost';
+export type PdxButtonTone = 'Neutral' | 'Danger' | 'Warning';
+export type PdxButtonIconPosition = 'Left' | 'Right';
+
+export interface PdxButtonVisualProps {
+  icon?: ReactNode;
+  iconPosition?: PdxButtonIconPosition;
+  loading?: boolean;
+  loadingText?: string;
+  size?: PdxControlSize;
   text?: string;
-  size?: 'Big' | 'Medium' | 'Small' | 'Tiny';
-  category?:
-    | 'Primary'
-    | 'Secondary'
-    | 'Danger'
-    | 'SubtleDanger'
-    | 'Warning'
-    | 'SubtleWarning'
-    | 'Ghost';
-  disabled?: boolean;
-  icon?: React.ReactNode;
-  onlyIcon?: boolean;
-  iconPosition?: 'Left' | 'Right';
+  tone?: PdxButtonTone;
+  variant?: PdxButtonVariant;
 }
 
-export interface PdxButtonProps extends PdxComponent, PdxButtonSpecificProps {}
+interface RegularButtonContentProps {
+  children?: ReactNode;
+  iconOnly?: false;
+}
 
-function PdxButton({
-  text,
-  size = 'Medium',
-  category = 'Secondary',
-  disabled = false,
-  onlyIcon = false,
-  icon,
-  iconPosition = 'Right',
+interface IconOnlyButtonContentProps {
+  'aria-label': string;
+  children?: never;
+  icon: ReactNode;
+  iconOnly: true;
+  text?: never;
+}
+
+export type PdxButtonContentProps =
+  IconOnlyButtonContentProps | RegularButtonContentProps;
+
+export type PdxButtonProps = Omit<PdxNativeProps<'button'>, 'children'> &
+  PdxButtonVisualProps &
+  PdxButtonContentProps;
+
+interface ButtonClassNameOptions {
+  className?: string;
+  disabled?: boolean;
+  iconOnly?: boolean;
+  loading?: boolean;
+  size: PdxControlSize;
+  tone: PdxButtonTone;
+  variant: PdxButtonVariant;
+}
+
+export function getButtonClassName({
   className,
-  style,
-  id,
-  dataAttributes = {},
-  onClick,
-  as: Component = 'button',
-}: PdxButtonProps) {
-  const fullClassName =
-    `PdxButton ${size} ${category} ${onlyIcon ? 'OnlyIcon' : ''} ${disabled ? 'Disabled' : ''} ${className || ''}`.trim();
-
-  const dataProps = { ...dataAttributes };
-
-  const Element = Component as React.ElementType;
-
-  if (onlyIcon && icon) {
-    return (
-      <Element
-        className={fullClassName}
-        style={style}
-        id={id}
-        onClick={onClick}
-        {...dataProps}
-      >
-        {icon}
-      </Element>
-    );
-  }
-  if (icon && iconPosition === 'Left') {
-    return (
-      <Element
-        className={fullClassName}
-        style={style}
-        id={id}
-        onClick={onClick}
-        {...dataProps}
-      >
-        {icon}
-        <span>{text}</span>
-      </Element>
-    );
-  }
-  if (icon && iconPosition === 'Right') {
-    return (
-      <Element
-        className={fullClassName}
-        style={style}
-        id={id}
-        onClick={onClick}
-        {...dataProps}
-      >
-        <span>{text}</span>
-        {icon}
-      </Element>
-    );
-  }
-  return (
-    <Element
-      className={fullClassName}
-      style={style}
-      id={id}
-      onClick={onClick}
-      {...dataProps}
-    >
-      {text}
-    </Element>
+  disabled,
+  iconOnly,
+  loading,
+  size,
+  tone,
+  variant,
+}: ButtonClassNameOptions) {
+  return mergeClassNames(
+    'PdxButton',
+    size,
+    `Variant${variant}`,
+    `Tone${tone}`,
+    iconOnly && 'IconOnly',
+    loading && 'Loading',
+    disabled && 'Disabled',
+    className
   );
 }
+
+interface ButtonContentRenderProps extends PdxButtonVisualProps {
+  children?: ReactNode;
+  iconOnly?: boolean;
+}
+
+export function ButtonContent({
+  children,
+  icon,
+  iconOnly,
+  iconPosition = 'Left',
+  loading,
+  loadingText,
+  text,
+}: ButtonContentRenderProps) {
+  const content = children ?? text;
+
+  if (loading) {
+    return (
+      <>
+        <span className="PdxButtonSpinner" aria-hidden="true" />
+        {!iconOnly && <span>{loadingText ?? content}</span>}
+      </>
+    );
+  }
+
+  if (iconOnly) {
+    return <span className="PdxButtonIcon">{icon}</span>;
+  }
+
+  return (
+    <>
+      {icon && iconPosition === 'Left' && (
+        <span className="PdxButtonIcon" aria-hidden="true">
+          {icon}
+        </span>
+      )}
+      {content !== undefined && <span>{content}</span>}
+      {icon && iconPosition === 'Right' && (
+        <span className="PdxButtonIcon" aria-hidden="true">
+          {icon}
+        </span>
+      )}
+    </>
+  );
+}
+
+const PdxButton = forwardRef<HTMLButtonElement, PdxButtonProps>(
+  function PdxButton(
+    {
+      children,
+      className,
+      dataAttributes,
+      disabled = false,
+      icon,
+      iconOnly = false,
+      iconPosition = 'Left',
+      loading = false,
+      loadingText,
+      size = 'Medium',
+      text,
+      tone = 'Neutral',
+      type = 'button',
+      variant = 'Secondary',
+      ...rest
+    },
+    ref
+  ) {
+    const isDisabled = disabled || loading;
+
+    return (
+      <button
+        {...rest}
+        {...getDataAttributes(dataAttributes)}
+        aria-busy={loading || undefined}
+        className={getButtonClassName({
+          className,
+          disabled: isDisabled,
+          iconOnly,
+          loading,
+          size,
+          tone,
+          variant,
+        })}
+        disabled={isDisabled}
+        ref={ref}
+        type={type}
+      >
+        <ButtonContent
+          icon={icon}
+          iconOnly={iconOnly}
+          iconPosition={iconPosition}
+          loading={loading}
+          loadingText={loadingText}
+          text={text}
+        >
+          {children}
+        </ButtonContent>
+      </button>
+    );
+  }
+);
 
 export default PdxButton;

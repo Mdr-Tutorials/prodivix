@@ -86,6 +86,8 @@ pnpm dev:web
 
 Backend-backed workspace, auth, sync, and project persistence flows require PostgreSQL. Start a local database from `apps/backend` with `docker compose up -d`; backend dependencies are managed by Go modules and can be preloaded with `go mod download`. See `apps/backend/README.md` for backend-specific setup.
 
+On Windows, `scripts\start-dev.bat` can open the native PostgreSQL, backend, Web editor, and UI Storybook processes together. Copy `.env.example` to `.env.local` to override the local PostgreSQL connection or `PRODIVIX_PG_BIN`; the database and backend launchers read the same `BACKEND_DB_URL`.
+
 Common entry points:
 
 | Command                | Description                              |

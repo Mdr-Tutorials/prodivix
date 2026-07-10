@@ -1,73 +1,76 @@
 .PdxParagraph {
-  line-height: 1.6;
   margin: 0;
-  word-wrap: break-word;
+  color: var(--text-primary);
+  font-family: var(--font-family-ui);
+  line-height: var(--line-height-normal);
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
 
-  &.Left {
+  &.AlignLeft {
     text-align: left;
   }
 
-  &.Center {
+  &.AlignCenter {
     text-align: center;
   }
 
-  &.Right {
+  &.AlignRight {
     text-align: right;
   }
 
-  &.Small {
+  &.SizeSmall {
     font-size: var(--font-size-sm);
   }
 
-  &.Medium {
+  &.SizeMedium {
     font-size: var(--font-size-md);
   }
 
-  &.Large {
+  &.SizeLarge {
     font-size: var(--font-size-lg);
   }
 
-  &.Light {
+  &.WeightLight {
     font-weight: 300;
   }
 
-  &.Normal {
-    font-weight: 400;
+  &.WeightNormal {
+    font-weight: var(--font-weight-regular);
   }
 
-  &.Medium {
-    font-weight: 500;
+  &.WeightMedium {
+    font-weight: var(--font-weight-medium);
   }
 
-  &.SemiBold {
-    font-weight: 600;
+  &.WeightSemiBold {
+    font-weight: var(--font-weight-semibold);
   }
 
-  &.Default {
+  &.ToneDefault {
     color: var(--text-primary);
   }
 
-  &.Muted {
+  &.ToneMuted {
     color: var(--text-muted);
   }
 
-  &.Primary {
-    color: var(--text-primary);
+  &.TonePrimary {
+    color: var(--accent-color);
   }
 
-  &.Secondary {
+  &.ToneSecondary {
     color: var(--text-secondary);
   }
 
-  &.Danger {
+  &.ToneDanger {
     color: var(--danger-color);
   }
 
-  &.Warning {
+  &.ToneWarning {
     color: var(--warning-color);
   }
 
-  &.Success {
+  &.ToneSuccess {
     color: var(--success-color);
   }
 }

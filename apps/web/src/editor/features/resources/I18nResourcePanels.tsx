@@ -51,7 +51,7 @@ export function I18nResourceSidebar({
       <PdxSearch
         size="Small"
         value={searchKeyword}
-        onChange={onSearchKeywordChange}
+        onValueChange={onSearchKeywordChange}
         placeholder={t('resourceManager.i18n.searchPlaceholder')}
       />
 
@@ -131,29 +131,29 @@ export function I18nResourceSidebar({
 
       <div className="grid grid-cols-2 gap-2 pt-1">
         <PdxInput
-          type="Text"
+          type="text"
           size="Small"
           value={newLocale}
-          onChange={onNewLocaleChange}
+          onValueChange={onNewLocaleChange}
           placeholder={t('resourceManager.i18n.newLocalePlaceholder')}
         />
         <PdxButton
           text={t('resourceManager.i18n.actions.addLocale')}
-          size="Tiny"
-          category="Secondary"
+          size="ExtraSmall"
+          variant="Secondary"
           onClick={onAddLocale}
         />
         <PdxInput
-          type="Text"
+          type="text"
           size="Small"
           value={newNamespace}
-          onChange={onNewNamespaceChange}
+          onValueChange={onNewNamespaceChange}
           placeholder={t('resourceManager.i18n.newModulePlaceholder')}
         />
         <PdxButton
           text={t('resourceManager.i18n.actions.addModule')}
-          size="Tiny"
-          category="Secondary"
+          size="ExtraSmall"
+          variant="Secondary"
           onClick={onAddNamespace}
         />
       </div>
@@ -354,10 +354,10 @@ export function I18nResourceTable({
                     +
                   </button>
                   <PdxInput
-                    type="Text"
+                    type="text"
                     size="Small"
                     value={newKey}
-                    onChange={onNewKeyChange}
+                    onValueChange={onNewKeyChange}
                     className="w-full"
                     placeholder={t('resourceManager.i18n.newKeyPlaceholder')}
                   />
@@ -370,10 +370,10 @@ export function I18nResourceTable({
                 >
                   {locale === sourceLocale ? (
                     <PdxInput
-                      type="Text"
+                      type="text"
                       size="Small"
                       value={newSourceValue}
-                      onChange={onNewSourceValueChange}
+                      onValueChange={onNewSourceValueChange}
                       className="w-full"
                       placeholder={t(
                         'resourceManager.i18n.newSourcePlaceholder',

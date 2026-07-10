@@ -1,29 +1,80 @@
 .PdxPopover {
-  position: relative;
   display: inline-flex;
 }
 
 .PdxPopoverPanel {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  margin-top: 6px;
-  background-color: var(--bg-canvas);
+  z-index: 1100;
+  min-width: 220px;
+  max-width: min(440px, calc(100vw - 24px));
+  padding: 10px;
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-sm);
-  min-width: 180px;
-  box-shadow: var(--shadow-md);
-  z-index: 20;
+  border-radius: var(--radius-lg);
+  outline: none;
+  background: var(--bg-canvas);
+  box-shadow: var(--shadow-lg);
+  color: var(--text-primary);
+  font-family: var(--font-family-ui);
+  transform-origin: var(--radix-popover-content-transform-origin);
+
+  &[data-state='open'] {
+    animation: pdx-popover-in var(--motion-duration-normal)
+      var(--motion-easing-standard);
+  }
+
+  &[data-state='closed'] {
+    animation: pdx-popover-out var(--motion-duration-fast)
+      var(--motion-easing-standard);
+  }
 }
 
 .PdxPopoverTitle {
-  font-weight: 600;
-  margin-bottom: 4px;
+  margin: 0 0 7px;
+  padding: 1px 2px 8px;
+  border-bottom: 1px solid var(--border-subtle);
   color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-compact);
 }
 
 .PdxPopoverContent {
-  font-size: 13px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+.PdxPopoverArrow {
+  fill: var(--bg-canvas);
+  stroke: var(--border-default);
+  stroke-width: 1px;
+}
+
+@keyframes pdx-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px) scale(0.975);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pdx-popover-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .PdxPopoverPanel {
+    animation-duration: 1ms !important;
+  }
 }

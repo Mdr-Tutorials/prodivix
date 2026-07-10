@@ -28,7 +28,7 @@ echo [INFO] Starting dev processes with: "%PS_EXE%"
 
 start "dev-db" /d "%PROJECT_DIR%" "%PS_EXE%" -NoExit -ExecutionPolicy Bypass -File ".\scripts\start-dev-postgres.ps1"
 start "dev-web" /d "%PROJECT_DIR%" "%PS_EXE%" -NoExit -Command "pnpm run dev:web"
-start "dev-backend" /d "%PROJECT_DIR%" "%PS_EXE%" -NoExit -Command "$env:BACKEND_DB_URL='postgres://postgres:postgres@127.0.0.1:55432/prodivix?sslmode=disable'; pnpm run dev:backend"
+start "dev-backend" /d "%PROJECT_DIR%" "%PS_EXE%" -NoExit -ExecutionPolicy Bypass -File ".\scripts\start-dev-backend.ps1"
 start "storybook-ui" /d "%PROJECT_DIR%" "%PS_EXE%" -NoExit -Command "pnpm run storybook:ui"
 
 echo [SUCCESS] Dev windows have been opened.

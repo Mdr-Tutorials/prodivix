@@ -17,7 +17,8 @@ type Story = StoryObj<typeof PdxColorPicker>;
 export const Default: Story = {
   args: {
     label: 'Theme color',
-    value: '#2f6fed',
+    description: 'Used for focused and selected controls.',
+    defaultValue: '#2F6FED',
   },
 };
 
@@ -25,6 +26,21 @@ export const WithoutTextInput: Story = {
   args: {
     label: 'Accent',
     showTextInput: false,
-    value: '#ffb007',
+    defaultValue: '#FFB007',
   },
+};
+
+export const ValidationStates: Story = {
+  render: () => (
+    <div style={{ display: 'grid', gap: 16, width: 320 }}>
+      <PdxColorPicker defaultValue="#2F6FED" label="Brand color" size="Small" />
+      <PdxColorPicker
+        defaultValue="#D14343"
+        label="Invalid token"
+        message="Use a six-digit hexadecimal value."
+        state="Error"
+      />
+      <PdxColorPicker defaultValue="#3F3F3F" disabled label="Inherited color" />
+    </div>
+  ),
 };

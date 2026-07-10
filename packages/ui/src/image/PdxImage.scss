@@ -1,7 +1,13 @@
 .PdxImage {
+  box-sizing: border-box;
   display: block;
+  max-width: 100%;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-raised);
   object-fit: cover;
-  transition: all var(--transition-normal);
+  color: var(--text-muted);
+  transition: opacity var(--motion-duration-normal)
+    var(--motion-easing-standard);
 
   &.Small {
     width: 64px;
@@ -53,6 +59,11 @@
   }
 
   &.Circle {
+    aspect-ratio: 1;
     border-radius: var(--radius-full);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition-duration: 0.01ms;
   }
 }

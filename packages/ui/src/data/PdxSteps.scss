@@ -1,7 +1,13 @@
 .PdxSteps {
+  width: 100%;
   display: flex;
-  gap: var(--spacing-lg);
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
   color: var(--text-primary);
+  font-family: var(--font-family-ui);
 }
 
 .PdxSteps.Vertical {
@@ -10,10 +16,16 @@
 }
 
 .PdxStep {
+  min-width: 0;
   display: flex;
+  flex: 1;
   align-items: center;
   position: relative;
   gap: var(--spacing-sm);
+}
+
+.PdxSteps.Horizontal .PdxStep:last-child {
+  flex: 0 0 auto;
 }
 
 .PdxSteps.Vertical .PdxStep {
@@ -21,15 +33,15 @@
 }
 
 .PdxStepIndicator {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 2px solid var(--border-default);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-strong);
   display: flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
   background-color: var(--bg-canvas);
   color: var(--text-muted);
@@ -41,8 +53,9 @@
 
 .PdxStep.Active .PdxStepIndicator {
   border-color: var(--accent-color);
-  color: var(--accent-color);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 10%, transparent);
+  background: var(--accent-color);
+  color: var(--text-inverse);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 12%, transparent);
 }
 
 .PdxStep.Completed .PdxStepIndicator {
@@ -59,23 +72,36 @@
 }
 
 .PdxStepTitle {
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-compact);
 }
 
 .PdxStepDescription {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
   color: var(--text-muted);
 }
 
 .PdxStepConnector {
   flex: 1;
-  height: 2px;
+  min-width: 28px;
+  height: 1px;
   background-color: var(--border-default);
-  margin-left: var(--spacing-sm);
+  margin-inline: var(--spacing-sm) 0;
+}
+
+.PdxStep.Completed .PdxStepConnector {
+  background-color: var(--success-color);
 }
 
 .PdxSteps.Vertical .PdxStepConnector {
-  width: 2px;
-  height: 24px;
-  margin-left: 12px;
+  position: absolute;
+  top: 32px;
+  bottom: calc(-1 * var(--spacing-md));
+  left: 13px;
+  width: 1px;
+  min-width: 0;
+  height: auto;
+  margin: 0;
 }

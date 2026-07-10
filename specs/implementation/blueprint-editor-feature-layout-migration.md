@@ -25,14 +25,14 @@
 
 ## 迁移前基线（已核实）
 
-| 项 | 现状 | 来源 |
-| --- | --- | --- |
-| `features/design/` 子树 | `blueprint/`、`inspector/`、`__tests__/`（无 `design/index.ts` barrel） | `git ls-files` |
-| `editor/components/` 子目录 | AddressBar / Assistant / Canvas / ComponentTree / Inspector / SaveIndicator / Sidebar / ViewportBar（共 8 个） | `git ls-files` |
-| `editor/components/` 散文件 | `collapseButtonStyles.ts`（被 4 处引用）、`index.ts`（barrel，绝对路径引用方为 0） | `git grep` |
-| `collapseButtonStyles.ts` 引用方 | Assistant / ComponentTree / Inspector / Sidebar 四个组件 | `git grep -l` |
-| Inspector 外部消费方 | 仅 Blueprint（薄壳 `BlueprintEditorInspector.tsx` + `useBlueprintEditorInspectorController`） | `git grep` |
-| `.trellis/spec/` | **不存在** | `ls` |
+| 项                               | 现状                                                                                                           | 来源           |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------- | -------------- |
+| `features/design/` 子树          | `blueprint/`、`inspector/`、`__tests__/`（无 `design/index.ts` barrel）                                        | `git ls-files` |
+| `editor/components/` 子目录      | AddressBar / Assistant / Canvas / ComponentTree / Inspector / SaveIndicator / Sidebar / ViewportBar（共 8 个） | `git ls-files` |
+| `editor/components/` 散文件      | `collapseButtonStyles.ts`（被 4 处引用）、`index.ts`（barrel，绝对路径引用方为 0）                             | `git grep`     |
+| `collapseButtonStyles.ts` 引用方 | Assistant / ComponentTree / Inspector / Sidebar 四个组件                                                       | `git grep -l`  |
+| Inspector 外部消费方             | 仅 Blueprint（薄壳 `BlueprintEditorInspector.tsx` + `useBlueprintEditorInspectorController`）                  | `git grep`     |
+| `.trellis/spec/`                 | **不存在**                                                                                                     | `ls`           |
 
 > ADR 32 中"`.trellis/spec/` 若有 design feature 描述需同步"一条：**当前为 N/A**，无 trellis spec 需同步。执行时仍按 CLAUDE.md 跑一次 `python ./.trellis/scripts/get_context.py --mode packages` 复核。
 
@@ -80,16 +80,16 @@ apps/web/src/editor/features/
 
 `editor/components/` 的 PascalCase 子目录迁移到 `editor/` 直属时统一改为 camelCase，对齐既有约定（inspector 内部已有 `classProtocol/`、`layoutGroup/` 等 camelCase 多词目录）：
 
-| 旧 | 新 |
-| --- | --- |
-| `components/Canvas/` | `editor/canvas/` |
+| 旧                              | 新                                       |
+| ------------------------------- | ---------------------------------------- |
+| `components/Canvas/`            | `editor/canvas/`                         |
 | `components/Inspector/`（薄壳） | 合并入 `editor/inspector/`（见 Phase 2） |
-| `components/Sidebar/` | `editor/sidebar/` |
-| `components/ComponentTree/` | `editor/componentTree/` |
-| `components/ViewportBar/` | `editor/viewportBar/` |
-| `components/AddressBar/` | `editor/addressBar/` |
-| `components/Assistant/` | `editor/assistant/` |
-| `components/SaveIndicator/` | `editor/saveIndicator/` |
+| `components/Sidebar/`           | `editor/sidebar/`                        |
+| `components/ComponentTree/`     | `editor/componentTree/`                  |
+| `components/ViewportBar/`       | `editor/viewportBar/`                    |
+| `components/AddressBar/`        | `editor/addressBar/`                     |
+| `components/Assistant/`         | `editor/assistant/`                      |
+| `components/SaveIndicator/`     | `editor/saveIndicator/`                  |
 
 ---
 
@@ -326,11 +326,11 @@ apps/web/src/editor/features/
 
 ## 风险与回滚
 
-| 风险 | 缓解 |
-| --- | --- |
-| import 替换遗漏导致 tsc 失败 | 每阶段 tsc 关卡 + Phase 5 全仓 grep 归零校验 |
-| barrel `components/index.ts` 存在隐藏相对引用 | Phase 0 复核步骤；若发现，先迁引用再删 barrel |
+| 风险                                                            | 缓解                                                                                                                       |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| import 替换遗漏导致 tsc 失败                                    | 每阶段 tsc 关卡 + Phase 5 全仓 grep 归零校验                                                                               |
+| barrel `components/index.ts` 存在隐藏相对引用                   | Phase 0 复核步骤；若发现，先迁引用再删 barrel                                                                              |
 | `git mv` 后 Windows 大小写折叠（如 `Canvas/` → `canvas/` 同盘） | 分两步：先 `git mv components/Canvas components/_canvas_tmp` 再 `git mv components/_canvas_tmp canvas`，避免大小写敏感问题 |
-| 迁移中途发现设计需调整 | 每阶段独立可编译，可停在任意已通过关卡回滚最近一两个 commit |
+| 迁移中途发现设计需调整                                          | 每阶段独立可编译，可停在任意已通过关卡回滚最近一两个 commit                                                                |
 
 > Windows 大小写折叠是本迁移在 win32 上的主要坑。`Canvas → canvas` 这类纯大小写改名，git 在不区分大小写的文件系统上可能只改引用不改磁盘。建议每个这类改名走"先临时名再目标名"两步，并在每步后 `git ls-files` 复核磁盘与索引一致。

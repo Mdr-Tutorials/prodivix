@@ -1,101 +1,118 @@
 import './PdxCollapse.scss';
-import { type PdxComponent } from '@prodivix/shared';
-import { Minus, Plus } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import type React from 'react';
+import {
+  getDataAttributes,
+  mergeClassNames,
+  type PdxNativeProps,
+} from '../foundation/component';
+import { useControllableState } from '../foundation/useControllableState';
+import { ChevronDown } from 'lucide-react';
+import { forwardRef, useId, type ReactNode } from 'react';
 
 export interface PdxCollapseItem {
-  key: string;
-  title: string;
-  content: React.ReactNode;
+  content: ReactNode;
   disabled?: boolean;
+  key: string;
+  title: ReactNode;
 }
 
-interface PdxCollapseSpecificProps {
-  items: PdxCollapseItem[];
+export interface PdxCollapseOwnProps {
+  accordion?: boolean;
   activeKeys?: string[];
   defaultActiveKeys?: string[];
-  accordion?: boolean;
-  onChange?: (keys: string[]) => void;
+  items: PdxCollapseItem[];
+  keepMounted?: boolean;
+  onExpandedKeysChange?: (keys: string[]) => void;
 }
 
-export interface PdxCollapseProps
-  extends PdxComponent, PdxCollapseSpecificProps {}
+export type PdxCollapseProps = Omit<PdxNativeProps<'div'>, 'children'> &
+  PdxCollapseOwnProps;
 
-function PdxCollapse({
-  items,
-  activeKeys,
-  defaultActiveKeys,
-  accordion = false,
-  onChange,
-  className,
-  style,
-  id,
-  dataAttributes = {},
-}: PdxCollapseProps) {
-  const [internalKeys, setInternalKeys] = useState<string[]>(
-    defaultActiveKeys || []
-  );
+const PdxCollapse = forwardRef<HTMLDivElement, PdxCollapseProps>(
+  function PdxCollapse(
+    {
+      accordion = false,
+      activeKeys,
+      className,
+      dataAttributes,
+      defaultActiveKeys = [],
+      items,
+      keepMounted = false,
+      onExpandedKeysChange,
+      ...rest
+    },
+    ref
+  ) {
+    const baseId = useId();
+    const [expandedKeys, setExpandedKeys] = useControllableState({
+      value: activeKeys,
+      defaultValue: accordion
+        ? defaultActiveKeys.slice(0, 1)
+        : defaultActiveKeys,
+      onChange: onExpandedKeysChange,
+    });
 
-  useEffect(() => {
-    if (activeKeys) {
-      setInternalKeys(activeKeys);
-    }
-  }, [activeKeys]);
+    const toggleKey = (key: string) => {
+      const nextKeys = accordion
+        ? expandedKeys.includes(key)
+          ? []
+          : [key]
+        : expandedKeys.includes(key)
+          ? expandedKeys.filter((item) => item !== key)
+          : [...expandedKeys, key];
+      setExpandedKeys(nextKeys);
+    };
 
-  const currentKeys = activeKeys || internalKeys;
-
-  const toggleKey = (key: string) => {
-    let nextKeys: string[] = [];
-    if (accordion) {
-      nextKeys = currentKeys.includes(key) ? [] : [key];
-    } else {
-      nextKeys = currentKeys.includes(key)
-        ? currentKeys.filter((item) => item !== key)
-        : [...currentKeys, key];
-    }
-
-    if (!activeKeys) {
-      setInternalKeys(nextKeys);
-    }
-    if (onChange) {
-      onChange(nextKeys);
-    }
-  };
-
-  const fullClassName = `PdxCollapse ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
-
-  return (
-    <div
-      className={fullClassName}
-      style={style as React.CSSProperties}
-      id={id}
-      {...dataProps}
-    >
-      {items.map((item) => {
-        const isOpen = currentKeys.includes(item.key);
-        return (
-          <div
-            key={item.key}
-            className={`PdxCollapseItem ${isOpen ? 'Open' : ''} ${item.disabled ? 'Disabled' : ''}`}
-          >
-            <button
-              type="button"
-              className="PdxCollapseHeader"
-              onClick={() => !item.disabled && toggleKey(item.key)}
+    return (
+      <div
+        {...rest}
+        {...getDataAttributes(dataAttributes)}
+        className={mergeClassNames('PdxCollapse', className)}
+        ref={ref}
+      >
+        {items.map((item, index) => {
+          const isOpen = expandedKeys.includes(item.key);
+          const triggerId = `${baseId}-trigger-${index}`;
+          const panelId = `${baseId}-panel-${index}`;
+          return (
+            <section
+              className={mergeClassNames('PdxCollapseItem', isOpen && 'Open')}
+              key={item.key}
             >
-              <span>{item.title}</span>
-              <span className="PdxCollapseIcon">
-                {isOpen ? <Minus size={14} /> : <Plus size={14} />}
-              </span>
-            </button>
-            {isOpen && <div className="PdxCollapseContent">{item.content}</div>}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+              <h3 className="PdxCollapseHeading">
+                <button
+                  aria-controls={panelId}
+                  aria-expanded={isOpen}
+                  className="PdxCollapseTrigger"
+                  disabled={item.disabled}
+                  id={triggerId}
+                  onClick={() => toggleKey(item.key)}
+                  type="button"
+                >
+                  <span>{item.title}</span>
+                  <ChevronDown
+                    aria-hidden="true"
+                    className="PdxCollapseIcon"
+                    size={16}
+                  />
+                </button>
+              </h3>
+              {isOpen || keepMounted ? (
+                <div
+                  aria-labelledby={triggerId}
+                  className="PdxCollapsePanel"
+                  hidden={!isOpen}
+                  id={panelId}
+                  role="region"
+                >
+                  <div className="PdxCollapseContent">{item.content}</div>
+                </div>
+              ) : null}
+            </section>
+          );
+        })}
+      </div>
+    );
+  }
+);
 
 export default PdxCollapse;

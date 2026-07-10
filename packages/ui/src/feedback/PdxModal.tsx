@@ -1,66 +1,109 @@
 import './PdxModal.scss';
-import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes, mergeClassNames } from '../foundation/component';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
-import type React from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
-interface PdxModalSpecificProps {
-  open: boolean;
-  title?: string;
-  children?: React.ReactNode;
-  footer?: React.ReactNode;
-  size?: 'Small' | 'Medium' | 'Large';
+export type PdxModalSize = 'Small' | 'Medium' | 'Large';
+
+export interface PdxModalProps {
+  children?: ReactNode;
+  className?: string;
+  closeLabel?: string;
+  closeOnEscape?: boolean;
   closeOnOverlayClick?: boolean;
-  showClose?: boolean;
+  dataAttributes?: Record<string, string>;
+  description?: ReactNode;
+  footer?: ReactNode;
+  id?: string;
   onClose?: () => void;
+  onOpenChange?: (open: boolean) => void;
+  open: boolean;
+  portal?: boolean;
+  showClose?: boolean;
+  size?: PdxModalSize;
+  style?: CSSProperties;
+  title: ReactNode;
 }
 
-export interface PdxModalProps extends PdxComponent, PdxModalSpecificProps {}
-
 function PdxModal({
-  open,
-  title,
   children,
-  footer,
-  size = 'Medium',
-  closeOnOverlayClick = true,
-  showClose = true,
-  onClose,
   className,
-  style,
+  closeLabel = 'Close dialog',
+  closeOnEscape = true,
+  closeOnOverlayClick = true,
+  dataAttributes,
+  description,
+  footer,
   id,
-  dataAttributes = {},
+  onClose,
+  onOpenChange,
+  open,
+  portal = true,
+  showClose = true,
+  size = 'Medium',
+  style,
+  title,
 }: PdxModalProps) {
-  if (!open) return null;
+  const handleOpenChange = (nextOpen: boolean) => {
+    onOpenChange?.(nextOpen);
+    if (!nextOpen) onClose?.();
+  };
 
-  const fullClassName = `PdxModal ${size} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const content = (
+    <>
+      <DialogPrimitive.Overlay className="PdxModalOverlay" />
+      <DialogPrimitive.Content
+        {...getDataAttributes(dataAttributes)}
+        {...(description ? {} : { 'aria-describedby': undefined })}
+        className={mergeClassNames('PdxModal', size, className)}
+        id={id}
+        onEscapeKeyDown={(event) => {
+          if (!closeOnEscape) event.preventDefault();
+        }}
+        onPointerDownOutside={(event) => {
+          if (!closeOnOverlayClick) event.preventDefault();
+        }}
+        style={style}
+      >
+        <header className="PdxModalHeader">
+          <div className="PdxModalHeading">
+            <DialogPrimitive.Title className="PdxModalTitle">
+              {title}
+            </DialogPrimitive.Title>
+            {description ? (
+              <DialogPrimitive.Description className="PdxModalDescription">
+                {description}
+              </DialogPrimitive.Description>
+            ) : null}
+          </div>
+          {showClose ? (
+            <DialogPrimitive.Close asChild>
+              <button
+                aria-label={closeLabel}
+                className="PdxModalClose"
+                title={closeLabel}
+                type="button"
+              >
+                <X aria-hidden="true" size={16} />
+              </button>
+            </DialogPrimitive.Close>
+          ) : null}
+        </header>
+        <div className="PdxModalBody">{children}</div>
+        {footer ? <footer className="PdxModalFooter">{footer}</footer> : null}
+      </DialogPrimitive.Content>
+    </>
+  );
 
   return (
-    <div
-      className="PdxModalOverlay"
-      onClick={closeOnOverlayClick ? onClose : undefined}
-    >
-      <div
-        className={fullClassName}
-        style={style as React.CSSProperties}
-        id={id}
-        {...dataProps}
-        onClick={(event) => event.stopPropagation()}
-      >
-        {(title || showClose) && (
-          <div className="PdxModalHeader">
-            {title && <h3>{title}</h3>}
-            {showClose && (
-              <button type="button" className="PdxModalClose" onClick={onClose}>
-                <X size={16} />
-              </button>
-            )}
-          </div>
-        )}
-        <div className="PdxModalBody">{children}</div>
-        {footer && <div className="PdxModalFooter">{footer}</div>}
-      </div>
-    </div>
+    <DialogPrimitive.Root open={open} onOpenChange={handleOpenChange}>
+      {portal ? (
+        <DialogPrimitive.Portal>{content}</DialogPrimitive.Portal>
+      ) : (
+        content
+      )}
+    </DialogPrimitive.Root>
   );
 }
 

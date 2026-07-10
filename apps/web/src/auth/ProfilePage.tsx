@@ -193,13 +193,13 @@ export const ProfilePage = () => {
           <PdxButton
             text={t('actions.backHome')}
             size="Small"
-            category="Ghost"
+            variant="Ghost"
             onClick={() => navigate('/')}
           />
           <PdxButton
             text={t('actions.login')}
             size="Small"
-            category="Primary"
+            variant="Primary"
             onClick={() => navigate('/auth')}
           />
         </header>
@@ -222,15 +222,17 @@ export const ProfilePage = () => {
         <PdxButton
           text={t('actions.backHome')}
           size="Small"
-          category="Ghost"
+          variant="Ghost"
           onClick={() => navigate('/')}
         />
         <div className="flex flex-wrap gap-2.5">
           <PdxButton
             size="Small"
-            category="Secondary"
-            onlyIcon
+            variant="Secondary"
+            iconOnly
             icon={<Pencil size={16} />}
+            aria-label={t('actions.edit')}
+            title={t('actions.edit')}
             disabled={isLoading}
             onClick={openEdit}
           />
@@ -244,7 +246,7 @@ export const ProfilePage = () => {
           <PdxButton
             text={t('actions.logout')}
             size="Small"
-            category="Primary"
+            variant="Primary"
             disabled={isLoading}
             onClick={async () => {
               if (token) {
@@ -392,14 +394,14 @@ export const ProfilePage = () => {
             <PdxButton
               text={t('actions.cancel')}
               size="Small"
-              category="Secondary"
+              variant="Secondary"
               disabled={isLoading}
               onClick={() => setEditOpen(false)}
             />
             <PdxButton
               text={profileJustSaved ? t('messages.saved') : t('actions.save')}
               size="Small"
-              category="Primary"
+              variant="Primary"
               icon={profileJustSaved ? <Check size={16} /> : undefined}
               iconPosition="Left"
               disabled={isLoading || !draft.name.trim()}
@@ -422,7 +424,9 @@ export const ProfilePage = () => {
             <PdxInput
               size="Small"
               value={draft.name}
-              onChange={(value) => setDraft((p) => ({ ...p, name: value }))}
+              onValueChange={(value) =>
+                setDraft((p) => ({ ...p, name: value }))
+              }
             />
           </label>
           <label className="grid gap-1.5 text-xs text-(--text-secondary)">
@@ -431,7 +435,7 @@ export const ProfilePage = () => {
               size="Small"
               rows={3}
               value={draft.description}
-              onChange={(value) =>
+              onValueChange={(value) =>
                 setDraft((p) => ({ ...p, description: value }))
               }
             />

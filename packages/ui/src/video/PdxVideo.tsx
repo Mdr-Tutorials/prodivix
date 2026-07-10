@@ -1,3 +1,6 @@
+import './PdxVideo.scss';
+import { getDataAttributes, mergeClassNames } from '../foundation/component';
+import { getAspectRatioStyle, type PdxAspectRatio } from '../foundation/media';
 import React from 'react';
 import type { PdxComponent } from '@prodivix/shared';
 
@@ -12,7 +15,7 @@ interface PdxVideoSpecificProps {
   preload?: 'None' | 'Metadata' | 'Auto';
   width?: number | string;
   height?: number | string;
-  aspectRatio?: '16:9' | '4:3' | '1:1' | '21:9';
+  aspectRatio?: PdxAspectRatio;
   onPlay?: React.ReactEventHandler<HTMLVideoElement>;
   onPause?: React.ReactEventHandler<HTMLVideoElement>;
   onEnded?: React.ReactEventHandler<HTMLVideoElement>;
@@ -30,7 +33,7 @@ function PdxVideo({
   controls = true,
   loop = false,
   muted = false,
-  playsInline = false,
+  playsInline = true,
   preload = 'Metadata',
   width,
   height,
@@ -47,58 +50,34 @@ function PdxVideo({
   onLoadedMetadata,
   onClick,
 }: PdxVideoProps) {
-  const fullClassName =
-    `PdxVideo ${aspectRatio.replace(':', '-')} ${className || ''}`.trim();
-
-  const dataProps = { ...dataAttributes };
+  const fullClassName = mergeClassNames(
+    'PdxVideo',
+    `aspect-${aspectRatio.replace(':', '-')}`,
+    height !== undefined && 'HasExplicitHeight',
+    className
+  );
   const normalizedSrc = src?.trim() ? src : undefined;
   const normalizedPoster = poster?.trim() ? poster : undefined;
 
   const containerStyle = {
-    ...style,
-    width: width || '100%',
-    height: height || 'auto',
-  };
-
-  const aspectRatioMap: Record<string, string> = {
-    '16:9': '16 / 9',
-    '4:3': '4 / 3',
-    '1:1': '1 / 1',
-    '21:9': '21 / 9',
-  };
-
-  const videoContainerStyle = {
-    position: 'relative',
-    width: '100%',
-    aspectRatio: aspectRatioMap[aspectRatio],
-    overflow: 'hidden',
-    backgroundColor: '#000',
-    borderRadius: '8px',
-  };
-
-  const videoStyle = {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: '100%',
-    objectFit: 'contain',
-  };
+    ...getAspectRatioStyle(aspectRatio),
+    ...(style as React.CSSProperties),
+    width: width ?? style?.width ?? '100%',
+    ...(height !== undefined ? { height } : {}),
+  } as React.CSSProperties;
 
   return (
     <div
       className={fullClassName}
-      style={containerStyle as React.CSSProperties}
       id={id}
       onClick={onClick}
-      {...dataProps}
+      style={containerStyle}
+      {...getDataAttributes(dataAttributes)}
     >
-      <div style={videoContainerStyle as React.CSSProperties}>
+      <div className="PdxVideoFrame">
         <video
-          style={videoStyle as React.CSSProperties}
-          src={normalizedSrc}
-          poster={normalizedPoster}
           autoPlay={autoplay}
+          className="PdxVideoElement"
           controls={controls}
           loop={loop}
           muted={muted}
@@ -110,6 +89,8 @@ function PdxVideo({
           onTimeUpdate={onTimeUpdate}
           onProgress={onProgress}
           onLoadedMetadata={onLoadedMetadata}
+          poster={normalizedPoster}
+          src={normalizedSrc}
         />
       </div>
     </div>

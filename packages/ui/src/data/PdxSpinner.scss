@@ -1,37 +1,50 @@
 .PdxSpinner {
+  --pdx-spinner-color: var(--accent-color);
+  --pdx-spinner-size: 22px;
+  --pdx-spinner-stroke: 2px;
+
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-sm);
+  font-family: var(--font-family-ui);
   color: var(--text-muted);
 }
 
 .PdxSpinnerCircle {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 3px solid var(--border-default);
-  border-top-color: var(--accent-color);
-  animation: prodivix-spin 0.8s linear infinite;
+  box-sizing: border-box;
+  width: var(--pdx-spinner-size);
+  height: var(--pdx-spinner-size);
+  flex: 0 0 auto;
+  border: var(--pdx-spinner-stroke) solid var(--border-default);
+  border-top-color: var(--pdx-spinner-color);
+  border-right-color: var(--pdx-spinner-color);
+  border-radius: var(--radius-full);
+  animation: prodivix-spin 0.72s linear infinite;
 }
 
 .PdxSpinnerLabel {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-compact);
 }
 
-.PdxSpinner.Small .PdxSpinnerCircle {
-  width: 16px;
-  height: 16px;
-  border-width: 2px;
+.PdxSpinner.Small {
+  --pdx-spinner-size: 16px;
 }
 
-.PdxSpinner.Large .PdxSpinnerCircle {
-  width: 32px;
-  height: 32px;
-  border-width: 4px;
+.PdxSpinner.Large {
+  --pdx-spinner-size: 30px;
+  --pdx-spinner-stroke: 3px;
 }
 
 @keyframes prodivix-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .PdxSpinnerCircle {
+    animation-duration: 1.8s;
   }
 }

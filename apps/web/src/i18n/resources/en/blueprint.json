@@ -227,6 +227,10 @@
         "description": "Generated from external component metadata (d.ts).",
         "reset": "Reset"
       },
+      "componentProps": {
+        "label": "Component Props",
+        "description": "Generated from the @prodivix/ui component manifest."
+      },
       "dataScope": {
         "title": "Data Scope",
         "sourceKind": "Source Kind",

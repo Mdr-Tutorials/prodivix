@@ -3,9 +3,10 @@ import {
   unregisterRuntimeComponent,
 } from '@/pir/renderer/registry';
 import {
-  registerComponentGroup,
-  unregisterComponentGroup,
-} from '@/editor/features/blueprint/registry';
+  createPaletteContributionDescriptor,
+  disableTrustedPalettePlugin,
+  registerTrustedPaletteContribution,
+} from '@/editor/features/blueprint/palette';
 import {
   resetExternalRuntimeMetaStore,
   setExternalRuntimeMeta,
@@ -21,7 +22,7 @@ import type {
 } from './types';
 
 const runtimeTypesByLibraryId = new Map<string, Set<string>>();
-const groupIdsByLibraryId = new Map<string, Set<string>>();
+const palettePluginIdByLibraryId = new Map<string, string>();
 
 const addRuntimeType = (libraryId: string, runtimeType: string) => {
   const current = runtimeTypesByLibraryId.get(libraryId) ?? new Set<string>();
@@ -29,26 +30,53 @@ const addRuntimeType = (libraryId: string, runtimeType: string) => {
   runtimeTypesByLibraryId.set(libraryId, current);
 };
 
-const addGroupId = (libraryId: string, groupId: string) => {
-  const current = groupIdsByLibraryId.get(libraryId) ?? new Set<string>();
-  current.add(groupId);
-  groupIdsByLibraryId.set(libraryId, current);
+const unregisterRuntimeComponentsByLibraryId = (libraryId: string) => {
+  runtimeTypesByLibraryId.get(libraryId)?.forEach((runtimeType) => {
+    unregisterRuntimeComponent(runtimeType);
+  });
+  runtimeTypesByLibraryId.delete(libraryId);
 };
 
-export const clearRegisteredExternalLibraries = () => {
+const toExternalDiagnostic = (
+  libraryId: string,
+  diagnostic: {
+    code: string;
+    severity: 'info' | 'warning' | 'error' | 'fatal';
+    message: string;
+    hint: string;
+    retryable: boolean;
+  }
+): ExternalLibraryDiagnostic => ({
+  code: 'ELIB-3010',
+  level: diagnostic.severity === 'fatal' ? 'error' : diagnostic.severity,
+  stage: 'register',
+  libraryId,
+  message: `[${diagnostic.code}] ${diagnostic.message}`,
+  hint: diagnostic.hint,
+  retryable: diagnostic.retryable,
+});
+
+export const clearRegisteredExternalLibraries = async (): Promise<
+  ExternalLibraryDiagnostic[]
+> => {
+  const diagnostics: ExternalLibraryDiagnostic[] = [];
+  for (const [libraryId, pluginId] of palettePluginIdByLibraryId) {
+    const result = await disableTrustedPalettePlugin(pluginId);
+    diagnostics.push(
+      ...result.diagnostics.map((diagnostic) =>
+        toExternalDiagnostic(libraryId, diagnostic)
+      )
+    );
+  }
+  palettePluginIdByLibraryId.clear();
   runtimeTypesByLibraryId.forEach((runtimeTypes) => {
     runtimeTypes.forEach((runtimeType) => {
       unregisterRuntimeComponent(runtimeType);
     });
   });
-  groupIdsByLibraryId.forEach((groupIds) => {
-    groupIds.forEach((groupId) => {
-      unregisterComponentGroup(groupId);
-    });
-  });
   runtimeTypesByLibraryId.clear();
-  groupIdsByLibraryId.clear();
   resetExternalRuntimeMetaStore();
+  return diagnostics;
 };
 
 const EXTERNAL_PROP_KEYS = [
@@ -175,16 +203,48 @@ export const registerExternalRuntimeComponents = (
   }
 };
 
-export const registerExternalGroups = (groups: ExternalCanonicalGroup[]) => {
-  groups.forEach((group) => {
-    const nextGroup: ComponentGroup = {
-      id: group.id,
-      title: group.title,
-      source: 'external',
-      items: group.items.map(toPreviewItem),
-    };
-    registerComponentGroup(nextGroup);
-    const libraryId = group.items[0]?.libraryId;
-    if (libraryId) addGroupId(libraryId, group.id);
+export const registerExternalGroups = async (
+  libraryId: string,
+  version: string,
+  groups: ExternalCanonicalGroup[]
+): Promise<ExternalLibraryDiagnostic[]> => {
+  const resolvedGroups: ComponentGroup[] = groups.map((group) => ({
+    id: group.id,
+    title: group.title,
+    source: 'external',
+    items: group.items.map(toPreviewItem),
+  }));
+  const pluginId = `@prodivix/core.external.${libraryId}`;
+  const result = await registerTrustedPaletteContribution({
+    pluginId,
+    displayName: `${libraryId} Core-Embedded Palette`,
+    version,
+    installationId: `core-external:${libraryId}`,
+    contributionId: 'blueprint.palette',
+    descriptor: createPaletteContributionDescriptor(resolvedGroups, {
+      externalLibraryId: libraryId,
+    }),
+    groups: resolvedGroups,
+    order: 100,
   });
+  if (result.ok) palettePluginIdByLibraryId.set(libraryId, pluginId);
+  return result.diagnostics.map((diagnostic) =>
+    toExternalDiagnostic(libraryId, diagnostic)
+  );
+};
+
+export const unregisterExternalLibraryRuntime = async (libraryId: string) => {
+  const pluginId = palettePluginIdByLibraryId.get(libraryId);
+  const diagnostics: ExternalLibraryDiagnostic[] = [];
+  if (pluginId) {
+    const result = await disableTrustedPalettePlugin(pluginId);
+    diagnostics.push(
+      ...result.diagnostics.map((diagnostic) =>
+        toExternalDiagnostic(libraryId, diagnostic)
+      )
+    );
+    palettePluginIdByLibraryId.delete(libraryId);
+  }
+  unregisterRuntimeComponentsByLibraryId(libraryId);
+  return diagnostics;
 };

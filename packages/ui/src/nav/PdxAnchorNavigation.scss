@@ -1,22 +1,68 @@
 .PdxAnchorNavigation {
   display: flex;
-  gap: var(--spacing-sm);
+  gap: 2px;
   color: var(--text-muted);
+  font-family: var(--font-family-ui);
 }
 
 .PdxAnchorNavigation.Vertical {
   flex-direction: column;
+  border-left: 1px solid var(--border-default);
 }
 
 .PdxAnchorNavigationItem {
+  position: relative;
   text-decoration: none;
   color: inherit;
-  font-size: 13px;
-  padding: 4px 8px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-compact);
+  padding: 7px var(--spacing-sm);
   border-radius: var(--radius-sm);
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-easing-standard),
+    color var(--motion-duration-fast) var(--motion-easing-standard);
+
+  &:hover {
+    background-color: var(--bg-panel);
+    color: var(--text-primary);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--accent-color) 14%, transparent);
+  }
 
   &.Active {
     background-color: var(--bg-raised);
     color: var(--text-primary);
+    font-weight: var(--font-weight-medium);
   }
+}
+
+.PdxAnchorNavigation.Vertical .PdxAnchorNavigationItem.Active::before {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: -1px;
+  width: 2px;
+  border-radius: var(--radius-full);
+  background: var(--accent-color);
+  content: '';
+}
+
+.PdxAnchorNavigation.Horizontal {
+  align-items: center;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.PdxAnchorNavigation.Horizontal .PdxAnchorNavigationItem {
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.PdxAnchorNavigation.Horizontal .PdxAnchorNavigationItem.Active {
+  border-bottom-color: var(--accent-color);
+  background: transparent;
 }

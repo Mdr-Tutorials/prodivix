@@ -1,121 +1,138 @@
-import React from 'react';
 import './PdxSearch.scss';
-import { type PdxComponent } from '@prodivix/shared';
+import {
+  assignRef,
+  getDataAttributes,
+  mergeClassNames,
+  type PdxControlSize,
+  type PdxNativeProps,
+  type PdxValidationState,
+} from '../foundation/component';
+import { useControllableState } from '../foundation/useControllableState';
+import { forwardRef, useCallback, useRef } from 'react';
 
-interface PdxSearchSpecificProps {
-  placeholder?: string;
-  value?: string;
-  size?: 'Small' | 'Medium' | 'Large';
-  disabled?: boolean;
-  readOnly?: boolean;
-  required?: boolean;
-  minLength?: number;
-  maxLength?: number;
-  autoFocus?: boolean;
-  autoComplete?: string;
-  name?: string;
-  onChange?: (value: string) => void;
-  onFocus?: React.FocusEventHandler<HTMLInputElement>;
-  onBlur?: React.FocusEventHandler<HTMLInputElement>;
-  onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
-  onKeyUp?: React.KeyboardEventHandler<HTMLInputElement>;
+export interface PdxSearchOwnProps {
+  clearLabel?: string;
+  defaultValue?: string;
+  inputClassName?: string;
   onClear?: () => void;
   onSearch?: (value: string) => void;
+  onValueChange?: (value: string) => void;
+  size?: PdxControlSize;
+  state?: PdxValidationState;
+  value?: string;
 }
 
-export interface PdxSearchProps extends PdxComponent, PdxSearchSpecificProps {}
+export type PdxSearchProps = Omit<
+  PdxNativeProps<'input'>,
+  'defaultValue' | 'type' | 'value'
+> &
+  PdxSearchOwnProps;
 
-function PdxSearch({
-  size = 'Medium',
-  placeholder = 'Search...',
-  value = '',
-  disabled = false,
-  onClear,
-  onSearch,
-  className,
-  style,
-  id,
-  dataAttributes = {},
-  onChange,
-  onKeyDown,
-  ...rest
-}: PdxSearchProps) {
-  const fullClassName =
-    `PdxSearch ${size} ${disabled ? 'Disabled' : ''} ${value ? 'HasValue' : ''} ${className || ''}`.trim();
+const PdxSearch = forwardRef<HTMLInputElement, PdxSearchProps>(
+  function PdxSearch(
+    {
+      'aria-invalid': ariaInvalid,
+      className,
+      clearLabel = 'Clear search',
+      dataAttributes,
+      defaultValue = '',
+      disabled = false,
+      inputClassName,
+      onChange,
+      onClear,
+      onKeyDown,
+      onSearch,
+      onValueChange,
+      placeholder = 'Search…',
+      readOnly = false,
+      size = 'Medium',
+      state = 'Default',
+      style,
+      value,
+      ...rest
+    },
+    forwardedRef
+  ) {
+    const inputRef = useRef<HTMLInputElement | null>(null);
+    const [currentValue, setCurrentValue] = useControllableState({
+      value,
+      defaultValue,
+      onChange: onValueChange,
+    });
+    const setInputRef = useCallback(
+      (node: HTMLInputElement | null) => {
+        inputRef.current = node;
+        assignRef(forwardedRef, node);
+      },
+      [forwardedRef]
+    );
 
-  const dataProps = { ...dataAttributes };
-
-  const handleClear = () => {
-    if (onClear) {
-      onClear();
-    }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (onChange) {
-      onChange(e.target.value);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && onSearch) {
-      onSearch(value);
-    }
-    if (onKeyDown) {
-      onKeyDown(e);
-    }
-  };
-
-  return (
-    <div
-      className={fullClassName}
-      style={style as React.CSSProperties}
-      id={id}
-      {...dataProps}
-    >
-      <span className="PdxSearchIcon">
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <circle cx="11" cy="11" r="8" />
-          <path d="m21 21-4.35-4.35" />
-        </svg>
-      </span>
-      <input
-        type="text"
-        placeholder={placeholder}
-        value={value}
-        disabled={disabled}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        {...rest}
-      />
-      {value && !disabled && (
-        <button
-          type="button"
-          className="PdxSearchClear"
-          onClick={handleClear}
-          aria-label="Clear search"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M18 6 6 18M6 6l12 12" />
+    return (
+      <span
+        {...getDataAttributes(dataAttributes)}
+        className={mergeClassNames(
+          'PdxSearch',
+          size,
+          state !== 'Default' && state,
+          disabled && 'Disabled',
+          readOnly && 'ReadOnly',
+          currentValue.length > 0 && 'HasValue',
+          className
+        )}
+        style={style}
+      >
+        <span className="PdxSearchIcon" aria-hidden="true">
+          <svg fill="none" height="16" viewBox="0 0 24 24" width="16">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
           </svg>
-        </button>
-      )}
-    </div>
-  );
-}
+        </span>
+        <input
+          {...rest}
+          aria-invalid={ariaInvalid ?? (state === 'Error' || undefined)}
+          className={inputClassName}
+          disabled={disabled}
+          onChange={(event) => {
+            onChange?.(event);
+            setCurrentValue(event.currentTarget.value);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.defaultPrevented) {
+              onSearch?.(currentValue);
+            }
+            onKeyDown?.(event);
+          }}
+          placeholder={placeholder}
+          readOnly={readOnly}
+          ref={setInputRef}
+          type="search"
+          value={currentValue}
+        />
+        {currentValue.length > 0 && !disabled && !readOnly && (
+          <button
+            type="button"
+            className="PdxSearchClear"
+            aria-label={clearLabel}
+            onClick={() => {
+              setCurrentValue('');
+              onClear?.();
+              inputRef.current?.focus();
+            }}
+          >
+            <svg
+              aria-hidden="true"
+              fill="none"
+              height="14"
+              viewBox="0 0 24 24"
+              width="14"
+            >
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </span>
+    );
+  }
+);
 
 export default PdxSearch;

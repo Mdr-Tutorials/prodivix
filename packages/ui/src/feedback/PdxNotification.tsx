@@ -1,60 +1,104 @@
 import './PdxNotification.scss';
-import { type PdxComponent } from '@prodivix/shared';
-import { X } from 'lucide-react';
-import type React from 'react';
+import {
+  getDataAttributes,
+  mergeClassNames,
+  type PdxNativeProps,
+} from '../foundation/component';
+import type { PdxFeedbackType } from './PdxMessage';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CircleX,
+  Info,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
+import { forwardRef, type ReactNode } from 'react';
 
-interface PdxNotificationSpecificProps {
-  title: string;
-  description?: string;
-  type?: 'Info' | 'Success' | 'Warning' | 'Danger';
+export interface PdxNotificationOwnProps {
+  actions?: ReactNode;
   closable?: boolean;
-  actions?: React.ReactNode;
+  closeLabel?: string;
+  description?: ReactNode;
+  icon?: ReactNode;
   onClose?: () => void;
+  showIcon?: boolean;
+  title: ReactNode;
+  type?: PdxFeedbackType;
 }
 
-export interface PdxNotificationProps
-  extends PdxComponent, PdxNotificationSpecificProps {}
+export type PdxNotificationProps = Omit<
+  PdxNativeProps<'div'>,
+  'children' | 'title'
+> &
+  PdxNotificationOwnProps;
 
-function PdxNotification({
-  title,
-  description,
-  type = 'Info',
-  closable = false,
-  actions,
-  onClose,
-  className,
-  style,
-  id,
-  dataAttributes = {},
-}: PdxNotificationProps) {
-  const fullClassName = `PdxNotification ${type} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+const NOTIFICATION_ICONS: Record<PdxFeedbackType, LucideIcon> = {
+  Info,
+  Success: CheckCircle2,
+  Warning: AlertTriangle,
+  Danger: CircleX,
+};
 
-  return (
-    <div
-      className={fullClassName}
-      style={style as React.CSSProperties}
-      id={id}
-      {...dataProps}
-    >
-      <div className="PdxNotificationHeader">
-        <div className="PdxNotificationTitle">{title}</div>
-        {closable && (
+const PdxNotification = forwardRef<HTMLDivElement, PdxNotificationProps>(
+  function PdxNotification(
+    {
+      actions,
+      className,
+      closable = false,
+      closeLabel = 'Dismiss notification',
+      dataAttributes,
+      description,
+      icon,
+      onClose,
+      role,
+      showIcon = true,
+      title,
+      type = 'Info',
+      ...rest
+    },
+    ref
+  ) {
+    const NotificationIcon = NOTIFICATION_ICONS[type];
+
+    return (
+      <div
+        {...rest}
+        {...getDataAttributes(dataAttributes)}
+        className={mergeClassNames('PdxNotification', type, className)}
+        ref={ref}
+        role={
+          role ?? (type === 'Danger' || type === 'Warning' ? 'alert' : 'status')
+        }
+      >
+        {showIcon ? (
+          <span aria-hidden="true" className="PdxNotificationIcon">
+            {icon ?? <NotificationIcon size={18} />}
+          </span>
+        ) : null}
+        <div className="PdxNotificationBody">
+          <div className="PdxNotificationTitle">{title}</div>
+          {description ? (
+            <div className="PdxNotificationDescription">{description}</div>
+          ) : null}
+          {actions ? (
+            <div className="PdxNotificationActions">{actions}</div>
+          ) : null}
+        </div>
+        {closable ? (
           <button
-            type="button"
+            aria-label={closeLabel}
             className="PdxNotificationClose"
             onClick={onClose}
+            title={closeLabel}
+            type="button"
           >
-            <X size={16} />
+            <X aria-hidden="true" size={15} />
           </button>
-        )}
+        ) : null}
       </div>
-      {description && (
-        <div className="PdxNotificationDescription">{description}</div>
-      )}
-      {actions && <div className="PdxNotificationActions">{actions}</div>}
-    </div>
-  );
-}
+    );
+  }
+);
 
 export default PdxNotification;

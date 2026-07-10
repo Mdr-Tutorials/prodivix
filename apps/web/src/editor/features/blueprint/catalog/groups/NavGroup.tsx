@@ -39,7 +39,7 @@ export const NAV_GROUP: ComponentGroup = {
             <PdxText size="Tiny">Brand</PdxText>
           </div>
           <div className="PdxNavRight">
-            <PdxButton text="Login" size="Tiny" category="Ghost" />
+            <PdxButton text="Login" size="ExtraSmall" variant="Ghost" />
           </div>
         </PdxNav>
       ),
@@ -57,8 +57,8 @@ export const NAV_GROUP: ComponentGroup = {
             <div className="PdxNavRight">
               <PdxButton
                 text={columns === 2 ? 'Login' : 'Start'}
-                size="Tiny"
-                category="Ghost"
+                size="ExtraSmall"
+                variant="Ghost"
               />
             </div>
           </PdxNav>

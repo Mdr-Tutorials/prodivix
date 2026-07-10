@@ -32,7 +32,7 @@ export function ColorInput({
         <PdxInput
           size="Small"
           value={value ?? ''}
-          onChange={(next) => onChange(next.trim() ? next : undefined)}
+          onValueChange={(next) => onChange(next.trim() ? next : undefined)}
           placeholder={
             placeholder ??
             t('inspector.fields.colorInput.placeholder', {

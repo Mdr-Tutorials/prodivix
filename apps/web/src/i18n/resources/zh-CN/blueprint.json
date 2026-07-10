@@ -227,6 +227,10 @@
         "description": "根据外部组件元数据（d.ts）生成。",
         "reset": "重置"
       },
+      "componentProps": {
+        "label": "组件属性",
+        "description": "根据 @prodivix/ui 组件清单生成。"
+      },
       "dataScope": {
         "title": "数据作用域",
         "sourceKind": "来源类型",

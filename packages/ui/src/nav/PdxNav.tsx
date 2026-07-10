@@ -1,3 +1,4 @@
+import { getDataAttributes, mergeClassNames } from '../foundation/component';
 import React from 'react';
 import type { PdxComponent } from '@prodivix/shared';
 import './PdxNav.scss';
@@ -6,19 +7,23 @@ interface PdxNavSpecificProps {
   columns?: 2 | 3;
   align?: 'Start' | 'Center' | 'End' | 'Baseline' | 'Stretch';
   canHide?: boolean;
+  hidden?: boolean;
   isFloat?: boolean;
   backgroundStyle?: 'Transparent' | 'Solid' | 'Blurred';
+  navigationLabel?: string;
   children?: React.ReactNode;
 }
 
-interface PdxNavProps extends PdxComponent, PdxNavSpecificProps {}
+export interface PdxNavProps extends PdxComponent, PdxNavSpecificProps {}
 
 function PdxNav({
-  columns = 2,
+  columns = 3,
   align = 'Center',
   canHide = false,
+  hidden = false,
   isFloat = false,
   backgroundStyle = 'Solid',
+  navigationLabel,
   children,
   className,
   style,
@@ -27,18 +32,28 @@ function PdxNav({
   onClick,
   as: Component = 'nav',
 }: PdxNavProps) {
-  const fullClassName =
-    `PdxNav Columns-${columns} Align-${align} ${isFloat ? 'Float' : ''} ${canHide ? 'CanHide' : ''} ${backgroundStyle} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const fullClassName = mergeClassNames(
+    'PdxNav',
+    `Columns-${columns}`,
+    `Align-${align}`,
+    isFloat && 'Float',
+    canHide && 'CanHide',
+    canHide && hidden && 'Hidden',
+    backgroundStyle,
+    className
+  );
   const Element = Component as React.ElementType;
 
   return (
     <Element
+      aria-hidden={canHide && hidden ? true : undefined}
+      aria-label={navigationLabel}
       className={fullClassName}
-      style={style}
       id={id}
+      inert={canHide && hidden ? true : undefined}
       onClick={onClick}
-      {...dataProps}
+      style={style}
+      {...getDataAttributes(dataAttributes)}
     >
       {children}
     </Element>
@@ -62,7 +77,7 @@ function PdxNavRight({ children }: PdxNavAreaProps) {
 }
 
 function PdxNavHeading({ heading }: { heading: string }) {
-  return <h1 className="PdxNavHeading">{heading}</h1>;
+  return <span className="PdxNavHeading">{heading}</span>;
 }
 
 PdxNav.Left = PdxNavLeft;

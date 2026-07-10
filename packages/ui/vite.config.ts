@@ -5,6 +5,9 @@ import { resolve } from 'node:path';
 const externalPackages = [
   '@prodivix/shared',
   '@prodivix/themes',
+  '@radix-ui/react-dialog',
+  '@radix-ui/react-popover',
+  '@radix-ui/react-tooltip',
   'lucide-react',
   'react',
   'react-dom',

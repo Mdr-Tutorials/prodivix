@@ -1,55 +1,122 @@
 @use './PdxField.scss';
+@use '../foundation/control' as control;
 
 .PdxRadioGroup {
   width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.PdxRadioGroupLegend {
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 .PdxRadioGroupList {
-  list-style: none;
-  padding: 0;
-  margin: 0;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .PdxRadioGroup.Horizontal .PdxRadioGroupList {
-  flex-direction: row;
-  flex-wrap: wrap;
+  flex-flow: row wrap;
   gap: var(--spacing-sm);
 }
 
 .PdxRadioGroupItem {
-  padding: var(--spacing-xs) 0;
+  min-width: 0;
 }
 
 .PdxRadioGroupLabel {
+  @include control.control-transition;
+
   display: flex;
   align-items: flex-start;
   gap: var(--spacing-sm);
+  padding: var(--spacing-xs) 0;
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
   cursor: pointer;
+
+  &:hover:not(.Disabled) {
+    color: var(--text-secondary);
+  }
+
+  &.Disabled {
+    @include control.disabled-control;
+  }
+
+  @include control.reduced-motion;
 }
 
 .PdxRadioGroupLabel input {
-  width: 16px;
-  height: 16px;
-  margin-top: 2px;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  margin: 0.15em 0 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  appearance: none;
+  background: var(--bg-canvas);
+  cursor: inherit;
+
+  &:checked {
+    border-color: var(--accent-color);
+    box-shadow: inset 0 0 0 4px var(--accent-color);
+  }
+
+  &:focus-visible {
+    @include control.focus-ring;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
 }
 
-.PdxRadioGroupLabel.Disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.PdxRadioGroup.ExtraSmall .PdxRadioGroupLabel input {
+  width: 14px;
+  height: 14px;
+}
+
+.PdxRadioGroup.Small .PdxRadioGroupLabel input {
+  width: 16px;
+  height: 16px;
+}
+
+.PdxRadioGroup.Medium .PdxRadioGroupLabel input {
+  width: 18px;
+  height: 18px;
+}
+
+.PdxRadioGroup.Large .PdxRadioGroupLabel input {
+  width: 20px;
+  height: 20px;
 }
 
 .PdxRadioGroupText {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 13px;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+.PdxRadioGroup.ExtraSmall .PdxRadioGroupText {
+  font-size: var(--font-size-xs);
+}
+
+.PdxRadioGroup.Large .PdxRadioGroupText {
+  font-size: var(--font-size-md);
 }
 
 .PdxRadioGroupDescription {
-  font-size: 11px;
   color: var(--text-muted);
+  font-size: var(--font-size-xs);
 }

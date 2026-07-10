@@ -1,28 +1,39 @@
 .PdxSkeleton {
-  background: linear-gradient(
-    90deg,
-    var(--bg-raised) 25%,
-    var(--border-default) 50%,
-    var(--bg-raised) 75%
-  );
-  background-size: 200% 100%;
-  animation: prodivix-skeleton 1.4s ease infinite;
-  border-radius: var(--radius-sm);
+  box-sizing: border-box;
+  display: block;
+  overflow: hidden;
   width: 100%;
   height: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-raised);
+}
+
+.PdxSkeleton.Animated {
+  background-image: linear-gradient(
+    90deg,
+    transparent 20%,
+    color-mix(in srgb, var(--bg-canvas) 58%, transparent) 50%,
+    transparent 80%
+  );
+  background-size: 200% 100%;
+  animation: prodivix-skeleton 1.45s ease-in-out infinite;
 }
 
 .PdxSkeleton.Rect {
   height: 120px;
+  border-radius: var(--radius-md);
 }
 
 .PdxSkeleton.Circle {
-  border-radius: 50%;
   width: 48px;
   height: 48px;
+  aspect-ratio: 1;
+  border-radius: var(--radius-full);
 }
 
 .PdxSkeletonGroup {
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
@@ -37,8 +48,8 @@
   }
 }
 
-[data-theme='dark'] {
-  .PdxSkeleton {
-    background-size: 200% 100%;
+@media (prefers-reduced-motion: reduce) {
+  .PdxSkeleton.Animated {
+    animation: none;
   }
 }

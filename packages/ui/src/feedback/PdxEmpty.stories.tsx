@@ -19,6 +19,6 @@ export const Default: Story = {
   args: {
     title: 'No results',
     description: 'Try adjusting your filters.',
-    action: <PdxButton text="Reset" size="Small" category="Secondary" />,
+    action: <PdxButton text="Reset" size="Small" variant="Secondary" />,
   },
 };

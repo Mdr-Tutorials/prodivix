@@ -22,8 +22,9 @@ export const Default: Story = {
       { label: 'Home', href: '#', active: true },
       { label: 'Docs', href: '#' },
       { label: 'Pricing', href: '#' },
+      { label: 'Enterprise', disabled: true },
     ],
-    actions: <PdxButton text="Sign in" size="Small" category="Secondary" />,
+    actions: <PdxButton text="Sign in" size="Small" variant="Secondary" />,
   },
 };
 

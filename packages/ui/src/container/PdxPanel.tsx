@@ -1,6 +1,9 @@
 import './PdxPanel.scss';
+import { getDataAttributes, mergeClassNames } from '../foundation/component';
+import { useControllableState } from '../foundation/useControllableState';
 import { type PdxComponent } from '@prodivix/shared';
-import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
+import { useId } from 'react';
 
 interface PdxPanelSpecificProps {
   children: React.ReactNode;
@@ -9,7 +12,8 @@ interface PdxPanelSpecificProps {
   padding?: 'None' | 'Small' | 'Medium' | 'Large';
   collapsible?: boolean;
   collapsed?: boolean;
-  onToggle?: () => void;
+  defaultCollapsed?: boolean;
+  onToggle?: (collapsed: boolean) => void;
   title?: string;
 }
 
@@ -21,69 +25,70 @@ function PdxPanel({
   variant = 'Default',
   padding = 'Medium',
   collapsible = false,
-  collapsed = false,
+  collapsed,
+  defaultCollapsed = false,
   onToggle,
   title,
   className,
   style,
   id,
   dataAttributes = {},
+  onClick,
 }: PdxPanelProps) {
-  const [isCollapsed, setIsCollapsed] = useState(collapsed);
+  const generatedId = useId().replaceAll(':', '');
+  const contentId = `${id ?? `pdx-panel-${generatedId}`}-content`;
+  const [isCollapsed, setIsCollapsed] = useControllableState({
+    value: collapsed,
+    defaultValue: defaultCollapsed,
+    onChange: onToggle,
+  });
 
   const handleToggle = () => {
-    if (collapsible) {
-      const newCollapsed = !isCollapsed;
-      setIsCollapsed(newCollapsed);
-      if (onToggle) {
-        onToggle();
-      }
-    }
+    if (collapsible) setIsCollapsed(!isCollapsed);
   };
 
-  const fullClassName =
-    `PdxPanel ${size} ${variant} Padding${padding} ${collapsible ? 'Collapsible' : ''} ${isCollapsed ? 'Collapsed' : ''} ${className || ''}`.trim();
-
-  const dataProps = { ...dataAttributes };
+  const fullClassName = mergeClassNames(
+    'PdxPanel',
+    size,
+    variant,
+    `Padding${padding}`,
+    collapsible && 'Collapsible',
+    isCollapsed && 'Collapsed',
+    className
+  );
 
   return (
     <div
       className={fullClassName}
-      style={style as React.CSSProperties | undefined}
       id={id}
-      {...dataProps}
+      onClick={onClick}
+      style={style as React.CSSProperties | undefined}
+      {...getDataAttributes(dataAttributes)}
     >
-      {title && (
-        <div
-          className="PdxPanelHeader"
-          onClick={collapsible ? handleToggle : undefined}
+      {title && collapsible && (
+        <button
+          aria-controls={contentId}
+          aria-expanded={!isCollapsed}
+          className="PdxPanelHeader PdxPanelHeaderButton"
+          onClick={handleToggle}
+          type="button"
         >
+          <span className="PdxPanelTitle">{title}</span>
+          <ChevronDown
+            aria-hidden="true"
+            className="PdxPanelToggleIcon"
+            size={16}
+          />
+        </button>
+      )}
+      {title && !collapsible && (
+        <div className="PdxPanelHeader">
           <h3 className="PdxPanelTitle">{title}</h3>
-          {collapsible && (
-            <button
-              type="button"
-              className="PdxPanelToggle"
-              aria-label={isCollapsed ? 'Expand' : 'Collapse'}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                style={{
-                  transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.2s ease',
-                }}
-              >
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </button>
-          )}
         </div>
       )}
-      <div className="PdxPanelContent">{children}</div>
+      <div className="PdxPanelContent" hidden={isCollapsed} id={contentId}>
+        {children}
+      </div>
     </div>
   );
 }

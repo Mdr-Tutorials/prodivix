@@ -58,15 +58,15 @@ export const Sizes: Story = {
     <div>
       <PdxSection size="Small" backgroundColor="Light" padding="Small">
         <h2>Small Section</h2>
-        <p>Minimum height: 200px</p>
+        <p>Minimum height: 120px</p>
       </PdxSection>
       <PdxSection size="Medium" backgroundColor="Default" padding="Medium">
         <h2>Medium Section</h2>
-        <p>Minimum height: 400px</p>
+        <p>Minimum height: 200px</p>
       </PdxSection>
       <PdxSection size="Large" backgroundColor="Light" padding="Large">
         <h2>Large Section</h2>
-        <p>Minimum height: 600px</p>
+        <p>Minimum height: 320px</p>
       </PdxSection>
     </div>
   ),

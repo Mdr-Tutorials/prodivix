@@ -102,11 +102,11 @@ export const AuthPage = () => {
               <span>{t('fields.email')}</span>
               <PdxInput
                 size="Small"
-                type="Email"
+                type="email"
                 autoComplete="email"
                 value={loginForm.email}
                 placeholder={t('placeholders.email')}
-                onChange={(value) =>
+                onValueChange={(value) =>
                   setLoginForm((prev) => ({
                     ...prev,
                     email: value,
@@ -118,11 +118,11 @@ export const AuthPage = () => {
               <span>{t('fields.password')}</span>
               <PdxInput
                 size="Small"
-                type="Password"
+                type="password"
                 autoComplete="current-password"
                 value={loginForm.password}
                 placeholder={t('placeholders.password')}
-                onChange={(value) =>
+                onValueChange={(value) =>
                   setLoginForm((prev) => ({
                     ...prev,
                     password: value,
@@ -133,7 +133,8 @@ export const AuthPage = () => {
             <PdxButton
               text={t('actions.login')}
               size="Small"
-              category="Primary"
+              type="submit"
+              variant="Primary"
               disabled={loginDisabled}
             />
           </form>
@@ -158,7 +159,7 @@ export const AuthPage = () => {
                 autoComplete="name"
                 value={registerForm.name}
                 placeholder={t('placeholders.name')}
-                onChange={(value) =>
+                onValueChange={(value) =>
                   setRegisterForm((prev) => ({
                     ...prev,
                     name: value,
@@ -172,7 +173,7 @@ export const AuthPage = () => {
                 size="Small"
                 value={registerForm.description}
                 placeholder={t('placeholders.description')}
-                onChange={(value) =>
+                onValueChange={(value) =>
                   setRegisterForm((prev) => ({
                     ...prev,
                     description: value,
@@ -184,11 +185,11 @@ export const AuthPage = () => {
               <span>{t('fields.email')}</span>
               <PdxInput
                 size="Small"
-                type="Email"
+                type="email"
                 autoComplete="email"
                 value={registerForm.email}
                 placeholder={t('placeholders.email')}
-                onChange={(value) =>
+                onValueChange={(value) =>
                   setRegisterForm((prev) => ({
                     ...prev,
                     email: value,
@@ -200,11 +201,11 @@ export const AuthPage = () => {
               <span>{t('fields.password')}</span>
               <PdxInput
                 size="Small"
-                type="Password"
+                type="password"
                 autoComplete="new-password"
                 value={registerForm.password}
                 placeholder={t('placeholders.password')}
-                onChange={(value) =>
+                onValueChange={(value) =>
                   setRegisterForm((prev) => ({
                     ...prev,
                     password: value,
@@ -218,7 +219,8 @@ export const AuthPage = () => {
             <PdxButton
               text={t('actions.register')}
               size="Small"
-              category="Primary"
+              type="submit"
+              variant="Primary"
               disabled={registerDisabled}
             />
           </form>
@@ -272,7 +274,7 @@ export const AuthPage = () => {
           <PdxTabs
             items={tabs}
             activeKey={mode}
-            onChange={(key) => {
+            onActiveKeyChange={(key) => {
               setMode(key as AuthMode);
               setError(null);
             }}
@@ -282,7 +284,7 @@ export const AuthPage = () => {
             <PdxButton
               text={t('footer.backHome')}
               size="Small"
-              category="Ghost"
+              variant="Ghost"
               onClick={() => navigate('/')}
             />
           </div>

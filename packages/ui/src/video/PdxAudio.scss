@@ -1,27 +1,25 @@
 .PdxAudio {
+  box-sizing: border-box;
   display: block;
-  padding: var(--spacing-md);
-  background-color: var(--border-default);
+  width: 100%;
+  max-width: 600px;
+  padding: var(--spacing-xs);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  transition: all var(--transition-normal);
+  background-color: var(--bg-panel);
+  color: var(--text-primary);
+  font-family: var(--font-family-ui);
 
-  audio {
-    width: 100%;
-    height: 40px;
-  }
-
-  &:hover {
-    box-shadow: var(--shadow-md);
+  &:focus-within {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--accent-color) 14%, transparent);
   }
 }
 
-[data-theme='dark'] {
-  .PdxAudio {
-    box-shadow: var(--shadow-sm);
-
-    &:hover {
-      box-shadow: var(--shadow-md);
-    }
-  }
+.PdxAudioElement {
+  display: block;
+  width: 100%;
+  height: 40px;
+  color-scheme: light dark;
 }

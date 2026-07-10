@@ -42,8 +42,17 @@ function PdxTag({
     >
       <span className="PdxTagText">{text}</span>
       {closable && (
-        <button type="button" className="PdxTagClose" onClick={onClose}>
-          <X size={12} />
+        <button
+          aria-label={`Remove ${text || 'tag'}`}
+          className="PdxTagClose"
+          onClick={(event) => {
+            event.stopPropagation();
+            onClose?.();
+          }}
+          title={`Remove ${text || 'tag'}`}
+          type="button"
+        >
+          <X aria-hidden="true" size={12} />
         </button>
       )}
     </span>

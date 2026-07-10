@@ -13,21 +13,21 @@ const meta: Meta<typeof PdxInput> = {
     type: {
       control: 'select',
       options: [
-        'Text',
-        'Password',
-        'Email',
-        'Number',
-        'Tel',
-        'Url',
-        'Search',
-        'Date',
-        'Time',
+        'text',
+        'password',
+        'email',
+        'number',
+        'tel',
+        'url',
+        'search',
+        'date',
+        'time',
       ],
       description: '输入类型',
     },
     size: {
       control: 'select',
-      options: ['Small', 'Medium', 'Large'],
+      options: ['ExtraSmall', 'Small', 'Medium', 'Large'],
       description: '输入框尺寸',
     },
     state: {
@@ -52,7 +52,7 @@ const meta: Meta<typeof PdxInput> = {
       control: 'object',
       description: '图标',
     },
-    onChange: { action: 'changed' },
+    onValueChange: { action: 'value changed' },
   },
 };
 
@@ -61,7 +61,7 @@ type Story = StoryObj<typeof PdxInput>;
 
 export const Default: Story = {
   args: {
-    type: 'Text',
+    type: 'text',
     placeholder: 'Enter text...',
     size: 'Medium',
   },
@@ -94,14 +94,14 @@ export const Types: Story = {
         width: '300px',
       }}
     >
-      <PdxInput type="Text" placeholder="Text input" />
-      <PdxInput type="Email" placeholder="Email input" />
-      <PdxInput type="Password" placeholder="Password input" />
-      <PdxInput type="Number" placeholder="Number input" />
-      <PdxInput type="Tel" placeholder="Phone input" />
-      <PdxInput type="Url" placeholder="URL input" />
-      <PdxInput type="Date" placeholder="Date input" />
-      <PdxInput type="Time" placeholder="Time input" />
+      <PdxInput type="text" placeholder="Text input" />
+      <PdxInput type="email" placeholder="Email input" />
+      <PdxInput type="password" placeholder="Password input" />
+      <PdxInput type="number" placeholder="Number input" />
+      <PdxInput type="tel" placeholder="Phone input" />
+      <PdxInput type="url" placeholder="URL input" />
+      <PdxInput type="date" placeholder="Date input" />
+      <PdxInput type="time" placeholder="Time input" />
     </div>
   ),
 };
@@ -188,7 +188,7 @@ export const Controlled: Story = {
         <PdxInput
           placeholder="Type something..."
           value={value}
-          onChange={setValue}
+          onValueChange={setValue}
         />
         <p style={{ marginTop: '8px' }}>Value: {value}</p>
       </div>

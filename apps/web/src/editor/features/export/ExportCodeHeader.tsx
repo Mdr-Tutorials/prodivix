@@ -44,6 +44,7 @@ export function ExportCodeHeader({
             open={viewMenuOpen}
             onOpenChange={onOpenViewMenuChange}
             panelClassName="ExportCodeViewMenu"
+            panelLabel={titleLabel}
             content={
               <div className="ExportCodeViewMenuList" role="listbox">
                 {viewOptions.map((option) => (

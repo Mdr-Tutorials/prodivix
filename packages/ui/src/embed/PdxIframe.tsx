@@ -1,3 +1,10 @@
+import './PdxIframe.scss';
+import { getDataAttributes, mergeClassNames } from '../foundation/component';
+import {
+  enumValueToKebabCase,
+  getAspectRatioStyle,
+  type PdxAspectRatio,
+} from '../foundation/media';
 import React from 'react';
 import type { PdxComponent } from '@prodivix/shared';
 
@@ -20,7 +27,7 @@ interface PdxIframeSpecificProps {
   sandbox?: string;
   width?: number | string;
   height?: number | string;
-  aspectRatio?: '16:9' | '4:3' | '1:1' | '21:9';
+  aspectRatio?: PdxAspectRatio;
 }
 
 type PdxIframeNativeProps = Omit<
@@ -70,66 +77,50 @@ function PdxIframe({
   dataAttributes = {},
   onLoad,
   onError,
+  onClick,
   ...rest
 }: PdxIframeProps) {
-  const fullClassName =
-    `PdxIframe ${aspectRatio.replace(':', '-')} ${className || ''}`.trim();
-
-  const dataProps = { ...dataAttributes };
+  const fullClassName = mergeClassNames(
+    'PdxIframe',
+    `aspect-${aspectRatio.replace(':', '-')}`,
+    height !== undefined && 'HasExplicitHeight',
+    className
+  );
 
   const containerStyle: React.CSSProperties = {
+    ...getAspectRatioStyle(aspectRatio),
     ...(style as React.CSSProperties | undefined),
-    width: width || '100%',
-    height: height || 'auto',
-  };
-
-  const aspectRatioMap: Record<string, string> = {
-    '16:9': '16 / 9',
-    '4:3': '4 / 3',
-    '1:1': '1 / 1',
-    '21:9': '21 / 9',
-  };
-
-  const iframeContainerStyle: React.CSSProperties = {
-    position: 'relative',
-    width: '100%',
-    aspectRatio: aspectRatioMap[aspectRatio],
-    overflow: 'hidden',
-    backgroundColor: '#f5f5f5',
-    borderRadius: '8px',
-  };
-
-  const iframeStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: '100%',
-    border: 'none',
+    width: width ?? style?.width ?? '100%',
+    ...(height !== undefined ? { height } : {}),
   };
 
   return (
     <div
       className={fullClassName}
-      style={containerStyle}
       id={id}
-      {...dataProps}
+      onClick={onClick}
+      style={containerStyle}
+      {...getDataAttributes(dataAttributes)}
     >
-      <div style={iframeContainerStyle}>
+      <div className="PdxIframeFrame">
         <iframe
-          style={iframeStyle}
-          src={src}
-          srcDoc={srcDoc}
-          title={title}
           allow={allow}
           allowFullScreen={allowFullScreen}
+          className="PdxIframeElement"
           loading={loading.toLowerCase() as 'eager' | 'lazy'}
           referrerPolicy={
-            referrerPolicy?.toLowerCase() as React.IframeHTMLAttributes<HTMLIFrameElement>['referrerPolicy']
+            referrerPolicy
+              ? (enumValueToKebabCase(
+                  referrerPolicy
+                ) as React.IframeHTMLAttributes<HTMLIFrameElement>['referrerPolicy'])
+              : undefined
           }
           sandbox={sandbox}
-          onLoad={onLoad}
           onError={onError}
+          onLoad={onLoad}
+          src={src}
+          srcDoc={srcDoc}
+          title={title || 'Embedded content'}
           {...rest}
         />
       </div>

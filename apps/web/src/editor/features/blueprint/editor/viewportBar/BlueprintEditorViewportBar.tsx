@@ -99,13 +99,13 @@ export function BlueprintEditorViewportBar({
           <PdxInput
             size="Small"
             value={viewportWidth}
-            onChange={onViewportWidthChange}
+            onValueChange={onViewportWidthChange}
           />
           <span className="text-(--text-muted)">×</span>
           <PdxInput
             size="Small"
             value={viewportHeight}
-            onChange={onViewportHeightChange}
+            onValueChange={onViewportHeightChange}
           />
         </div>
       </div>
@@ -190,16 +190,11 @@ export function BlueprintEditorViewportBar({
         </select>
       </div>
       <PdxPopover
+        align="End"
         className="ml-auto flex-none"
         panelClassName="max-h-[min(60vh,520px)] w-[min(760px,90vw)] overflow-auto p-2.5"
-        panelStyle={{
-          top: 'auto',
-          right: 0,
-          bottom: '100%',
-          left: 'auto',
-          marginTop: 0,
-          marginBottom: '6px',
-        }}
+        panelLabel={t('viewport.moreDevices')}
+        placement="Top"
         content={
           <div className="grid [grid-template-columns:repeat(auto-fill,minmax(190px,1fr))] gap-2.5">
             {VIEWPORT_DEVICE_PRESETS.map((preset) => {

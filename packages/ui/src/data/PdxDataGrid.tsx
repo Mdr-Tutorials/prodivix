@@ -63,41 +63,64 @@ function PdxDataGrid<T extends Record<string, unknown>>({
 
   return (
     <div
+      aria-colcount={columns.length}
+      aria-rowcount={
+        data.length + (showHeader ? 1 : 0) + (data.length === 0 ? 1 : 0)
+      }
       className={fullClassName}
-      style={style as React.CSSProperties}
-      id={id}
       {...dataProps}
+      id={id}
+      role="grid"
+      style={style as React.CSSProperties}
     >
       {showHeader && (
         <div
+          aria-rowindex={1}
           className="PdxDataGridHeader"
+          role="row"
           style={{ gridTemplateColumns: columnTemplate }}
         >
-          {columns.map((column) => (
+          {columns.map((column, columnIndex) => (
             <div
+              aria-colindex={columnIndex + 1}
               key={column.key}
               className={`PdxDataGridCell Align${column.align || 'Left'}`}
+              role="columnheader"
             >
               {column.title}
             </div>
           ))}
         </div>
       )}
-      {data.length === 0 && <div className="PdxDataGridEmpty">{emptyText}</div>}
+      {data.length === 0 && (
+        <div
+          aria-rowindex={showHeader ? 2 : 1}
+          className="PdxDataGridEmpty"
+          role="row"
+        >
+          <div aria-colspan={columns.length} role="gridcell">
+            {emptyText}
+          </div>
+        </div>
+      )}
       {data.map((record, index) => (
         <div
+          aria-rowindex={index + (showHeader ? 2 : 1)}
           key={getRowKey(record, index)}
           className="PdxDataGridRow"
+          role="row"
           style={{ gridTemplateColumns: columnTemplate }}
         >
-          {columns.map((column) => {
+          {columns.map((column, columnIndex) => {
             const value = column.dataIndex
               ? (record as Record<string, unknown>)[column.dataIndex as string]
               : undefined;
             return (
               <div
+                aria-colindex={columnIndex + 1}
                 key={column.key}
                 className={`PdxDataGridCell Align${column.align || 'Left'}`}
+                role="gridcell"
               >
                 {column.render
                   ? column.render(value, record, index)

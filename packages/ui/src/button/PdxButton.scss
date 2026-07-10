@@ -1,178 +1,163 @@
-@mixin button-hover($bg, $color: null, $border: null) {
-  background-color: $bg;
-
-  @if $color {
-    color: $color;
-  }
-
-  @if $border {
-    border-color: $border;
-  }
-}
+@use '../foundation/control' as control;
 
 .PdxButton {
-  font-weight: var(--font-weight-regular);
-  border-radius: 6px;
-  cursor: pointer;
-  transition:
-    background-color var(--motion-duration-normal) var(--motion-easing-standard),
-    color var(--motion-duration-normal) var(--motion-easing-standard),
-    border-color var(--motion-duration-normal) var(--motion-easing-standard);
-  text-align: center;
-  text-decoration: none;
-  user-select: none;
-  border: 1px solid;
+  --pdx-button-background: var(--bg-canvas);
+  --pdx-button-border: var(--border-default);
+  --pdx-button-foreground: var(--text-primary);
+  --pdx-button-hover-background: var(--bg-raised);
+  --pdx-button-hover-border: var(--border-strong);
+  --pdx-button-hover-foreground: var(--text-primary);
+
+  @include control.control-transition;
+
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.3em;
+  gap: var(--spacing-xs);
+  box-sizing: border-box;
+  border: 1px solid var(--pdx-button-border);
+  border-radius: var(--radius-md);
+  background: var(--pdx-button-background);
+  color: var(--pdx-button-foreground);
+  font-family: var(--font-family-ui);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-compact);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
 
-  &:active {
-    opacity: 0.9;
+  &:hover:not(:disabled, [aria-disabled='true']) {
+    border-color: var(--pdx-button-hover-border);
+    background: var(--pdx-button-hover-background);
+    color: var(--pdx-button-hover-foreground);
   }
 
-  &.Disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  &.PdxButtonLink {
+    color: var(--pdx-button-foreground);
 
-    &:hover,
-    &:active {
-      opacity: 0.5;
+    &:hover:not([aria-disabled='true']) {
+      color: var(--pdx-button-hover-foreground);
     }
   }
 
-  &.Big {
-    font-weight: var(--font-weight-medium);
-    padding: 16px 32px;
-    font-size: var(--font-size-2xl);
-    border-radius: 8px;
+  &:active:not(:disabled, [aria-disabled='true']) {
+    transform: translateY(1px);
   }
 
-  &.Medium {
-    font-weight: var(--font-weight-medium);
-    padding: 12px 24px;
-    font-size: var(--font-size-lg);
+  &:focus-visible {
+    @include control.focus-ring;
   }
 
-  &.Small {
-    padding: 8px 16px;
-    font-size: var(--font-size-md);
+  &:disabled,
+  &[aria-disabled='true'],
+  &.Disabled {
+    @include control.disabled-control;
   }
 
-  &.Tiny {
-    padding: 5px 10px;
+  &.ExtraSmall {
+    min-height: 28px;
+    padding: 0 var(--spacing-sm);
     font-size: var(--font-size-xs);
   }
 
-  &.Primary {
-    background-color: var(--accent-color);
-    color: var(--text-inverse);
-    border-color: var(--accent-color);
-
-    &:not(.Disabled):hover {
-      @include button-hover(
-        var(--accent-hover),
-        var(--text-inverse),
-        var(--accent-hover)
-      );
-    }
+  &.Small {
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: var(--font-size-sm);
   }
 
-  &.Secondary {
-    background-color: var(--bg-canvas);
-    color: var(--text-primary);
-    border-color: var(--border-default);
-
-    &:not(.Disabled):hover {
-      @include button-hover(var(--bg-raised), var(--text-primary));
-    }
-
-    &:not(.Disabled):active {
-      opacity: 0.75;
-    }
+  &.Medium {
+    min-height: 36px;
+    padding: 0 var(--spacing-md);
+    font-size: var(--font-size-sm);
   }
 
-  &.Danger {
-    background-color: var(--danger-color);
-    color: var(--text-inverse);
-    border-color: var(--danger-color);
-
-    &:not(.Disabled):hover {
-      @include button-hover(var(--danger-hover), null, var(--danger-hover));
-    }
+  &.Large {
+    min-height: 44px;
+    padding: 0 var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    font-size: var(--font-size-md);
   }
 
-  &.Warning {
-    background-color: var(--warning-color);
-    color: var(--text-primary);
-    border-color: var(--warning-color);
-
-    &:not(.Disabled):hover {
-      @include button-hover(var(--warning-hover), null, var(--warning-hover));
-    }
+  &.IconOnly {
+    aspect-ratio: 1;
+    padding: 0;
   }
 
-  &.Ghost {
-    background-color: transparent;
-    color: var(--text-primary);
-    border-color: var(--border-strong);
-
-    &:not(.Disabled):hover {
-      background-color: color-mix(
-        in srgb,
-        var(--text-primary) 10%,
-        transparent
-      );
-      color: var(--text-secondary);
-      border-color: var(--text-secondary);
-    }
+  &.VariantPrimary {
+    --pdx-button-background: var(--accent-color);
+    --pdx-button-border: var(--accent-color);
+    --pdx-button-foreground: var(--text-inverse);
+    --pdx-button-hover-background: var(--accent-hover);
+    --pdx-button-hover-border: var(--accent-hover);
+    --pdx-button-hover-foreground: var(--text-inverse);
   }
 
-  &.SubtleDanger {
-    background-color: transparent;
-    color: var(--danger-color);
-    border-color: var(--danger-subtle);
-
-    &:not(.Disabled):hover {
-      @include button-hover(
-        var(--danger-subtle-hover),
-        var(--danger-color),
-        var(--danger-hover)
-      );
-    }
+  &.VariantGhost {
+    --pdx-button-background: transparent;
+    --pdx-button-border: transparent;
+    --pdx-button-hover-background: var(--bg-raised);
+    --pdx-button-hover-border: transparent;
   }
 
-  &.SubtleWarning {
-    background-color: transparent;
-    color: var(--warning-color);
-    border-color: var(--warning-subtle);
-
-    &:not(.Disabled):hover {
-      @include button-hover(
-        var(--warning-subtle-hover),
-        var(--warning-color),
-        var(--warning-hover)
-      );
-    }
+  &.ToneDanger {
+    --pdx-button-foreground: var(--danger-color);
+    --pdx-button-hover-foreground: var(--danger-color);
   }
 
-  &.OnlyIcon {
-    padding: 8px;
+  &.VariantPrimary.ToneDanger {
+    --pdx-button-background: var(--danger-color);
+    --pdx-button-border: var(--danger-color);
+    --pdx-button-foreground: var(--text-inverse);
+    --pdx-button-hover-background: var(--danger-hover);
+    --pdx-button-hover-border: var(--danger-hover);
+    --pdx-button-hover-foreground: var(--text-inverse);
   }
 
-  &.OnlyIcon.Big {
-    font-size: 40px;
+  &.ToneWarning {
+    --pdx-button-foreground: var(--warning-color);
+    --pdx-button-hover-foreground: var(--warning-color);
   }
 
-  &.OnlyIcon.Medium {
-    font-size: 32px;
+  &.VariantPrimary.ToneWarning {
+    --pdx-button-background: var(--warning-color);
+    --pdx-button-border: var(--warning-color);
+    --pdx-button-foreground: var(--text-primary);
+    --pdx-button-hover-background: var(--warning-hover);
+    --pdx-button-hover-border: var(--warning-hover);
+    --pdx-button-hover-foreground: var(--text-primary);
   }
 
-  &.OnlyIcon.Small {
-    font-size: 24px;
-  }
+  @include control.reduced-motion;
+}
 
-  &.OnlyIcon.Tiny {
-    font-size: 16px;
+.PdxButtonIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.PdxButtonSpinner {
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--radius-full);
+  animation: pdx-button-spin 700ms linear infinite;
+}
+
+@keyframes pdx-button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .PdxButtonSpinner {
+    animation-duration: 1400ms;
   }
 }

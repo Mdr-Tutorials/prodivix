@@ -1,51 +1,21 @@
+@use '../foundation/media';
+
 .PdxVideo {
-  display: block;
-  transition: all var(--transition-normal);
-
-  > div {
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-sm);
-  }
-
-  video {
-    background-color: var(--text-primary);
-  }
-
-  &.aspect-16-9 {
-    > div {
-      aspect-ratio: 16 / 9;
-    }
-  }
-
-  &.aspect-4-3 {
-    > div {
-      aspect-ratio: 4 / 3;
-    }
-  }
-
-  &.aspect-1-1 {
-    > div {
-      aspect-ratio: 1 / 1;
-    }
-  }
-
-  &.aspect-21-9 {
-    > div {
-      aspect-ratio: 21 / 9;
-    }
-  }
-
-  &:hover > div {
-    box-shadow: var(--shadow-md);
-  }
+  @include media.media-container;
 }
 
-[data-theme='dark'] {
-  .PdxVideo > div {
-    box-shadow: var(--shadow-sm);
-  }
+.PdxVideoFrame {
+  @include media.media-frame(#000);
+  @include media.reduced-motion;
+}
 
-  .PdxVideo:hover > div {
-    box-shadow: var(--shadow-md);
-  }
+.PdxVideo.HasExplicitHeight .PdxVideoFrame {
+  @include media.explicit-height-frame;
+}
+
+.PdxVideoElement {
+  @include media.fill-media;
+
+  object-fit: contain;
+  background-color: #000;
 }

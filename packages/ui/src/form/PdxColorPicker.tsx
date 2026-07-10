@@ -1,16 +1,24 @@
 import './PdxColorPicker.scss';
+import {
+  mergeClassNames,
+  type PdxValidationState,
+} from '../foundation/component';
+import { useControllableState } from '../foundation/useControllableState';
+import PdxField, { usePdxFieldIds } from './PdxField';
 import { type PdxComponent } from '@prodivix/shared';
 import { useEffect, useState } from 'react';
 import type React from 'react';
 
 interface PdxColorPickerSpecificProps {
-  label?: string;
-  description?: string;
-  message?: string;
+  label?: React.ReactNode;
+  description?: React.ReactNode;
+  message?: React.ReactNode;
   value?: string;
   defaultValue?: string;
   size?: 'Small' | 'Medium' | 'Large';
   disabled?: boolean;
+  required?: boolean;
+  state?: PdxValidationState;
   showTextInput?: boolean;
   onChange?: (value: string) => void;
 }
@@ -18,10 +26,21 @@ interface PdxColorPickerSpecificProps {
 export interface PdxColorPickerProps
   extends PdxComponent, PdxColorPickerSpecificProps {}
 
-const normalizeColor = (value: string) => {
-  if (!value) return '#000000';
-  return value.startsWith('#') ? value : `#${value}`;
-};
+const DEFAULT_COLOR = '#3F3F3F';
+
+function parseHexColor(value: string) {
+  const candidate = value.trim().replace(/^#/, '');
+  if (/^[0-9a-f]{3}$/i.test(candidate)) {
+    return `#${candidate
+      .split('')
+      .map((character) => `${character}${character}`)
+      .join('')}`.toUpperCase();
+  }
+  if (/^[0-9a-f]{6}$/i.test(candidate)) {
+    return `#${candidate.toUpperCase()}`;
+  }
+  return undefined;
+}
 
 function PdxColorPicker({
   label,
@@ -31,6 +50,8 @@ function PdxColorPicker({
   defaultValue = '#3f3f3f',
   size = 'Medium',
   disabled = false,
+  required = false,
+  state = 'Default',
   showTextInput = true,
   onChange,
   className,
@@ -38,67 +59,108 @@ function PdxColorPicker({
   id,
   dataAttributes = {},
 }: PdxColorPickerProps) {
-  const [internalValue, setInternalValue] = useState(defaultValue);
+  const normalizedDefault = parseHexColor(defaultValue) ?? DEFAULT_COLOR;
+  const [currentValue, setCurrentValue] = useControllableState({
+    value,
+    defaultValue: normalizedDefault,
+    onChange,
+  });
+  const resolvedValue = parseHexColor(currentValue) ?? normalizedDefault;
+  const [draftValue, setDraftValue] = useState(resolvedValue);
+  const { controlId, descriptionId, messageId, describedBy } = usePdxFieldIds({
+    id,
+    description,
+    message,
+  });
+  const colorInputId = showTextInput ? `${controlId}-swatch` : controlId;
 
   useEffect(() => {
-    if (value !== undefined) {
-      setInternalValue(value);
-    }
-  }, [value]);
+    setDraftValue(resolvedValue);
+  }, [resolvedValue]);
 
-  const currentValue = value !== undefined ? value : internalValue;
+  const commitValue = (nextValue: string) => {
+    const normalized = parseHexColor(nextValue);
+    if (!normalized) return false;
 
-  const handleChange = (nextValue: string) => {
-    const normalized = normalizeColor(nextValue);
-    if (value === undefined) {
-      setInternalValue(normalized);
-    }
-    if (onChange) {
-      onChange(normalized);
-    }
+    setDraftValue(normalized);
+    setCurrentValue(normalized);
+    return true;
   };
 
-  const fullClassName =
-    `PdxColorPicker ${size} ${disabled ? 'Disabled' : ''} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const fullClassName = mergeClassNames(
+    'PdxColorPicker',
+    size,
+    state,
+    disabled && 'Disabled',
+    className
+  );
 
   return (
-    <div
-      className={`PdxField ${fullClassName}`}
+    <PdxField
+      className={fullClassName}
+      controlId={controlId}
+      dataAttributes={dataAttributes}
+      description={description}
+      descriptionId={descriptionId}
+      label={label}
+      message={message}
+      messageId={messageId}
+      required={required}
+      state={state}
       style={style as React.CSSProperties}
-      id={id}
-      {...dataProps}
     >
-      {label && (
-        <div className="PdxFieldHeader">
-          <label className="PdxFieldLabel">{label}</label>
-        </div>
-      )}
-      {description && <div className="PdxFieldDescription">{description}</div>}
       <div className="PdxColorPickerControls">
-        <input
-          className="PdxColorPickerInput"
-          type="color"
-          value={normalizeColor(currentValue)}
-          disabled={disabled}
-          onChange={(event) => handleChange(event.target.value)}
-        />
+        <label
+          aria-label={showTextInput ? 'Choose color' : undefined}
+          className="PdxColorPickerSwatch"
+          htmlFor={colorInputId}
+          style={{ '--pdx-color-value': resolvedValue } as React.CSSProperties}
+          title={resolvedValue}
+        >
+          <input
+            aria-label={showTextInput ? 'Choose color' : undefined}
+            aria-describedby={describedBy}
+            aria-invalid={state === 'Error' || undefined}
+            className="PdxColorPickerInput"
+            disabled={disabled}
+            id={colorInputId}
+            onChange={(event) => commitValue(event.target.value)}
+            type="color"
+            value={resolvedValue}
+          />
+        </label>
         {showTextInput && (
           <input
+            aria-describedby={describedBy}
+            aria-invalid={state === 'Error' || undefined}
+            aria-label={typeof label === 'string' ? label : 'Color value'}
             className="PdxColorPickerText"
-            type="text"
-            value={normalizeColor(currentValue)}
             disabled={disabled}
-            onChange={(event) => handleChange(event.target.value)}
+            id={controlId}
+            maxLength={7}
+            onBlur={() => {
+              if (!commitValue(draftValue)) setDraftValue(resolvedValue);
+            }}
+            onChange={(event) => {
+              const nextValue = event.target.value.toUpperCase();
+              setDraftValue(nextValue);
+              commitValue(nextValue);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                setDraftValue(resolvedValue);
+                event.currentTarget.blur();
+              }
+              if (event.key === 'Enter') event.currentTarget.blur();
+            }}
+            required={required}
+            spellCheck={false}
+            type="text"
+            value={draftValue}
           />
         )}
-        <span
-          className="PdxColorPickerSwatch"
-          style={{ backgroundColor: normalizeColor(currentValue) }}
-        />
       </div>
-      {message && <div className="PdxFieldMessage">{message}</div>}
-    </div>
+    </PdxField>
   );
 }
 

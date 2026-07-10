@@ -1,153 +1,131 @@
-.PdxInput {
-  display: inline-flex;
-  align-items: center;
-  position: relative;
-  width: 100%;
-  max-width: 400px;
+@use '../foundation/control' as control;
 
+.PdxInputWrapper {
+  position: relative;
+  display: inline-flex;
   width: 100%;
-  border: 1px solid;
+  min-width: 0;
+}
+
+.PdxInput {
+  @include control.control-transition;
+
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  padding: 0 var(--spacing-sm);
-  font-size: var(--font-size-lg);
-  line-height: var(--line-height-normal);
-  transition:
-    border-color var(--motion-duration-fast) var(--motion-easing-standard),
-    box-shadow var(--motion-duration-fast) var(--motion-easing-standard);
-  outline: none;
-  background-color: var(--bg-canvas);
+  background: var(--bg-canvas);
   color: var(--text-primary);
-  border-color: var(--border-default);
+  font-family: var(--font-family-ui);
+  line-height: var(--line-height-normal);
 
   &::placeholder {
     color: var(--text-muted);
   }
 
-  &:focus {
-    border-color: var(--accent-color);
-    box-shadow: 0 0 0 3px
-      color-mix(in srgb, var(--accent-color) 12%, transparent);
+  &:hover:not(:disabled, :read-only) {
+    border-color: var(--border-strong);
+  }
+
+  &:focus-visible {
+    @include control.focus-ring;
   }
 
   &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    background-color: var(--bg-raised);
+    @include control.disabled-control;
+
+    background: var(--bg-raised);
   }
 
   &:read-only {
-    background-color: var(--bg-raised);
-    cursor: default;
+    background: var(--bg-raised);
+  }
+
+  &.ExtraSmall {
+    min-height: 28px;
+    padding: 0 var(--spacing-sm);
+    font-size: var(--font-size-xs);
   }
 
   &.Small {
-    padding: var(--spacing-xs) var(--spacing-sm);
-    font-size: var(--font-size-md);
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: var(--font-size-sm);
   }
 
   &.Medium {
-    padding: var(--spacing-sm) var(--spacing-md);
-    font-size: var(--font-size-lg);
+    min-height: 36px;
+    padding: 0 var(--spacing-md);
+    font-size: var(--font-size-sm);
   }
 
   &.Large {
-    padding: var(--spacing-md) var(--spacing-lg);
-    font-size: var(--font-size-xl);
+    min-height: 44px;
+    padding: 0 var(--spacing-lg);
+    font-size: var(--font-size-md);
+  }
+
+  &.WithIcon.Left {
+    padding-left: 34px;
+  }
+
+  &.WithIcon.Right {
+    padding-right: 34px;
+  }
+
+  &.Large.WithIcon.Left {
+    padding-left: 42px;
+  }
+
+  &.Large.WithIcon.Right {
+    padding-right: 42px;
   }
 
   &.Error {
     border-color: var(--danger-color);
 
-    &:focus {
-      border-color: var(--danger-color);
-      box-shadow: 0 0 0 3px
-        color-mix(in srgb, var(--danger-color) 12%, transparent);
+    &:focus-visible {
+      @include control.focus-ring(var(--danger-color));
     }
   }
 
   &.Warning {
     border-color: var(--warning-color);
 
-    &:focus {
-      border-color: var(--warning-color);
-      box-shadow: 0 0 0 3px
-        color-mix(in srgb, var(--warning-color) 14%, transparent);
+    &:focus-visible {
+      @include control.focus-ring(var(--warning-color));
     }
   }
 
   &.Success {
     border-color: var(--success-color);
 
-    &:focus {
-      border-color: var(--success-color);
-      box-shadow: 0 0 0 3px
-        color-mix(in srgb, var(--success-color) 12%, transparent);
+    &:focus-visible {
+      @include control.focus-ring(var(--success-color));
     }
   }
 
-  &.WithIcon {
-    input {
-      padding-left: var(--spacing-xl);
-    }
-
-    &.Small {
-      padding-left: var(--spacing-lg);
-    }
-
-    &.Large {
-      padding-left: var(--spacing-xl);
-    }
-
-    &.WithIcon {
-      padding-right: var(--spacing-xl);
-    }
-
-    &.Small.WithIcon {
-      padding-right: var(--spacing-lg);
-    }
-
-    &.Large.WithIcon {
-      padding-right: var(--spacing-xl);
-    }
-  }
-
-  .PdxInputIcon {
-    position: absolute;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-muted);
-    pointer-events: none;
-
-    &.Left {
-      left: var(--spacing-sm);
-    }
-
-    &.Right {
-      right: var(--spacing-sm);
-    }
-  }
-
-  &.Small .PdxInputIcon.Left {
-    left: var(--spacing-sm);
-  }
-
-  &.Small .PdxInputIcon.Right {
-    right: var(--spacing-sm);
-  }
-
-  &.Large .PdxInputIcon.Left {
-    left: var(--spacing-md);
-  }
-
-  &.Large .PdxInputIcon.Right {
-    right: var(--spacing-md);
-  }
+  @include control.reduced-motion;
 }
 
-.PdxInput-wrapper {
-  display: flex;
-  flex-direction: row;
-  gap: var(--spacing-sm);
+.PdxInputIcon {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  line-height: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+
+  &.Left {
+    left: 10px;
+  }
+
+  &.Right {
+    right: 10px;
+  }
 }

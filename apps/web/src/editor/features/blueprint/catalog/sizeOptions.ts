@@ -7,10 +7,10 @@ export const SIZE_OPTIONS: ComponentPreviewOption[] = [
 ];
 
 export const BUTTON_SIZE_OPTIONS: ComponentPreviewOption[] = [
-  { id: 'XS', label: 'XS', value: 'Tiny' },
+  { id: 'XS', label: 'XS', value: 'ExtraSmall' },
   { id: 'S', label: 'S', value: 'Small' },
   { id: 'M', label: 'M', value: 'Medium' },
-  { id: 'L', label: 'L', value: 'Big' },
+  { id: 'L', label: 'L', value: 'Large' },
 ];
 
 export const TEXT_SIZE_OPTIONS: ComponentPreviewOption[] = [

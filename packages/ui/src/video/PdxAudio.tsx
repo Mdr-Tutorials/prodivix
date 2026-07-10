@@ -1,3 +1,5 @@
+import './PdxAudio.scss';
+import { getDataAttributes, mergeClassNames } from '../foundation/component';
 import React from 'react';
 import type { PdxComponent } from '@prodivix/shared';
 
@@ -37,28 +39,20 @@ function PdxAudio({
   onLoadedMetadata,
   onClick,
 }: PdxAudioProps) {
-  const fullClassName = `PdxAudio ${className || ''}`.trim();
-
-  const dataProps = { ...dataAttributes };
+  const fullClassName = mergeClassNames('PdxAudio', className);
   const normalizedSrc = src?.trim() ? src : undefined;
-
-  const containerStyle = {
-    ...style,
-    width: '100%',
-    maxWidth: '600px',
-  };
 
   return (
     <div
       className={fullClassName}
-      style={containerStyle as React.CSSProperties}
       id={id}
       onClick={onClick}
-      {...dataProps}
+      style={style as React.CSSProperties}
+      {...getDataAttributes(dataAttributes)}
     >
       <audio
-        src={normalizedSrc}
         autoPlay={autoplay}
+        className="PdxAudioElement"
         controls={controls}
         loop={loop}
         muted={muted}
@@ -69,6 +63,7 @@ function PdxAudio({
         onTimeUpdate={onTimeUpdate}
         onProgress={onProgress}
         onLoadedMetadata={onLoadedMetadata}
+        src={normalizedSrc}
       />
     </div>
   );

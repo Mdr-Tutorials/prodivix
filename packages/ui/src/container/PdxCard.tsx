@@ -1,4 +1,5 @@
 import './PdxCard.scss';
+import { getDataAttributes, mergeClassNames } from '../foundation/component';
 import { type PdxComponent } from '@prodivix/shared';
 import type React from 'react';
 
@@ -9,6 +10,7 @@ interface PdxCardSpecificProps {
   padding?: 'None' | 'Small' | 'Medium' | 'Large';
   hoverable?: boolean;
   clickable?: boolean;
+  disabled?: boolean;
 }
 
 export interface PdxCardProps extends PdxComponent, PdxCardSpecificProps {}
@@ -20,24 +22,43 @@ function PdxCard({
   padding = 'Medium',
   hoverable = false,
   clickable = false,
+  disabled = false,
   className,
   style,
   id,
   dataAttributes = {},
   onClick,
 }: PdxCardProps) {
-  const fullClassName =
-    `PdxCard ${size} ${variant} Padding${padding} ${hoverable ? 'Hoverable' : ''} ${clickable ? 'Clickable' : ''} ${className || ''}`.trim();
+  const fullClassName = mergeClassNames(
+    'PdxCard',
+    size,
+    variant,
+    `Padding${padding}`,
+    hoverable && 'Hoverable',
+    clickable && 'Clickable',
+    disabled && 'Disabled',
+    className
+  );
 
-  const dataProps = { ...dataAttributes };
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!clickable || disabled || !onClick) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+
+    event.preventDefault();
+    event.currentTarget.click();
+  };
 
   return (
     <div
+      aria-disabled={clickable && disabled ? true : undefined}
       className={fullClassName}
-      style={style as React.CSSProperties | undefined}
       id={id}
-      onClick={onClick}
-      {...dataProps}
+      onClick={disabled ? undefined : onClick}
+      onKeyDown={handleKeyDown}
+      role={clickable ? 'button' : undefined}
+      style={style as React.CSSProperties | undefined}
+      tabIndex={clickable && !disabled ? 0 : undefined}
+      {...getDataAttributes(dataAttributes)}
     >
       {children}
     </div>

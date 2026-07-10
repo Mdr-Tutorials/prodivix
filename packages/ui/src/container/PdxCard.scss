@@ -1,25 +1,30 @@
+@use '../foundation/control';
+
 .PdxCard {
   box-sizing: border-box;
-  background-color: var(--bg-canvas);
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
-  transition:
-    border-color var(--transition-normal),
-    box-shadow var(--transition-normal),
-    transform var(--transition-fast),
-    background-color var(--transition-normal);
+  background-color: var(--bg-canvas);
   color: var(--text-primary);
-  display: block;
+  font-family: var(--font-family-ui);
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-easing-standard),
+    border-color var(--motion-duration-fast) var(--motion-easing-standard),
+    box-shadow var(--motion-duration-fast) var(--motion-easing-standard),
+    transform var(--motion-duration-fast) var(--motion-easing-standard);
 
   &.Small {
-    min-height: 100px;
+    min-height: 88px;
   }
 
   &.Medium {
-    min-height: 200px;
+    min-height: 128px;
   }
 
   &.Large {
-    min-height: 300px;
+    min-height: 176px;
   }
 
   &.PaddingNone {
@@ -43,36 +48,47 @@
   }
 
   &.Bordered {
-    border: 2px solid var(--border-default);
+    border-color: var(--border-strong);
   }
 
   &.Elevated {
-    border: 1px solid var(--border-default);
-    box-shadow: var(--shadow-md);
+    border-color: var(--border-subtle);
+    box-shadow: var(--shadow-sm);
   }
 
   &.Flat {
-    border: none;
-    background-color: var(--bg-raised);
+    background-color: var(--bg-panel);
   }
 
-  &.Hoverable {
-    &:hover {
-      box-shadow: var(--shadow-lg);
-      transform: translateY(-2px);
-    }
+  &.Hoverable:hover:not(.Disabled) {
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
   }
 
   &.Clickable {
     cursor: pointer;
 
-    &:hover {
-      border-color: var(--accent-color);
-      box-shadow: var(--shadow-lg);
+    &:hover:not(.Disabled) {
+      border-color: var(--border-strong);
+      background-color: var(--bg-panel);
     }
 
-    &:active {
-      transform: scale(0.98);
+    &:focus-visible {
+      @include control.focus-ring;
     }
+
+    &:active:not(.Disabled) {
+      background-color: var(--bg-raised);
+    }
+  }
+
+  &.Disabled {
+    cursor: not-allowed;
+    opacity: 0.52;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition-duration: 0.01ms;
   }
 }

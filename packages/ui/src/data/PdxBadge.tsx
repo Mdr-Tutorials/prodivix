@@ -41,6 +41,10 @@ function PdxBadge({
       {children}
       {showBadge && (
         <span
+          aria-label={
+            dot ? 'Status indicator' : `${displayCount} notifications`
+          }
+          aria-live="polite"
           className={`PdxBadgeCount ${dot ? 'Dot' : ''}`}
           style={color ? { backgroundColor: color } : undefined}
         >

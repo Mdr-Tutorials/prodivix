@@ -1,13 +1,22 @@
 .PdxAvatar {
+  --pdx-avatar-size: 48px;
+  --pdx-avatar-status-size: 12px;
+
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   position: relative;
+  width: var(--pdx-avatar-size);
+  height: var(--pdx-avatar-size);
+  flex: 0 0 auto;
   overflow: hidden;
-  background-color: var(--border-default);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-raised);
   color: var(--text-secondary);
-  font-weight: 600;
-  transition: all var(--transition-normal);
+  font-family: var(--font-family-ui);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
 
   img {
     display: block;
@@ -24,64 +33,45 @@
 
   .PdxAvatar-status {
     position: absolute;
-    bottom: 0;
-    right: 0;
+    right: 1px;
+    bottom: 1px;
+    box-sizing: border-box;
+    width: var(--pdx-avatar-status-size);
+    height: var(--pdx-avatar-status-size);
     border: 2px solid var(--bg-canvas);
+    border-radius: var(--radius-full);
   }
 
   &.ExtraSmall {
-    width: 24px;
-    height: 24px;
-    font-size: 10px;
+    --pdx-avatar-size: 24px;
+    --pdx-avatar-status-size: 8px;
 
-    .PdxAvatar-status {
-      width: 8px;
-      height: 8px;
-    }
+    font-size: 10px;
   }
 
   &.Small {
-    width: 32px;
-    height: 32px;
-    font-size: 12px;
+    --pdx-avatar-size: 32px;
+    --pdx-avatar-status-size: 10px;
 
-    .PdxAvatar-status {
-      width: 10px;
-      height: 10px;
-    }
+    font-size: var(--font-size-xs);
   }
 
   &.Medium {
-    width: 48px;
-    height: 48px;
-    font-size: 16px;
-
-    .PdxAvatar-status {
-      width: 12px;
-      height: 12px;
-    }
+    font-size: var(--font-size-md);
   }
 
   &.Large {
-    width: 64px;
-    height: 64px;
-    font-size: 20px;
+    --pdx-avatar-size: 64px;
+    --pdx-avatar-status-size: 14px;
 
-    .PdxAvatar-status {
-      width: 14px;
-      height: 14px;
-    }
+    font-size: var(--font-size-xl);
   }
 
   &.ExtraLarge {
-    width: 96px;
-    height: 96px;
-    font-size: 28px;
+    --pdx-avatar-size: 96px;
+    --pdx-avatar-status-size: 18px;
 
-    .PdxAvatar-status {
-      width: 16px;
-      height: 16px;
-    }
+    font-size: 28px;
   }
 
   &.Square {
@@ -94,10 +84,6 @@
 
   &.Circle {
     border-radius: var(--radius-full);
-
-    .PdxAvatar-status {
-      border-radius: var(--radius-full);
-    }
   }
 
   &.status-Online .PdxAvatar-status {

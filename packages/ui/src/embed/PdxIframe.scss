@@ -1,52 +1,20 @@
+@use '../foundation/media';
+
 .PdxIframe {
-  display: block;
-  transition: all var(--transition-normal);
-
-  > div {
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-sm);
-    background-color: var(--border-default);
-  }
-
-  iframe {
-    background-color: var(--bg-canvas);
-  }
-
-  &.aspect-16-9 {
-    > div {
-      aspect-ratio: 16 / 9;
-    }
-  }
-
-  &.aspect-4-3 {
-    > div {
-      aspect-ratio: 4 / 3;
-    }
-  }
-
-  &.aspect-1-1 {
-    > div {
-      aspect-ratio: 1 / 1;
-    }
-  }
-
-  &.aspect-21-9 {
-    > div {
-      aspect-ratio: 21 / 9;
-    }
-  }
-
-  &:hover > div {
-    box-shadow: var(--shadow-md);
-  }
+  @include media.media-container;
 }
 
-[data-theme='dark'] {
-  .PdxIframe > div {
-    box-shadow: var(--shadow-sm);
-  }
+.PdxIframeFrame {
+  @include media.media-frame;
+  @include media.reduced-motion;
+}
 
-  .PdxIframe:hover > div {
-    box-shadow: var(--shadow-md);
-  }
+.PdxIframe.HasExplicitHeight .PdxIframeFrame {
+  @include media.explicit-height-frame;
+}
+
+.PdxIframeElement {
+  @include media.fill-media;
+
+  background-color: var(--bg-canvas);
 }

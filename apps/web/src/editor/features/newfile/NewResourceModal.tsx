@@ -222,7 +222,7 @@ function NewResourceModal({
               id="new-resource-name"
               placeholder="项目名称？（默认：'Untitled'）"
               value={name}
-              onChange={setName}
+              onValueChange={setName}
             />
           </div>
 
@@ -236,7 +236,7 @@ function NewResourceModal({
                 'Optional description'
               )}
               value={description}
-              onChange={setDescription}
+              onValueChange={setDescription}
             />
           </div>
 
@@ -259,12 +259,12 @@ function NewResourceModal({
         <footer className="flex items-center justify-end gap-[12px] border-t border-t-(--border-subtle) bg-(--bg-panel) px-[22px] py-[18px]">
           <PdxButton
             text={t('modals.actions.cancel')}
-            category="Ghost"
+            variant="Ghost"
             onClick={onClose}
           />
           <PdxButton
             text={t('modals.actions.create', 'Create')}
-            category="Primary"
+            variant="Primary"
             onClick={handleCreate}
             disabled={isSubmitting}
           />

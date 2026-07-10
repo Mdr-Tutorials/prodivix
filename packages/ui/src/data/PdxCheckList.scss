@@ -1,30 +1,88 @@
+@use '../foundation/control';
+@use '../form/PdxField.scss';
+
 .PdxCheckList {
-  list-style: none;
+  min-width: 0;
+  border: 0;
   padding: 0;
   margin: 0;
+}
+
+.PdxCheckListLegend {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-xs);
+  padding: 0;
+}
+
+.PdxCheckListItems {
   display: flex;
   flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.PdxCheckList.Horizontal .PdxCheckListItems {
+  flex-flow: row wrap;
   gap: var(--spacing-xs);
 }
 
-.PdxCheckListItem {
-  padding: var(--spacing-xs) 0;
-}
-
 .PdxCheckListLabel {
+  box-sizing: border-box;
+  min-height: 34px;
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
+  padding: 0 var(--spacing-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background-color: transparent;
   color: var(--text-primary);
   cursor: pointer;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-compact);
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-easing-standard),
+    border-color var(--motion-duration-fast) var(--motion-easing-standard);
+
+  &:hover:not(.Disabled) {
+    background-color: var(--bg-panel);
+  }
+
+  &:has(input:checked) {
+    border-color: var(--border-subtle);
+    background-color: var(--bg-raised);
+  }
+
+  &:has(input:focus-visible) {
+    @include control.focus-ring;
+  }
 
   input {
+    flex: 0 0 auto;
     width: 16px;
     height: 16px;
+    margin: 0;
+    accent-color: var(--accent-color);
+    cursor: inherit;
   }
 }
 
-.PdxCheckListLabel.Disabled {
-  opacity: 0.5;
+.PdxCheckListLabel.Disabled,
+.PdxCheckList.Disabled .PdxCheckListLabel {
   cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.PdxCheckList.Horizontal .PdxCheckListItem {
+  flex: 0 1 auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .PdxCheckListLabel {
+    transition-duration: 0.01ms;
+  }
 }

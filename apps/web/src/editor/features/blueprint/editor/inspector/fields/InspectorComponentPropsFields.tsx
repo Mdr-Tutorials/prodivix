@@ -6,7 +6,7 @@ const isPrimitive = (value: unknown): value is string | number | boolean =>
   typeof value === 'number' ||
   typeof value === 'boolean';
 
-const EXTERNAL_PROP_EXCLUDE_KEYS = new Set([
+const COMPONENT_PROP_EXCLUDE_KEYS = new Set([
   'children',
   'className',
   'style',
@@ -14,24 +14,24 @@ const EXTERNAL_PROP_EXCLUDE_KEYS = new Set([
   'key',
   'sx',
 ]);
-const MAX_EXTERNAL_FIELDS = 16;
+const MAX_COMPONENT_FIELDS = 20;
 
-export function InspectorExternalPropsFields() {
+export function InspectorComponentPropsFields() {
   const {
     t,
     selectedNode,
-    externalComponentItem,
+    componentMeta,
     updateSelectedNode,
     dataModelFieldPaths = [],
   } = useInspectorContext();
 
-  if (!selectedNode || !externalComponentItem) return null;
+  if (!selectedNode || !componentMeta) return null;
 
-  const defaultProps = (externalComponentItem.defaultProps ?? {}) as Record<
+  const defaultProps = (componentMeta.defaultProps ?? {}) as Record<
     string,
     unknown
   >;
-  const propOptions = externalComponentItem.propOptions ?? {};
+  const propOptions = componentMeta.propOptions ?? {};
   const optionKeys = Object.keys(propOptions);
   const primitiveDefaultKeys = Object.keys(defaultProps).filter((key) =>
     isPrimitive(defaultProps[key])
@@ -39,8 +39,8 @@ export function InspectorExternalPropsFields() {
   const fieldKeys = [
     ...new Set([...optionKeys, ...primitiveDefaultKeys]).values(),
   ]
-    .filter((key) => !EXTERNAL_PROP_EXCLUDE_KEYS.has(key))
-    .slice(0, MAX_EXTERNAL_FIELDS);
+    .filter((key) => !COMPONENT_PROP_EXCLUDE_KEYS.has(key))
+    .slice(0, MAX_COMPONENT_FIELDS);
 
   if (fieldKeys.length === 0) return null;
 
@@ -75,12 +75,28 @@ export function InspectorExternalPropsFields() {
     <div className="InspectorField flex flex-col gap-1.5">
       <InspectorRow
         layout="vertical"
-        label={t('inspector.fields.externalProps.label', {
-          defaultValue: 'External Props',
-        })}
-        description={t('inspector.fields.externalProps.description', {
-          defaultValue: 'Generated from external component metadata (d.ts).',
-        })}
+        label={t(
+          componentMeta.source === 'builtIn'
+            ? 'inspector.fields.componentProps.label'
+            : 'inspector.fields.externalProps.label',
+          {
+            defaultValue:
+              componentMeta.source === 'builtIn'
+                ? 'Component Props'
+                : 'External Props',
+          }
+        )}
+        description={t(
+          componentMeta.source === 'builtIn'
+            ? 'inspector.fields.componentProps.description'
+            : 'inspector.fields.externalProps.description',
+          {
+            defaultValue:
+              componentMeta.source === 'builtIn'
+                ? 'Generated from the @prodivix/ui component manifest.'
+                : 'Generated from external component metadata (d.ts).',
+          }
+        )}
         control={
           <div className="grid gap-1.5">
             {fieldKeys.map((key) => {
@@ -99,7 +115,7 @@ export function InspectorExternalPropsFields() {
                       {key}
                     </span>
                     <select
-                      data-testid={`inspector-external-prop-${key}`}
+                      data-testid={`inspector-component-prop-${key}`}
                       className="h-7 min-w-0 flex-1 rounded-md border border-(--border-default) bg-transparent px-2 text-xs text-(--text-primary)"
                       value={normalizedValue}
                       onChange={(event) => updateProp(key, event.target.value)}
@@ -113,7 +129,7 @@ export function InspectorExternalPropsFields() {
                     {canReset && (
                       <button
                         type="button"
-                        data-testid={`inspector-external-prop-reset-${key}`}
+                        data-testid={`inspector-component-prop-reset-${key}`}
                         className="h-7 cursor-pointer rounded-md border border-(--border-default) px-1.5 text-[10px] text-(--text-muted) hover:border-(--border-strong) hover:text-(--text-primary)"
                         onClick={() => clearProp(key)}
                       >
@@ -133,7 +149,7 @@ export function InspectorExternalPropsFields() {
                     </span>
                     <label className="inline-flex items-center gap-1 text-xs text-(--text-secondary)">
                       <input
-                        data-testid={`inspector-external-prop-${key}`}
+                        data-testid={`inspector-component-prop-${key}`}
                         type="checkbox"
                         checked={value}
                         onChange={(event) =>
@@ -145,7 +161,7 @@ export function InspectorExternalPropsFields() {
                     {canReset && (
                       <button
                         type="button"
-                        data-testid={`inspector-external-prop-reset-${key}`}
+                        data-testid={`inspector-component-prop-reset-${key}`}
                         className="h-7 cursor-pointer rounded-md border border-(--border-default) px-1.5 text-[10px] text-(--text-muted) hover:border-(--border-strong) hover:text-(--text-primary)"
                         onClick={() => clearProp(key)}
                       >
@@ -164,7 +180,7 @@ export function InspectorExternalPropsFields() {
                       {key}
                     </span>
                     <input
-                      data-testid={`inspector-external-prop-${key}`}
+                      data-testid={`inspector-component-prop-${key}`}
                       className="h-7 min-w-0 flex-1 rounded-md border border-(--border-default) bg-transparent px-2 text-xs text-(--text-primary)"
                       type="number"
                       value={value}
@@ -181,7 +197,7 @@ export function InspectorExternalPropsFields() {
                     {canReset && (
                       <button
                         type="button"
-                        data-testid={`inspector-external-prop-reset-${key}`}
+                        data-testid={`inspector-component-prop-reset-${key}`}
                         className="h-7 cursor-pointer rounded-md border border-(--border-default) px-1.5 text-[10px] text-(--text-muted) hover:border-(--border-strong) hover:text-(--text-primary)"
                         onClick={() => clearProp(key)}
                       >
@@ -199,7 +215,7 @@ export function InspectorExternalPropsFields() {
                     {key}
                   </span>
                   <input
-                    data-testid={`inspector-external-prop-${key}`}
+                    data-testid={`inspector-component-prop-${key}`}
                     className="h-7 min-w-0 flex-1 rounded-md border border-(--border-default) bg-transparent px-2 text-xs text-(--text-primary)"
                     list={
                       dataModelFieldPaths.length
@@ -212,7 +228,7 @@ export function InspectorExternalPropsFields() {
                   {canReset && (
                     <button
                       type="button"
-                      data-testid={`inspector-external-prop-reset-${key}`}
+                      data-testid={`inspector-component-prop-reset-${key}`}
                       className="h-7 cursor-pointer rounded-md border border-(--border-default) px-1.5 text-[10px] text-(--text-muted) hover:border-(--border-strong) hover:text-(--text-primary)"
                       onClick={() => clearProp(key)}
                     >

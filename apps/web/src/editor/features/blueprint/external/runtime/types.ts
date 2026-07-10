@@ -33,7 +33,7 @@ export type CanonicalExternalComponent = {
   adapter: ComponentAdapter;
   preview: ReactNode;
   renderPreview?: (options: { size?: string; status?: string }) => ReactNode;
-  sizeOptions?: { id: string; label: string; value: string }[];
+  sizeOptions?: readonly { id: string; label: string; value: string }[];
   defaultProps?: Record<string, unknown>;
   propOptions?: Record<string, string[]>;
   propsSchema?: Record<string, unknown>;
@@ -52,7 +52,7 @@ export type ExternalCanonicalGroup = {
 export type ExternalComponentManifestOverride = {
   displayName?: string;
   defaultProps?: Record<string, unknown>;
-  sizeOptions?: { id: string; label: string; value: string }[];
+  sizeOptions?: readonly { id: string; label: string; value: string }[];
   propOptions?: Record<string, string[]>;
   behaviorTags?: string[];
   codegenHints?: Record<string, unknown>;

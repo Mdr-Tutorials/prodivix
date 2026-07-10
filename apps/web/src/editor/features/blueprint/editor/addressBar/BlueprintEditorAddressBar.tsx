@@ -291,7 +291,7 @@ export function BlueprintEditorAddressBar({
             value={currentPath}
             size="Small"
             className="AddressInput AddressCurrentInput"
-            onChange={onCurrentPathChange}
+            onValueChange={onCurrentPathChange}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && isCurrentPathUnmatched) {
                 handleCreateCurrentPath();
@@ -360,8 +360,8 @@ export function BlueprintEditorAddressBar({
                     text={t('address.routeTree.createCurrent', {
                       defaultValue: 'Create route',
                     })}
-                    size="Tiny"
-                    category="Primary"
+                    size="ExtraSmall"
+                    variant="Primary"
                     onClick={handleCreateCurrentPath}
                   />
                 </div>
@@ -373,21 +373,21 @@ export function BlueprintEditorAddressBar({
                   value={newPath}
                   size="Small"
                   className="AddressInput AddressNewInput"
-                  onChange={onNewPathChange}
+                  onValueChange={onNewPathChange}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') handleAddRouteFromPanel();
                   }}
                 />
                 <PdxButton
                   text={t('address.add')}
-                  size="Tiny"
-                  category="Ghost"
+                  size="ExtraSmall"
+                  variant="Ghost"
                   onClick={handleAddRouteFromPanel}
                 />
               </div>
 
               <PdxInput
-                type="Search"
+                type="search"
                 placeholder={t('address.routeTree.search', {
                   defaultValue: 'Search routes',
                 })}
@@ -395,7 +395,7 @@ export function BlueprintEditorAddressBar({
                 size="Small"
                 icon={<Search size={13} />}
                 className="AddressInput AddressRouteSearchInput"
-                onChange={setRouteSearch}
+                onValueChange={setRouteSearch}
               />
 
               {renderRouteTree()}

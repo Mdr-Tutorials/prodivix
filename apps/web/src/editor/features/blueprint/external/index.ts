@@ -198,15 +198,15 @@ export const ensureConfiguredExternalLibraries = async (
   if (options.signal?.aborted) return [];
   ensureBootstrap();
   if (libraryIds.length === 0) {
-    clearRegisteredExternalLibraries();
-    setLatestDiagnostics([]);
+    const cleanupDiagnostics = await clearRegisteredExternalLibraries();
+    setLatestDiagnostics(cleanupDiagnostics);
     Array.from(externalLibraryStateById.keys()).forEach((libraryId) => {
       if (!libraryIds.includes(libraryId)) {
         externalLibraryStateById.delete(libraryId);
       }
     });
     emitExternalLibraryStates();
-    return [];
+    return cleanupDiagnostics;
   }
   if (isExternalLibraryRuntimeOffline()) {
     const uniqueIds = [...new Set(libraryIds)];
@@ -227,7 +227,7 @@ export const ensureConfiguredExternalLibraries = async (
     emitExternalLibraryStates();
     return diagnostics;
   }
-  clearRegisteredExternalLibraries();
+  const cleanupDiagnostics = await clearRegisteredExternalLibraries();
   setLoadingState(true);
   try {
     const uniqueIds = [...new Set(libraryIds)];
@@ -242,7 +242,7 @@ export const ensureConfiguredExternalLibraries = async (
         ensureExternalLibraryById(libraryId, options)
       )
     );
-    const diagnostics = results.flat();
+    const diagnostics = [...cleanupDiagnostics, ...results.flat()];
     setLatestDiagnostics(diagnostics);
     return diagnostics;
   } finally {

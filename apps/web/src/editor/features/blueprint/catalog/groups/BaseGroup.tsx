@@ -8,6 +8,11 @@ import {
   PdxParagraph,
   PdxText,
 } from '@prodivix/ui';
+import type {
+  PdxButtonTone,
+  PdxButtonVariant,
+  PdxControlSize,
+} from '@prodivix/ui';
 import { Sparkles } from 'lucide-react';
 import type { ComponentGroup } from '@/editor/features/blueprint/editor/model/types';
 import { buildVariants } from '@/editor/features/blueprint/catalog/helpers';
@@ -18,7 +23,7 @@ import {
 } from '@/editor/features/blueprint/catalog/sizeOptions';
 
 const HEADING_LEVELS = [1, 2, 3, 4, 5, 6] as const;
-const BUTTON_CATEGORIES = [
+const BUTTON_PRESENTATIONS = [
   'Primary',
   'Secondary',
   'Danger',
@@ -27,6 +32,20 @@ const BUTTON_CATEGORIES = [
   'SubtleWarning',
   'Ghost',
 ] as const;
+type ButtonPresentation = (typeof BUTTON_PRESENTATIONS)[number];
+
+const BUTTON_STYLE_BY_PRESENTATION: Record<
+  ButtonPresentation,
+  { variant: PdxButtonVariant; tone: PdxButtonTone }
+> = {
+  Primary: { variant: 'Primary', tone: 'Neutral' },
+  Secondary: { variant: 'Secondary', tone: 'Neutral' },
+  Danger: { variant: 'Primary', tone: 'Danger' },
+  SubtleDanger: { variant: 'Secondary', tone: 'Danger' },
+  Warning: { variant: 'Primary', tone: 'Warning' },
+  SubtleWarning: { variant: 'Secondary', tone: 'Warning' },
+  Ghost: { variant: 'Ghost', tone: 'Neutral' },
+};
 
 export const BASE_GROUP: ComponentGroup = {
   id: 'base',
@@ -74,30 +93,34 @@ export const BASE_GROUP: ComponentGroup = {
     {
       id: 'button',
       name: 'Button',
-      preview: <PdxButton text="Button" size="Medium" category="Primary" />,
+      preview: <PdxButton text="Button" size="Medium" variant="Primary" />,
       sizeOptions: BUTTON_SIZE_OPTIONS,
       renderPreview: ({ size }) => (
         <PdxButton
           text="Button"
-          size={(size ?? 'Medium') as 'Tiny' | 'Small' | 'Medium' | 'Big'}
-          category="Primary"
+          size={(size ?? 'Medium') as PdxControlSize}
+          variant="Primary"
         />
       ),
       variants: buildVariants(
-        BUTTON_CATEGORIES,
-        (category) => (
-          <PdxButton text={category} size="Medium" category={category} />
-        ),
-        undefined,
-        undefined,
-        (category, { size }) => (
+        BUTTON_PRESENTATIONS,
+        (presentation) => (
           <PdxButton
-            text={category}
-            size={(size ?? 'Medium') as 'Tiny' | 'Small' | 'Medium' | 'Big'}
-            category={category}
+            text={presentation}
+            size="Medium"
+            {...BUTTON_STYLE_BY_PRESENTATION[presentation]}
           />
         ),
-        (category) => ({ category })
+        undefined,
+        undefined,
+        (presentation, { size }) => (
+          <PdxButton
+            text={presentation}
+            size={(size ?? 'Medium') as PdxControlSize}
+            {...BUTTON_STYLE_BY_PRESENTATION[presentation]}
+          />
+        ),
+        (presentation) => ({ ...BUTTON_STYLE_BY_PRESENTATION[presentation] })
       ),
     },
     {
@@ -108,7 +131,7 @@ export const BASE_GROUP: ComponentGroup = {
           text="Link"
           to="/blueprint"
           size="Medium"
-          category="Secondary"
+          variant="Secondary"
         />
       ),
       sizeOptions: BUTTON_SIZE_OPTIONS,
@@ -116,31 +139,31 @@ export const BASE_GROUP: ComponentGroup = {
         <PdxButtonLink
           text="Link"
           to="/blueprint"
-          size={(size ?? 'Medium') as 'Tiny' | 'Small' | 'Medium' | 'Big'}
-          category="Secondary"
+          size={(size ?? 'Medium') as PdxControlSize}
+          variant="Secondary"
         />
       ),
       variants: buildVariants(
-        BUTTON_CATEGORIES,
-        (category) => (
+        BUTTON_PRESENTATIONS,
+        (presentation) => (
           <PdxButtonLink
-            text={category}
+            text={presentation}
             to="/blueprint"
             size="Medium"
-            category={category}
+            {...BUTTON_STYLE_BY_PRESENTATION[presentation]}
           />
         ),
         undefined,
         undefined,
-        (category, { size }) => (
+        (presentation, { size }) => (
           <PdxButtonLink
-            text={category}
+            text={presentation}
             to="/blueprint"
-            size={(size ?? 'Medium') as 'Tiny' | 'Small' | 'Medium' | 'Big'}
-            category={category}
+            size={(size ?? 'Medium') as PdxControlSize}
+            {...BUTTON_STYLE_BY_PRESENTATION[presentation]}
           />
         ),
-        (category) => ({ category })
+        (presentation) => ({ ...BUTTON_STYLE_BY_PRESENTATION[presentation] })
       ),
     },
     {
@@ -159,10 +182,24 @@ export const BASE_GROUP: ComponentGroup = {
     {
       id: 'icon-link',
       name: 'IconLink',
-      preview: <PdxIconLink icon={Sparkles} to="/blueprint" size={18} />,
+      preview: (
+        <PdxIconLink
+          icon={Sparkles}
+          label="Open blueprint"
+          to="/blueprint"
+          size={18}
+        />
+      ),
       variants: buildVariants(
         [14, 18, 22] as const,
-        (size) => <PdxIconLink icon={Sparkles} to="/blueprint" size={size} />,
+        (size) => (
+          <PdxIconLink
+            icon={Sparkles}
+            label="Open blueprint"
+            to="/blueprint"
+            size={size}
+          />
+        ),
         (size) => `${size}px`,
         undefined,
         undefined,

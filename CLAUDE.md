@@ -8,19 +8,11 @@ This file provides Claude Code-specific guidance for working in this repository.
 
 1. Follow `AGENTS.md` for architecture and coding policy.
 2. At the start of a new coding session, run `git fetch` and check whether the current branch is behind its remote before editing. Integrate remote changes non-destructively if needed.
-3. Before writing code, load relevant Trellis project guidance:
-
-   ```bash
-   python ./.trellis/scripts/get_context.py --mode packages
-   ```
-
-   Then read the relevant `.trellis/spec/<package>/<layer>/index.md` files and `.trellis/spec/guides/index.md`.
-
-4. Use UTF-8 for reading and writing documentation.
-5. Prefer `git ls-files`, `git diff --name-only`, and `git grep` for repository discovery. Avoid broad recursive scans that enter `node_modules`.
-6. Do not commit or push unless explicitly asked.
-7. If dependency installation or updates modify `pnpm-lock.yaml`, accept the package-manager-generated lockfile changes instead of manually editing the lockfile.
-8. Do not force all documentation into English. Match the target audience and existing file context: root `README.md` is English, `README.zh-CN.md` is Simplified Chinese, and Chinese specs / decisions may remain Chinese.
+3. Use UTF-8 for reading and writing documentation.
+4. Prefer `git ls-files`, `git diff --name-only`, and `git grep` for repository discovery. Avoid broad recursive scans that enter `node_modules`.
+5. Do not commit or push unless explicitly asked.
+6. If dependency installation or updates modify `pnpm-lock.yaml`, accept the package-manager-generated lockfile changes instead of manually editing the lockfile.
+7. Do not force all documentation into English. Match the target audience and existing file context: root `README.md` is English, `README.zh-CN.md` is Simplified Chinese, and Chinese specs / decisions may remain Chinese.
 
 ## Project Summary
 

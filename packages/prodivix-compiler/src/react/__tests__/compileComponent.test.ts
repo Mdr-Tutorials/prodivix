@@ -169,8 +169,8 @@ describe('compilePirToReactComponent', () => {
               type: 'PdxButton',
               text: 'Button',
               props: {
-                size: 'Big',
-                category: 'Primary',
+                size: 'Large',
+                variant: 'Primary',
               },
             },
           },
@@ -188,7 +188,7 @@ describe('compilePirToReactComponent', () => {
     );
     expect(compiled.code).toContain("import '@prodivix/ui/style.css';");
     expect(compiled.code).toContain(
-      '<PdxButton size="Big" category="Primary" text="Button" />'
+      '<PdxButton size="Large" variant="Primary" text="Button" />'
     );
     expect(compiled.code).not.toContain('>\n      Button\n    </PdxButton>');
   });

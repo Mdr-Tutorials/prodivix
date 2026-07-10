@@ -1,84 +1,166 @@
 import './PdxPagination.scss';
-import { type PdxComponent } from '@prodivix/shared';
+import {
+  getDataAttributes,
+  mergeClassNames,
+  type PdxNativeProps,
+} from '../foundation/component';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { forwardRef } from 'react';
 
-interface PdxPaginationSpecificProps {
-  page: number;
-  total: number;
-  pageSize?: number;
+type PaginationItem = number | 'EllipsisLeft' | 'EllipsisRight';
+
+export interface PdxPaginationOwnProps {
+  disabled?: boolean;
   maxButtons?: number;
-  onChange?: (page: number) => void;
+  navigationLabel?: string;
+  nextLabel?: string;
+  onPageChange?: (page: number) => void;
+  page: number;
+  pageLabel?: (page: number) => string;
+  pageSize?: number;
+  previousLabel?: string;
+  total: number;
 }
 
-export interface PdxPaginationProps
-  extends PdxComponent, PdxPaginationSpecificProps {}
+export type PdxPaginationProps = Omit<PdxNativeProps<'nav'>, 'children'> &
+  PdxPaginationOwnProps;
 
-function PdxPagination({
-  page,
-  total,
-  pageSize = 10,
-  maxButtons = 5,
-  onChange,
-  className,
-  style,
-  id,
-  dataAttributes = {},
-}: PdxPaginationProps) {
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const currentPage = Math.min(Math.max(1, page), totalPages);
+function createPaginationItems(
+  currentPage: number,
+  totalPages: number,
+  requestedMaximum: number
+): PaginationItem[] {
+  const maximum = Math.max(5, requestedMaximum);
+  if (totalPages <= maximum) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
 
-  const half = Math.floor(maxButtons / 2);
-  let start = Math.max(1, currentPage - half);
-  let end = Math.min(totalPages, start + maxButtons - 1);
-  start = Math.max(1, end - maxButtons + 1);
+  const edgeCount = maximum - 3;
+  if (currentPage <= edgeCount) {
+    return [
+      ...Array.from({ length: maximum - 2 }, (_, index) => index + 1),
+      'EllipsisRight',
+      totalPages,
+    ];
+  }
 
-  const pages = Array.from(
-    { length: end - start + 1 },
-    (_, index) => start + index
-  );
+  if (currentPage >= totalPages - edgeCount + 1) {
+    return [
+      1,
+      'EllipsisLeft',
+      ...Array.from(
+        { length: maximum - 2 },
+        (_, index) => totalPages - maximum + 3 + index
+      ),
+    ];
+  }
 
-  const handleChange = (nextPage: number) => {
-    if (nextPage < 1 || nextPage > totalPages) return;
-    if (onChange) {
-      onChange(nextPage);
-    }
-  };
+  const middleCount = maximum - 4;
+  const middleStart = currentPage - Math.floor(middleCount / 2);
+  return [
+    1,
+    'EllipsisLeft',
+    ...Array.from({ length: middleCount }, (_, index) => middleStart + index),
+    'EllipsisRight',
+    totalPages,
+  ];
+}
 
-  const fullClassName = `PdxPagination ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+const PdxPagination = forwardRef<HTMLElement, PdxPaginationProps>(
+  function PdxPagination(
+    {
+      className,
+      dataAttributes,
+      disabled = false,
+      maxButtons = 7,
+      navigationLabel = 'Pagination',
+      nextLabel = 'Next page',
+      onPageChange,
+      page,
+      pageLabel = (pageNumber) => `Go to page ${pageNumber}`,
+      pageSize = 10,
+      previousLabel = 'Previous page',
+      total,
+      ...rest
+    },
+    ref
+  ) {
+    const normalizedPageSize = Math.max(1, pageSize);
+    const totalPages = Math.max(
+      1,
+      Math.ceil(Math.max(0, total) / normalizedPageSize)
+    );
+    const currentPage = Math.min(Math.max(1, page), totalPages);
+    const items = createPaginationItems(currentPage, totalPages, maxButtons);
 
-  return (
-    <div
-      className={fullClassName}
-      style={style as React.CSSProperties}
-      id={id}
-      {...dataProps}
-    >
-      <button
-        type="button"
-        onClick={() => handleChange(currentPage - 1)}
-        disabled={currentPage === 1}
+    const changePage = (nextPage: number) => {
+      if (
+        disabled ||
+        nextPage === currentPage ||
+        nextPage < 1 ||
+        nextPage > totalPages
+      ) {
+        return;
+      }
+      onPageChange?.(nextPage);
+    };
+
+    return (
+      <nav
+        {...rest}
+        {...getDataAttributes(dataAttributes)}
+        aria-label={navigationLabel}
+        className={mergeClassNames('PdxPagination', className)}
+        ref={ref}
       >
-        Prev
-      </button>
-      {pages.map((pageNumber) => (
         <button
-          key={pageNumber}
+          aria-label={previousLabel}
+          className="PdxPaginationButton PdxPaginationDirection"
+          disabled={disabled || currentPage === 1}
+          onClick={() => changePage(currentPage - 1)}
           type="button"
-          className={pageNumber === currentPage ? 'Active' : ''}
-          onClick={() => handleChange(pageNumber)}
         >
-          {pageNumber}
+          <ChevronLeft aria-hidden="true" size={15} />
+          <span>{previousLabel}</span>
         </button>
-      ))}
-      <button
-        type="button"
-        onClick={() => handleChange(currentPage + 1)}
-        disabled={currentPage === totalPages}
-      >
-        Next
-      </button>
-    </div>
-  );
-}
+        <div className="PdxPaginationPages">
+          {items.map((item) =>
+            typeof item === 'number' ? (
+              <button
+                aria-current={item === currentPage ? 'page' : undefined}
+                aria-label={pageLabel(item)}
+                className="PdxPaginationButton PdxPaginationPage"
+                disabled={disabled}
+                key={item}
+                onClick={() => changePage(item)}
+                type="button"
+              >
+                {item}
+              </button>
+            ) : (
+              <span
+                aria-hidden="true"
+                className="PdxPaginationEllipsis"
+                key={item}
+              >
+                …
+              </span>
+            )
+          )}
+        </div>
+        <button
+          aria-label={nextLabel}
+          className="PdxPaginationButton PdxPaginationDirection"
+          disabled={disabled || currentPage === totalPages}
+          onClick={() => changePage(currentPage + 1)}
+          type="button"
+        >
+          <span>{nextLabel}</span>
+          <ChevronRight aria-hidden="true" size={15} />
+        </button>
+      </nav>
+    );
+  }
+);
 
 export default PdxPagination;

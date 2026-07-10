@@ -19,7 +19,7 @@ export const Default: Story = {
   args: {
     title: 'New update',
     description: 'Version 2.4.0 is now available.',
-    actions: <PdxButton text="Update" size="Small" category="Primary" />,
+    actions: <PdxButton text="Update" size="Small" variant="Primary" />,
   },
 };
 

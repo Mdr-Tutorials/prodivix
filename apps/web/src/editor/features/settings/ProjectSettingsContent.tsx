@@ -60,7 +60,7 @@ export const ProjectSettingsContent = () => {
             <PdxInput
               size="Small"
               value={projectValues.name}
-              onChange={(value) => updateProjectValue('name', value)}
+              onValueChange={(value) => updateProjectValue('name', value)}
             />
           }
         />
@@ -72,7 +72,9 @@ export const ProjectSettingsContent = () => {
               size="Small"
               rows={3}
               value={projectValues.description}
-              onChange={(value) => updateProjectValue('description', value)}
+              onValueChange={(value) =>
+                updateProjectValue('description', value)
+              }
             />
           }
         />
@@ -83,7 +85,9 @@ export const ProjectSettingsContent = () => {
             <PdxInput
               size="Small"
               value={projectValues.defaultRoute}
-              onChange={(value) => updateProjectValue('defaultRoute', value)}
+              onValueChange={(value) =>
+                updateProjectValue('defaultRoute', value)
+              }
             />
           }
         />
@@ -112,7 +116,7 @@ export const ProjectSettingsContent = () => {
                 },
               ]}
               value={projectValues.timezone}
-              onChange={(value) => updateProjectValue('timezone', value)}
+              onValueChange={(value) => updateProjectValue('timezone', value)}
             />
           }
         />
@@ -141,7 +145,9 @@ export const ProjectSettingsContent = () => {
                 },
               ]}
               value={projectValues.defaultRole[0]}
-              onChange={(value) => updateProjectValue('defaultRole', [value])}
+              onValueChange={(value) =>
+                updateProjectValue('defaultRole', [value])
+              }
             />
           }
         />
@@ -165,7 +171,9 @@ export const ProjectSettingsContent = () => {
                 },
               ]}
               value={projectValues.previewAccess[0]}
-              onChange={(value) => updateProjectValue('previewAccess', [value])}
+              onValueChange={(value) =>
+                updateProjectValue('previewAccess', [value])
+              }
             />
           }
         />
@@ -245,7 +253,9 @@ export const ProjectSettingsContent = () => {
                 },
               ]}
               value={projectValues.themeTokenSet}
-              onChange={(value) => updateProjectValue('themeTokenSet', value)}
+              onValueChange={(value) =>
+                updateProjectValue('themeTokenSet', value)
+              }
             />
           }
         />
@@ -272,7 +282,7 @@ export const ProjectSettingsContent = () => {
                 },
               ]}
               value={projectValues.componentLibraryVersion}
-              onChange={(value) =>
+              onValueChange={(value) =>
                 updateProjectValue('componentLibraryVersion', value)
               }
             />
@@ -285,7 +295,7 @@ export const ProjectSettingsContent = () => {
             <PdxInput
               size="Small"
               value={projectValues.assetHost}
-              onChange={(value) => updateProjectValue('assetHost', value)}
+              onValueChange={(value) => updateProjectValue('assetHost', value)}
             />
           }
         />
@@ -316,7 +326,7 @@ export const ProjectSettingsContent = () => {
                 { label: 'Feather', value: 'feather' },
               ]}
               value={projectValues.iconSet}
-              onChange={(value) => updateProjectValue('iconSet', value)}
+              onValueChange={(value) => updateProjectValue('iconSet', value)}
             />
           }
         />
@@ -332,7 +342,7 @@ export const ProjectSettingsContent = () => {
             <PdxInput
               size="Small"
               value={projectValues.apiBase}
-              onChange={(value) => updateProjectValue('apiBase', value)}
+              onValueChange={(value) => updateProjectValue('apiBase', value)}
             />
           }
         />
@@ -356,7 +366,7 @@ export const ProjectSettingsContent = () => {
                 },
               ]}
               value={projectValues.authMode[0]}
-              onChange={(value) => updateProjectValue('authMode', [value])}
+              onValueChange={(value) => updateProjectValue('authMode', [value])}
             />
           }
         />
@@ -367,7 +377,7 @@ export const ProjectSettingsContent = () => {
             <PdxInput
               size="Small"
               value={projectValues.envPrefix}
-              onChange={(value) => updateProjectValue('envPrefix', value)}
+              onValueChange={(value) => updateProjectValue('envPrefix', value)}
             />
           }
         />
@@ -397,7 +407,7 @@ export const ProjectSettingsContent = () => {
                 },
               ]}
               value={projectValues.deploymentTarget[0]}
-              onChange={(value) =>
+              onValueChange={(value) =>
                 updateProjectValue('deploymentTarget', [value])
               }
             />
@@ -429,7 +439,9 @@ export const ProjectSettingsContent = () => {
                 },
               ]}
               value={projectValues.schemaVersion}
-              onChange={(value) => updateProjectValue('schemaVersion', value)}
+              onValueChange={(value) =>
+                updateProjectValue('schemaVersion', value)
+              }
             />
           }
         />
@@ -495,7 +507,9 @@ export const ProjectSettingsContent = () => {
                 },
               ]}
               value={projectValues.autoMigrate[0]}
-              onChange={(value) => updateProjectValue('autoMigrate', [value])}
+              onValueChange={(value) =>
+                updateProjectValue('autoMigrate', [value])
+              }
             />
           }
         />
@@ -524,7 +538,9 @@ export const ProjectSettingsContent = () => {
                 },
               ]}
               value={projectValues.buildTarget[0]}
-              onChange={(value) => updateProjectValue('buildTarget', [value])}
+              onValueChange={(value) =>
+                updateProjectValue('buildTarget', [value])
+              }
             />
           }
         />
@@ -535,7 +551,7 @@ export const ProjectSettingsContent = () => {
             <PdxInput
               size="Small"
               value={projectValues.outputDir}
-              onChange={(value) => updateProjectValue('outputDir', value)}
+              onValueChange={(value) => updateProjectValue('outputDir', value)}
             />
           }
         />
@@ -555,7 +571,7 @@ export const ProjectSettingsContent = () => {
                 },
               ]}
               value={projectValues.minify[0]}
-              onChange={(value) => updateProjectValue('minify', [value])}
+              onValueChange={(value) => updateProjectValue('minify', [value])}
             />
           }
         />
@@ -575,7 +591,9 @@ export const ProjectSettingsContent = () => {
                 },
               ]}
               value={projectValues.sourceMaps[0]}
-              onChange={(value) => updateProjectValue('sourceMaps', [value])}
+              onValueChange={(value) =>
+                updateProjectValue('sourceMaps', [value])
+              }
             />
           }
         />

@@ -34,6 +34,8 @@
     "@monaco-editor/react": "^4.7.0",
     "@prodivix/ai": "workspace:*",
     "@prodivix/i18n": "workspace:*",
+    "@prodivix/plugin-contracts": "workspace:*",
+    "@prodivix/plugin-host": "workspace:*",
     "@prodivix/prodivix-compiler": "workspace:*",
     "@prodivix/shared": "workspace:*",
     "@prodivix/themes": "workspace:*",

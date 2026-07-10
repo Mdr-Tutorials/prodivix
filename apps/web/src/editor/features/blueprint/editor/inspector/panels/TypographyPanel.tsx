@@ -66,7 +66,7 @@ function TypographyPanelView({ node, updateNode }: InspectorPanelRenderProps) {
           <PdxInput
             size="Small"
             value={fontFamilyValue}
-            onChange={(value) =>
+            onValueChange={(value) =>
               updateNode((current) =>
                 updateStyleValue(current, 'fontFamily', value)
               )
@@ -110,7 +110,7 @@ function TypographyPanelView({ node, updateNode }: InspectorPanelRenderProps) {
           <PdxInput
             size="Small"
             value={fontWeightValue}
-            onChange={(value) =>
+            onValueChange={(value) =>
               updateNode((current) =>
                 updateStyleValue(current, 'fontWeight', value)
               )

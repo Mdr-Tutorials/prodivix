@@ -1,5 +1,6 @@
 import './PdxBreadcrumb.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { ChevronRight } from 'lucide-react';
 import type React from 'react';
 
 export interface PdxBreadcrumbItem {
@@ -18,7 +19,7 @@ export interface PdxBreadcrumbProps
 
 function PdxBreadcrumb({
   items,
-  separator = '/',
+  separator = <ChevronRight aria-hidden="true" size={14} strokeWidth={1.8} />,
   className,
   style,
   id,
@@ -29,24 +30,40 @@ function PdxBreadcrumb({
 
   return (
     <nav
+      aria-label="Breadcrumb"
       className={fullClassName}
-      style={style as React.CSSProperties}
-      id={id}
       {...dataProps}
+      id={id}
+      style={style as React.CSSProperties}
     >
-      {items.map((item, index) => (
-        <span key={item.label} className="PdxBreadcrumbItem">
-          {item.icon && <span className="PdxBreadcrumbIcon">{item.icon}</span>}
-          {item.href ? (
-            <a href={item.href}>{item.label}</a>
-          ) : (
-            <span>{item.label}</span>
-          )}
-          {index < items.length - 1 && (
-            <span className="PdxBreadcrumbSeparator">{separator}</span>
-          )}
-        </span>
-      ))}
+      <ol className="PdxBreadcrumbList">
+        {items.map((item, index) => {
+          const isCurrent = index === items.length - 1;
+          return (
+            <li key={item.label} className="PdxBreadcrumbItem">
+              <span className="PdxBreadcrumbItemContent">
+                {item.icon && (
+                  <span className="PdxBreadcrumbIcon" aria-hidden="true">
+                    {item.icon}
+                  </span>
+                )}
+                {item.href && !isCurrent ? (
+                  <a href={item.href}>{item.label}</a>
+                ) : (
+                  <span aria-current={isCurrent ? 'page' : undefined}>
+                    {item.label}
+                  </span>
+                )}
+              </span>
+              {!isCurrent && (
+                <span className="PdxBreadcrumbSeparator" aria-hidden="true">
+                  {separator}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
     </nav>
   );
 }

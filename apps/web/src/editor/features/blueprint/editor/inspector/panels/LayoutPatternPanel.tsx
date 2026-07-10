@@ -189,7 +189,7 @@ function LayoutPatternPanelView({
                     label: option.label,
                     value: option.value,
                   }))}
-                  onChange={(next) => updatePatternParam(key, next)}
+                  onValueChange={(next) => updatePatternParam(key, next)}
                 />
               }
             />
@@ -204,7 +204,7 @@ function LayoutPatternPanelView({
                 <PdxInput
                   size="Small"
                   value={String(value ?? definition.defaultValue)}
-                  onChange={(next) => {
+                  onValueChange={(next) => {
                     const parsed = Number(next);
                     if (!Number.isFinite(parsed)) return;
                     updatePatternParam(key, parsed);

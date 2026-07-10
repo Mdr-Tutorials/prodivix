@@ -1,4 +1,5 @@
 import './PdxParagraph.scss';
+import { getDataAttributes, mergeClassNames } from '../foundation/component';
 import { type PdxComponent } from '@prodivix/shared';
 import type React from 'react';
 
@@ -33,20 +34,24 @@ function PdxParagraph({
   dataAttributes = {},
   onClick,
 }: PdxParagraphProps) {
-  const fullClassName =
-    `PdxParagraph ${size} ${weight} ${color} ${align} ${className || ''}`.trim();
-
-  const dataProps = { ...dataAttributes };
+  const fullClassName = mergeClassNames(
+    'PdxParagraph',
+    `Size${size}`,
+    `Weight${weight}`,
+    `Tone${color}`,
+    `Align${align}`,
+    className
+  );
 
   const Element = Component as React.ElementType;
 
   return (
     <Element
       className={fullClassName}
-      style={style}
       id={id}
       onClick={onClick}
-      {...dataProps}
+      style={style}
+      {...getDataAttributes(dataAttributes)}
     >
       {children}
     </Element>

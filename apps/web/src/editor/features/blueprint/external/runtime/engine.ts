@@ -7,6 +7,7 @@ import {
 import {
   registerExternalGroups,
   registerExternalRuntimeComponents,
+  unregisterExternalLibraryRuntime,
 } from './registry';
 import { scanExternalModulePaths } from './scanner';
 import type {
@@ -69,8 +70,28 @@ export const ensureExternalLibrary = async (
         profile.manifest
       );
 
+      const paletteDiagnostics = await registerExternalGroups(
+        descriptor.libraryId,
+        descriptor.version,
+        groupsWithManifest
+      );
+      diagnostics.push(...paletteDiagnostics);
+      if (paletteDiagnostics.some((item) => item.level === 'error')) {
+        diagnostics.push(
+          ...(await unregisterExternalLibraryRuntime(descriptor.libraryId))
+        );
+        return diagnostics;
+      }
       registerExternalRuntimeComponents(canonicalWithManifest, diagnostics);
-      registerExternalGroups(groupsWithManifest);
+      if (
+        diagnostics.some(
+          (item) => item.code === 'ELIB-3001' && item.level === 'error'
+        )
+      ) {
+        diagnostics.push(
+          ...(await unregisterExternalLibraryRuntime(descriptor.libraryId))
+        );
+      }
     } catch (error) {
       diagnostics.push({
         code: 'ELIB-1099',

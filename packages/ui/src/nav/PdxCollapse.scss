@@ -1,41 +1,77 @@
+@use '../foundation/control' as control;
+
 .PdxCollapse {
   width: 100%;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
   overflow: hidden;
-  background-color: var(--bg-canvas);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-family-ui);
 }
 
 .PdxCollapseItem + .PdxCollapseItem {
-  border-top: 1px solid var(--border-default);
+  border-top: 1px solid var(--border-subtle);
 }
 
-.PdxCollapseHeader {
-  width: 100%;
-  padding: var(--spacing-sm) var(--spacing-md);
+.PdxCollapseHeading {
+  margin: 0;
+}
+
+.PdxCollapseTrigger {
+  @include control.control-transition;
+
   display: flex;
-  justify-content: space-between;
+  width: 100%;
+  min-height: 44px;
   align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding: 10px 14px;
+  border: 0;
   background: transparent;
-  border: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  text-align: left;
   cursor: pointer;
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-secondary);
-}
 
-.PdxCollapseContent {
-  padding: var(--spacing-md);
-  color: var(--text-muted);
-  border-top: 1px solid var(--border-default);
-}
+  &:hover:not(:disabled) {
+    background: var(--bg-raised);
+  }
 
-.PdxCollapseItem.Disabled .PdxCollapseHeader {
-  opacity: 0.5;
-  cursor: not-allowed;
+  &:focus-visible {
+    @include control.focus-ring;
+
+    position: relative;
+    z-index: 1;
+  }
+
+  &:disabled {
+    @include control.disabled-control;
+  }
 }
 
 .PdxCollapseIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  flex: none;
+  color: var(--text-muted);
+  transition: transform var(--motion-duration-fast)
+    var(--motion-easing-standard);
+}
+
+.PdxCollapseItem.Open .PdxCollapseIcon {
+  transform: rotate(180deg);
+}
+
+.PdxCollapsePanel {
+  border-top: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--bg-panel) 42%, var(--bg-canvas));
+}
+
+.PdxCollapseContent {
+  padding: 14px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
 }

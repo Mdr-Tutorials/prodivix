@@ -1,3 +1,6 @@
+import './PdxEmbed.scss';
+import { getDataAttributes, mergeClassNames } from '../foundation/component';
+import { getAspectRatioStyle, type PdxAspectRatio } from '../foundation/media';
 import React from 'react';
 import type { PdxComponent } from '@prodivix/shared';
 import {
@@ -15,7 +18,7 @@ interface PdxEmbedSpecificProps {
   loading?: 'Eager' | 'Lazy';
   width?: number | string;
   height?: number | string;
-  aspectRatio?: '16:9' | '4:3' | '1:1' | '21:9';
+  aspectRatio?: PdxAspectRatio;
 }
 
 type PdxEmbedNativeProps = Omit<
@@ -55,85 +58,43 @@ function PdxEmbed({
   dataAttributes = {},
   onLoad,
   onError,
+  onClick,
   ...rest
 }: PdxEmbedProps) {
-  const fullClassName =
-    `PdxEmbed ${type} ${aspectRatio.replace(':', '-')} ${className || ''}`.trim();
-
-  const dataProps = { ...dataAttributes };
+  const fullClassName = mergeClassNames(
+    'PdxEmbed',
+    type,
+    `aspect-${aspectRatio.replace(':', '-')}`,
+    height !== undefined && 'HasExplicitHeight',
+    className
+  );
 
   const containerStyle: React.CSSProperties = {
+    ...getAspectRatioStyle(aspectRatio),
     ...(style as React.CSSProperties | undefined),
-    width: width || '100%',
-    height: height || 'auto',
-  };
-
-  const aspectRatioMap: Record<string, string> = {
-    '16:9': '16 / 9',
-    '4:3': '4 / 3',
-    '1:1': '1 / 1',
-    '21:9': '21 / 9',
-  };
-
-  const embedContainerStyle: React.CSSProperties = {
-    position: 'relative',
-    width: '100%',
-    aspectRatio: aspectRatioMap[aspectRatio],
-    overflow: 'hidden',
-    backgroundColor: '#f5f5f5',
-    borderRadius: '8px',
-  };
-
-  const iframeStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: '100%',
-    border: 'none',
+    width: width ?? style?.width ?? '100%',
+    ...(height !== undefined ? { height } : {}),
   };
 
   const embedUrl = resolveSafeEmbedUrl(type, url);
 
-  if (type === 'Twitter' || type === 'Instagram') {
-    return (
-      <div
-        className={fullClassName}
-        style={containerStyle}
-        id={id}
-        {...dataProps}
-      >
-        <div style={embedContainerStyle}>
-          <iframe
-            style={iframeStyle}
-            src={embedUrl}
-            title={title || `${type} embed`}
-            loading={loading.toLowerCase() as 'eager' | 'lazy'}
-            onLoad={onLoad}
-            onError={onError}
-            {...rest}
-          />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       className={fullClassName}
-      style={containerStyle}
       id={id}
-      {...dataProps}
+      onClick={onClick}
+      style={containerStyle}
+      {...getDataAttributes(dataAttributes)}
     >
-      <div style={embedContainerStyle}>
+      <div className="PdxEmbedFrame">
         <iframe
-          style={iframeStyle}
+          allowFullScreen={allowFullScreen}
+          className="PdxEmbedElement"
+          loading={loading.toLowerCase() as 'eager' | 'lazy'}
+          onError={onError}
+          onLoad={onLoad}
           src={embedUrl}
           title={title || `${type} embed`}
-          allowFullScreen={allowFullScreen}
-          loading={loading.toLowerCase() as 'eager' | 'lazy'}
-          onLoad={onLoad}
-          onError={onError}
           {...rest}
         />
       </div>

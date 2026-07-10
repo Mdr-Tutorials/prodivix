@@ -201,7 +201,7 @@ function ExternalCodePanelView({
                 }
               )}
               disabled={!hasCompatibleResources}
-              onChange={(value) =>
+              onValueChange={(value) =>
                 updateNode((current) =>
                   updateExternalCodeConfig(current, (config) => ({
                     ...config,
@@ -260,7 +260,7 @@ function ExternalCodePanelView({
               { label: 'GLSL', value: 'glsl' },
               { label: 'WGSL', value: 'wgsl' },
             ]}
-            onChange={(value) =>
+            onValueChange={(value) =>
               updateNode((current) =>
                 updateExternalCodeConfig(current, (config) => ({
                   ...config,
@@ -293,7 +293,7 @@ function ExternalCodePanelView({
           <PdxInput
             size="Small"
             value={externalCode.resourcePath ?? ''}
-            onChange={(value) =>
+            onValueChange={(value) =>
               updateNode((current) =>
                 updateExternalCodeConfig(current, (config) => ({
                   ...config,
@@ -322,7 +322,7 @@ function ExternalCodePanelView({
           <PdxInput
             size="Small"
             value={externalCode.entry ?? ''}
-            onChange={(value) =>
+            onValueChange={(value) =>
               updateNode((current) =>
                 updateExternalCodeConfig(current, (config) => ({
                   ...config,

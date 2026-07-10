@@ -27,15 +27,18 @@ function PdxTimeline({
   const dataProps = { ...dataAttributes };
 
   return (
-    <div
+    <ol
       className={fullClassName}
-      style={style as React.CSSProperties}
-      id={id}
       {...dataProps}
+      id={id}
+      style={style as React.CSSProperties}
     >
       {items.map((item, index) => (
-        <div key={index} className="PdxTimelineItem">
-          <div className={`PdxTimelineDot ${item.status || 'Default'}`} />
+        <li key={index} className="PdxTimelineItem">
+          <div
+            aria-hidden="true"
+            className={`PdxTimelineDot ${item.status || 'Default'}`}
+          />
           <div className="PdxTimelineContent">
             <div className="PdxTimelineTitle">{item.title}</div>
             {item.time && <div className="PdxTimelineTime">{item.time}</div>}
@@ -43,9 +46,9 @@ function PdxTimeline({
               <div className="PdxTimelineDescription">{item.description}</div>
             )}
           </div>
-        </div>
+        </li>
       ))}
-    </div>
+    </ol>
   );
 }
 

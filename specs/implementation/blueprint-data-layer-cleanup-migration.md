@@ -26,24 +26,24 @@
 
 ### barrel `editor/model/data.ts` 的 8 个转发源
 
-| 源 | 经 barrel 消费？ | barrel 消费者取用的 symbol |
-| --- | --- | --- |
-| `data/viewport` | ✅ | `VIEWPORT_ZOOM_RANGE`（canvas / controller）、`VIEWPORT_DEVICE_PRESETS` / `VIEWPORT_QUICK_PRESETS` / `VIEWPORT_ZOOM_RANGE`（viewportBar）、`DEFAULT_PREVIEW_SCALE`（SidebarPreviewFrame）、`COMPACT_PREVIEW_SCALE`（SidebarComponentList） |
-| `data/sampleData` | ✅ | 18 个 `*_ITEMS` / `*_DATA` symbol（palette） |
-| `data/helpers` | ✅ | `getDefaultSizeId` / `getDefaultStatusIndex` / `getPreviewScale` / `isWideComponent`（SidebarComponentList） |
-| `data/options` | ❌ 死 | — |
-| `data/placeholders` | ❌ 死 | — |
-| `data/ComponentGroups` | ❌ 死 | — |
-| `blueprint/registry` | ❌ 死 | — |
-| `blueprint/layoutPatterns` | ❌ 死 | — |
+| 源                         | 经 barrel 消费？ | barrel 消费者取用的 symbol                                                                                                                                                                                                                 |
+| -------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `data/viewport`            | ✅               | `VIEWPORT_ZOOM_RANGE`（canvas / controller）、`VIEWPORT_DEVICE_PRESETS` / `VIEWPORT_QUICK_PRESETS` / `VIEWPORT_ZOOM_RANGE`（viewportBar）、`DEFAULT_PREVIEW_SCALE`（SidebarPreviewFrame）、`COMPACT_PREVIEW_SCALE`（SidebarComponentList） |
+| `data/sampleData`          | ✅               | 18 个 `*_ITEMS` / `*_DATA` symbol（palette）                                                                                                                                                                                               |
+| `data/helpers`             | ✅               | `getDefaultSizeId` / `getDefaultStatusIndex` / `getPreviewScale` / `isWideComponent`（SidebarComponentList）                                                                                                                               |
+| `data/options`             | ❌ 死            | —                                                                                                                                                                                                                                          |
+| `data/placeholders`        | ❌ 死            | —                                                                                                                                                                                                                                          |
+| `data/ComponentGroups`     | ❌ 死            | —                                                                                                                                                                                                                                          |
+| `blueprint/registry`       | ❌ 死            | —                                                                                                                                                                                                                                          |
+| `blueprint/layoutPatterns` | ❌ 死            | —                                                                                                                                                                                                                                          |
 
 ### `data/viewport.ts` 现有导出
 
-| 导出 | 关注点 | 消费方 |
-| --- | --- | --- |
-| `DEFAULT_ROUTES` | 路由 | **0（死代码）** |
-| `VIEWPORT_QUICK_PRESETS` / `VIEWPORT_DEVICE_PRESETS` / `VIEWPORT_ZOOM_RANGE` | 视口 UI 配置 | canvas / controller / viewportBar |
-| `DEFAULT_PREVIEW_SCALE` / `COMPACT_PREVIEW_SCALE` | sidebar 预览比例 | SidebarComponentList / SidebarPreviewFrame / `helpers.getPreviewScale` |
+| 导出                                                                         | 关注点           | 消费方                                                                 |
+| ---------------------------------------------------------------------------- | ---------------- | ---------------------------------------------------------------------- |
+| `DEFAULT_ROUTES`                                                             | 路由             | **0（死代码）**                                                        |
+| `VIEWPORT_QUICK_PRESETS` / `VIEWPORT_DEVICE_PRESETS` / `VIEWPORT_ZOOM_RANGE` | 视口 UI 配置     | canvas / controller / viewportBar                                      |
+| `DEFAULT_PREVIEW_SCALE` / `COMPACT_PREVIEW_SCALE`                            | sidebar 预览比例 | SidebarComponentList / SidebarPreviewFrame / `helpers.getPreviewScale` |
 
 ### `data/helpers.ts` 中与 preview-scale 相关的项
 
@@ -228,11 +228,11 @@ export const getPreviewScale = (
 
 ## 风险与回滚
 
-| 风险 | 缓解 |
-| --- | --- |
-| `RouteItem` 删除后仍被 `viewport.ts` 内部引用 | tsc 复核；若仍被引用则保留该类型 import |
-| `getPreviewScale` 签名复制有偏差 | 直接从 `helpers.ts` 原样搬迁（见"新建文件内容"），不改逻辑 |
-| barrel 消费者遗漏导致 tsc 失败 | Phase 2 后 `git grep "editor/model/data"` 归零校验 + tsc 关卡 |
-| 某消费者除 barrel 外还隐式依赖 barrel 的传递导出 | 6 个消费者的取用已逐一核实（见基线表），无传递依赖 |
+| 风险                                             | 缓解                                                          |
+| ------------------------------------------------ | ------------------------------------------------------------- |
+| `RouteItem` 删除后仍被 `viewport.ts` 内部引用    | tsc 复核；若仍被引用则保留该类型 import                       |
+| `getPreviewScale` 签名复制有偏差                 | 直接从 `helpers.ts` 原样搬迁（见"新建文件内容"），不改逻辑    |
+| barrel 消费者遗漏导致 tsc 失败                   | Phase 2 后 `git grep "editor/model/data"` 归零校验 + tsc 关卡 |
+| 某消费者除 barrel 外还隐式依赖 barrel 的传递导出 | 6 个消费者的取用已逐一核实（见基线表），无传递依赖            |
 
 > 回滚：全部改动未提交前可 `git restore`；提交后因每阶段独立可编译，可 revert 最近一两个 commit。

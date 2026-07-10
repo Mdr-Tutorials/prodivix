@@ -1,0 +1,66 @@
+{
+  "$schema": "https://prodivix.dev/schemas/palette-contribution-v1.schema.json",
+  "schemaVersion": "1.0",
+  "surface": "blueprint.components",
+  "groups": [
+    {
+      "id": "example-forms",
+      "label": "Example UI / Forms",
+      "placement": {
+        "section": "external",
+        "libraryId": "example-ui"
+      },
+      "items": [
+        {
+          "kind": "component",
+          "id": "example-button",
+          "label": "Button",
+          "runtimeType": "ExampleButton",
+          "defaultProps": {
+            "variant": "primary",
+            "size": "medium"
+          },
+          "propOptions": {
+            "variant": ["primary", "secondary"],
+            "size": ["small", "medium", "large"]
+          },
+          "presentation": {
+            "sizes": [
+              {
+                "id": "Small",
+                "label": "S",
+                "value": "small"
+              },
+              {
+                "id": "Medium",
+                "label": "M",
+                "value": "medium"
+              },
+              {
+                "id": "Large",
+                "label": "L",
+                "value": "large"
+              }
+            ],
+            "variants": [
+              {
+                "id": "Primary",
+                "label": "Primary",
+                "props": {
+                  "variant": "primary"
+                }
+              },
+              {
+                "id": "Secondary",
+                "label": "Secondary",
+                "props": {
+                  "variant": "secondary"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

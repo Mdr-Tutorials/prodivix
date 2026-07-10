@@ -1,0 +1,366 @@
+/**
+ * Generated from specs/plugins/plugin-manifest-v1.schema.json.
+ * DO NOT EDIT. Run `pnpm --filter @prodivix/plugin-contracts generate`.
+ */
+
+export const PLUGIN_MANIFEST_V1_SCHEMA_ID =
+  'https://prodivix.dev/schemas/plugin-manifest-v1.schema.json';
+export const PLUGIN_MANIFEST_V1_SCHEMA_VERSION = '1.0';
+export const PLUGIN_MANIFEST_V1_SCHEMA: object = {
+  $schema: 'https://json-schema.org/draft/2020-12/schema',
+  $id: 'https://prodivix.dev/schemas/plugin-manifest-v1.schema.json',
+  title: 'PluginManifestV1',
+  description:
+    'Serializable installation and contribution declaration contract for Prodivix plugins.',
+  $comment:
+    'Cross-field authorization, reference integrity, SemVer ranges, resource containment, and point-specific descriptors require semantic validation after this structural schema passes.',
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'schemaVersion',
+    'id',
+    'displayName',
+    'version',
+    'publisher',
+    'engines',
+    'capabilities',
+    'contributes',
+  ],
+  properties: {
+    $schema: {
+      const: 'https://prodivix.dev/schemas/plugin-manifest-v1.schema.json',
+    },
+    schemaVersion: { const: '1.0' },
+    id: { $ref: '#/$defs/pluginId' },
+    displayName: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 80,
+      pattern: '\\S',
+    },
+    description: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 500,
+      pattern: '\\S',
+    },
+    version: { $ref: '#/$defs/semver' },
+    publisher: { $ref: '#/$defs/publisherId' },
+    license: { type: 'string', minLength: 1, maxLength: 120, pattern: '\\S' },
+    homepage: { $ref: '#/$defs/httpsUri' },
+    repository: { $ref: '#/$defs/httpsUri' },
+    icon: { $ref: '#/$defs/packageRelativePath' },
+    engines: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['prodivix'],
+      properties: {
+        prodivix: {
+          type: 'string',
+          minLength: 1,
+          maxLength: 120,
+          pattern: '\\S',
+        },
+      },
+    },
+    entrypoints: { $ref: '#/$defs/entrypoints' },
+    activationEvents: {
+      type: 'array',
+      maxItems: 64,
+      uniqueItems: true,
+      items: { $ref: '#/$defs/activationEvent' },
+    },
+    capabilities: {
+      type: 'array',
+      maxItems: 64,
+      items: { $ref: '#/$defs/capabilityRequest' },
+    },
+    contributes: {
+      type: 'array',
+      minItems: 1,
+      maxItems: 256,
+      items: { $ref: '#/$defs/contributionDeclaration' },
+    },
+    metadata: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        categories: {
+          type: 'array',
+          maxItems: 16,
+          uniqueItems: true,
+          items: { $ref: '#/$defs/shortLabel' },
+        },
+        tags: {
+          type: 'array',
+          maxItems: 32,
+          uniqueItems: true,
+          items: { $ref: '#/$defs/tag' },
+        },
+      },
+    },
+  },
+  dependentRequired: { activationEvents: ['entrypoints'] },
+  $defs: {
+    pluginId: {
+      type: 'string',
+      minLength: 3,
+      maxLength: 120,
+      pattern:
+        '^(?:@[a-z0-9]+(?:[._-][a-z0-9]+)*/)?[a-z0-9]+(?:[._-][a-z0-9]+)*$',
+    },
+    publisherId: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 80,
+      pattern: '^[a-z0-9]+(?:[._-][a-z0-9]+)*$',
+    },
+    localId: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 120,
+      pattern: '^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$',
+    },
+    qualifiedId: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 180,
+      pattern:
+        '^(?:@[a-z0-9]+(?:[._-][a-z0-9]+)*/)?[a-z0-9]+(?:[._/-][a-z0-9]+)*$',
+    },
+    semver: {
+      type: 'string',
+      pattern:
+        '^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$',
+    },
+    contractVersion: {
+      type: 'string',
+      pattern: '^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$',
+    },
+    packageRelativePath: {
+      type: 'string',
+      minLength: 3,
+      maxLength: 240,
+      pattern:
+        '^\\./(?:[A-Za-z0-9_](?:[A-Za-z0-9._-]*[A-Za-z0-9_])?/)*[A-Za-z0-9_](?:[A-Za-z0-9._-]*[A-Za-z0-9_])?$',
+    },
+    httpsUri: { type: 'string', format: 'uri', pattern: '^https://' },
+    integrity: { type: 'string', pattern: '^sha256-[A-Za-z0-9+/]{43}=$' },
+    shortLabel: { type: 'string', minLength: 1, maxLength: 64, pattern: '\\S' },
+    tag: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 48,
+      pattern: '^[a-z0-9]+(?:[._-][a-z0-9]+)*$',
+    },
+    reason: { type: 'string', minLength: 1, maxLength: 240, pattern: '\\S' },
+    scope: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 160,
+      pattern: '^[a-z0-9*]+(?:[._/:-][a-z0-9*]+)*$',
+    },
+    jsonValue: {
+      oneOf: [
+        { type: 'null' },
+        { type: 'boolean' },
+        { type: 'number' },
+        { type: 'string' },
+        { type: 'array', items: { $ref: '#/$defs/jsonValue' } },
+        { type: 'object', additionalProperties: { $ref: '#/$defs/jsonValue' } },
+      ],
+    },
+    artifact: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['path'],
+      properties: {
+        path: { $ref: '#/$defs/packageRelativePath' },
+        integrity: { $ref: '#/$defs/integrity' },
+      },
+    },
+    uiEntrypoint: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['id', 'path'],
+      properties: {
+        id: { $ref: '#/$defs/localId' },
+        path: { $ref: '#/$defs/packageRelativePath' },
+        integrity: { $ref: '#/$defs/integrity' },
+      },
+    },
+    entrypoints: {
+      type: 'object',
+      additionalProperties: false,
+      minProperties: 1,
+      properties: {
+        runtime: { $ref: '#/$defs/artifact' },
+        ui: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 32,
+          items: { $ref: '#/$defs/uiEntrypoint' },
+        },
+      },
+    },
+    contributionPoint: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 96,
+      pattern: '^[a-z][A-Za-z0-9]*(?:[._-][A-Za-z0-9]+)*$',
+    },
+    activationEvent: {
+      oneOf: [
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['type'],
+          properties: { type: { const: 'startup' } },
+        },
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['type'],
+          properties: { type: { const: 'workspace.open' } },
+        },
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['type', 'commandId'],
+          properties: {
+            type: { const: 'command' },
+            commandId: { $ref: '#/$defs/qualifiedId' },
+          },
+        },
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['type', 'point'],
+          properties: {
+            type: { const: 'contribution.use' },
+            point: { $ref: '#/$defs/contributionPoint' },
+            contributionId: { $ref: '#/$defs/localId' },
+          },
+        },
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['type'],
+          properties: { type: { const: 'manual' } },
+        },
+      ],
+    },
+    capabilityRequest: {
+      oneOf: [
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['id', 'reason'],
+          properties: {
+            id: {
+              enum: [
+                'workspace.read',
+                'workspace.intent.dispatch',
+                'route.read',
+                'route.intent.dispatch',
+                'telemetry.emit',
+              ],
+            },
+            reason: { $ref: '#/$defs/reason' },
+            optional: { type: 'boolean', default: false },
+          },
+        },
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['id', 'scope', 'reason'],
+          properties: {
+            id: {
+              enum: [
+                'document.read',
+                'document.write',
+                'network.request',
+                'secrets.read',
+              ],
+            },
+            scope: { $ref: '#/$defs/scope' },
+            reason: { $ref: '#/$defs/reason' },
+            optional: { type: 'boolean', default: false },
+          },
+        },
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['id', 'scope', 'reason'],
+          properties: {
+            id: { const: 'extension.register' },
+            scope: { $ref: '#/$defs/contributionPoint' },
+            reason: { $ref: '#/$defs/reason' },
+            optional: { type: 'boolean', default: false },
+          },
+        },
+      ],
+    },
+    inlineContributionSource: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['kind', 'descriptor'],
+      properties: {
+        kind: { const: 'inline' },
+        descriptor: {
+          type: 'object',
+          minProperties: 1,
+          additionalProperties: { $ref: '#/$defs/jsonValue' },
+        },
+      },
+    },
+    resourceContributionSource: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['kind', 'path'],
+      properties: {
+        kind: { const: 'resource' },
+        path: { $ref: '#/$defs/packageRelativePath' },
+        integrity: { $ref: '#/$defs/integrity' },
+      },
+    },
+    contributionMetadata: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        displayName: { $ref: '#/$defs/shortLabel' },
+        description: {
+          type: 'string',
+          minLength: 1,
+          maxLength: 300,
+          pattern: '\\S',
+        },
+        order: { type: 'integer', minimum: -10000, maximum: 10000 },
+        tags: {
+          type: 'array',
+          maxItems: 16,
+          uniqueItems: true,
+          items: { $ref: '#/$defs/tag' },
+        },
+      },
+    },
+    contributionDeclaration: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['id', 'point', 'contractVersion', 'source'],
+      properties: {
+        id: { $ref: '#/$defs/localId' },
+        point: { $ref: '#/$defs/contributionPoint' },
+        contractVersion: { $ref: '#/$defs/contractVersion' },
+        source: {
+          oneOf: [
+            { $ref: '#/$defs/inlineContributionSource' },
+            { $ref: '#/$defs/resourceContributionSource' },
+          ],
+        },
+        enabledByDefault: { type: 'boolean', default: true },
+        metadata: { $ref: '#/$defs/contributionMetadata' },
+      },
+    },
+  },
+};

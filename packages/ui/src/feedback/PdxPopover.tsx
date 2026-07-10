@@ -1,88 +1,105 @@
 import './PdxPopover.scss';
-import { type PdxComponent } from '@prodivix/shared';
-import { useEffect, useState } from 'react';
-import type React from 'react';
+import { getDataAttributes, mergeClassNames } from '../foundation/component';
+import type { PdxFloatingAlign, PdxFloatingPlacement } from './PdxTooltip';
+import * as PopoverPrimitive from '@radix-ui/react-popover';
+import {
+  useId,
+  type CSSProperties,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 
-interface PdxPopoverSpecificProps {
-  title?: string;
-  content: React.ReactNode;
-  trigger?: 'Click' | 'Hover';
-  open?: boolean;
+export interface PdxPopoverProps {
+  align?: PdxFloatingAlign;
+  children: ReactElement;
+  className?: string;
+  collisionPadding?: number;
+  content: ReactNode;
+  dataAttributes?: Record<string, string>;
   defaultOpen?: boolean;
+  id?: string;
+  modal?: boolean;
   onOpenChange?: (open: boolean) => void;
+  open?: boolean;
   panelClassName?: string;
-  panelStyle?: React.CSSProperties;
-  children: React.ReactNode;
+  panelLabel: string;
+  panelStyle?: CSSProperties;
+  placement?: PdxFloatingPlacement;
+  portal?: boolean;
+  sideOffset?: number;
+  style?: CSSProperties;
+  title?: ReactNode;
 }
 
-export interface PdxPopoverProps
-  extends PdxComponent, PdxPopoverSpecificProps {}
+const toSide = (placement: PdxFloatingPlacement) =>
+  placement.toLowerCase() as Lowercase<PdxFloatingPlacement>;
+const toAlign = (align: PdxFloatingAlign) =>
+  align.toLowerCase() as Lowercase<PdxFloatingAlign>;
 
 function PdxPopover({
-  title,
-  content,
-  trigger = 'Click',
-  open,
-  defaultOpen = false,
-  onOpenChange,
-  panelClassName,
-  panelStyle,
+  align = 'Start',
   children,
   className,
-  style,
+  collisionPadding = 12,
+  content,
+  dataAttributes,
+  defaultOpen,
   id,
-  dataAttributes = {},
+  modal = false,
+  onOpenChange,
+  open,
+  panelClassName,
+  panelLabel,
+  panelStyle,
+  placement = 'Bottom',
+  portal = true,
+  sideOffset = 7,
+  style,
+  title,
 }: PdxPopoverProps) {
-  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const titleId = useId();
 
-  useEffect(() => {
-    if (open !== undefined) {
-      setInternalOpen(open);
-    }
-  }, [open]);
-
-  const isOpen = open !== undefined ? open : internalOpen;
-
-  const setOpen = (next: boolean) => {
-    if (open === undefined) {
-      setInternalOpen(next);
-    }
-    if (onOpenChange) {
-      onOpenChange(next);
-    }
-  };
-
-  const fullClassName = `PdxPopover ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
-
-  const triggerProps =
-    trigger === 'Hover'
-      ? {
-          onMouseEnter: () => setOpen(true),
-          onMouseLeave: () => setOpen(false),
-        }
-      : {
-          onClick: () => setOpen(!isOpen),
-        };
+  const popoverContent = (
+    <PopoverPrimitive.Content
+      align={toAlign(align)}
+      aria-label={title ? undefined : panelLabel}
+      aria-labelledby={title ? titleId : undefined}
+      className={mergeClassNames('PdxPopoverPanel', panelClassName)}
+      collisionPadding={collisionPadding}
+      side={toSide(placement)}
+      sideOffset={sideOffset}
+      style={panelStyle}
+    >
+      {title ? (
+        <div className="PdxPopoverTitle" id={titleId}>
+          {title}
+        </div>
+      ) : null}
+      <div className="PdxPopoverContent">{content}</div>
+      <PopoverPrimitive.Arrow className="PdxPopoverArrow" />
+    </PopoverPrimitive.Content>
+  );
 
   return (
     <span
-      className={fullClassName}
-      style={style as React.CSSProperties}
+      {...getDataAttributes(dataAttributes)}
+      className={mergeClassNames('PdxPopover', className)}
       id={id}
-      {...dataProps}
-      {...triggerProps}
+      style={style}
     >
-      {children}
-      {isOpen && (
-        <span
-          className={`PdxPopoverPanel ${panelClassName || ''}`.trim()}
-          style={panelStyle}
-        >
-          {title && <div className="PdxPopoverTitle">{title}</div>}
-          <div className="PdxPopoverContent">{content}</div>
-        </span>
-      )}
+      <PopoverPrimitive.Root
+        defaultOpen={defaultOpen}
+        modal={modal}
+        onOpenChange={onOpenChange}
+        open={open}
+      >
+        <PopoverPrimitive.Trigger asChild>{children}</PopoverPrimitive.Trigger>
+        {portal ? (
+          <PopoverPrimitive.Portal>{popoverContent}</PopoverPrimitive.Portal>
+        ) : (
+          popoverContent
+        )}
+      </PopoverPrimitive.Root>
     </span>
   );
 }

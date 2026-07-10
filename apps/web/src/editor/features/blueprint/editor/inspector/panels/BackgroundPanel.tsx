@@ -53,7 +53,7 @@ function BackgroundPanelView({ node, updateNode }: InspectorPanelRenderProps) {
           <PdxInput
             size="Small"
             value={backgroundImageValue}
-            onChange={(value) =>
+            onValueChange={(value) =>
               updateNode((current) =>
                 updateStyleValue(current, 'backgroundImage', value)
               )
@@ -75,7 +75,7 @@ function BackgroundPanelView({ node, updateNode }: InspectorPanelRenderProps) {
           <PdxInput
             size="Small"
             value={backgroundSizeValue}
-            onChange={(value) =>
+            onValueChange={(value) =>
               updateNode((current) =>
                 updateStyleValue(current, 'backgroundSize', value)
               )
@@ -97,7 +97,7 @@ function BackgroundPanelView({ node, updateNode }: InspectorPanelRenderProps) {
           <PdxInput
             size="Small"
             value={backgroundPositionValue}
-            onChange={(value) =>
+            onValueChange={(value) =>
               updateNode((current) =>
                 updateStyleValue(current, 'backgroundPosition', value)
               )

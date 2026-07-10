@@ -72,54 +72,63 @@ function EditorBar() {
             <>
               <PdxIconLink
                 icon={<Home size={22} />}
+                label={t('bar.projectHome')}
                 size={22}
                 title={t('bar.projectHome')}
                 to={`/editor/project/${projectId}`}
               />
               <PdxIconLink
                 icon={<LayoutGrid size={22} />}
+                label={t('projectHome.actions.blueprint.label')}
                 size={22}
                 title={t('projectHome.actions.blueprint.label')}
                 to={`${basePath}/blueprint`}
               />
               <PdxIconLink
                 icon={<GitBranch size={22} />}
+                label={t('projectHome.actions.nodegraph.label')}
                 size={22}
                 title={t('projectHome.actions.nodegraph.label')}
                 to={`${basePath}/nodegraph`}
               />
               <PdxIconLink
                 icon={<Sparkles size={22} />}
+                label={t('projectHome.actions.animation.label')}
                 size={22}
                 title={t('projectHome.actions.animation.label')}
                 to={`${basePath}/animation`}
               />
               <PdxIconLink
                 icon={<Box size={22} />}
+                label={t('projectHome.actions.component.label')}
                 size={22}
                 title={t('projectHome.actions.component.label')}
                 to={`${basePath}/component`}
               />
               <PdxIconLink
                 icon={<Folder size={22} />}
+                label={t('projectHome.actions.resources.label')}
                 size={22}
                 title={t('projectHome.actions.resources.label')}
                 to={`${basePath}/resources`}
               />
               <PdxIconLink
                 icon={<TestTube size={22} />}
+                label={t('projectHome.actions.testing.label')}
                 size={22}
                 title={t('projectHome.actions.testing.label')}
                 to={`${basePath}/test`}
               />
               <PdxIconLink
                 icon={<FileCode size={22} />}
+                label={t('projectHome.actions.export.label')}
                 size={22}
                 title={t('projectHome.actions.export.label')}
                 to={`${basePath}/export`}
               />
               <PdxIconLink
                 icon={<Rocket size={22} />}
+                label={t('projectHome.actions.deployment.label')}
                 size={22}
                 title={t('projectHome.actions.deployment.label')}
                 to={`${basePath}/deployment`}
@@ -130,6 +139,7 @@ function EditorBar() {
         <section className={barEdgeGroupClassName}>
           <PdxIconLink
             icon={<Settings size={22} />}
+            label={settingsLabel}
             size={22}
             title={settingsLabel}
             to={`${basePath}/settings`}

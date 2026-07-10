@@ -28,6 +28,9 @@ const config: StorybookConfig = {
     name: '@storybook/react-vite',
     options: {},
   },
+  features: {
+    changeDetection: false,
+  },
   viteFinal: async (baseConfig) =>
     mergeConfig(baseConfig, {
       resolve: {

@@ -47,6 +47,10 @@ function PdxSlider({
   }, [value]);
 
   const currentValue = value !== undefined ? value : internalValue;
+  const progress =
+    max > min
+      ? Math.min(100, Math.max(0, ((currentValue - min) / (max - min)) * 100))
+      : 0;
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const nextValue = Number(event.target.value);
@@ -82,6 +86,11 @@ function PdxSlider({
         min={min}
         max={max}
         step={step}
+        style={
+          {
+            '--pdx-slider-progress': `${progress}%`,
+          } as React.CSSProperties
+        }
         value={currentValue}
         disabled={disabled}
         onChange={handleChange}

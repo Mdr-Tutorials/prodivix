@@ -51,3 +51,4 @@ cd apps/backend && go fmt ./...
 - 迁移由 `migrations/` 管理，启动时按需自动应用
 - 本地开发可在 `apps/backend` 下执行 `docker compose up -d` 起 PG
 - 默认连接串：`BACKEND_DB_URL=postgres://postgres:postgres@localhost:5432/prodivix?sslmode=disable`
+- Windows 原生开发脚本读取仓库根目录 `.env.local`；复制 `.env.example` 后修改 `BACKEND_DB_URL`，数据库与后端会使用同一个端口和连接参数

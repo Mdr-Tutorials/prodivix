@@ -42,9 +42,9 @@ export type ComponentPreviewItem = {
   defaultProps?: Record<string, unknown>;
   propOptions?: Record<string, string[]>;
   scale?: number;
-  variants?: ComponentPreviewVariant[];
-  sizeOptions?: ComponentPreviewOption[];
-  statusOptions?: ComponentPreviewStatus[];
+  variants?: readonly ComponentPreviewVariant[];
+  sizeOptions?: readonly ComponentPreviewOption[];
+  statusOptions?: readonly ComponentPreviewStatus[];
   statusProp?: string;
   statusLabel?: string;
   renderPreview?: (options: { size?: string; status?: string }) => ReactNode;
@@ -55,7 +55,7 @@ export type ComponentGroup = {
   id: string;
   title: string;
   source?: 'builtIn' | 'headless' | 'external';
-  items: ComponentPreviewItem[];
+  items: readonly ComponentPreviewItem[];
 };
 
 export type ViewportPreset = {

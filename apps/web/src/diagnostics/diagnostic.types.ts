@@ -3,6 +3,7 @@ export type ProdivixDiagnosticSeverity = 'info' | 'warning' | 'error' | 'fatal';
 export type ProdivixDiagnosticDomain =
   | 'pir'
   | 'workspace'
+  | 'plugin'
   | 'route'
   | 'editor'
   | 'ux'

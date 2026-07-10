@@ -10,8 +10,7 @@ import { useEditorStore } from '@/editor/store/useEditorStore';
 import { buildExternalLibrariesValueFromWorkspace } from '@/editor/features/resources/workspaceExternalLibraries';
 
 type RetryExternalLibrary = (libraryId: string) => Promise<void>;
-type ExternalModule =
-  typeof import('@/editor/features/blueprint/external');
+type ExternalModule = typeof import('@/editor/features/blueprint/external');
 
 export const useExternalLibraryRuntime = () => {
   const workspaceDocumentsById = useEditorStore(

@@ -11,21 +11,18 @@ const meta: Meta<typeof PdxButton> = {
   argTypes: {
     size: {
       control: 'select',
-      options: ['Big', 'Medium', 'Small', 'Tiny'],
+      options: ['ExtraSmall', 'Small', 'Medium', 'Large'],
       description: '按钮尺寸',
     },
-    category: {
+    variant: {
       control: 'select',
-      options: [
-        'Primary',
-        'Secondary',
-        'Danger',
-        'SubtleDanger',
-        'Warning',
-        'SubtleWarning',
-        'Ghost',
-      ],
-      description: '按钮类型',
+      options: ['Primary', 'Secondary', 'Ghost'],
+      description: '按钮层级',
+    },
+    tone: {
+      control: 'select',
+      options: ['Neutral', 'Danger', 'Warning'],
+      description: '按钮语义色调',
     },
     disabled: {
       control: 'boolean',
@@ -36,9 +33,13 @@ const meta: Meta<typeof PdxButton> = {
       options: ['Left', 'Right'],
       description: '图标位置',
     },
-    onlyIcon: {
+    iconOnly: {
       control: 'boolean',
       description: '仅显示图标',
+    },
+    loading: {
+      control: 'boolean',
+      description: '是否正在执行操作',
     },
     onClick: { action: 'clicked' },
   },
@@ -50,7 +51,7 @@ type Story = StoryObj<typeof PdxButton>;
 export const Primary: Story = {
   args: {
     text: 'Primary Button',
-    category: 'Primary',
+    variant: 'Primary',
     size: 'Medium',
   },
 };
@@ -58,7 +59,7 @@ export const Primary: Story = {
 export const Secondary: Story = {
   args: {
     text: 'Secondary Button',
-    category: 'Secondary',
+    variant: 'Secondary',
     size: 'Medium',
   },
 };
@@ -66,7 +67,8 @@ export const Secondary: Story = {
 export const Danger: Story = {
   args: {
     text: 'Danger Button',
-    category: 'Danger',
+    variant: 'Primary',
+    tone: 'Danger',
     size: 'Medium',
   },
 };
@@ -74,7 +76,8 @@ export const Danger: Story = {
 export const Warning: Story = {
   args: {
     text: 'Warning Button',
-    category: 'Warning',
+    variant: 'Primary',
+    tone: 'Warning',
     size: 'Medium',
   },
 };
@@ -82,7 +85,7 @@ export const Warning: Story = {
 export const Ghost: Story = {
   args: {
     text: 'Ghost Button',
-    category: 'Ghost',
+    variant: 'Ghost',
     size: 'Medium',
   },
 };
@@ -90,10 +93,10 @@ export const Ghost: Story = {
 export const Sizes: Story = {
   render: () => (
     <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-      <PdxButton text="Big" size="Big" />
+      <PdxButton text="Large" size="Large" />
       <PdxButton text="Medium" size="Medium" />
       <PdxButton text="Small" size="Small" />
-      <PdxButton text="Tiny" size="Tiny" />
+      <PdxButton text="Extra small" size="ExtraSmall" />
     </div>
   ),
 };
@@ -136,9 +139,10 @@ export const IconRight: Story = {
   },
 };
 
-export const OnlyIcon: Story = {
+export const IconOnly: Story = {
   args: {
-    onlyIcon: true,
+    'aria-label': 'Add item',
+    iconOnly: true,
     icon: (
       <svg
         width="20"
@@ -154,6 +158,15 @@ export const OnlyIcon: Story = {
   },
 };
 
+export const Loading: Story = {
+  args: {
+    text: 'Publish',
+    loading: true,
+    loadingText: 'Publishing',
+    variant: 'Primary',
+  },
+};
+
 export const Disabled: Story = {
   args: {
     text: 'Disabled Button',
@@ -161,23 +174,23 @@ export const Disabled: Story = {
   },
 };
 
-export const AllCategories: Story = {
+export const AllVariants: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', gap: '12px' }}>
-        <PdxButton text="Primary" category="Primary" />
-        <PdxButton text="Secondary" category="Secondary" />
+        <PdxButton text="Primary" variant="Primary" />
+        <PdxButton text="Secondary" variant="Secondary" />
       </div>
       <div style={{ display: 'flex', gap: '12px' }}>
-        <PdxButton text="Danger" category="Danger" />
-        <PdxButton text="SubtleDanger" category="SubtleDanger" />
+        <PdxButton text="Danger" variant="Primary" tone="Danger" />
+        <PdxButton text="Subtle danger" variant="Secondary" tone="Danger" />
       </div>
       <div style={{ display: 'flex', gap: '12px' }}>
-        <PdxButton text="Warning" category="Warning" />
-        <PdxButton text="SubtleWarning" category="SubtleWarning" />
+        <PdxButton text="Warning" variant="Primary" tone="Warning" />
+        <PdxButton text="Subtle warning" variant="Secondary" tone="Warning" />
       </div>
       <div style={{ display: 'flex', gap: '12px' }}>
-        <PdxButton text="Ghost" category="Ghost" />
+        <PdxButton text="Ghost" variant="Ghost" />
       </div>
     </div>
   ),

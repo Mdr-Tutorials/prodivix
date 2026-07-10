@@ -1,4 +1,5 @@
 import './PdxText.scss';
+import { getDataAttributes, mergeClassNames } from '../foundation/component';
 import { type PdxComponent } from '@prodivix/shared';
 import type React from 'react';
 
@@ -34,20 +35,25 @@ function PdxText({
   dataAttributes = {},
   onClick,
 }: PdxTextProps) {
-  const fullClassName =
-    `PdxText ${size} ${weight} ${color} ${align} ${truncate ? 'Truncate' : ''} ${className || ''}`.trim();
-
-  const dataProps = { ...dataAttributes };
+  const fullClassName = mergeClassNames(
+    'PdxText',
+    `Size${size}`,
+    `Weight${weight}`,
+    `Tone${color}`,
+    `Align${align}`,
+    truncate && 'Truncate',
+    className
+  );
 
   const Element = Component as React.ElementType;
 
   return (
     <Element
       className={fullClassName}
-      style={style}
       id={id}
       onClick={onClick}
-      {...dataProps}
+      style={style}
+      {...getDataAttributes(dataAttributes)}
     >
       {children}
     </Element>

@@ -49,7 +49,7 @@ export function EditorConfirmModal({
         <>
           <PdxButton
             text={cancelText}
-            category="Ghost"
+            variant="Ghost"
             size="Small"
             icon={<Delete size={15} className="opacity-60" />}
             iconPosition="Right"
@@ -57,7 +57,7 @@ export function EditorConfirmModal({
           />
           <PdxButton
             text={confirmText}
-            category="Primary"
+            variant="Primary"
             size="Small"
             icon={<CornerDownLeft size={15} className="opacity-60" />}
             iconPosition="Right"

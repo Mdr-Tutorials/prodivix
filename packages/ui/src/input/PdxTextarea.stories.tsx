@@ -12,7 +12,7 @@ const meta: Meta<typeof PdxTextarea> = {
   argTypes: {
     size: {
       control: 'select',
-      options: ['Small', 'Medium', 'Large'],
+      options: ['ExtraSmall', 'Small', 'Medium', 'Large'],
       description: '文本域尺寸',
     },
     state: {
@@ -41,7 +41,7 @@ const meta: Meta<typeof PdxTextarea> = {
       control: 'number',
       description: '最大字符数',
     },
-    onChange: { action: 'changed' },
+    onValueChange: { action: 'value changed' },
   },
 };
 
@@ -147,7 +147,7 @@ export const Controlled: Story = {
         <PdxTextarea
           placeholder="Type something..."
           value={value}
-          onChange={setValue}
+          onValueChange={setValue}
           rows={4}
         />
         <p style={{ marginTop: '8px' }}>Characters: {value.length}</p>

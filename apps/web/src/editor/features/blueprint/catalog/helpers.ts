@@ -48,12 +48,12 @@ export const buildVariants = <T extends string | number>(
     ...(propsBuilder && { props: propsBuilder(value) }),
   }));
 
-export const getDefaultSizeId = (options?: ComponentPreviewOption[]) =>
+export const getDefaultSizeId = (options?: readonly ComponentPreviewOption[]) =>
   options?.find((option) => option.value === 'Medium' || option.id === 'M')
     ?.id ?? options?.[0]?.id;
 
 export const getDefaultStatusIndex = (
-  options?: ComponentPreviewStatus[],
+  options?: readonly ComponentPreviewStatus[],
   preferred?: string
 ) => {
   if (!options?.length) return 0;

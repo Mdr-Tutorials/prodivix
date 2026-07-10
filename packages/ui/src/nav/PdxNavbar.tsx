@@ -1,4 +1,5 @@
 import './PdxNavbar.scss';
+import { getDataAttributes, mergeClassNames } from '../foundation/component';
 import { type PdxComponent } from '@prodivix/shared';
 import type React from 'react';
 
@@ -6,6 +7,8 @@ export interface PdxNavbarItem {
   label: string;
   href?: string;
   active?: boolean;
+  disabled?: boolean;
+  target?: React.HTMLAttributeAnchorTarget;
 }
 
 interface PdxNavbarSpecificProps {
@@ -15,6 +18,8 @@ interface PdxNavbarSpecificProps {
   variant?: 'Solid' | 'Transparent' | 'Blurred';
   size?: 'Small' | 'Medium' | 'Large';
   sticky?: boolean;
+  navigationLabel?: string;
+  onItemSelect?: (item: PdxNavbarItem, index: number) => void;
   children?: React.ReactNode;
 }
 
@@ -27,39 +32,85 @@ function PdxNavbar({
   variant = 'Solid',
   size = 'Medium',
   sticky = false,
+  navigationLabel,
+  onItemSelect,
   children,
   className,
   style,
   id,
   dataAttributes = {},
+  onClick,
 }: PdxNavbarProps) {
-  const fullClassName =
-    `PdxNavbar ${size} ${variant} ${sticky ? 'Sticky' : ''} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const fullClassName = mergeClassNames(
+    'PdxNavbar',
+    size,
+    variant,
+    sticky && 'Sticky',
+    children && 'CustomContent',
+    className
+  );
 
   return (
     <nav
+      aria-label={navigationLabel}
       className={fullClassName}
-      style={style as React.CSSProperties}
       id={id}
-      {...dataProps}
+      onClick={onClick}
+      style={style as React.CSSProperties}
+      {...getDataAttributes(dataAttributes)}
     >
       {children ? (
         children
       ) : (
         <>
           <div className="PdxNavbarBrand">{brand}</div>
-          <div className="PdxNavbarItems">
-            {items.map((item) => (
-              <a
-                key={item.label}
-                href={item.href || '#'}
-                className={`PdxNavbarItem ${item.active ? 'Active' : ''}`}
-              >
-                {item.label}
-              </a>
-            ))}
-          </div>
+          <ul className="PdxNavbarItems">
+            {items.map((item, index) => {
+              const itemClassName = mergeClassNames(
+                'PdxNavbarItem',
+                item.active && 'Active',
+                item.disabled && 'Disabled'
+              );
+              const handleSelect = (
+                event: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>
+              ) => {
+                if (item.disabled) {
+                  event.preventDefault();
+                  return;
+                }
+                onItemSelect?.(item, index);
+              };
+
+              return (
+                <li key={`${item.label}-${index}`}>
+                  {item.href ? (
+                    <a
+                      aria-current={item.active ? 'page' : undefined}
+                      aria-disabled={item.disabled || undefined}
+                      className={itemClassName}
+                      href={item.href}
+                      onClick={handleSelect}
+                      rel={item.target === '_blank' ? 'noreferrer' : undefined}
+                      tabIndex={item.disabled ? -1 : undefined}
+                      target={item.target}
+                    >
+                      {item.label}
+                    </a>
+                  ) : (
+                    <button
+                      aria-current={item.active ? 'page' : undefined}
+                      className={itemClassName}
+                      disabled={item.disabled}
+                      onClick={handleSelect}
+                      type="button"
+                    >
+                      {item.label}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
           <div className="PdxNavbarActions">{actions}</div>
         </>
       )}

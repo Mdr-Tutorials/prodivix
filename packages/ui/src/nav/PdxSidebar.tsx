@@ -7,6 +7,7 @@ export interface PdxSidebarItem {
   href?: string;
   icon?: React.ReactNode;
   active?: boolean;
+  disabled?: boolean;
 }
 
 interface PdxSidebarSpecificProps {
@@ -16,6 +17,7 @@ interface PdxSidebarSpecificProps {
   collapsed?: boolean;
   width?: number;
   children?: React.ReactNode;
+  onItemSelect?: (item: PdxSidebarItem) => void;
 }
 
 export interface PdxSidebarProps
@@ -28,6 +30,7 @@ function PdxSidebar({
   collapsed = false,
   width = 240,
   children,
+  onItemSelect,
   className,
   style,
   id,
@@ -40,22 +43,49 @@ function PdxSidebar({
   return (
     <aside
       className={fullClassName}
-      style={{ width, ...(style as React.CSSProperties) }}
-      id={id}
       {...dataProps}
+      id={id}
+      style={{
+        width: collapsed ? 64 : width,
+        ...(style as React.CSSProperties),
+      }}
     >
-      {title && <div className="PdxSidebarTitle">{title}</div>}
+      {title && (
+        <div
+          aria-label={collapsed ? title : undefined}
+          className="PdxSidebarTitle"
+          title={collapsed ? title : undefined}
+        >
+          {collapsed ? title.slice(0, 1) : title}
+        </div>
+      )}
       {children ? (
         children
       ) : (
-        <nav className="PdxSidebarNav">
+        <nav aria-label={title || 'Sidebar'} className="PdxSidebarNav">
           {items.map((item) => (
             <a
+              aria-current={item.active ? 'page' : undefined}
+              aria-disabled={item.disabled || undefined}
               key={item.label}
               href={item.href || '#'}
-              className={`PdxSidebarItem ${item.active ? 'Active' : ''}`}
+              className={`PdxSidebarItem ${item.active ? 'Active' : ''} ${item.disabled ? 'Disabled' : ''}`}
+              onClick={(event) => {
+                if (!item.href || item.disabled) event.preventDefault();
+                if (!item.disabled) onItemSelect?.(item);
+              }}
+              tabIndex={item.disabled ? -1 : undefined}
+              title={collapsed ? item.label : undefined}
             >
-              {item.icon && <span className="PdxSidebarIcon">{item.icon}</span>}
+              {item.icon ? (
+                <span className="PdxSidebarIcon" aria-hidden="true">
+                  {item.icon}
+                </span>
+              ) : collapsed ? (
+                <span className="PdxSidebarFallbackIcon" aria-hidden="true">
+                  {item.label.slice(0, 1)}
+                </span>
+              ) : null}
               {!collapsed && <span>{item.label}</span>}
             </a>
           ))}

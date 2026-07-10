@@ -1,45 +1,90 @@
 import './PdxMessage.scss';
-import { type PdxComponent } from '@prodivix/shared';
-import { X } from 'lucide-react';
+import {
+  getDataAttributes,
+  mergeClassNames,
+  type PdxNativeProps,
+} from '../foundation/component';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CircleX,
+  Info,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
+import { forwardRef, type ReactNode } from 'react';
 
-interface PdxMessageSpecificProps {
-  text: string;
-  type?: 'Info' | 'Success' | 'Warning' | 'Danger';
+export type PdxFeedbackType = 'Info' | 'Success' | 'Warning' | 'Danger';
+
+export interface PdxMessageOwnProps {
   closable?: boolean;
+  closeLabel?: string;
+  icon?: ReactNode;
   onClose?: () => void;
+  showIcon?: boolean;
+  text: ReactNode;
+  type?: PdxFeedbackType;
 }
 
-export interface PdxMessageProps
-  extends PdxComponent, PdxMessageSpecificProps {}
+export type PdxMessageProps = Omit<PdxNativeProps<'div'>, 'children'> &
+  PdxMessageOwnProps;
 
-function PdxMessage({
-  text,
-  type = 'Info',
-  closable = false,
-  onClose,
-  className,
-  style,
-  id,
-  dataAttributes = {},
-}: PdxMessageProps) {
-  const fullClassName = `PdxMessage ${type} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+const MESSAGE_ICONS: Record<PdxFeedbackType, LucideIcon> = {
+  Info,
+  Success: CheckCircle2,
+  Warning: AlertTriangle,
+  Danger: CircleX,
+};
 
-  return (
-    <div
-      className={fullClassName}
-      style={style as React.CSSProperties}
-      id={id}
-      {...dataProps}
-    >
-      <span>{text}</span>
-      {closable && (
-        <button type="button" className="PdxMessageClose" onClick={onClose}>
-          <X size={14} />
-        </button>
-      )}
-    </div>
-  );
-}
+const PdxMessage = forwardRef<HTMLDivElement, PdxMessageProps>(
+  function PdxMessage(
+    {
+      className,
+      closable = false,
+      closeLabel = 'Dismiss message',
+      dataAttributes,
+      icon,
+      onClose,
+      role,
+      showIcon = true,
+      text,
+      type = 'Info',
+      ...rest
+    },
+    ref
+  ) {
+    const MessageIcon = MESSAGE_ICONS[type];
+
+    return (
+      <div
+        {...rest}
+        {...getDataAttributes(dataAttributes)}
+        className={mergeClassNames('PdxMessage', type, className)}
+        ref={ref}
+        role={
+          role ?? (type === 'Danger' || type === 'Warning' ? 'alert' : 'status')
+        }
+      >
+        {showIcon ? (
+          <span aria-hidden="true" className="PdxMessageIcon">
+            {icon ?? <MessageIcon size={16} />}
+          </span>
+        ) : null}
+        <span className="PdxMessageText">{text}</span>
+        {closable ? (
+          <button
+            aria-label={closeLabel}
+            className="PdxMessageClose"
+            onClick={onClose}
+            title={closeLabel}
+            type="button"
+          >
+            <X aria-hidden="true" size={14} />
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+);
 
 export default PdxMessage;

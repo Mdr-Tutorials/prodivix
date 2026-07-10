@@ -23,25 +23,27 @@ requestId
 
 ## 编码域
 
-| 前缀        | 范围     | 说明                                                     |
-| ----------- | -------- | -------------------------------------------------------- |
-| `PIR-xxxx`  | PIR 文档 | 文档形状、UI graph、ValueRef、materialize 和运行前校验   |
-| `WKS-xxxx`  | 工作区   | 工作区加载、文档保存、同步冲突、capability 和 patch 应用 |
-| `EDT-xxxx`  | 编辑器   | 选择、拖拽、Inspector、画布、命令和 autosave             |
-| `UX-xxxx`   | 用户体验 | 可访问性、交互、响应式布局、内容、视觉反馈和体验检查器   |
-| `COD-xxxx`  | 用户代码 | 代码片段、符号解析、类型、宿主绑定、运行时和转译编译     |
-| `ELIB-xxxx` | 外部库   | 外部库加载、扫描、注册、渲染和代码生成                   |
-| `GEN-xxxx`  | 代码生成 | Canonical IR、adapter、依赖解析、代码发射和导出产物      |
-| `API-xxxx`  | 后端/API | 请求、鉴权、权限、业务校验、持久化和第三方集成           |
-| `AI-xxxx`   | AI 助手  | Provider、模型发现、Prompt、响应解析和 AI command        |
-| `RTE-xxxx`  | 路由     | 路由清单、匹配、Outlet、导航和运行时                     |
-| `NGR-xxxx`  | 节点图   | 节点图结构、端口、连线、执行和调试                       |
-| `ANI-xxxx`  | 动画     | Timeline、binding、track、keyframe、filter 和预览运行时  |
+| 前缀        | 范围     | 说明                                                                       |
+| ----------- | -------- | -------------------------------------------------------------------------- |
+| `PIR-xxxx`  | PIR 文档 | 文档形状、UI graph、ValueRef、materialize 和运行前校验                     |
+| `WKS-xxxx`  | 工作区   | 工作区加载、文档保存、同步冲突、capability 和 patch 应用                   |
+| `PLG-xxxx`  | 插件     | Plugin Manifest、contribution contract、权限、注册事务和 runtime lifecycle |
+| `EDT-xxxx`  | 编辑器   | 选择、拖拽、Inspector、画布、命令和 autosave                               |
+| `UX-xxxx`   | 用户体验 | 可访问性、交互、响应式布局、内容、视觉反馈和体验检查器                     |
+| `COD-xxxx`  | 用户代码 | 代码片段、符号解析、类型、宿主绑定、运行时和转译编译                       |
+| `ELIB-xxxx` | 外部库   | 外部库加载、扫描、注册、渲染和代码生成                                     |
+| `GEN-xxxx`  | 代码生成 | Canonical IR、adapter、依赖解析、代码发射和导出产物                        |
+| `API-xxxx`  | 后端/API | 请求、鉴权、权限、业务校验、持久化和第三方集成                             |
+| `AI-xxxx`   | AI 助手  | Provider、模型发现、Prompt、响应解析和 AI command                          |
+| `RTE-xxxx`  | 路由     | 路由清单、匹配、Outlet、导航和运行时                                       |
+| `NGR-xxxx`  | 节点图   | 节点图结构、端口、连线、执行和调试                                         |
+| `ANI-xxxx`  | 动画     | Timeline、binding、track、keyframe、filter 和预览运行时                    |
 
 ## 命名空间索引
 
 - [PIR](/reference/diagnostics/pir)
 - [Workspace](/reference/diagnostics/wks)
+- [Plugin](/reference/diagnostics/plg)
 - [Editor](/reference/diagnostics/edt)
 - [UX](/reference/diagnostics/ux)
 - [Code](/reference/diagnostics/cod)
@@ -90,6 +92,51 @@ requestId
 | [`WKS-5001`](/reference/diagnostics/wks-5001) | Intent 类型不支持          | `error`   |
 | [`WKS-5002`](/reference/diagnostics/wks-5002) | Patch 应用失败             | `error`   |
 | [`WKS-9001`](/reference/diagnostics/wks-9001) | Workspace 未知异常         | `error`   |
+
+### Plugin
+
+| Code                                          | 名称                                    | 严重程度  |
+| --------------------------------------------- | --------------------------------------- | --------- |
+| [`PLG-1001`](/reference/diagnostics/plg-1001) | Manifest 源不是严格 UTF-8 JSON          | `error`   |
+| [`PLG-1002`](/reference/diagnostics/plg-1002) | Manifest 包含重复对象键                 | `error`   |
+| [`PLG-1003`](/reference/diagnostics/plg-1003) | 程序化输入不是 JSON value               | `error`   |
+| [`PLG-1004`](/reference/diagnostics/plg-1004) | Manifest 不符合 v1 Schema               | `error`   |
+| [`PLG-1005`](/reference/diagnostics/plg-1005) | Manifest 超出资源上限                   | `error`   |
+| [`PLG-1010`](/reference/diagnostics/plg-1010) | Contribution 资源读取失败               | `error`   |
+| [`PLG-1011`](/reference/diagnostics/plg-1011) | Contribution 资源不是严格 JSON          | `error`   |
+| [`PLG-1012`](/reference/diagnostics/plg-1012) | Contribution 资源完整性不匹配           | `error`   |
+| [`PLG-1013`](/reference/diagnostics/plg-1013) | Contribution contract 不受支持          | `error`   |
+| [`PLG-1014`](/reference/diagnostics/plg-1014) | Contribution descriptor 不符合 contract | `error`   |
+| [`PLG-1015`](/reference/diagnostics/plg-1015) | Contribution 资源超出上限               | `error`   |
+| [`PLG-2001`](/reference/diagnostics/plg-2001) | 插件版本不是有效 SemVer                 | `error`   |
+| [`PLG-2002`](/reference/diagnostics/plg-2002) | Prodivix engine range 无效              | `error`   |
+| [`PLG-2003`](/reference/diagnostics/plg-2003) | 当前宿主版本不兼容                      | `error`   |
+| [`PLG-2004`](/reference/diagnostics/plg-2004) | Publisher 与插件 scope 不一致           | `error`   |
+| [`PLG-2010`](/reference/diagnostics/plg-2010) | Capability 重复声明                     | `error`   |
+| [`PLG-2011`](/reference/diagnostics/plg-2011) | Contribution id 重复                    | `error`   |
+| [`PLG-2012`](/reference/diagnostics/plg-2012) | Contribution 缺少注册能力               | `error`   |
+| [`PLG-2013`](/reference/diagnostics/plg-2013) | Activation 引用无效                     | `error`   |
+| [`PLG-2014`](/reference/diagnostics/plg-2014) | Activation 缺少 runtime entrypoint      | `error`   |
+| [`PLG-2015`](/reference/diagnostics/plg-2015) | 资源路径不可移植或发生冲突              | `error`   |
+| [`PLG-2016`](/reference/diagnostics/plg-2016) | UI entrypoint id 重复                   | `error`   |
+| [`PLG-3001`](/reference/diagnostics/plg-3001) | Required capability 被拒绝              | `error`   |
+| [`PLG-3002`](/reference/diagnostics/plg-3002) | Capability policy 解析失败              | `error`   |
+| [`PLG-3010`](/reference/diagnostics/plg-3010) | Contribution identity 冲突              | `error`   |
+| [`PLG-3011`](/reference/diagnostics/plg-3011) | Registry transaction revision 冲突      | `error`   |
+| [`PLG-3012`](/reference/diagnostics/plg-3012) | Contribution resolver 失败              | `error`   |
+| [`PLG-3013`](/reference/diagnostics/plg-3013) | Plugin owner generation 已过期          | `error`   |
+| [`PLG-3014`](/reference/diagnostics/plg-3014) | Contribution contract 配置冲突          | `error`   |
+| [`PLG-4001`](/reference/diagnostics/plg-4001) | Plugin Host 状态转换非法                | `error`   |
+| [`PLG-4002`](/reference/diagnostics/plg-4002) | Runtime activation 失败                 | `error`   |
+| [`PLG-4003`](/reference/diagnostics/plg-4003) | Runtime 操作超时                        | `error`   |
+| [`PLG-4004`](/reference/diagnostics/plg-4004) | Owner cleanup 不完整                    | `error`   |
+| [`PLG-4005`](/reference/diagnostics/plg-4005) | Runtime transport 意外终止              | `error`   |
+| [`PLG-4006`](/reference/diagnostics/plg-4006) | Host operation 已被替代                 | `info`    |
+| [`PLG-4007`](/reference/diagnostics/plg-4007) | Audit sink 不可用                       | `warning` |
+| [`PLG-4008`](/reference/diagnostics/plg-4008) | Host subscriber 回调失败                | `warning` |
+| [`PLG-4010`](/reference/diagnostics/plg-4010) | Runtime artifact 读取失败               | `error`   |
+| [`PLG-4011`](/reference/diagnostics/plg-4011) | Runtime artifact 完整性不匹配           | `error`   |
+| [`PLG-4012`](/reference/diagnostics/plg-4012) | Runtime artifact 超出上限               | `error`   |
 
 ### Editor
 

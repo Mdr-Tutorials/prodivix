@@ -60,7 +60,7 @@ export const testDoc: PIRDocument = normalizePirDocument({
           id: 'btn',
           type: 'PdxButton',
           text: { $param: 'buttonText' },
-          props: { size: 'Medium', category: 'Primary' },
+          props: { size: 'Medium', variant: 'Primary' },
           events: {
             click: {
               trigger: 'click',

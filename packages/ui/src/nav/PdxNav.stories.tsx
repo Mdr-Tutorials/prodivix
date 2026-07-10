@@ -3,6 +3,7 @@ import PdxNav from './PdxNav';
 import PdxButton from '../button/PdxButton';
 import PdxLink from '../link/PdxLink';
 import PdxIcon from '../icon/PdxIcon';
+import { Menu, Search } from 'lucide-react';
 
 const meta: Meta<typeof PdxNav> = {
   title: 'Components/Nav',
@@ -36,35 +37,6 @@ const meta: Meta<typeof PdxNav> = {
 export default meta;
 type Story = StoryObj<typeof PdxNav>;
 
-const MenuIcon = () => (
-  <svg
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <line x1="3" y1="12" x2="21" y2="12" />
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <line x1="3" y1="18" x2="21" y2="18" />
-  </svg>
-);
-
-const SearchIcon = () => (
-  <svg
-    width="20"
-    height="20"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <circle cx="11" cy="11" r="8" />
-    <path d="M21 21l-4.35-4.35" />
-  </svg>
-);
-
 export const Default: Story = {
   render: () => (
     <PdxNav>
@@ -77,7 +49,7 @@ export const Default: Story = {
         <PdxLink to="/contact" text="Contact" />
       </PdxNav.Center>
       <PdxNav.Right>
-        <PdxIcon icon={SearchIcon} />
+        <PdxIcon icon={Search} />
         <PdxButton text="Sign Up" size="Small" />
       </PdxNav.Right>
     </PdxNav>
@@ -110,7 +82,7 @@ export const ThreeColumns: Story = {
         <PdxLink to="/nav3" text="Nav Item 3" />
       </PdxNav.Center>
       <PdxNav.Right>
-        <PdxIcon icon={SearchIcon} />
+        <PdxIcon icon={Search} />
         <PdxButton text="Action" size="Small" />
       </PdxNav.Right>
     </PdxNav>
@@ -131,7 +103,7 @@ export const WithHeading: Story = {
         <PdxButton
           text="Menu"
           size="Small"
-          icon={<PdxIcon icon={MenuIcon} />}
+          icon={<PdxIcon icon={Menu} />}
           iconPosition="Left"
         />
       </PdxNav.Right>
@@ -143,20 +115,32 @@ export const TransparentBackground: Story = {
   render: () => (
     <div
       style={{
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: 'var(--text-primary)',
         padding: '20px',
       }}
     >
       <PdxNav backgroundStyle="Transparent">
         <PdxNav.Left>
-          <PdxLink to="/" text="Logo" style={{ color: 'white' }} />
+          <PdxLink
+            to="/"
+            text="Logo"
+            style={{ color: 'var(--text-inverse)' }}
+          />
         </PdxNav.Left>
         <PdxNav.Center>
-          <PdxLink to="/products" text="Products" style={{ color: 'white' }} />
-          <PdxLink to="/about" text="About" style={{ color: 'white' }} />
+          <PdxLink
+            to="/products"
+            text="Products"
+            style={{ color: 'var(--text-inverse)' }}
+          />
+          <PdxLink
+            to="/about"
+            text="About"
+            style={{ color: 'var(--text-inverse)' }}
+          />
         </PdxNav.Center>
         <PdxNav.Right>
-          <PdxButton text="Sign Up" size="Small" category="Primary" />
+          <PdxButton text="Sign Up" size="Small" variant="Primary" />
         </PdxNav.Right>
       </PdxNav>
     </div>

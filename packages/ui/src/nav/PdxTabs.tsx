@@ -1,82 +1,174 @@
 import './PdxTabs.scss';
-import { type PdxComponent } from '@prodivix/shared';
-import { useEffect, useState } from 'react';
-import type React from 'react';
+import {
+  getDataAttributes,
+  mergeClassNames,
+  type PdxNativeProps,
+} from '../foundation/component';
+import { useControllableState } from '../foundation/useControllableState';
+import {
+  forwardRef,
+  useId,
+  useRef,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 
 export interface PdxTabItem {
-  key: string;
-  label: string;
-  content: React.ReactNode;
+  content: ReactNode;
   disabled?: boolean;
+  key: string;
+  label: ReactNode;
 }
 
-interface PdxTabsSpecificProps {
-  items: PdxTabItem[];
+export type PdxTabsOrientation = 'Horizontal' | 'Vertical';
+export type PdxTabsVariant = 'Underline' | 'Pills';
+
+export interface PdxTabsOwnProps {
   activeKey?: string;
+  activationMode?: 'Automatic' | 'Manual';
   defaultActiveKey?: string;
-  onChange?: (key: string) => void;
+  items: PdxTabItem[];
+  onActiveKeyChange?: (key: string) => void;
+  orientation?: PdxTabsOrientation;
+  size?: 'Small' | 'Medium';
+  variant?: PdxTabsVariant;
 }
 
-export interface PdxTabsProps extends PdxComponent, PdxTabsSpecificProps {}
+export type PdxTabsProps = Omit<PdxNativeProps<'div'>, 'children'> &
+  PdxTabsOwnProps;
 
-function PdxTabs({
-  items,
-  activeKey,
-  defaultActiveKey,
-  onChange,
-  className,
-  style,
-  id,
-  dataAttributes = {},
-}: PdxTabsProps) {
-  const [internalKey, setInternalKey] = useState(
-    defaultActiveKey || items[0]?.key
+const PdxTabs = forwardRef<HTMLDivElement, PdxTabsProps>(function PdxTabs(
+  {
+    'aria-label': ariaLabel = 'Tabs',
+    activeKey,
+    activationMode = 'Automatic',
+    className,
+    dataAttributes,
+    defaultActiveKey,
+    items,
+    onActiveKeyChange,
+    orientation = 'Horizontal',
+    size = 'Medium',
+    variant = 'Underline',
+    ...rest
+  },
+  ref
+) {
+  const baseId = useId();
+  const tabRefs = useRef(new Map<string, HTMLButtonElement>());
+  const firstEnabledKey = items.find((item) => !item.disabled)?.key ?? '';
+  const [requestedKey, setRequestedKey] = useControllableState({
+    value: activeKey,
+    defaultValue: defaultActiveKey ?? firstEnabledKey,
+    onChange: onActiveKeyChange,
+  });
+  const requestedIndex = items.findIndex(
+    (item) => item.key === requestedKey && !item.disabled
   );
+  const fallbackIndex = items.findIndex((item) => !item.disabled);
+  const selectedIndex = requestedIndex >= 0 ? requestedIndex : fallbackIndex;
+  const selectedItem = selectedIndex >= 0 ? items[selectedIndex] : undefined;
+  const selectedKey = selectedItem?.key ?? '';
 
-  useEffect(() => {
-    if (activeKey !== undefined) {
-      setInternalKey(activeKey);
-    }
-  }, [activeKey]);
-
-  const currentKey = activeKey !== undefined ? activeKey : internalKey;
-  const currentTab = items.find((item) => item.key === currentKey) || items[0];
-
-  const handleChange = (key: string, disabled?: boolean) => {
-    if (disabled) return;
-    if (activeKey === undefined) {
-      setInternalKey(key);
-    }
-    if (onChange) {
-      onChange(key);
-    }
+  const focusTab = (key: string) => {
+    tabRefs.current.get(key)?.focus();
+    if (activationMode === 'Automatic') setRequestedKey(key);
   };
 
-  const fullClassName = `PdxTabs ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const handleKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    itemKey: string
+  ) => {
+    const enabledItems = items.filter((item) => !item.disabled);
+    const currentIndex = enabledItems.findIndex((item) => item.key === itemKey);
+    if (currentIndex < 0) return;
+
+    const previousKey = orientation === 'Horizontal' ? 'ArrowLeft' : 'ArrowUp';
+    const nextKey = orientation === 'Horizontal' ? 'ArrowRight' : 'ArrowDown';
+    let nextIndex: number | undefined;
+
+    if (event.key === previousKey) {
+      nextIndex =
+        (currentIndex - 1 + enabledItems.length) % enabledItems.length;
+    } else if (event.key === nextKey) {
+      nextIndex = (currentIndex + 1) % enabledItems.length;
+    } else if (event.key === 'Home') {
+      nextIndex = 0;
+    } else if (event.key === 'End') {
+      nextIndex = enabledItems.length - 1;
+    } else if (
+      activationMode === 'Manual' &&
+      (event.key === 'Enter' || event.key === ' ')
+    ) {
+      event.preventDefault();
+      setRequestedKey(itemKey);
+      return;
+    }
+
+    if (nextIndex === undefined || !enabledItems[nextIndex]) return;
+    event.preventDefault();
+    focusTab(enabledItems[nextIndex].key);
+  };
 
   return (
     <div
-      className={fullClassName}
-      style={style as React.CSSProperties}
-      id={id}
-      {...dataProps}
+      {...rest}
+      {...getDataAttributes(dataAttributes)}
+      className={mergeClassNames(
+        'PdxTabs',
+        orientation,
+        size,
+        variant,
+        className
+      )}
+      ref={ref}
     >
-      <div className="PdxTabsHeader">
-        {items.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            className={`PdxTabsTab ${item.key === currentKey ? 'Active' : ''} ${item.disabled ? 'Disabled' : ''}`}
-            onClick={() => handleChange(item.key, item.disabled)}
-          >
-            {item.label}
-          </button>
-        ))}
+      <div
+        aria-label={ariaLabel}
+        aria-orientation={
+          orientation.toLowerCase() as 'horizontal' | 'vertical'
+        }
+        className="PdxTabsList"
+        role="tablist"
+      >
+        {items.map((item, index) => {
+          const isSelected = item.key === selectedKey;
+          return (
+            <button
+              aria-controls={`${baseId}-panel-${index}`}
+              aria-selected={isSelected}
+              className="PdxTabsTab"
+              disabled={item.disabled}
+              id={`${baseId}-tab-${index}`}
+              key={item.key}
+              onClick={() => setRequestedKey(item.key)}
+              onKeyDown={(event) => handleKeyDown(event, item.key)}
+              ref={(node) => {
+                if (node) tabRefs.current.set(item.key, node);
+                else tabRefs.current.delete(item.key);
+              }}
+              role="tab"
+              tabIndex={isSelected ? 0 : -1}
+              type="button"
+            >
+              {item.label}
+            </button>
+          );
+        })}
       </div>
-      <div className="PdxTabsContent">{currentTab?.content}</div>
+      {selectedItem ? (
+        <div
+          aria-labelledby={`${baseId}-tab-${selectedIndex}`}
+          className="PdxTabsPanel"
+          id={`${baseId}-panel-${selectedIndex}`}
+          role="tabpanel"
+          tabIndex={0}
+        >
+          {selectedItem.content}
+        </div>
+      ) : null}
     </div>
   );
-}
+});
 
 export default PdxTabs;

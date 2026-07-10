@@ -1,51 +1,102 @@
 @use './PdxField.scss';
+@use '../foundation/control' as control;
 
 .PdxSelect {
+  width: 100%;
+  min-width: 0;
+}
+
+.PdxSelectControlWrapper {
+  position: relative;
+  display: block;
   width: 100%;
 }
 
 .PdxSelectControl {
+  @include control.control-transition;
+
+  box-sizing: border-box;
   width: 100%;
+  min-width: 0;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  padding: var(--spacing-sm) var(--spacing-md);
-  font-size: var(--font-size-lg);
-  line-height: var(--line-height-normal);
-  background-color: var(--bg-canvas);
+  appearance: none;
+  background: var(--bg-canvas);
   color: var(--text-primary);
-  transition:
-    border-color var(--motion-duration-fast) var(--motion-easing-standard),
-    box-shadow var(--motion-duration-fast) var(--motion-easing-standard);
+  font-family: var(--font-family-ui);
+  line-height: var(--line-height-normal);
+  cursor: pointer;
 
-  &:focus {
-    outline: none;
-    border-color: var(--accent-color);
-    box-shadow: 0 0 0 3px
-      color-mix(in srgb, var(--accent-color) 12%, transparent);
+  &:hover:not(:disabled) {
+    border-color: var(--border-strong);
+  }
+
+  &:focus-visible {
+    @include control.focus-ring;
   }
 
   &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    background-color: var(--bg-raised);
+    @include control.disabled-control;
+
+    background: var(--bg-raised);
   }
+
+  &.Error {
+    border-color: var(--danger-color);
+
+    &:focus-visible {
+      @include control.focus-ring(var(--danger-color));
+    }
+  }
+
+  &.Warning {
+    border-color: var(--warning-color);
+
+    &:focus-visible {
+      @include control.focus-ring(var(--warning-color));
+    }
+  }
+
+  &.Success {
+    border-color: var(--success-color);
+
+    &:focus-visible {
+      @include control.focus-ring(var(--success-color));
+    }
+  }
+
+  @include control.reduced-motion;
+}
+
+.PdxSelectIndicator {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  color: var(--text-muted);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.PdxSelect.ExtraSmall .PdxSelectControl {
+  min-height: 28px;
+  padding: 0 30px 0 var(--spacing-sm);
+  font-size: var(--font-size-xs);
 }
 
 .PdxSelect.Small .PdxSelectControl {
-  padding: var(--spacing-xs) var(--spacing-sm);
-  font-size: var(--font-size-md);
+  min-height: 32px;
+  padding: 0 30px 0 10px;
+  font-size: var(--font-size-sm);
 }
 
 .PdxSelect.Medium .PdxSelectControl {
-  padding: var(--spacing-sm) var(--spacing-md);
-  font-size: var(--font-size-lg);
+  min-height: 36px;
+  padding: 0 32px 0 var(--spacing-md);
+  font-size: var(--font-size-sm);
 }
 
 .PdxSelect.Large .PdxSelectControl {
-  padding: var(--spacing-md) var(--spacing-lg);
-  font-size: var(--font-size-xl);
-}
-
-.PdxSelect.Disabled {
-  opacity: 0.6;
+  min-height: 44px;
+  padding: 0 36px 0 var(--spacing-lg);
+  font-size: var(--font-size-md);
 }

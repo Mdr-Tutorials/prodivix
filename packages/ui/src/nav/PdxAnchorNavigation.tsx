@@ -33,14 +33,16 @@ function PdxAnchorNavigation({
 
   return (
     <nav
+      aria-label="On this page"
       className={fullClassName}
-      style={style as React.CSSProperties}
-      id={id}
       {...dataProps}
+      id={id}
+      style={style as React.CSSProperties}
     >
       {items.map((item) => (
         <a
           key={item.id}
+          aria-current={activeId === item.id ? 'location' : undefined}
           href={item.href || `#${item.id}`}
           className={`PdxAnchorNavigationItem ${activeId === item.id ? 'Active' : ''}`}
           onClick={() => onSelect?.(item)}

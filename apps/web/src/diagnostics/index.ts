@@ -1,5 +1,9 @@
 export { createDiagnostic } from './createDiagnostic';
-export { isDiagnostic } from './isDiagnostic';
+export {
+  isDiagnostic,
+  isDiagnosticDomain,
+  PRODIVIX_DIAGNOSTIC_DOMAINS,
+} from './isDiagnostic';
 export {
   buildDiagnosticPresentation,
   createDefaultDiagnosticPresentationTemplate,

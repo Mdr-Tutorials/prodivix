@@ -15,6 +15,7 @@ const mode = process.argv[2] ?? 'generate';
 const domainOrder = [
   'PIR',
   'WKS',
+  'PLG',
   'EDT',
   'UX',
   'COD',
@@ -39,6 +40,13 @@ const domainInfo = {
     title: 'Workspace',
     area: '工作区',
     description: '工作区加载、文档保存、同步冲突、capability 和 patch 应用',
+  },
+  PLG: {
+    file: 'plugin-diagnostic-codes.md',
+    title: 'Plugin',
+    area: '插件',
+    description:
+      'Plugin Manifest、contribution contract、权限、注册事务和 runtime lifecycle',
   },
   EDT: {
     file: 'editor-diagnostic-codes.md',
@@ -287,7 +295,35 @@ function readDiagnostics() {
     );
   }
 
+  validatePluginDiagnosticCoverage(grouped.get('PLG') ?? []);
+
   return grouped;
+}
+
+function validatePluginDiagnosticCoverage(specDiagnostics) {
+  const sourcePath = path.join(
+    rootDir,
+    'packages',
+    'plugin-contracts',
+    'src',
+    'diagnostics.ts'
+  );
+  const sourceCodes = new Set(
+    [...readUtf8(sourcePath).matchAll(/'(?<code>PLG-\d{4})'/g)].map(
+      (match) => match.groups.code
+    )
+  );
+  const specCodes = new Set(specDiagnostics.map((diagnostic) => diagnostic.code));
+  const missingFromSpec = [...sourceCodes].filter((code) => !specCodes.has(code));
+  const missingFromSource = [...specCodes].filter(
+    (code) => !sourceCodes.has(code)
+  );
+
+  if (missingFromSpec.length > 0 || missingFromSource.length > 0) {
+    throw new Error(
+      `PLG diagnostic code drift: source-only=[${missingFromSpec.join(', ')}], spec-only=[${missingFromSource.join(', ')}]`
+    );
+  }
 }
 
 function renderRetryable(value) {

@@ -17,6 +17,8 @@ export const createWebResolveAliases = (): AliasOptions => ({
   '#src': packageSource('prodivix-compiler'),
   '@prodivix/ai': packageSource('ai'),
   '@prodivix/i18n': packageSource('i18n'),
+  '@prodivix/plugin-contracts': packageSource('plugin-contracts'),
+  '@prodivix/plugin-host': packageSource('plugin-host'),
   '@prodivix/prodivix-compiler': packageSource('prodivix-compiler'),
   '@prodivix/shared/safety': resolve(packageSource('shared'), 'safety'),
   '@prodivix/shared/package.json': packageManifest('shared'),
@@ -25,4 +27,6 @@ export const createWebResolveAliases = (): AliasOptions => ({
   '@prodivix/ui': packageSource('ui'),
   '@prodivix/themes/package.json': packageManifest('themes'),
   '@prodivix/themes': packageSource('themes'),
+  '#contracts': packageSource('plugin-contracts'),
+  '#host': packageSource('plugin-host'),
 });

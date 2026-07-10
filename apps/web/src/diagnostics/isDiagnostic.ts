@@ -11,9 +11,10 @@ const DIAGNOSTIC_SEVERITIES: ReadonlySet<ProdivixDiagnosticSeverity> = new Set([
   'fatal',
 ]);
 
-const DIAGNOSTIC_DOMAINS: ReadonlySet<ProdivixDiagnosticDomain> = new Set([
+export const PRODIVIX_DIAGNOSTIC_DOMAINS = [
   'pir',
   'workspace',
+  'plugin',
   'route',
   'editor',
   'ux',
@@ -24,17 +25,27 @@ const DIAGNOSTIC_DOMAINS: ReadonlySet<ProdivixDiagnosticDomain> = new Set([
   'codegen',
   'backend',
   'ai',
-]);
+] as const satisfies readonly ProdivixDiagnosticDomain[];
+
+const DIAGNOSTIC_DOMAINS: ReadonlySet<ProdivixDiagnosticDomain> = new Set(
+  PRODIVIX_DIAGNOSTIC_DOMAINS
+);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+
+export const isDiagnosticDomain = (
+  value: unknown
+): value is ProdivixDiagnosticDomain =>
+  typeof value === 'string' &&
+  DIAGNOSTIC_DOMAINS.has(value as ProdivixDiagnosticDomain);
 
 export const isDiagnostic = (value: unknown): value is ProdivixDiagnostic => {
   if (!isRecord(value)) return false;
   return (
     typeof value.code === 'string' &&
     DIAGNOSTIC_SEVERITIES.has(value.severity as ProdivixDiagnosticSeverity) &&
-    DIAGNOSTIC_DOMAINS.has(value.domain as ProdivixDiagnosticDomain) &&
+    isDiagnosticDomain(value.domain) &&
     typeof value.message === 'string'
   );
 };

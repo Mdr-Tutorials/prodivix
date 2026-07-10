@@ -1,33 +1,142 @@
+@use '../foundation/control' as control;
+
 .PdxTabs {
+  display: grid;
   width: 100%;
+  color: var(--text-primary);
+  font-family: var(--font-family-ui);
 }
 
-.PdxTabsHeader {
+.PdxTabsList {
   display: flex;
-  gap: var(--spacing-sm);
-  border-bottom: 1px solid var(--border-default);
+  min-width: 0;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .PdxTabsTab {
-  border: none;
-  background: transparent;
-  padding: var(--spacing-sm) var(--spacing-md);
-  cursor: pointer;
-  color: var(--text-muted);
-  border-bottom: 2px solid transparent;
+  @include control.control-transition;
 
-  &.Active {
-    color: var(--text-primary);
-    border-bottom-color: var(--accent-color);
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+
+  &::after {
+    position: absolute;
+    right: 8px;
+    bottom: -1px;
+    left: 8px;
+    height: 2px;
+    border-radius: 999px;
+    background: transparent;
+    content: '';
   }
 
-  &.Disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  &:hover:not(:disabled) {
+    background: var(--bg-raised);
+    color: var(--text-primary);
+  }
+
+  &[aria-selected='true'] {
+    color: var(--text-primary);
+
+    &::after {
+      background: var(--accent-color);
+    }
+  }
+
+  &:focus-visible {
+    @include control.focus-ring;
+
+    z-index: 1;
+  }
+
+  &:disabled {
+    @include control.disabled-control;
   }
 }
 
-.PdxTabsContent {
-  padding: var(--spacing-md) 0;
+.PdxTabs.Small .PdxTabsTab {
+  min-height: 30px;
+  padding: 0 9px;
+  font-size: var(--font-size-xs);
+}
+
+.PdxTabs.Pills .PdxTabsList {
+  width: fit-content;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+}
+
+.PdxTabs.Pills .PdxTabsTab {
+  min-height: 30px;
+  border-radius: var(--radius-md);
+
+  &::after {
+    display: none;
+  }
+
+  &[aria-selected='true'] {
+    background: var(--bg-canvas);
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+.PdxTabsPanel {
+  min-width: 0;
+  padding: 16px 2px 2px;
   color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  outline: none;
+
+  &:focus-visible {
+    @include control.focus-ring;
+  }
+}
+
+.PdxTabs.Vertical {
+  grid-template-columns: minmax(120px, auto) minmax(0, 1fr);
+  align-items: start;
+}
+
+.PdxTabs.Vertical .PdxTabsList {
+  flex-direction: column;
+  border-right: 1px solid var(--border-subtle);
+  border-bottom: 0;
+  padding-right: 8px;
+}
+
+.PdxTabs.Vertical .PdxTabsTab {
+  justify-content: flex-start;
+  border-radius: var(--radius-md);
+  text-align: left;
+
+  &::after {
+    top: 7px;
+    right: -9px;
+    bottom: 7px;
+    left: auto;
+    width: 2px;
+    height: auto;
+  }
+}
+
+.PdxTabs.Vertical .PdxTabsPanel {
+  padding: 4px 4px 4px 16px;
 }

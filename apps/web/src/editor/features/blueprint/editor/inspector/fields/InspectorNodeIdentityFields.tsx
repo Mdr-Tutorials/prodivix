@@ -57,7 +57,7 @@ export function InspectorNodeIdentityFields() {
                 dataAttributes={{
                   'data-testid': 'inspector-id-input',
                 }}
-                onChange={(value) => setDraftId(value)}
+                onValueChange={(value) => setDraftId(value)}
                 onBlur={applyRename}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
@@ -186,7 +186,7 @@ export function InspectorNodeIdentityFields() {
                       primaryTextField.key === 'text' ? 'pr-8' : undefined
                     }
                     value={primaryTextField.value}
-                    onChange={(value) => {
+                    onValueChange={(value) => {
                       updateSelectedNode((current) =>
                         updateNodeTextField(current, primaryTextField, value)
                       );

@@ -32,6 +32,10 @@ const meta: Meta<typeof PdxPanel> = {
       control: 'boolean',
       description: '是否折叠',
     },
+    defaultCollapsed: {
+      control: 'boolean',
+      description: '初始折叠状态',
+    },
     onToggle: { action: 'toggled' },
   },
 };
@@ -135,7 +139,7 @@ export const Collapsible: Story = {
       </div>
     ),
     collapsible: true,
-    collapsed: false,
+    defaultCollapsed: false,
   },
 };
 
@@ -149,7 +153,7 @@ export const Collapsed: Story = {
       </div>
     ),
     collapsible: true,
-    collapsed: true,
+    defaultCollapsed: true,
   },
 };
 
@@ -211,8 +215,10 @@ export const SettingsPanel: Story = {
             style={{
               width: '100%',
               padding: '8px',
-              border: '1px solid #ccc',
+              border: '1px solid var(--border-default)',
               borderRadius: '4px',
+              background: 'var(--bg-canvas)',
+              color: 'var(--text-primary)',
             }}
           />
         </div>
@@ -229,13 +235,14 @@ export const MultiplePanels: Story = {
         display: 'flex',
         flexDirection: 'column',
         gap: '16px',
+        width: '500px',
         maxWidth: '500px',
       }}
     >
       <PdxPanel title="Panel 1" collapsible>
         <p>Content for panel 1</p>
       </PdxPanel>
-      <PdxPanel title="Panel 2" collapsible collapsed>
+      <PdxPanel title="Panel 2" collapsible defaultCollapsed>
         <p>Content for panel 2</p>
       </PdxPanel>
       <PdxPanel title="Panel 3" collapsible>

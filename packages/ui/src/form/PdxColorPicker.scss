@@ -1,6 +1,10 @@
+@use '../foundation/control';
 @use './PdxField.scss';
 
 .PdxColorPicker {
+  --pdx-color-picker-height: 36px;
+  --pdx-color-picker-swatch-size: 36px;
+
   width: 100%;
 }
 
@@ -11,52 +15,82 @@
 }
 
 .PdxColorPickerInput {
-  width: 44px;
-  height: 36px;
-  border: none;
-  background: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   padding: 0;
+  border: 0;
+  opacity: 0;
   cursor: pointer;
 }
 
 .PdxColorPickerText {
-  flex: 1;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  font-size: var(--font-size-md);
-  line-height: var(--line-height-normal);
-  background-color: var(--bg-canvas);
-  color: var(--text-primary);
-  transition:
-    border-color var(--motion-duration-fast) var(--motion-easing-standard),
-    box-shadow var(--motion-duration-fast) var(--motion-easing-standard);
+  @include control.field-control;
+  @include control.field-control-size(
+    var(--pdx-color-picker-height),
+    var(--spacing-sm),
+    var(--font-size-sm)
+  );
 
-  &:focus {
-    border-color: var(--accent-color);
-    outline: none;
-    box-shadow: 0 0 0 3px
-      color-mix(in srgb, var(--accent-color) 12%, transparent);
-  }
+  flex: 1;
+  min-width: 88px;
+  font-family: var(--font-family-mono);
+  text-transform: uppercase;
 }
 
 .PdxColorPickerSwatch {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
+  position: relative;
+  box-sizing: border-box;
+  width: var(--pdx-color-picker-swatch-size);
+  height: var(--pdx-color-picker-swatch-size);
+  flex: 0 0 auto;
+  overflow: hidden;
   border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(var(--pdx-color-value), var(--pdx-color-value)),
+    repeating-conic-gradient(var(--border-subtle) 0 25%, var(--bg-canvas) 0 50%)
+      0 / 8px 8px;
+  cursor: pointer;
+  transition:
+    border-color var(--motion-duration-fast) var(--motion-easing-standard),
+    box-shadow var(--motion-duration-fast) var(--motion-easing-standard),
+    transform var(--motion-duration-fast) var(--motion-easing-standard);
+
+  &:hover {
+    border-color: var(--border-strong);
+  }
+
+  &:has(input:focus-visible) {
+    @include control.focus-ring;
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
 }
 
 .PdxColorPicker.Disabled {
-  opacity: 0.6;
+  opacity: 0.52;
+
+  .PdxColorPickerSwatch {
+    cursor: not-allowed;
+  }
 }
 
-.PdxColorPicker.Small .PdxColorPickerInput {
-  width: 36px;
-  height: 30px;
+.PdxColorPicker.Small {
+  --pdx-color-picker-height: 32px;
+  --pdx-color-picker-swatch-size: 32px;
 }
 
-.PdxColorPicker.Large .PdxColorPickerInput {
-  width: 52px;
-  height: 42px;
+.PdxColorPicker.Large {
+  --pdx-color-picker-height: 40px;
+  --pdx-color-picker-swatch-size: 40px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .PdxColorPickerSwatch {
+    transition-duration: 0.01ms;
+  }
 }

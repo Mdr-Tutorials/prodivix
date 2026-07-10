@@ -135,90 +135,101 @@ function PdxRichTextEditor({
         </div>
       )}
       {description && <div className="PdxFieldDescription">{description}</div>}
-      {showToolbar && (
-        <div className="PdxRichTextEditorToolbar">
-          <button
-            type="button"
-            className={toolbarState.bold ? 'Active' : ''}
-            onClick={() => runCommand('bold')}
-            disabled={disabled || readOnly}
-            title="Bold (Ctrl/Cmd+B)"
-            aria-label="Bold"
+      <div className="PdxRichTextEditorSurface">
+        {showToolbar && (
+          <div
+            aria-label="Formatting controls"
+            className="PdxRichTextEditorToolbar"
+            role="toolbar"
           >
-            <Bold size={14} />
-          </button>
-          <button
-            type="button"
-            className={toolbarState.italic ? 'Active' : ''}
-            onClick={() => runCommand('italic')}
-            disabled={disabled || readOnly}
-            title="Italic (Ctrl/Cmd+I)"
-            aria-label="Italic"
-          >
-            <Italic size={14} />
-          </button>
-          <button
-            type="button"
-            className={toolbarState.underline ? 'Active' : ''}
-            onClick={() => runCommand('underline')}
-            disabled={disabled || readOnly}
-            title="Underline (Ctrl/Cmd+U)"
-            aria-label="Underline"
-          >
-            <Underline size={14} />
-          </button>
-          <button
-            type="button"
-            className={toolbarState.unorderedList ? 'Active' : ''}
-            onClick={() => runCommand('insertUnorderedList')}
-            disabled={disabled || readOnly}
-            title="Bulleted list"
-            aria-label="Bulleted list"
-          >
-            <List size={14} />
-          </button>
-          <button
-            type="button"
-            className={toolbarState.orderedList ? 'Active' : ''}
-            onClick={() => runCommand('insertOrderedList')}
-            disabled={disabled || readOnly}
-            title="Numbered list"
-            aria-label="Numbered list"
-          >
-            <ListOrdered size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={handleLink}
-            disabled={disabled || readOnly}
-            title="Insert link"
-            aria-label="Insert link"
-          >
-            <LinkIcon size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={() => runCommand('removeFormat')}
-            disabled={disabled || readOnly}
-            title="Clear formatting"
-            aria-label="Clear formatting"
-          >
-            <Eraser size={14} />
-          </button>
+            <button
+              type="button"
+              className={toolbarState.bold ? 'Active' : ''}
+              onClick={() => runCommand('bold')}
+              disabled={disabled || readOnly}
+              title="Bold (Ctrl/Cmd+B)"
+              aria-label="Bold"
+            >
+              <Bold size={14} />
+            </button>
+            <button
+              type="button"
+              className={toolbarState.italic ? 'Active' : ''}
+              onClick={() => runCommand('italic')}
+              disabled={disabled || readOnly}
+              title="Italic (Ctrl/Cmd+I)"
+              aria-label="Italic"
+            >
+              <Italic size={14} />
+            </button>
+            <button
+              type="button"
+              className={toolbarState.underline ? 'Active' : ''}
+              onClick={() => runCommand('underline')}
+              disabled={disabled || readOnly}
+              title="Underline (Ctrl/Cmd+U)"
+              aria-label="Underline"
+            >
+              <Underline size={14} />
+            </button>
+            <button
+              type="button"
+              className={toolbarState.unorderedList ? 'Active' : ''}
+              onClick={() => runCommand('insertUnorderedList')}
+              disabled={disabled || readOnly}
+              title="Bulleted list"
+              aria-label="Bulleted list"
+            >
+              <List size={14} />
+            </button>
+            <button
+              type="button"
+              className={toolbarState.orderedList ? 'Active' : ''}
+              onClick={() => runCommand('insertOrderedList')}
+              disabled={disabled || readOnly}
+              title="Numbered list"
+              aria-label="Numbered list"
+            >
+              <ListOrdered size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={handleLink}
+              disabled={disabled || readOnly}
+              title="Insert link"
+              aria-label="Insert link"
+            >
+              <LinkIcon size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => runCommand('removeFormat')}
+              disabled={disabled || readOnly}
+              title="Clear formatting"
+              aria-label="Clear formatting"
+            >
+              <Eraser size={14} />
+            </button>
+          </div>
+        )}
+        <div
+          ref={editorRef}
+          aria-disabled={disabled || undefined}
+          aria-multiline="true"
+          aria-readonly={readOnly || undefined}
+          className="PdxRichTextEditorContent"
+          contentEditable={!disabled && !readOnly}
+          data-placeholder={placeholder}
+          onInput={emitChange}
+          onKeyUp={syncToolbarState}
+          onMouseUp={syncToolbarState}
+          role="textbox"
+          suppressContentEditableWarning
+        />
+        <div className="PdxRichTextEditorFooter" aria-live="polite">
+          <span>{`${wordCount} words`}</span>
+          <span>{`${characterCount} chars`}</span>
         </div>
-      )}
-      <div
-        ref={editorRef}
-        className="PdxRichTextEditorContent"
-        contentEditable={!disabled && !readOnly}
-        data-placeholder={placeholder}
-        onInput={emitChange}
-        onKeyUp={syncToolbarState}
-        onMouseUp={syncToolbarState}
-      />
-      <div className="PdxRichTextEditorFooter" aria-live="polite">
-        <span>{`${wordCount} words`}</span>
-        <span>{`${characterCount} chars`}</span>
       </div>
       {message && <div className="PdxFieldMessage">{message}</div>}
     </div>

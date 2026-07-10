@@ -85,6 +85,8 @@ export const Variants: Story = {
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
         gap: '16px',
+        width: '720px',
+        maxWidth: '90vw',
       }}
     >
       <PdxCard variant="Default" padding="Medium">
@@ -169,13 +171,13 @@ export const ProductCard: Story = {
         <div
           style={{
             height: '150px',
-            backgroundColor: '#f0f0f0',
+            backgroundColor: 'var(--bg-raised)',
             borderRadius: '4px',
             marginBottom: '12px',
           }}
         ></div>
         <h4>Product Name</h4>
-        <p style={{ color: '#666', marginBottom: '8px' }}>
+        <p style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>
           Product description goes here
         </p>
         <p style={{ fontWeight: 'bold', fontSize: '18px' }}>$99.99</p>
@@ -197,13 +199,15 @@ export const UserCard: Story = {
             width: '60px',
             height: '60px',
             borderRadius: '50%',
-            backgroundColor: '#e0e0e0',
+            backgroundColor: 'var(--bg-raised)',
             flexShrink: 0,
           }}
         ></div>
         <div>
           <h4 style={{ margin: '0 0 4px 0' }}>John Doe</h4>
-          <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>
+          <p
+            style={{ margin: 0, color: 'var(--text-muted)', fontSize: '14px' }}
+          >
             Software Developer
           </p>
         </div>
@@ -224,17 +228,23 @@ export const StatsCard: Story = {
       }}
     >
       <PdxCard variant="Elevated" padding="Medium">
-        <h4 style={{ margin: '0 0 8px 0', color: '#666' }}>Total Users</h4>
+        <h4 style={{ margin: '0 0 8px 0', color: 'var(--text-muted)' }}>
+          Total Users
+        </h4>
         <p style={{ margin: 0, fontSize: '32px', fontWeight: 'bold' }}>1,234</p>
       </PdxCard>
       <PdxCard variant="Elevated" padding="Medium">
-        <h4 style={{ margin: '0 0 8px 0', color: '#666' }}>Revenue</h4>
+        <h4 style={{ margin: '0 0 8px 0', color: 'var(--text-muted)' }}>
+          Revenue
+        </h4>
         <p style={{ margin: 0, fontSize: '32px', fontWeight: 'bold' }}>
           $45.6K
         </p>
       </PdxCard>
       <PdxCard variant="Elevated" padding="Medium">
-        <h4 style={{ margin: '0 0 8px 0', color: '#666' }}>Orders</h4>
+        <h4 style={{ margin: '0 0 8px 0', color: 'var(--text-muted)' }}>
+          Orders
+        </h4>
         <p style={{ margin: 0, fontSize: '32px', fontWeight: 'bold' }}>567</p>
       </PdxCard>
     </div>

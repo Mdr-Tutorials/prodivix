@@ -1,12 +1,19 @@
 .PdxNavbar {
-  display: flex;
+  --pdx-navbar-min-height: 52px;
+  --pdx-navbar-padding-inline: var(--spacing-lg);
+
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--pdx-navbar-min-height);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  padding: var(--spacing-sm) var(--spacing-lg);
+  padding: var(--spacing-sm) var(--pdx-navbar-padding-inline);
   gap: var(--spacing-md);
   background-color: var(--bg-canvas);
   color: var(--text-primary);
   border-bottom: 1px solid var(--border-subtle);
+  font-family: var(--font-family-ui);
 }
 
 .PdxNavbar.Sticky {
@@ -17,46 +24,127 @@
 
 .PdxNavbar.Transparent {
   background-color: transparent;
-  border-bottom: none;
+  border-bottom-color: transparent;
 }
 
 .PdxNavbar.Blurred {
-  background-color: color-mix(in srgb, var(--bg-canvas) 80%, transparent);
-  backdrop-filter: blur(10px);
+  background-color: color-mix(in srgb, var(--bg-canvas) 88%, transparent);
+  backdrop-filter: blur(12px);
 }
 
 .PdxNavbarBrand {
+  grid-column: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-compact);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .PdxNavbarItems {
+  grid-column: 2;
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
+  justify-content: center;
+  gap: 2px;
+  overflow-x: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .PdxNavbarItem {
-  color: inherit;
-  text-decoration: none;
-  font-size: 14px;
-  padding: 4px 8px;
+  box-sizing: border-box;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--spacing-sm);
+  border: 0;
   border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-compact);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-easing-standard),
+    color var(--motion-duration-fast) var(--motion-easing-standard),
+    box-shadow var(--motion-duration-fast) var(--motion-easing-standard);
+
+  &:hover:not(.Disabled, :disabled) {
+    background-color: var(--bg-panel);
+    color: var(--text-primary);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--accent-color) 14%, transparent);
+  }
 
   &.Active {
     background-color: var(--bg-raised);
+    box-shadow: inset 0 -2px 0 var(--accent-color);
+    color: var(--text-primary);
+  }
+
+  &.Disabled,
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.52;
   }
 }
 
 .PdxNavbarActions {
+  grid-column: 3;
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
 }
 
 .PdxNavbar.Small {
-  padding: var(--spacing-xs) var(--spacing-md);
+  --pdx-navbar-min-height: 44px;
+  --pdx-navbar-padding-inline: var(--spacing-md);
 }
 
 .PdxNavbar.Large {
-  padding: var(--spacing-md) var(--spacing-xl);
+  --pdx-navbar-min-height: 60px;
+  --pdx-navbar-padding-inline: var(--spacing-xl);
+}
+
+.PdxNavbar.CustomContent {
+  display: flex;
+  justify-content: space-between;
+}
+
+@media (max-width: 640px) {
+  .PdxNavbar {
+    --pdx-navbar-padding-inline: var(--spacing-sm);
+
+    gap: var(--spacing-sm);
+  }
+
+  .PdxNavbarItems {
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .PdxNavbarItem {
+    transition-duration: 0.01ms;
+  }
 }

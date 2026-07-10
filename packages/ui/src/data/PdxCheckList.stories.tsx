@@ -16,6 +16,8 @@ type Story = StoryObj<typeof PdxCheckList>;
 
 export const Default: Story = {
   args: {
+    label: 'Notification channels',
+    description: 'Choose where operational alerts should be delivered.',
     items: [
       { label: 'Email notifications', value: 'email' },
       { label: 'Push notifications', value: 'push' },
@@ -31,5 +33,17 @@ export const Preselected: Story = {
       { label: 'Product tips', value: 'tips' },
     ],
     defaultValue: ['marketing'],
+  },
+};
+
+export const Horizontal: Story = {
+  args: {
+    label: 'Visible panels',
+    orientation: 'Horizontal',
+    items: [
+      { label: 'Layers', value: 'layers', checked: true },
+      { label: 'Inspector', value: 'inspector', checked: true },
+      { label: 'Issues', value: 'issues' },
+    ],
   },
 };

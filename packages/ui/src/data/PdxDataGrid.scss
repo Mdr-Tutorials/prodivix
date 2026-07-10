@@ -3,12 +3,15 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   background-color: var(--bg-canvas);
   color: var(--text-primary);
-  font-size: 14px;
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-compact);
 }
 
 .PdxDataGridHeader,
@@ -18,13 +21,16 @@
 }
 
 .PdxDataGridHeader {
-  background-color: var(--bg-panel);
-  font-weight: 600;
+  min-height: 38px;
+  background-color: color-mix(in srgb, var(--bg-panel) 72%, var(--bg-canvas));
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-default);
 }
 
 .PdxDataGridRow {
+  min-height: 40px;
   border-bottom: 1px solid var(--border-subtle);
   transition: background-color var(--motion-duration-fast)
     var(--motion-easing-standard);
@@ -36,7 +42,10 @@
 
 .PdxDataGridCell {
   min-width: 0;
-  padding: var(--spacing-sm);
+  overflow: hidden;
+  padding: 9px var(--spacing-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .PdxDataGrid.Striped .PdxDataGridRow:nth-child(even) {
@@ -56,7 +65,10 @@
 }
 
 .PdxDataGridEmpty {
-  padding: var(--spacing-md);
+  min-height: 112px;
+  display: grid;
+  place-items: center;
+  padding: var(--spacing-lg);
   text-align: center;
   color: var(--text-muted);
 }

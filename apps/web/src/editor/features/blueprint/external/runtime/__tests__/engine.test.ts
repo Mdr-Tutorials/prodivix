@@ -17,7 +17,8 @@ const runtimeMocks = vi.hoisted(() => ({
     (_components: unknown[], groups: unknown[]) => groups
   ),
   registerExternalRuntimeComponents: vi.fn(),
-  registerExternalGroups: vi.fn(),
+  registerExternalGroups: vi.fn(async () => []),
+  unregisterExternalLibraryRuntime: vi.fn(async () => []),
 }));
 
 vi.mock('../loader', () => ({
@@ -43,6 +44,8 @@ vi.mock('../registry', () => ({
   registerExternalRuntimeComponents:
     runtimeMocks.registerExternalRuntimeComponents,
   registerExternalGroups: runtimeMocks.registerExternalGroups,
+  unregisterExternalLibraryRuntime:
+    runtimeMocks.unregisterExternalLibraryRuntime,
 }));
 
 const createProfile = (): ExternalLibraryProfile => ({
@@ -92,6 +95,7 @@ describe('ensureExternalLibrary', () => {
     runtimeMocks.applyManifestToGroups.mockClear();
     runtimeMocks.registerExternalRuntimeComponents.mockClear();
     runtimeMocks.registerExternalGroups.mockClear();
+    runtimeMocks.unregisterExternalLibraryRuntime.mockClear();
   });
 
   it('dedupes concurrent ensure calls for the same library', async () => {

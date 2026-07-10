@@ -58,7 +58,7 @@ function PdxRating({
   };
 
   const fullClassName =
-    `PdxRating ${size} ${disabled ? 'Disabled' : ''} ${className || ''}`.trim();
+    `PdxRating ${size} ${disabled ? 'Disabled' : ''} ${readOnly ? 'ReadOnly' : ''} ${className || ''}`.trim();
   const dataProps = { ...dataAttributes };
 
   return (
@@ -74,18 +74,26 @@ function PdxRating({
         </div>
       )}
       {description && <div className="PdxFieldDescription">{description}</div>}
-      <div className="PdxRatingStars">
+      <div
+        aria-label={label || 'Rating'}
+        className="PdxRatingStars"
+        role="group"
+      >
         {Array.from({ length: max }, (_, index) => {
           const ratingValue = index + 1;
           return (
             <button
               key={ratingValue}
-              type="button"
+              aria-label={`${ratingValue} out of ${max}`}
+              aria-pressed={currentValue === ratingValue}
               className={`PdxRatingStar ${displayValue >= ratingValue ? 'Active' : ''}`}
               onClick={() => handleSelect(ratingValue)}
-              onMouseEnter={() => setHoverValue(ratingValue)}
+              onMouseEnter={() => {
+                if (!readOnly && !disabled) setHoverValue(ratingValue);
+              }}
               onMouseLeave={() => setHoverValue(null)}
-              disabled={disabled}
+              disabled={disabled || readOnly}
+              type="button"
             >
               <Star className="PdxRatingIcon" />
             </button>

@@ -31,7 +31,7 @@ function BorderPanelView({ node, updateNode }: InspectorPanelRenderProps) {
           <PdxInput
             size="Small"
             value={borderValue}
-            onChange={(value) =>
+            onValueChange={(value) =>
               updateNode((current) =>
                 updateStyleValue(current, 'border', value)
               )

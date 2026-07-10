@@ -60,7 +60,7 @@ export const ProjectSettingsPage = () => {
           <PdxButton
             text={t('settings.actions.exit')}
             size="Small"
-            category="Secondary"
+            variant="Secondary"
             onClick={() => navigate(basePath)}
           />
         </div>

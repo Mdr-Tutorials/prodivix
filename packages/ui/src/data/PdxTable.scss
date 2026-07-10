@@ -1,89 +1,135 @@
-.PdxTableWrapper {
+@use '../foundation/control' as control;
+
+.PdxTableRegion {
+  display: grid;
   width: 100%;
-  overflow-x: auto;
+  min-width: 0;
+  gap: 9px;
+  color: var(--text-primary);
+  font-family: var(--font-family-ui);
 }
 
 .PdxTableTitle {
-  font-weight: 600;
-  margin-bottom: var(--spacing-sm);
   color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-compact);
+}
+
+.PdxTableScroll {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-canvas);
+  overscroll-behavior-inline: contain;
+
+  &:focus-visible {
+    @include control.focus-ring;
+  }
 }
 
 .PdxTable {
   width: 100%;
+  min-width: max-content;
   border-collapse: separate;
   border-spacing: 0;
-  overflow: hidden;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  font-size: 14px;
   color: var(--text-primary);
+  font-size: var(--font-size-sm);
 
   th,
   td {
-    padding: var(--spacing-sm);
-    border-bottom: 1px solid var(--border-default);
+    min-width: 96px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: middle;
   }
 
   thead th {
-    font-weight: 600;
-    text-align: left;
+    background: var(--bg-panel);
     color: var(--text-secondary);
-    background-color: var(--bg-panel);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: 0.01em;
+    white-space: nowrap;
   }
 
   tbody tr {
-    background-color: var(--bg-canvas);
+    background: var(--bg-canvas);
     transition: background-color var(--motion-duration-fast)
       var(--motion-easing-standard);
   }
 
   tbody tr:last-child td {
-    border-bottom: none;
+    border-bottom: 0;
   }
 
   &.Bordered th,
   &.Bordered td {
-    border-right: 1px solid var(--border-default);
+    border-right: 1px solid var(--border-subtle);
   }
 
   &.Bordered th:last-child,
   &.Bordered td:last-child {
-    border-right: none;
+    border-right: 0;
   }
 
   &.Striped tbody tr:nth-child(even) {
-    background-color: var(--bg-panel);
+    background: color-mix(in srgb, var(--bg-panel) 52%, var(--bg-canvas));
   }
 
   &.Hoverable tbody tr:hover {
-    background-color: var(--bg-raised);
+    background: var(--bg-raised);
+  }
+
+  &.StickyHeader thead th {
+    position: sticky;
+    z-index: 1;
+    top: 0;
+    box-shadow: 0 1px 0 var(--border-subtle);
+  }
+
+  &.Small th,
+  &.Small td {
+    padding: 7px 10px;
+    font-size: var(--font-size-xs);
+  }
+
+  &.Large th,
+  &.Large td {
+    padding: 14px 16px;
+    font-size: var(--font-size-md);
+  }
+
+  caption {
+    caption-side: bottom;
+    padding: 8px 2px 2px;
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+    text-align: left;
   }
 }
 
-.PdxTable.Small th,
-.PdxTable.Small td {
-  padding: var(--spacing-xs) var(--spacing-sm);
-  font-size: 13px;
-}
-
-.PdxTable.Large th,
-.PdxTable.Large td {
-  padding: var(--spacing-md) var(--spacing-md);
-  font-size: 15px;
-}
-
-.PdxTable caption {
-  caption-side: bottom;
-  padding-top: var(--spacing-xs);
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
 .PdxTableEmpty {
-  text-align: center;
-  padding: var(--spacing-md);
+  height: 112px;
+  padding: 24px !important;
   color: var(--text-muted);
+  text-align: center;
+}
+
+.PdxTableSkeleton {
+  display: block;
+  width: min(100%, 160px);
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--bg-panel) 20%,
+    var(--bg-raised) 50%,
+    var(--bg-panel) 80%
+  );
+  background-size: 220% 100%;
+  animation: pdx-table-shimmer 1.4s linear infinite;
 }
 
 .AlignLeft {
@@ -96,4 +142,16 @@
 
 .AlignRight {
   text-align: right;
+}
+
+@keyframes pdx-table-shimmer {
+  to {
+    background-position: -220% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .PdxTableSkeleton {
+    animation: none;
+  }
 }

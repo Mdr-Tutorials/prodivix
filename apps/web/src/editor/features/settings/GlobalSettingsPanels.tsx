@@ -55,7 +55,7 @@ function AppearanceSettingsPanel({ controller }: GlobalSettingsPanelProps) {
               },
             ]}
             value={String(resolveValue('language'))}
-            onChange={(value) => updateValue('language', value)}
+            onValueChange={(value) => updateValue('language', value)}
             disabled={!canEditValue('language')}
           />
         }
@@ -84,7 +84,7 @@ function AppearanceSettingsPanel({ controller }: GlobalSettingsPanelProps) {
               disabled: !canEditValue('theme'),
             }))}
             value={String(resolveValue('theme'))}
-            onChange={(value) => updateValue('theme', value)}
+            onValueChange={(value) => updateValue('theme', value)}
           />
         }
       />
@@ -108,7 +108,7 @@ function AppearanceSettingsPanel({ controller }: GlobalSettingsPanelProps) {
               disabled: !canEditValue('density'),
             }))}
             value={String(resolveValue('density'))}
-            onChange={(value) => updateValue('density', value)}
+            onValueChange={(value) => updateValue('density', value)}
           />
         }
       />
@@ -165,7 +165,7 @@ function BehaviorSettingsPanel({ controller }: GlobalSettingsPanelProps) {
               disabled: !canEditValue('autosaveMode'),
             }))}
             value={String(resolveValue('autosaveMode'))}
-            onChange={(value) => updateValue('autosaveMode', value)}
+            onValueChange={(value) => updateValue('autosaveMode', value)}
           />
         }
       />
@@ -193,7 +193,7 @@ function BehaviorSettingsPanel({ controller }: GlobalSettingsPanelProps) {
           <PdxInput
             size="Small"
             value={String(resolveValue('undoSteps'))}
-            onChange={(value) => updateValue('undoSteps', value)}
+            onValueChange={(value) => updateValue('undoSteps', value)}
             disabled={!canEditValue('undoSteps')}
           />
         }
@@ -250,7 +250,7 @@ function BehaviorSettingsPanel({ controller }: GlobalSettingsPanelProps) {
               },
             ]}
             value={String(resolveValue('panelLayout'))}
-            onChange={(value) => updateValue('panelLayout', value)}
+            onValueChange={(value) => updateValue('panelLayout', value)}
             disabled={!canEditValue('panelLayout')}
           />
         }
@@ -279,7 +279,9 @@ function BehaviorSettingsPanel({ controller }: GlobalSettingsPanelProps) {
               disabled: !canEditValue('classPxTransformMode'),
             }))}
             value={String(resolveValue('classPxTransformMode'))}
-            onChange={(value) => updateValue('classPxTransformMode', value)}
+            onValueChange={(value) =>
+              updateValue('classPxTransformMode', value)
+            }
           />
         }
       />
@@ -304,14 +306,14 @@ function BlueprintSettingsPanel({ controller }: GlobalSettingsPanelProps) {
             <PdxInput
               size="Small"
               value={String(resolveValue('viewportWidth'))}
-              onChange={(value) => updateValue('viewportWidth', value)}
+              onValueChange={(value) => updateValue('viewportWidth', value)}
               disabled={!canEditValue('viewportWidth')}
             />
             <span className="text-[12px] text-(--text-muted)">×</span>
             <PdxInput
               size="Small"
               value={String(resolveValue('viewportHeight'))}
-              onChange={(value) => updateValue('viewportHeight', value)}
+              onValueChange={(value) => updateValue('viewportHeight', value)}
               disabled={!canEditValue('viewportHeight')}
             />
           </div>
@@ -401,7 +403,7 @@ function BlueprintSettingsPanel({ controller }: GlobalSettingsPanelProps) {
               disabled: !canEditValue('eventTriggerMode'),
             }))}
             value={String(resolveValue('eventTriggerMode'))}
-            onChange={(value) => updateValue('eventTriggerMode', value)}
+            onValueChange={(value) => updateValue('eventTriggerMode', value)}
           />
         }
       />
@@ -445,7 +447,7 @@ function ComponentSettingsPanel({ controller }: GlobalSettingsPanelProps) {
               },
             ]}
             value={String(resolveValue('resolverOrder'))}
-            onChange={(value) => updateValue('resolverOrder', value)}
+            onValueChange={(value) => updateValue('resolverOrder', value)}
             disabled={!canEditValue('resolverOrder')}
           />
         }
@@ -459,7 +461,7 @@ function ComponentSettingsPanel({ controller }: GlobalSettingsPanelProps) {
             size="Small"
             rows={3}
             value={String(resolveValue('customNamespaces'))}
-            onChange={(value) => updateValue('customNamespaces', value)}
+            onValueChange={(value) => updateValue('customNamespaces', value)}
             disabled={!canEditValue('customNamespaces')}
           />
         }
@@ -484,7 +486,7 @@ function ComponentSettingsPanel({ controller }: GlobalSettingsPanelProps) {
               disabled: !canEditValue('renderMode'),
             }))}
             value={String(resolveValue('renderMode'))}
-            onChange={(value) => updateValue('renderMode', value)}
+            onValueChange={(value) => updateValue('renderMode', value)}
           />
         }
       />
@@ -508,7 +510,7 @@ function ComponentSettingsPanel({ controller }: GlobalSettingsPanelProps) {
               disabled: !canEditValue('allowExternalProps'),
             }))}
             value={String(resolveValue('allowExternalProps'))}
-            onChange={(value) => updateValue('allowExternalProps', value)}
+            onValueChange={(value) => updateValue('allowExternalProps', value)}
           />
         }
       />
@@ -546,7 +548,7 @@ function CodegenSettingsPanel({ controller }: GlobalSettingsPanelProps) {
               },
             ]}
             value={String(resolveValue('defaultFramework'))}
-            onChange={(value) => updateValue('defaultFramework', value)}
+            onValueChange={(value) => updateValue('defaultFramework', value)}
             disabled={!canEditValue('defaultFramework')}
           />
         }
@@ -571,7 +573,7 @@ function CodegenSettingsPanel({ controller }: GlobalSettingsPanelProps) {
               disabled: !canEditValue('formatting'),
             }))}
             value={String(resolveValue('formatting'))}
-            onChange={(value) => updateValue('formatting', value)}
+            onValueChange={(value) => updateValue('formatting', value)}
           />
         }
       />
@@ -583,7 +585,7 @@ function CodegenSettingsPanel({ controller }: GlobalSettingsPanelProps) {
           <PdxInput
             size="Small"
             value={String(resolveValue('outputPath'))}
-            onChange={(value) => updateValue('outputPath', value)}
+            onValueChange={(value) => updateValue('outputPath', value)}
             disabled={!canEditValue('outputPath')}
           />
         }
@@ -610,7 +612,7 @@ function CodegenSettingsPanel({ controller }: GlobalSettingsPanelProps) {
               },
             ]}
             value={String(resolveValue('importStyle'))}
-            onChange={(value) => updateValue('importStyle', value)}
+            onValueChange={(value) => updateValue('importStyle', value)}
             disabled={!canEditValue('importStyle')}
           />
         }
@@ -635,7 +637,7 @@ function CodegenSettingsPanel({ controller }: GlobalSettingsPanelProps) {
               disabled: !canEditValue('metadata'),
             }))}
             value={String(resolveValue('metadata'))}
-            onChange={(value) => updateValue('metadata', value)}
+            onValueChange={(value) => updateValue('metadata', value)}
           />
         }
       />
@@ -673,7 +675,7 @@ function ShortcutSettingsPanel({ controller }: GlobalSettingsPanelProps) {
               },
             ]}
             value={String(resolveValue('shortcutPreset'))}
-            onChange={(value) => updateValue('shortcutPreset', value)}
+            onValueChange={(value) => updateValue('shortcutPreset', value)}
             disabled={!canEditValue('shortcutPreset')}
           />
         }
@@ -734,7 +736,7 @@ function ShortcutSettingsPanel({ controller }: GlobalSettingsPanelProps) {
               },
             ]}
             value={String(resolveValue('logLevel'))}
-            onChange={(value) => updateValue('logLevel', value)}
+            onValueChange={(value) => updateValue('logLevel', value)}
             disabled={!canEditValue('logLevel')}
           />
         }
@@ -759,7 +761,7 @@ function ShortcutSettingsPanel({ controller }: GlobalSettingsPanelProps) {
               disabled: !canEditValue('telemetry'),
             }))}
             value={String(resolveValue('telemetry'))}
-            onChange={(value) => updateValue('telemetry', value)}
+            onValueChange={(value) => updateValue('telemetry', value)}
           />
         }
       />

@@ -3,6 +3,7 @@ import {
   COD_DIAGNOSTIC_DEFINITIONS,
   createDiagnostic,
   isDiagnostic,
+  isDiagnosticDomain,
 } from '@/diagnostics';
 
 describe('diagnostics contract', () => {
@@ -53,5 +54,18 @@ describe('diagnostics contract', () => {
         startLine: 1,
       },
     });
+  });
+
+  it('accepts plugin contract diagnostics in the shared domain guard', () => {
+    const diagnostic = createDiagnostic({
+      code: 'PLG-1001',
+      domain: 'plugin',
+      severity: 'error',
+      message: 'Plugin Manifest is not strict JSON.',
+    });
+
+    expect(isDiagnostic(diagnostic)).toBe(true);
+    expect(isDiagnosticDomain('plugin')).toBe(true);
+    expect(isDiagnosticDomain('unknown')).toBe(false);
   });
 });

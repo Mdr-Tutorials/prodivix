@@ -1,61 +1,116 @@
 import './PdxDrawer.scss';
-import { type PdxComponent } from '@prodivix/shared';
-import type React from 'react';
+import { getDataAttributes, mergeClassNames } from '../foundation/component';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { X } from 'lucide-react';
+import type { CSSProperties, ReactNode } from 'react';
 
-interface PdxDrawerSpecificProps {
-  open: boolean;
-  title?: string;
-  children?: React.ReactNode;
-  footer?: React.ReactNode;
-  placement?: 'Left' | 'Right' | 'Top' | 'Bottom';
-  size?: number;
+export type PdxDrawerPlacement = 'Left' | 'Right' | 'Top' | 'Bottom';
+
+export interface PdxDrawerProps {
+  children?: ReactNode;
+  className?: string;
+  closeLabel?: string;
+  closeOnEscape?: boolean;
   closeOnOverlayClick?: boolean;
+  dataAttributes?: Record<string, string>;
+  description?: ReactNode;
+  footer?: ReactNode;
+  id?: string;
   onClose?: () => void;
+  onOpenChange?: (open: boolean) => void;
+  open: boolean;
+  placement?: PdxDrawerPlacement;
+  portal?: boolean;
+  showClose?: boolean;
+  size?: number | string;
+  style?: CSSProperties;
+  title: ReactNode;
 }
 
-export interface PdxDrawerProps extends PdxComponent, PdxDrawerSpecificProps {}
-
 function PdxDrawer({
-  open,
-  title,
   children,
-  footer,
-  placement = 'Right',
-  size = 360,
-  closeOnOverlayClick = true,
-  onClose,
   className,
-  style,
+  closeLabel = 'Close drawer',
+  closeOnEscape = true,
+  closeOnOverlayClick = true,
+  dataAttributes,
+  description,
+  footer,
   id,
-  dataAttributes = {},
+  onClose,
+  onOpenChange,
+  open,
+  placement = 'Right',
+  portal = true,
+  showClose = true,
+  size = 360,
+  style,
+  title,
 }: PdxDrawerProps) {
-  if (!open) return null;
-
-  const fullClassName = `PdxDrawer ${placement} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
-
-  const drawerStyle: React.CSSProperties =
+  const handleOpenChange = (nextOpen: boolean) => {
+    onOpenChange?.(nextOpen);
+    if (!nextOpen) onClose?.();
+  };
+  const dimension = typeof size === 'number' ? `${size}px` : size;
+  const drawerStyle: CSSProperties =
     placement === 'Top' || placement === 'Bottom'
-      ? { height: size, ...(style as React.CSSProperties) }
-      : { width: size, ...(style as React.CSSProperties) };
+      ? { height: dimension, ...style }
+      : { width: dimension, ...style };
+
+  const content = (
+    <>
+      <DialogPrimitive.Overlay className="PdxDrawerOverlay" />
+      <DialogPrimitive.Content
+        {...getDataAttributes(dataAttributes)}
+        {...(description ? {} : { 'aria-describedby': undefined })}
+        className={mergeClassNames('PdxDrawer', placement, className)}
+        id={id}
+        onEscapeKeyDown={(event) => {
+          if (!closeOnEscape) event.preventDefault();
+        }}
+        onPointerDownOutside={(event) => {
+          if (!closeOnOverlayClick) event.preventDefault();
+        }}
+        style={drawerStyle}
+      >
+        <header className="PdxDrawerHeader">
+          <div className="PdxDrawerHeading">
+            <DialogPrimitive.Title className="PdxDrawerTitle">
+              {title}
+            </DialogPrimitive.Title>
+            {description ? (
+              <DialogPrimitive.Description className="PdxDrawerDescription">
+                {description}
+              </DialogPrimitive.Description>
+            ) : null}
+          </div>
+          {showClose ? (
+            <DialogPrimitive.Close asChild>
+              <button
+                aria-label={closeLabel}
+                className="PdxDrawerClose"
+                title={closeLabel}
+                type="button"
+              >
+                <X aria-hidden="true" size={16} />
+              </button>
+            </DialogPrimitive.Close>
+          ) : null}
+        </header>
+        <div className="PdxDrawerBody">{children}</div>
+        {footer ? <footer className="PdxDrawerFooter">{footer}</footer> : null}
+      </DialogPrimitive.Content>
+    </>
+  );
 
   return (
-    <div
-      className="PdxDrawerOverlay"
-      onClick={closeOnOverlayClick ? onClose : undefined}
-    >
-      <div
-        className={fullClassName}
-        style={drawerStyle}
-        id={id}
-        {...dataProps}
-        onClick={(event) => event.stopPropagation()}
-      >
-        {title && <div className="PdxDrawerHeader">{title}</div>}
-        <div className="PdxDrawerBody">{children}</div>
-        {footer && <div className="PdxDrawerFooter">{footer}</div>}
-      </div>
-    </div>
+    <DialogPrimitive.Root open={open} onOpenChange={handleOpenChange}>
+      {portal ? (
+        <DialogPrimitive.Portal>{content}</DialogPrimitive.Portal>
+      ) : (
+        content
+      )}
+    </DialogPrimitive.Root>
   );
 }
 

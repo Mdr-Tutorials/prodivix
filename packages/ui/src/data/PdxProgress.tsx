@@ -31,10 +31,15 @@ function PdxProgress({
 
   return (
     <div
+      aria-label={label || 'Progress'}
+      aria-valuemax={100}
+      aria-valuemin={0}
+      aria-valuenow={clampedValue}
       className={fullClassName}
-      style={style as React.CSSProperties}
-      id={id}
       {...dataProps}
+      id={id}
+      role="progressbar"
+      style={style as React.CSSProperties}
     >
       {(label || showLabel) && (
         <div className="PdxProgressHeader">
@@ -42,7 +47,7 @@ function PdxProgress({
           {showLabel && <span>{clampedValue}%</span>}
         </div>
       )}
-      <div className="PdxProgressTrack">
+      <div className="PdxProgressTrack" aria-hidden="true">
         <div className="PdxProgressBar" style={{ width: `${clampedValue}%` }} />
       </div>
     </div>

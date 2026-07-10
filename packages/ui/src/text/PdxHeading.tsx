@@ -1,4 +1,5 @@
 import './PdxHeading.scss';
+import { getDataAttributes, mergeClassNames } from '../foundation/component';
 import { type PdxComponent } from '@prodivix/shared';
 import type React from 'react';
 
@@ -33,20 +34,24 @@ function PdxHeading({
   dataAttributes = {},
   onClick,
 }: PdxHeadingProps) {
-  const fullClassName =
-    `PdxHeading Level${level} ${weight} ${color} ${align} ${className || ''}`.trim();
-
-  const dataProps = { ...dataAttributes };
+  const fullClassName = mergeClassNames(
+    'PdxHeading',
+    `Level${level}`,
+    `Weight${weight}`,
+    `Tone${color}`,
+    `Align${align}`,
+    className
+  );
 
   const Element = (Component || `h${level}`) as React.ElementType;
 
   return (
     <Element
       className={fullClassName}
-      style={style}
       id={id}
       onClick={onClick}
-      {...dataProps}
+      style={style}
+      {...getDataAttributes(dataAttributes)}
     >
       {children}
     </Element>

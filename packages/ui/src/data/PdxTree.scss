@@ -1,68 +1,97 @@
 .PdxTree {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   color: var(--text-primary);
-  font-size: 14px;
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-sm);
 }
 
 .PdxTreeRow {
+  min-height: 32px;
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: 2px;
   min-width: 0;
-}
-
-.PdxTreeToggle {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: var(--text-muted);
-  font-size: 12px;
-  width: 18px;
-  height: 18px;
   border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition:
-    background-color var(--motion-duration-fast) var(--motion-easing-standard),
-    color var(--motion-duration-fast) var(--motion-easing-standard);
+  transition: background-color var(--motion-duration-fast)
+    var(--motion-easing-standard);
 
-  &:hover {
-    background-color: var(--bg-raised);
-    color: var(--text-primary);
-  }
-}
-
-.PdxTreeSpacer {
-  width: 18px;
-  flex: 0 0 auto;
-}
-
-.PdxTreeLabel {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: inherit;
-  padding: 3px 7px;
-  border-radius: var(--radius-sm);
-  min-width: 0;
-  transition:
-    background-color var(--motion-duration-fast) var(--motion-easing-standard),
-    color var(--motion-duration-fast) var(--motion-easing-standard);
-
-  &:hover {
+  &:hover:not(.Disabled) {
     background-color: var(--bg-panel);
   }
 
   &.Selected {
     background-color: var(--bg-raised);
-    color: var(--accent-color);
+    box-shadow: inset 2px 0 0 var(--accent-color);
   }
 
   &.Disabled {
-    opacity: 0.5;
+    opacity: 0.52;
+  }
+}
+
+.PdxTreeToggle {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-easing-standard),
+    color var(--motion-duration-fast) var(--motion-easing-standard);
+
+  &:hover {
+    border-color: var(--border-subtle);
+    background-color: var(--bg-canvas);
+    color: var(--text-primary);
+  }
+
+  &:focus-visible {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--accent-color) 14%, transparent);
+  }
+}
+
+.PdxTreeSpacer {
+  width: 26px;
+  flex: 0 0 auto;
+}
+
+.PdxTreeLabel {
+  min-width: 0;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  padding: 4px var(--spacing-xs);
+  font: inherit;
+  text-align: left;
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-easing-standard),
+    color var(--motion-duration-fast) var(--motion-easing-standard);
+
+  &:focus-visible {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--accent-color) 14%, transparent);
+  }
+
+  &:disabled {
     cursor: not-allowed;
   }
 }

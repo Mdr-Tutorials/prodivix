@@ -1,42 +1,59 @@
 import './PdxEmpty.scss';
-import { type PdxComponent } from '@prodivix/shared';
-import type React from 'react';
+import {
+  getDataAttributes,
+  mergeClassNames,
+  type PdxNativeProps,
+} from '../foundation/component';
+import { Inbox } from 'lucide-react';
+import { forwardRef, type ReactNode } from 'react';
 
-interface PdxEmptySpecificProps {
-  title?: string;
-  description?: string;
-  icon?: React.ReactNode;
-  action?: React.ReactNode;
+export interface PdxEmptyOwnProps {
+  action?: ReactNode;
+  description?: ReactNode;
+  icon?: ReactNode;
+  showIcon?: boolean;
+  size?: 'Small' | 'Medium' | 'Large';
+  title?: ReactNode;
+  variant?: 'Plain' | 'Panel';
 }
 
-export interface PdxEmptyProps extends PdxComponent, PdxEmptySpecificProps {}
+export type PdxEmptyProps = Omit<PdxNativeProps<'div'>, 'children' | 'title'> &
+  PdxEmptyOwnProps;
 
-function PdxEmpty({
-  title = 'No data',
-  description,
-  icon,
-  action,
-  className,
-  style,
-  id,
-  dataAttributes = {},
-}: PdxEmptyProps) {
-  const fullClassName = `PdxEmpty ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
-
+const PdxEmpty = forwardRef<HTMLDivElement, PdxEmptyProps>(function PdxEmpty(
+  {
+    action,
+    className,
+    dataAttributes,
+    description,
+    icon,
+    showIcon = true,
+    size = 'Medium',
+    title = 'No data',
+    variant = 'Plain',
+    ...rest
+  },
+  ref
+) {
   return (
     <div
-      className={fullClassName}
-      style={style as React.CSSProperties}
-      id={id}
-      {...dataProps}
+      {...rest}
+      {...getDataAttributes(dataAttributes)}
+      className={mergeClassNames('PdxEmpty', size, variant, className)}
+      ref={ref}
     >
-      {icon && <div className="PdxEmptyIcon">{icon}</div>}
+      {showIcon ? (
+        <div aria-hidden="true" className="PdxEmptyIcon">
+          {icon ?? <Inbox size={24} strokeWidth={1.7} />}
+        </div>
+      ) : null}
       <div className="PdxEmptyTitle">{title}</div>
-      {description && <div className="PdxEmptyDescription">{description}</div>}
-      {action && <div className="PdxEmptyAction">{action}</div>}
+      {description ? (
+        <div className="PdxEmptyDescription">{description}</div>
+      ) : null}
+      {action ? <div className="PdxEmptyAction">{action}</div> : null}
     </div>
   );
-}
+});
 
 export default PdxEmpty;

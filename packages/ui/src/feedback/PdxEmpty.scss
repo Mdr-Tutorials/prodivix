@@ -1,23 +1,73 @@
 .PdxEmpty {
   display: flex;
+  width: 100%;
+  min-width: 180px;
   flex-direction: column;
   align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-lg);
-  text-align: center;
+  gap: 7px;
+  padding: 28px 20px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
   color: var(--text-muted);
+  font-family: var(--font-family-ui);
+  text-align: center;
+
+  &.Panel {
+    border-color: var(--border-subtle);
+    background: color-mix(in srgb, var(--bg-panel) 55%, var(--bg-canvas));
+  }
+
+  &.Small {
+    min-width: 140px;
+    padding: 18px 14px;
+  }
+
+  &.Large {
+    min-width: 260px;
+    padding: 40px 28px;
+  }
 }
 
 .PdxEmptyIcon {
-  font-size: 32px;
-  color: var(--border-default);
+  display: inline-flex;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 50%;
+  background: var(--bg-canvas);
+  box-shadow: var(--shadow-sm);
+  color: var(--text-muted);
+}
+
+.PdxEmpty.Small .PdxEmptyIcon {
+  width: 38px;
+  height: 38px;
+}
+
+.PdxEmpty.Large .PdxEmptyIcon {
+  width: 58px;
+  height: 58px;
 }
 
 .PdxEmptyTitle {
-  font-weight: 600;
   color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-compact);
 }
 
 .PdxEmptyDescription {
-  font-size: 13px;
+  max-width: 38ch;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+}
+
+.PdxEmptyAction {
+  display: flex;
+  justify-content: center;
+  padding-top: 7px;
 }

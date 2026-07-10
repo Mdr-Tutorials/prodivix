@@ -1,3 +1,4 @@
+@use '../foundation/control' as control;
 @use './PdxField.scss';
 
 .PdxImageUpload {
@@ -5,46 +6,94 @@
 }
 
 .PdxImageUploadDropzone {
+  @include control.control-transition;
+
+  width: 100%;
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius-md);
   padding: var(--spacing-lg);
   text-align: center;
   cursor: pointer;
-  background-color: var(--bg-canvas);
-  transition:
-    border-color var(--motion-duration-fast) var(--motion-easing-standard),
-    background-color var(--motion-duration-fast) var(--motion-easing-standard),
-    box-shadow var(--motion-duration-fast) var(--motion-easing-standard);
+  background: color-mix(in srgb, var(--bg-panel) 52%, var(--bg-canvas));
+  color: var(--text-primary);
+  font-family: var(--font-family-ui);
 
-  &:hover {
+  &:hover:not(:disabled),
+  &.Dragging {
     border-color: var(--accent-color);
-    background-color: var(--bg-panel);
-    box-shadow: inset 0 0 0 1px var(--border-subtle);
+    background: color-mix(in srgb, var(--accent-color) 5%, var(--bg-canvas));
+  }
+
+  &:focus-visible {
+    @include control.focus-ring;
+  }
+
+  &:disabled {
+    @include control.disabled-control;
   }
 }
 
-.PdxImageUploadText {
-  font-size: 14px;
-  font-weight: var(--font-weight-medium);
+.PdxImageUploadIcon {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-canvas);
   color: var(--text-secondary);
 }
 
+.PdxImageUploadText {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+
+  span {
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+}
+
+.PdxImageUploadHint {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
 .PdxImageUploadInput {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.PdxImageUploadDropzone:has(+ .PdxImageUploadInput:focus-visible) {
+  @include control.focus-ring;
 }
 
 .PdxImageUploadGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
   gap: var(--spacing-sm);
-  margin-top: var(--spacing-sm);
+  margin-top: var(--spacing-xs);
 }
 
 .PdxImageUploadItem {
+  position: relative;
   border-radius: var(--radius-md);
   overflow: hidden;
   border: 1px solid var(--border-default);
-  background-color: var(--bg-panel);
+  background-color: var(--bg-canvas);
   transition:
     border-color var(--motion-duration-fast) var(--motion-easing-standard),
     box-shadow var(--motion-duration-fast) var(--motion-easing-standard);
@@ -56,13 +105,53 @@
 
   img {
     width: 100%;
-    height: 96px;
+    aspect-ratio: 4 / 3;
     object-fit: cover;
     display: block;
   }
 }
 
-.PdxImageUpload.Disabled .PdxImageUploadDropzone {
-  opacity: 0.6;
-  cursor: not-allowed;
+.PdxImageUploadName {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 7px var(--spacing-sm);
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: var(--font-size-micro);
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.PdxImageUploadRemove {
+  @include control.control-transition;
+
+  position: absolute;
+  top: var(--spacing-xs);
+  right: var(--spacing-xs);
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--border-default) 70%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-canvas) 88%, transparent);
+  color: var(--text-secondary);
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+
+  &:hover:not(:disabled) {
+    background: var(--bg-canvas);
+    color: var(--danger-color);
+  }
+
+  &:focus-visible {
+    @include control.focus-ring;
+  }
 }

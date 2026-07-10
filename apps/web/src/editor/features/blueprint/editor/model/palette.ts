@@ -22,7 +22,7 @@ import type { ComponentNode, PIRDocument } from '@prodivix/shared/types/pir';
 import { materializePirRoot } from '@/pir/graph';
 import { createRadixNodeFromPaletteItem } from '@/editor/features/blueprint/editor/model/radix';
 import { buildLayoutPatternNode } from '@/editor/features/blueprint/layoutPatterns';
-import { getComponentItemById } from '@/editor/features/blueprint/registry';
+import { getPaletteItemById } from '@/editor/features/blueprint/palette';
 
 const collectTypeCounts = (
   node: ComponentNode,
@@ -198,7 +198,7 @@ export const createNodeFromPaletteItem = (
 
   if (itemId.startsWith('layout-pattern-')) {
     const patternId = itemId.replace('layout-pattern-', '');
-    const registryItem = getComponentItemById(itemId);
+    const registryItem = getPaletteItemById(itemId);
     const patternNode = buildLayoutPatternNode({
       patternId,
       createId,
@@ -254,7 +254,7 @@ export const createNodeFromPaletteItem = (
       text: 'Button',
       props: {
         size: selectedSize ?? 'Medium',
-        category: 'Primary',
+        variant: 'Primary',
         ...variantProps,
       },
     };
@@ -281,7 +281,7 @@ export const createNodeFromPaletteItem = (
       props: {
         to: '',
         size: selectedSize ?? 'Medium',
-        category: 'Secondary',
+        variant: 'Secondary',
         ...variantProps,
       },
     };
@@ -396,6 +396,7 @@ export const createNodeFromPaletteItem = (
           name: 'Sparkles',
         },
         to: '',
+        label: 'Open link',
         size: 18,
         ...variantProps,
       },
@@ -421,7 +422,7 @@ export const createNodeFromPaletteItem = (
       ],
     };
   }
-  const registryItem = getComponentItemById(itemId);
+  const registryItem = getPaletteItemById(itemId);
   if (registryItem?.runtimeType) {
     const inferredText = inferDefaultText(registryItem.name);
     return {

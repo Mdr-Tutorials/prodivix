@@ -1,36 +1,41 @@
 .PdxNav {
+  box-sizing: border-box;
   width: 100%;
+  min-height: 52px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 12px 20px;
-  box-sizing: border-box;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-bottom: 1px solid var(--border-subtle);
   background-color: var(--bg-canvas);
   color: var(--text-primary);
+  font-family: var(--font-family-ui);
 
   &.Float {
     position: sticky;
     top: 0;
     z-index: 10;
-    box-shadow: var(--shadow-md);
+    border-color: var(--border-default);
   }
 
   &.CanHide {
     transition:
       transform 0.25s ease,
-      opacity 0.25s ease;
+      opacity 0.25s ease,
+      visibility 0.25s ease;
 
     &.Hidden {
       transform: translateY(-100%);
       opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
     }
   }
 
   &.Transparent {
     background-color: transparent;
-    border-color: transparent;
-    box-shadow: none;
+    border-bottom-color: transparent;
   }
 
   &.Solid {
@@ -38,7 +43,7 @@
   }
 
   &.Blurred {
-    background-color: color-mix(in srgb, var(--bg-canvas) 80%, transparent);
+    background-color: color-mix(in srgb, var(--bg-canvas) 88%, transparent);
     backdrop-filter: blur(12px);
   }
 
@@ -69,13 +74,15 @@
 
     .PdxNavLeft,
     .PdxNavRight {
-      flex: 1;
+      flex: 1 1 0;
     }
   }
 
   &.Columns-3 {
-    .PdxNavCenter {
-      flex: 1;
+    .PdxNavLeft,
+    .PdxNavCenter,
+    .PdxNavRight {
+      flex: 1 1 0;
     }
   }
 }
@@ -85,18 +92,23 @@
 .PdxNavRight {
   display: flex;
   align-items: inherit;
+  min-width: 0;
+  gap: var(--spacing-sm);
 }
 
 .PdxNavLeft,
 .PdxNavRight {
-  display: flex;
   flex-direction: row;
-  align-items: inherit;
-  min-width: 140px;
 }
 
 .PdxNavCenter {
   justify-content: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .PdxNavLeft {
@@ -105,30 +117,31 @@
 
 .PdxNavRight {
   justify-content: flex-end;
-
-  p {
-    font-size: 18px;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition:
-      color var(--motion-duration-normal) var(--motion-easing-standard),
-      background-color var(--motion-duration-normal)
-        var(--motion-easing-standard);
-    font-weight: var(--font-weight-medium);
-    padding: 4px 15px;
-    border-radius: 18px;
-
-    &:hover {
-      color: var(--text-primary);
-      background-color: var(--bg-panel);
-    }
-  }
 }
 
 .PdxNavHeading {
-  font-family: var(--font-family-ui);
-  font-size: 24px;
-  font-weight: var(--font-weight-extrabold);
+  overflow: hidden;
   color: var(--text-primary);
-  margin: 0 1rem;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-compact);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .PdxNav {
+    gap: var(--spacing-sm);
+    padding-inline: var(--spacing-sm);
+  }
+
+  .PdxNavCenter {
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .PdxNav.CanHide {
+    transition-duration: 0.01ms;
+  }
 }

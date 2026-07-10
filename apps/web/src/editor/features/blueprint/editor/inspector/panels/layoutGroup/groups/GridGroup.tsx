@@ -93,7 +93,7 @@ const GridGroupContent = ({ node, updateNode, t }: LayoutGroupRenderProps) => {
               dataAttributes={{
                 'data-testid': 'inspector-grid-columns',
               }}
-              onChange={(value) => {
+              onValueChange={(value) => {
                 updateNode((current) => {
                   const next = Number(value);
                   if (!Number.isFinite(next) || next <= 0) {

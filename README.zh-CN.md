@@ -86,6 +86,8 @@ pnpm dev:web
 
 后端 Workspace、鉴权、同步和项目持久化流程需要 PostgreSQL。可在 `apps/backend` 下执行 `docker compose up -d` 启动本地数据库；后端依赖由 Go modules 管理，也可以提前执行 `go mod download` 拉取。后端专属配置见 `apps/backend/README.md`。
 
+Windows 下可运行 `scripts\start-dev.bat`，一次打开原生 PostgreSQL、后端、Web 编辑器和 UI Storybook。需要覆盖本地 PostgreSQL 连接或 `PRODIVIX_PG_BIN` 时，将 `.env.example` 复制为 `.env.local`；数据库与后端启动器会读取同一个 `BACKEND_DB_URL`。
+
 常用入口：
 
 | 命令                   | 说明                      |

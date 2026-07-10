@@ -1,8 +1,8 @@
 import './PdxTree.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type React from 'react';
-import { Minus, Plus } from 'lucide-react';
 
 export interface PdxTreeNode {
   id: string;
@@ -44,7 +44,7 @@ function PdxTree({
     }
   }, [expandedKeys]);
 
-  const currentExpanded = expandedKeys || internalExpanded;
+  const currentExpanded = expandedKeys ?? internalExpanded;
   const expandedSet = useMemo(
     () => new Set(currentExpanded),
     [currentExpanded]
@@ -55,7 +55,7 @@ function PdxTree({
       ? currentExpanded.filter((key) => key !== nodeId)
       : [...currentExpanded, nodeId];
 
-    if (!expandedKeys) {
+    if (expandedKeys === undefined) {
       setInternalExpanded(nextExpanded);
     }
     if (onToggle) {
@@ -76,28 +76,40 @@ function PdxTree({
       const isExpanded = expandedSet.has(node.id);
       return (
         <div key={node.id} className="PdxTreeNode">
-          <div className="PdxTreeRow" style={{ paddingLeft: depth * 16 }}>
+          <div
+            className={`PdxTreeRow ${selectedKey === node.id ? 'Selected' : ''} ${node.disabled ? 'Disabled' : ''}`}
+            style={{ paddingLeft: depth * 16 }}
+          >
             {hasChildren ? (
               <button
-                type="button"
+                aria-expanded={isExpanded}
+                aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${node.label}`}
                 className="PdxTreeToggle"
                 onClick={() => toggleNode(node.id)}
+                type="button"
               >
-                {isExpanded ? <Minus size={14} /> : <Plus size={14} />}
+                {isExpanded ? (
+                  <ChevronDown aria-hidden="true" size={15} />
+                ) : (
+                  <ChevronRight aria-hidden="true" size={15} />
+                )}
               </button>
             ) : (
               <span className="PdxTreeSpacer" />
             )}
             <button
-              type="button"
-              className={`PdxTreeLabel ${selectedKey === node.id ? 'Selected' : ''} ${node.disabled ? 'Disabled' : ''}`}
+              aria-selected={selectedKey === node.id}
+              className="PdxTreeLabel"
+              disabled={node.disabled}
               onClick={() => handleSelect(node)}
+              role="treeitem"
+              type="button"
             >
               {node.label}
             </button>
           </div>
           {hasChildren && isExpanded && (
-            <div className="PdxTreeChildren">
+            <div className="PdxTreeChildren" role="group">
               {renderNodes(node.children || [], depth + 1)}
             </div>
           )}
@@ -112,9 +124,10 @@ function PdxTree({
   return (
     <div
       className={fullClassName}
-      style={style as React.CSSProperties}
-      id={id}
       {...dataProps}
+      id={id}
+      role="tree"
+      style={style as React.CSSProperties}
     >
       {renderNodes(data, 0)}
     </div>

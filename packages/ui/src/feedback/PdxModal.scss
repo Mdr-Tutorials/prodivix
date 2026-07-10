@@ -1,77 +1,181 @@
+@use '../foundation/control' as control;
+
 .PdxModalOverlay {
   position: fixed;
-  inset: 0;
-  background-color: rgb(0 0 0 / 0.42);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   z-index: 1000;
+  inset: 0;
+  background: rgb(0 0 0 / 0.48);
+  backdrop-filter: blur(3px);
+
+  &[data-state='open'] {
+    animation: pdx-overlay-in var(--motion-duration-fast)
+      var(--motion-easing-standard);
+  }
+
+  &[data-state='closed'] {
+    animation: pdx-overlay-out var(--motion-duration-fast)
+      var(--motion-easing-standard);
+  }
 }
 
 .PdxModal {
-  background-color: var(--bg-canvas);
+  position: fixed;
+  z-index: 1001;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  width: 560px;
+  max-width: calc(100vw - 32px);
+  max-height: min(760px, calc(100dvh - 32px));
+  flex-direction: column;
+  overflow: hidden;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
-  width: 520px;
-  max-width: calc(100% - 32px);
+  outline: none;
+  background: var(--bg-canvas);
   box-shadow: var(--shadow-lg);
   color: var(--text-primary);
+  font-family: var(--font-family-ui);
+  transform: translate(-50%, -50%);
+
+  &[data-state='open'] {
+    animation: pdx-modal-in var(--motion-duration-normal)
+      var(--motion-easing-standard);
+  }
+
+  &[data-state='closed'] {
+    animation: pdx-modal-out var(--motion-duration-fast)
+      var(--motion-easing-standard);
+  }
+
+  &.Small {
+    width: 400px;
+  }
+
+  &.Large {
+    width: 760px;
+  }
 }
 
 .PdxModalHeader {
-  padding: var(--spacing-md);
   display: flex;
+  flex: none;
+  align-items: flex-start;
   justify-content: space-between;
-  align-items: center;
   gap: var(--spacing-md);
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
 
-  h3 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 600;
-    line-height: var(--line-height-compact);
-  }
+.PdxModalHeading {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.PdxModalTitle {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-compact);
+}
+
+.PdxModalDescription {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
 }
 
 .PdxModalBody {
-  padding: var(--spacing-md);
-  font-size: 14px;
+  min-height: 0;
+  padding: 20px;
+  overflow: auto;
   color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  overscroll-behavior: contain;
 }
 
 .PdxModalFooter {
-  padding: var(--spacing-md);
   display: flex;
+  flex: none;
+  align-items: center;
   justify-content: flex-end;
   gap: var(--spacing-sm);
+  padding: 14px 20px;
+  border-top: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--bg-panel) 55%, var(--bg-canvas));
 }
 
 .PdxModalClose {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
-  font-size: 20px;
-  color: var(--text-muted);
+  @include control.control-transition;
+
   display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex: none;
   align-items: center;
   justify-content: center;
-  transition:
-    background-color var(--motion-duration-fast) var(--motion-easing-standard),
-    color var(--motion-duration-fast) var(--motion-easing-standard);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
 
   &:hover {
-    background-color: var(--bg-raised);
+    border-color: var(--border-subtle);
+    background: var(--bg-raised);
     color: var(--text-primary);
+  }
+
+  &:focus-visible {
+    @include control.focus-ring;
   }
 }
 
-.PdxModal.Small {
-  width: 360px;
+@keyframes pdx-overlay-in {
+  from {
+    opacity: 0;
+  }
 }
 
-.PdxModal.Large {
-  width: 720px;
+@keyframes pdx-overlay-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes pdx-modal-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.975);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes pdx-modal-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.985);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .PdxModalOverlay,
+  .PdxModal {
+    animation-duration: 1ms !important;
+  }
 }

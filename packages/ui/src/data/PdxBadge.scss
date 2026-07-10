@@ -4,16 +4,21 @@
 }
 
 .PdxBadgeCount {
+  box-sizing: border-box;
   position: absolute;
-  top: -6px;
-  right: -6px;
+  top: -7px;
+  right: -7px;
   min-width: 18px;
   height: 18px;
   padding: 0 4px;
+  border: 2px solid var(--bg-canvas);
   border-radius: var(--radius-full);
   background-color: var(--danger-color);
-  color: var(--bg-canvas);
-  font-size: 11px;
+  color: var(--text-inverse);
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -21,8 +26,10 @@
 }
 
 .PdxBadgeCount.Dot {
-  width: 10px;
-  height: 10px;
-  min-width: 10px;
+  top: -4px;
+  right: -4px;
+  width: 9px;
+  height: 9px;
+  min-width: 9px;
   padding: 0;
 }

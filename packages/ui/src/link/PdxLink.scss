@@ -1,13 +1,27 @@
+@use '../foundation/control' as control;
+
 .PdxLink {
-  text-decoration: underline;
+  color: inherit;
+  text-decoration-line: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 0.22em;
-}
+  border-radius: var(--radius-sm);
+  cursor: pointer;
 
-.PdxLink.NoUnderline {
-  text-decoration: none;
-}
+  &:hover:not([aria-disabled='true']) {
+    color: var(--text-secondary);
+  }
 
-.PdxLink.Disabled {
-  cursor: not-allowed;
+  &:focus-visible {
+    @include control.focus-ring;
+  }
+
+  &.NoUnderline {
+    text-decoration: none;
+  }
+
+  &[aria-disabled='true'],
+  &.Disabled {
+    @include control.disabled-control;
+  }
 }

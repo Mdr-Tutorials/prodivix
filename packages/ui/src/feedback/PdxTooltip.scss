@@ -1,47 +1,48 @@
 .PdxTooltip {
-  position: relative;
   display: inline-flex;
-  align-items: center;
 }
 
 .PdxTooltipContent {
-  position: absolute;
-  white-space: nowrap;
-  background-color: var(--accent-color);
+  z-index: 1100;
+  max-width: min(280px, calc(100vw - 24px));
+  padding: 6px 9px;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 78%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--text-primary);
+  box-shadow: var(--shadow-md);
   color: var(--bg-canvas);
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--transition-fast);
-  z-index: 20;
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-compact);
+  text-wrap: balance;
+  user-select: none;
+  transform-origin: var(--radix-tooltip-content-transform-origin);
+
+  &[data-state='delayed-open'],
+  &[data-state='instant-open'] {
+    animation: pdx-tooltip-in var(--motion-duration-fast)
+      var(--motion-easing-standard);
+  }
 }
 
-.PdxTooltip:hover .PdxTooltipContent {
-  opacity: 1;
+.PdxTooltipArrow {
+  fill: var(--text-primary);
 }
 
-.PdxTooltipContent.Top {
-  bottom: 100%;
-  left: 50%;
-  transform: translate(-50%, -6px);
+@keyframes pdx-tooltip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
-.PdxTooltipContent.Bottom {
-  top: 100%;
-  left: 50%;
-  transform: translate(-50%, 6px);
-}
-
-.PdxTooltipContent.Left {
-  right: 100%;
-  top: 50%;
-  transform: translate(-6px, -50%);
-}
-
-.PdxTooltipContent.Right {
-  left: 100%;
-  top: 50%;
-  transform: translate(6px, -50%);
+@media (prefers-reduced-motion: reduce) {
+  .PdxTooltipContent {
+    animation-duration: 1ms !important;
+  }
 }

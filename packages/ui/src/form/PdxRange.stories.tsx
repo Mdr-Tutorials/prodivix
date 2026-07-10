@@ -18,6 +18,7 @@ export const Default: Story = {
   args: {
     label: 'Price range',
     defaultValue: { min: 20, max: 80 },
+    style: { width: 320 },
   },
 };
 
@@ -28,5 +29,6 @@ export const CustomRange: Story = {
     max: 100,
     step: 5,
     defaultValue: { min: 30, max: 70 },
+    style: { width: 320 },
   },
 };

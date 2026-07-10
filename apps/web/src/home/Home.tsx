@@ -156,7 +156,7 @@ function Home() {
               <PdxButtonLink
                 text={t('nav.signIn')}
                 size="Small"
-                category="Ghost"
+                variant="Ghost"
                 to="/auth"
               />
             )}
@@ -184,15 +184,15 @@ function Home() {
           <div className="relative z-10 mt-8 flex flex-col items-center gap-3 sm:flex-row">
             <PdxButtonLink
               text={t('actions.enterEditor')}
-              size="Big"
-              category="Primary"
+              size="Large"
+              variant="Primary"
               to="/editor"
               icon={<ArrowRight size={18} />}
             />
             <PdxButtonLink
               text={t('actions.viewDocs')}
-              size="Big"
-              category="Secondary"
+              size="Large"
+              variant="Secondary"
               to={docsSiteUrl}
             />
           </div>
@@ -403,15 +403,15 @@ function Home() {
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <PdxButtonLink
               text={t('actions.enterEditor')}
-              size="Big"
-              category="Primary"
+              size="Large"
+              variant="Primary"
               to="/editor"
               icon={<ArrowRight size={18} />}
             />
             <PdxButtonLink
               text={t('actions.viewDocs')}
-              size="Big"
-              category="Secondary"
+              size="Large"
+              variant="Secondary"
               to={docsSiteUrl}
             />
           </div>

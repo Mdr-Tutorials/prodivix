@@ -12,21 +12,18 @@ const meta: Meta<typeof PdxButtonLink> = {
     to: { control: 'text', description: '跳转链接' },
     size: {
       control: 'select',
-      options: ['Big', 'Medium', 'Small', 'Tiny'],
+      options: ['ExtraSmall', 'Small', 'Medium', 'Large'],
       description: '按钮尺寸',
     },
-    category: {
+    variant: {
       control: 'select',
-      options: [
-        'Primary',
-        'Secondary',
-        'Danger',
-        'SubtleDanger',
-        'Warning',
-        'SubtleWarning',
-        'Ghost',
-      ],
-      description: '按钮类型',
+      options: ['Primary', 'Secondary', 'Ghost'],
+      description: '按钮层级',
+    },
+    tone: {
+      control: 'select',
+      options: ['Neutral', 'Danger', 'Warning'],
+      description: '按钮语义色调',
     },
     disabled: {
       control: 'boolean',
@@ -37,9 +34,13 @@ const meta: Meta<typeof PdxButtonLink> = {
       options: ['Left', 'Right'],
       description: '图标位置',
     },
-    onlyIcon: {
+    iconOnly: {
       control: 'boolean',
       description: '仅显示图标',
+    },
+    loading: {
+      control: 'boolean',
+      description: '是否正在执行操作',
     },
   },
 };
@@ -51,7 +52,7 @@ export const Primary: Story = {
   args: {
     to: '/example',
     text: 'Primary Link',
-    category: 'Primary',
+    variant: 'Primary',
     size: 'Medium',
   },
 };
@@ -60,7 +61,7 @@ export const Secondary: Story = {
   args: {
     to: '/example',
     text: 'Secondary Link',
-    category: 'Secondary',
+    variant: 'Secondary',
     size: 'Medium',
   },
 };
@@ -85,10 +86,11 @@ export const WithIcon: Story = {
   },
 };
 
-export const OnlyIcon: Story = {
+export const IconOnly: Story = {
   args: {
     to: '/example',
-    onlyIcon: true,
+    'aria-label': 'Open details',
+    iconOnly: true,
     icon: (
       <svg
         width="20"
@@ -105,6 +107,15 @@ export const OnlyIcon: Story = {
   },
 };
 
+export const Loading: Story = {
+  args: {
+    to: '/example',
+    text: 'Opening',
+    loading: true,
+    variant: 'Primary',
+  },
+};
+
 export const Disabled: Story = {
   args: {
     to: '/example',
@@ -113,16 +124,26 @@ export const Disabled: Story = {
   },
 };
 
-export const AllCategories: Story = {
+export const AllVariants: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', gap: '12px' }}>
-        <PdxButtonLink to="/example" text="Primary" category="Primary" />
-        <PdxButtonLink to="/example" text="Secondary" category="Secondary" />
+        <PdxButtonLink to="/example" text="Primary" variant="Primary" />
+        <PdxButtonLink to="/example" text="Secondary" variant="Secondary" />
       </div>
       <div style={{ display: 'flex', gap: '12px' }}>
-        <PdxButtonLink to="/example" text="Danger" category="Danger" />
-        <PdxButtonLink to="/example" text="Warning" category="Warning" />
+        <PdxButtonLink
+          to="/example"
+          text="Danger"
+          variant="Primary"
+          tone="Danger"
+        />
+        <PdxButtonLink
+          to="/example"
+          text="Warning"
+          variant="Primary"
+          tone="Warning"
+        />
       </div>
     </div>
   ),

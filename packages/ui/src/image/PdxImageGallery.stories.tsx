@@ -1,36 +1,42 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import PdxImageGallery from './PdxImageGallery';
+import accessibilityImage from '../stories/assets/accessibility.png';
+import assetsImage from '../stories/assets/assets.png';
+import contextImage from '../stories/assets/context.png';
+import stylingImage from '../stories/assets/styling.png';
+import testingImage from '../stories/assets/testing.png';
+import themingImage from '../stories/assets/theming.png';
 
 const sampleImages = [
   {
-    src: 'https://picsum.photos/400/300?random=1',
-    alt: 'Image 1',
-    caption: 'Beautiful landscape',
+    src: accessibilityImage,
+    alt: 'Accessibility audit panel',
+    caption: 'Accessibility audit',
   },
   {
-    src: 'https://picsum.photos/400/300?random=2',
-    alt: 'Image 2',
-    caption: 'City view',
+    src: contextImage,
+    alt: 'Component context panel',
+    caption: 'Component context',
   },
   {
-    src: 'https://picsum.photos/400/300?random=3',
-    alt: 'Image 3',
-    caption: 'Nature scene',
+    src: assetsImage,
+    alt: 'Asset browser panel',
+    caption: 'Asset browser',
   },
   {
-    src: 'https://picsum.photos/400/300?random=4',
-    alt: 'Image 4',
-    caption: 'Abstract art',
+    src: stylingImage,
+    alt: 'Styling controls',
+    caption: 'Styling controls',
   },
   {
-    src: 'https://picsum.photos/400/300?random=5',
-    alt: 'Image 5',
-    caption: 'Architecture',
+    src: testingImage,
+    alt: 'Component testing panel',
+    caption: 'Component testing',
   },
   {
-    src: 'https://picsum.photos/400/300?random=6',
-    alt: 'Image 6',
-    caption: 'Portrait',
+    src: themingImage,
+    alt: 'Theme controls',
+    caption: 'Theme controls',
   },
 ];
 
@@ -100,6 +106,7 @@ export const Default: Story = {
     size: 'Medium',
     shape: 'Rounded',
     fit: 'Cover',
+    showCaptions: true,
   },
 };
 
@@ -191,5 +198,11 @@ export const CustomColumns: Story = {
     gap: 'Small',
     size: 'Medium',
     shape: 'Rounded',
+  },
+};
+
+export const Empty: Story = {
+  args: {
+    images: [],
   },
 };

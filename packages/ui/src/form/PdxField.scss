@@ -1,7 +1,49 @@
 .PdxField {
+  --pdx-field-border-color: var(--border-default);
+  --pdx-field-hover-border-color: var(--border-strong);
+  --pdx-field-focus-color: var(--accent-color);
+  --pdx-field-message-color: var(--text-muted);
+
   display: flex;
   flex-direction: column;
+  gap: var(--spacing-xs);
   width: 100%;
+  min-width: 0;
+  color: var(--text-primary);
+  font-family: var(--font-family-ui);
+
+  &.Error {
+    --pdx-field-border-color: var(--danger-color);
+    --pdx-field-hover-border-color: var(--danger-color);
+    --pdx-field-focus-color: var(--danger-color);
+    --pdx-field-message-color: color-mix(
+      in srgb,
+      var(--danger-color) 82%,
+      var(--text-primary)
+    );
+  }
+
+  &.Warning {
+    --pdx-field-border-color: var(--warning-color);
+    --pdx-field-hover-border-color: var(--warning-color);
+    --pdx-field-focus-color: var(--warning-color);
+    --pdx-field-message-color: color-mix(
+      in srgb,
+      var(--warning-color) 72%,
+      var(--text-primary)
+    );
+  }
+
+  &.Success {
+    --pdx-field-border-color: var(--success-color);
+    --pdx-field-hover-border-color: var(--success-color);
+    --pdx-field-focus-color: var(--success-color);
+    --pdx-field-message-color: color-mix(
+      in srgb,
+      var(--success-color) 82%,
+      var(--text-primary)
+    );
+  }
 }
 
 .PdxFieldHeader {
@@ -11,8 +53,9 @@
 }
 
 .PdxFieldLabel {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-compact);
   color: var(--text-primary);
 }
 
@@ -21,23 +64,26 @@
 }
 
 .PdxFieldDescription {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
   color: var(--text-muted);
 }
 
 .PdxFieldMessage {
-  font-size: 12px;
-  color: var(--text-muted);
+  min-height: 1em;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+  color: var(--pdx-field-message-color);
 }
 
-.PdxFieldMessage.Error {
-  color: var(--danger-color);
+.PdxFieldMessage[data-state='Error'] {
+  color: color-mix(in srgb, var(--danger-color) 82%, var(--text-primary));
 }
 
-.PdxFieldMessage.Warning {
-  color: var(--warning-color);
+.PdxFieldMessage[data-state='Warning'] {
+  color: color-mix(in srgb, var(--warning-color) 72%, var(--text-primary));
 }
 
-.PdxFieldMessage.Success {
-  color: var(--success-color);
+.PdxFieldMessage[data-state='Success'] {
+  color: color-mix(in srgb, var(--success-color) 82%, var(--text-primary));
 }

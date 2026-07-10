@@ -1,5 +1,6 @@
 import React, { createElement } from 'react';
 import * as PdxUi from '@prodivix/ui';
+import { PDX_COMPONENT_MANIFEST } from '@prodivix/ui';
 import type { ComponentNode } from '@prodivix/shared/types/pir';
 import { isIconRef, resolveIconRef } from './iconRegistry';
 
@@ -376,10 +377,8 @@ const registerHeadlessComponents = (registry: ComponentRegistry) => {
 };
 
 const registerPdxComponents = (registry: ComponentRegistry) => {
-  // Auto-register all components exported by @prodivix/ui to keep the canvas renderer extensible.
-  // Defaults to prodivixAdapter; specific components override via adapterOverrides below.
-  Object.entries(PdxUi).forEach(([key, component]) => {
-    if (!key.startsWith('Pdx')) return;
+  PDX_COMPONENT_MANIFEST.forEach(({ runtimeType }) => {
+    const component = (PdxUi as Record<string, unknown>)[runtimeType];
     if (!component) return;
     const isValidElementType =
       typeof component === 'function' ||
@@ -387,7 +386,11 @@ const registerPdxComponents = (registry: ComponentRegistry) => {
         component !== null &&
         '$$typeof' in component);
     if (!isValidElementType) return;
-    registry.register(key, component as React.ElementType, prodivixAdapter);
+    registry.register(
+      runtimeType,
+      component as React.ElementType,
+      prodivixAdapter
+    );
   });
 
   const adapterOverrides: Record<string, ComponentAdapter> = {
@@ -419,9 +422,7 @@ const registerPdxComponents = (registry: ComponentRegistry) => {
     PdxLink: prodivixLinkAdapter,
   };
 
-  Object.keys(PdxUi).forEach((type) => {
-    const adapter = adapterOverrides[type];
-    if (!adapter) return;
+  Object.entries(adapterOverrides).forEach(([type, adapter]) => {
     const component = (PdxUi as Record<string, unknown>)[type];
     if (!component) return;
     registry.register(type, component as React.ElementType, adapter);

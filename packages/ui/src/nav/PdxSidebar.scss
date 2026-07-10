@@ -1,44 +1,102 @@
 .PdxSidebar {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
   background-color: var(--bg-canvas);
   border-right: 1px solid var(--border-subtle);
-  padding: var(--spacing-md);
+  padding: var(--spacing-sm);
   color: var(--text-secondary);
   min-height: 100vh;
+  font-family: var(--font-family-ui);
 }
 
 .PdxSidebarTitle {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--spacing-sm);
+  color: var(--text-primary);
   font-weight: var(--font-weight-semibold);
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 
 .PdxSidebarNav {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: 2px;
 }
 
 .PdxSidebarItem {
+  min-height: 36px;
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
   text-decoration: none;
   color: inherit;
-  padding: 6px 8px;
+  padding: 0 var(--spacing-sm);
   border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-compact);
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-easing-standard),
+    color var(--motion-duration-fast) var(--motion-easing-standard);
+
+  &:hover:not(.Disabled) {
+    background-color: var(--bg-panel);
+    color: var(--text-primary);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--accent-color) 14%, transparent);
+  }
 
   &.Active {
     background-color: var(--bg-raised);
+    box-shadow: inset 2px 0 0 var(--accent-color);
+    color: var(--text-primary);
     font-weight: var(--font-weight-semibold);
   }
+
+  &.Disabled {
+    cursor: not-allowed;
+    opacity: 0.52;
+  }
+}
+
+.PdxSidebarIcon,
+.PdxSidebarFallbackIcon {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.PdxSidebarFallbackIcon {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  font-size: var(--font-size-micro);
+  font-weight: var(--font-weight-semibold);
 }
 
 .PdxSidebarFooter {
   margin-top: auto;
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .PdxSidebar.Collapsed {
-  width: 72px;
+  align-items: stretch;
+  padding-inline: var(--spacing-xs);
+}
+
+.PdxSidebar.Collapsed .PdxSidebarTitle,
+.PdxSidebar.Collapsed .PdxSidebarItem {
+  justify-content: center;
+  padding-inline: 0;
 }

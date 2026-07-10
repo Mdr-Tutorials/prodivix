@@ -1,6 +1,8 @@
 import './PdxAvatar.scss';
+import { getDataAttributes, mergeClassNames } from '../foundation/component';
 import React from 'react';
 import { type PdxComponent } from '@prodivix/shared';
+import { User } from 'lucide-react';
 
 interface PdxAvatarSpecificProps {
   src?: string;
@@ -28,42 +30,50 @@ function PdxAvatar({
   id,
   dataAttributes = {},
   onError,
-  ...rest
+  onClick,
 }: PdxAvatarProps) {
-  const [imageError, setImageError] = React.useState(false);
+  const [failedSources, setFailedSources] = React.useState<string[]>([]);
 
   React.useEffect(() => {
-    setImageError(false);
-  }, [src]);
+    setFailedSources([]);
+  }, [fallback, src]);
 
-  const fullClassName =
-    `PdxAvatar ${size} ${shape} ${status ? `status-${status}` : ''} ${className || ''}`.trim();
+  const fullClassName = mergeClassNames(
+    'PdxAvatar',
+    size,
+    shape,
+    status && `status-${status}`,
+    className
+  );
+  const imageSource = [src, fallback].find(
+    (candidate): candidate is string =>
+      Boolean(candidate) && !failedSources.includes(candidate as string)
+  );
 
-  const dataProps = { ...dataAttributes };
-
-  const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    setImageError(true);
-    if (onError) {
-      onError(e);
+  const handleError = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    if (imageSource) {
+      setFailedSources((sources) => [...new Set([...sources, imageSource])]);
     }
+    onError?.(event);
   };
 
   const renderContent = () => {
-    if (src && !imageError) {
-      return <img src={src} alt={alt} onError={handleError} {...rest} />;
+    if (imageSource) {
+      return <img src={imageSource} alt={alt} onError={handleError} />;
     }
 
     if (initials) {
-      return <span className="PdxAvatar-initials">{initials}</span>;
+      return (
+        <span className="PdxAvatar-initials" aria-hidden="true">
+          {initials.trim().slice(0, 2).toUpperCase()}
+        </span>
+      );
     }
 
-    if (fallback) {
-      return <img src={fallback} alt={alt} {...rest} />;
-    }
-
+    const fallbackInitial = alt.trim().charAt(0).toUpperCase();
     return (
-      <span className="PdxAvatar-placeholder">
-        {alt.charAt(0).toUpperCase()}
+      <span className="PdxAvatar-placeholder" aria-hidden="true">
+        {fallbackInitial || <User size="55%" strokeWidth={1.7} />}
       </span>
     );
   };
@@ -71,12 +81,20 @@ function PdxAvatar({
   return (
     <div
       className={fullClassName}
-      style={style as React.CSSProperties}
       id={id}
-      {...dataProps}
+      onClick={onClick}
+      style={style as React.CSSProperties}
+      title={alt}
+      {...getDataAttributes(dataAttributes)}
     >
       {renderContent()}
-      {status && <span className="PdxAvatar-status" />}
+      {status && (
+        <span
+          aria-label={`${status} status`}
+          className="PdxAvatar-status"
+          role="status"
+        />
+      )}
     </div>
   );
 }

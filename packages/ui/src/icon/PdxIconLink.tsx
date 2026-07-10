@@ -1,23 +1,33 @@
-import React from 'react';
-import { type To } from 'react-router';
-import PdxIcon, { type PdxIconProps } from '../icon/PdxIcon';
-import PdxLink from '../link/PdxLink';
 import './PdxIconLink.scss';
+import PdxIcon, { type PdxIconOwnProps } from './PdxIcon';
+import PdxLink, { type PdxLinkProps } from '../link/PdxLink';
+import { forwardRef } from 'react';
 
-export interface PdxIconLinkSpecificProps
-  extends PdxIconProps, React.RefAttributes<HTMLAnchorElement> {
-  to: To;
-  replace?: boolean;
-  state?: unknown;
+export interface PdxIconLinkProps
+  extends
+    Omit<PdxLinkProps, 'aria-label' | 'children' | 'text'>,
+    Pick<PdxIconOwnProps, 'color' | 'icon' | 'size'> {
+  label: string;
 }
 
-function PdxIconLink(props: PdxIconLinkSpecificProps) {
-  const { to, title, ...iconProps } = props;
-  return (
-    <PdxLink className="PdxIconLink" to={to} title={title}>
-      <PdxIcon {...iconProps} title={title} />
-    </PdxLink>
-  );
-}
+const PdxIconLink = forwardRef<HTMLAnchorElement, PdxIconLinkProps>(
+  function PdxIconLink(
+    { className, color, icon, label, size = 20, title, ...rest },
+    ref
+  ) {
+    return (
+      <PdxLink
+        {...rest}
+        aria-label={label}
+        className={`PdxIconLink ${className ?? ''}`.trim()}
+        ref={ref}
+        title={title ?? label}
+        underline={false}
+      >
+        <PdxIcon color={color} decorative icon={icon} size={size} />
+      </PdxLink>
+    );
+  }
+);
 
 export default PdxIconLink;

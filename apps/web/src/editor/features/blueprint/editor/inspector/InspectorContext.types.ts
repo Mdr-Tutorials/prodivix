@@ -16,8 +16,9 @@ type InspectorTranslate = (
   options?: Record<string, unknown>
 ) => string;
 
-type ExternalComponentMeta = {
-  libraryId: string;
+type InspectorComponentMeta = {
+  source: 'builtIn' | 'external';
+  libraryId?: string;
   runtimeType: string;
   defaultProps?: Record<string, unknown>;
   propOptions?: Record<string, string[]>;
@@ -77,7 +78,7 @@ export type InspectorCapabilitiesContext = {
     outletNodeId: string | undefined
   ) => void;
   selectedParentNode: ComponentNode | null;
-  externalComponentItem: ExternalComponentMeta | null;
+  componentMeta: InspectorComponentMeta | null;
   dataModelFieldPaths: string[];
 };
 

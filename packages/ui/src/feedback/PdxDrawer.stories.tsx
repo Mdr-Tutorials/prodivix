@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
+import { useState } from 'react';
 import PdxDrawer from './PdxDrawer';
 import PdxButton from '../button/PdxButton';
 
@@ -20,7 +21,7 @@ export const Default: Story = {
     open: true,
     title: 'Settings',
     children: 'Drawer content goes here.',
-    footer: <PdxButton text="Save" size="Small" category="Primary" />,
+    footer: <PdxButton text="Save" size="Small" variant="Primary" />,
   },
 };
 
@@ -31,4 +32,32 @@ export const Left: Story = {
     placement: 'Left',
     children: 'Filter options',
   },
+};
+
+function InteractiveDrawer() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <PdxButton text="Open drawer" onClick={() => setOpen(true)} />
+      <PdxDrawer
+        description="Configure project-level preferences."
+        footer={
+          <PdxButton
+            text="Save"
+            variant="Primary"
+            onClick={() => setOpen(false)}
+          />
+        }
+        onOpenChange={setOpen}
+        open={open}
+        title="Project settings"
+      >
+        Drawer content goes here.
+      </PdxDrawer>
+    </>
+  );
+}
+
+export const Interactive: Story = {
+  render: () => <InteractiveDrawer />,
 };

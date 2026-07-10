@@ -3,19 +3,23 @@
   flex-direction: column;
   gap: var(--spacing-xs);
   color: var(--text-primary);
+  font-family: var(--font-family-ui);
 }
 
 .PdxStatisticTitle {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-compact);
   color: var(--text-muted);
 }
 
 .PdxStatisticValue {
   font-size: 24px;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
   display: flex;
   align-items: baseline;
   gap: 6px;
+  font-variant-numeric: tabular-nums;
 }
 
 .PdxStatisticTrend {
@@ -37,6 +41,7 @@
 
 .PdxStatisticPrefix,
 .PdxStatisticSuffix {
-  font-size: 14px;
+  font-size: var(--font-size-sm);
+  font-weight: 400;
   color: var(--text-muted);
 }

@@ -11,6 +11,12 @@
       "path": "./packages/ai"
     },
     {
+      "path": "./packages/plugin-contracts"
+    },
+    {
+      "path": "./packages/plugin-host"
+    },
+    {
       "path": "./packages/ui"
     },
     {

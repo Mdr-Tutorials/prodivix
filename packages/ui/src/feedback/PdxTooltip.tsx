@@ -1,37 +1,84 @@
 import './PdxTooltip.scss';
-import { type PdxComponent } from '@prodivix/shared';
-import type React from 'react';
+import { getDataAttributes, mergeClassNames } from '../foundation/component';
+import * as TooltipPrimitive from '@radix-ui/react-tooltip';
+import type { CSSProperties, ReactElement, ReactNode } from 'react';
 
-interface PdxTooltipSpecificProps {
-  content: React.ReactNode;
-  placement?: 'Top' | 'Right' | 'Bottom' | 'Left';
-  children: React.ReactNode;
+export type PdxFloatingPlacement = 'Top' | 'Right' | 'Bottom' | 'Left';
+export type PdxFloatingAlign = 'Start' | 'Center' | 'End';
+
+export interface PdxTooltipProps {
+  align?: PdxFloatingAlign;
+  children: ReactElement;
+  className?: string;
+  content: ReactNode;
+  dataAttributes?: Record<string, string>;
+  defaultOpen?: boolean;
+  delayDuration?: number;
+  disabled?: boolean;
+  id?: string;
+  onOpenChange?: (open: boolean) => void;
+  open?: boolean;
+  placement?: PdxFloatingPlacement;
+  portal?: boolean;
+  sideOffset?: number;
+  style?: CSSProperties;
 }
 
-export interface PdxTooltipProps
-  extends PdxComponent, PdxTooltipSpecificProps {}
+const toSide = (placement: PdxFloatingPlacement) =>
+  placement.toLowerCase() as Lowercase<PdxFloatingPlacement>;
+const toAlign = (align: PdxFloatingAlign) =>
+  align.toLowerCase() as Lowercase<PdxFloatingAlign>;
 
 function PdxTooltip({
-  content,
-  placement = 'Top',
+  align = 'Center',
   children,
   className,
-  style,
+  content,
+  dataAttributes,
+  defaultOpen,
+  delayDuration = 400,
+  disabled = false,
   id,
-  dataAttributes = {},
+  onOpenChange,
+  open,
+  placement = 'Top',
+  portal = true,
+  sideOffset = 7,
+  style,
 }: PdxTooltipProps) {
-  const fullClassName = `PdxTooltip ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  if (disabled) return children;
+
+  const tooltipContent = (
+    <TooltipPrimitive.Content
+      align={toAlign(align)}
+      className={mergeClassNames('PdxTooltipContent', className)}
+      side={toSide(placement)}
+      sideOffset={sideOffset}
+      style={style}
+    >
+      {content}
+      <TooltipPrimitive.Arrow className="PdxTooltipArrow" />
+    </TooltipPrimitive.Content>
+  );
 
   return (
-    <span
-      className={fullClassName}
-      style={style as React.CSSProperties}
-      id={id}
-      {...dataProps}
-    >
-      {children}
-      <span className={`PdxTooltipContent ${placement}`}>{content}</span>
+    <span {...getDataAttributes(dataAttributes)} className="PdxTooltip" id={id}>
+      <TooltipPrimitive.Provider delayDuration={delayDuration}>
+        <TooltipPrimitive.Root
+          defaultOpen={defaultOpen}
+          onOpenChange={onOpenChange}
+          open={open}
+        >
+          <TooltipPrimitive.Trigger asChild>
+            {children}
+          </TooltipPrimitive.Trigger>
+          {portal ? (
+            <TooltipPrimitive.Portal>{tooltipContent}</TooltipPrimitive.Portal>
+          ) : (
+            tooltipContent
+          )}
+        </TooltipPrimitive.Root>
+      </TooltipPrimitive.Provider>
     </span>
   );
 }

@@ -20,7 +20,7 @@ export const EditorSettingsPage = () => {
           <PdxButton
             text={t('settings.actions.exit')}
             size="Small"
-            category="Secondary"
+            variant="Secondary"
             onClick={() => navigate('/editor')}
           />
         </div>

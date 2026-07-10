@@ -1,7 +1,6 @@
 import type { Preview } from '@storybook/react';
 import { MemoryRouter } from 'react-router';
 import {
-  createThemeFontFaceCss,
   createThemeStyleText,
   officialMonochromeDarkHighContrastTheme,
   officialMonochromeDarkTheme,
@@ -10,6 +9,7 @@ import {
   type ThemeManifest,
 } from '@prodivix/themes';
 import '@prodivix/themes/css/font-stacks.css';
+import '../src/foundation/typography.scss';
 
 const STORYBOOK_THEME_STYLE_ELEMENT_ID = 'prodivix-storybook-theme-runtime';
 
@@ -33,6 +33,7 @@ function applyStorybookTheme(manifest: ThemeManifest) {
 
   const root = document.documentElement;
   const themeScopes = [
+    document.body,
     document.getElementById('storybook-root'),
     ...document.querySelectorAll<HTMLElement>('.sbdocs-preview, .docs-story'),
   ].filter((element): element is HTMLElement => Boolean(element));
@@ -49,7 +50,6 @@ function applyStorybookTheme(manifest: ThemeManifest) {
     createThemeStyleText(manifest, {
       selector: '.prodivix-storybook-theme-scope',
     }),
-    createThemeFontFaceCss(manifest.fonts),
     createStorybookPreviewSurfaceCss(),
   ]
     .filter(Boolean)
@@ -120,6 +120,9 @@ const preview: Preview = {
     },
   },
   parameters: {
+    a11y: {
+      test: 'error',
+    },
     controls: {
       matchers: {
         color: /(background|color)$/i,

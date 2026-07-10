@@ -29,6 +29,7 @@ import {
   isLayoutPatternRootNode,
 } from '@/editor/features/blueprint/layoutPatterns/dataAttributes';
 import { getExternalRuntimeMetaByType } from '@/editor/features/blueprint/external/runtime/metaStore';
+import { usePaletteRegistrySnapshot } from '@/editor/features/blueprint/palette';
 import { resolveInspectorPanels } from '@/editor/features/blueprint/editor/inspector/panels/registry';
 import {
   createMountedCssDocumentId,
@@ -212,10 +213,23 @@ export const useBlueprintEditorInspectorController = () => {
     () => (selectedNode ? getPrimaryTextField(selectedNode) : null),
     [selectedNode]
   );
-  const externalComponentItem = useMemo(() => {
+  const paletteSnapshot = usePaletteRegistrySnapshot();
+  const componentMeta = useMemo(() => {
     if (!selectedNode?.type) return null;
-    return getExternalRuntimeMetaByType(selectedNode.type) ?? null;
-  }, [selectedNode?.type]);
+    const externalMeta = getExternalRuntimeMetaByType(selectedNode.type);
+    if (externalMeta) return { ...externalMeta, source: 'external' as const };
+
+    const builtInMeta = paletteSnapshot.itemsByRuntimeType.get(
+      selectedNode.type
+    );
+    if (!builtInMeta?.runtimeType) return null;
+    return {
+      source: 'builtIn' as const,
+      runtimeType: builtInMeta.runtimeType,
+      defaultProps: builtInMeta.defaultProps,
+      propOptions: builtInMeta.propOptions,
+    };
+  }, [paletteSnapshot, selectedNode?.type]);
   const [draftId, setDraftId] = useState('');
   const [expandedPanels, setExpandedPanels] = useState<Record<string, boolean>>(
     () => ({ ...persistedExpandedPanels })
@@ -754,7 +768,7 @@ export const useBlueprintEditorInspectorController = () => {
       isDuplicate,
       primaryTextField,
       updateSelectedNode,
-      externalComponentItem,
+      componentMeta,
       openMountedCssEditor: mountedCssEditor.openMountedCssEditor,
       mountedCssEntries,
       matchedPanels,
@@ -805,7 +819,7 @@ export const useBlueprintEditorInspectorController = () => {
       canApply,
       isDuplicate,
       primaryTextField,
-      externalComponentItem,
+      componentMeta,
       mountedCssEditor.openMountedCssEditor,
       mountedCssEntries,
       matchedPanels,

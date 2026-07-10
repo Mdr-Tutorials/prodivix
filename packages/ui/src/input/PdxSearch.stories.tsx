@@ -12,7 +12,7 @@ const meta: Meta<typeof PdxSearch> = {
   argTypes: {
     size: {
       control: 'select',
-      options: ['Small', 'Medium', 'Large'],
+      options: ['ExtraSmall', 'Small', 'Medium', 'Large'],
       description: '搜索框尺寸',
     },
     disabled: {
@@ -21,7 +21,7 @@ const meta: Meta<typeof PdxSearch> = {
     },
     onClear: { action: 'cleared' },
     onSearch: { action: 'searched' },
-    onChange: { action: 'changed' },
+    onValueChange: { action: 'value changed' },
   },
 };
 
@@ -81,7 +81,7 @@ export const Controlled: Story = {
         <PdxSearch
           placeholder="Type to search..."
           value={value}
-          onChange={setValue}
+          onValueChange={setValue}
           onClear={handleClear}
           onSearch={handleSearch}
         />
@@ -125,7 +125,7 @@ export const WithSearchAction: Story = {
         <PdxSearch
           placeholder="Search and press Enter..."
           value={value}
-          onChange={setValue}
+          onValueChange={setValue}
           onClear={handleClear}
           onSearch={handleSearch}
         />

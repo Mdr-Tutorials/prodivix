@@ -4,7 +4,7 @@
 
 - Draft
 - 日期：2026-05-03
-- 适用范围：PIR、Workspace、Route、Editor、UX、Code、NodeGraph、Animation、External Library、Codegen、Backend、AI
+- 适用范围：PIR、Workspace、Plugin、Route、Editor、UX、Code、NodeGraph、Animation、External Library、Codegen、Backend、AI
 - 后端错误响应：`specs/decisions/24.backend-diagnostic-envelope.md`
 
 ## 1. 目的
@@ -44,6 +44,7 @@ type ProdivixDiagnostic = {
   domain:
     | 'pir'
     | 'workspace'
+    | 'plugin'
     | 'route'
     | 'editor'
     | 'ux'
@@ -92,6 +93,7 @@ type ProdivixDiagnostic = {
 | ----------- | ---------------- | ---------------------------------------------- | -------------------------------------------------------- |
 | `PIR-xxxx`  | PIR              | Schema、graph、ValueRef、materialize、校验     | `specs/diagnostics/pir-diagnostic-codes.md`              |
 | `WKS-xxxx`  | Workspace        | VFS、文档保存、revision、同步冲突、capability  | `specs/diagnostics/workspace-diagnostic-codes.md`        |
+| `PLG-xxxx`  | Plugin           | Manifest、contract、权限、注册事务、runtime    | `specs/diagnostics/plugin-diagnostic-codes.md`           |
 | `RTE-xxxx`  | Route            | Route manifest、Outlet、导航运行时             | `specs/diagnostics/route-diagnostic-codes.md`            |
 | `EDT-xxxx`  | Editor           | 编辑器交互、选择、拖拽、Inspector、画布状态    | `specs/diagnostics/editor-diagnostic-codes.md`           |
 | `UX-xxxx`   | UX               | 可访问性、交互、响应式布局、内容和视觉反馈     | `specs/diagnostics/ux-diagnostic-codes.md`               |

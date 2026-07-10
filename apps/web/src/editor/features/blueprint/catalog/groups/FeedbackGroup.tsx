@@ -30,9 +30,10 @@ export const FEEDBACK_GROUP: ComponentGroup = {
       preview: (
         <PdxModal
           open
+          portal={false}
           size="Medium"
           title="Modal"
-          footer={<PdxButton text="OK" size="Tiny" category="Primary" />}
+          footer={<PdxButton text="OK" size="ExtraSmall" variant="Primary" />}
         >
           <PdxText size="Tiny">Details</PdxText>
         </PdxModal>
@@ -41,9 +42,10 @@ export const FEEDBACK_GROUP: ComponentGroup = {
       renderPreview: ({ size }) => (
         <PdxModal
           open
+          portal={false}
           size={(size ?? 'Medium') as 'Small' | 'Medium' | 'Large'}
           title="Modal"
-          footer={<PdxButton text="OK" size="Tiny" category="Primary" />}
+          footer={<PdxButton text="OK" size="ExtraSmall" variant="Primary" />}
         >
           <PdxText size="Tiny">Details</PdxText>
         </PdxModal>
@@ -54,12 +56,24 @@ export const FEEDBACK_GROUP: ComponentGroup = {
       id: 'drawer',
       name: 'Drawer',
       preview: (
-        <PdxDrawer open placement="Right" size={160} title="Drawer">
+        <PdxDrawer
+          open
+          placement="Right"
+          portal={false}
+          size={160}
+          title="Drawer"
+        >
           <PdxText size="Tiny">Content</PdxText>
         </PdxDrawer>
       ),
       variants: buildVariants(DRAWER_PLACEMENTS, (placement) => (
-        <PdxDrawer open placement={placement} size={140} title="Drawer">
+        <PdxDrawer
+          open
+          placement={placement}
+          portal={false}
+          size={140}
+          title="Drawer"
+        >
           <PdxText size="Tiny">Content</PdxText>
         </PdxDrawer>
       )),
@@ -69,13 +83,13 @@ export const FEEDBACK_GROUP: ComponentGroup = {
       id: 'tooltip',
       name: 'Tooltip',
       preview: (
-        <PdxTooltip content="Tooltip" placement="Top">
-          <PdxButton text="Hover" size="Tiny" category="Secondary" />
+        <PdxTooltip content="Tooltip" placement="Top" portal={false}>
+          <PdxButton text="Hover" size="ExtraSmall" variant="Secondary" />
         </PdxTooltip>
       ),
       variants: buildVariants(TOOLTIP_PLACEMENTS, (placement) => (
-        <PdxTooltip content={placement} placement={placement}>
-          <PdxButton text="Hover" size="Tiny" category="Secondary" />
+        <PdxTooltip content={placement} placement={placement} portal={false}>
+          <PdxButton text="Hover" size="ExtraSmall" variant="Secondary" />
         </PdxTooltip>
       )),
       scale: 0.8,
@@ -84,8 +98,14 @@ export const FEEDBACK_GROUP: ComponentGroup = {
       id: 'popover',
       name: 'Popover',
       preview: (
-        <PdxPopover title="Popover" content="Details" defaultOpen>
-          <PdxButton text="More" size="Tiny" category="Secondary" />
+        <PdxPopover
+          title="Popover"
+          panelLabel="Popover details"
+          portal={false}
+          content="Details"
+          defaultOpen
+        >
+          <PdxButton text="More" size="ExtraSmall" variant="Secondary" />
         </PdxPopover>
       ),
       scale: 0.8,

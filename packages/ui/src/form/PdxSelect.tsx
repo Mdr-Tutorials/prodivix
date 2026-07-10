@@ -1,106 +1,138 @@
 import './PdxSelect.scss';
-import { type PdxComponent } from '@prodivix/shared';
-import { useEffect, useState } from 'react';
-import type React from 'react';
+import {
+  mergeClassNames,
+  type PdxControlSize,
+  type PdxNativeProps,
+  type PdxValidationState,
+} from '../foundation/component';
+import { useControllableState } from '../foundation/useControllableState';
+import PdxField, { usePdxFieldIds } from './PdxField';
+import { ChevronDown } from 'lucide-react';
+import { forwardRef, type ReactNode } from 'react';
 
 export interface PdxSelectOption {
+  disabled?: boolean;
   label: string;
   value: string;
-  disabled?: boolean;
 }
 
-interface PdxSelectSpecificProps {
-  label?: string;
-  description?: string;
-  message?: string;
-  options: PdxSelectOption[];
-  value?: string;
+export interface PdxSelectOwnProps {
+  controlClassName?: string;
   defaultValue?: string;
+  description?: ReactNode;
+  label?: ReactNode;
+  message?: ReactNode;
+  onValueChange?: (value: string, option?: PdxSelectOption) => void;
+  options: PdxSelectOption[];
   placeholder?: string;
-  size?: 'Small' | 'Medium' | 'Large';
-  disabled?: boolean;
-  onChange?: (value: string, option?: PdxSelectOption) => void;
+  size?: PdxControlSize;
+  state?: PdxValidationState;
+  value?: string;
 }
 
-export interface PdxSelectProps extends PdxComponent, PdxSelectSpecificProps {}
+export type PdxSelectProps = Omit<
+  PdxNativeProps<'select'>,
+  'children' | 'defaultValue' | 'value'
+> &
+  PdxSelectOwnProps;
 
-function PdxSelect({
-  label,
-  description,
-  message,
-  options,
-  value,
-  defaultValue,
-  placeholder = 'Select item',
-  size = 'Medium',
-  disabled = false,
-  onChange,
-  className,
-  style,
-  id,
-  dataAttributes = {},
-}: PdxSelectProps) {
-  const [internalValue, setInternalValue] = useState(defaultValue || '');
+const PdxSelect = forwardRef<HTMLSelectElement, PdxSelectProps>(
+  function PdxSelect(
+    {
+      'aria-describedby': ariaDescribedBy,
+      'aria-invalid': ariaInvalid,
+      className,
+      controlClassName,
+      dataAttributes,
+      defaultValue = '',
+      description,
+      disabled = false,
+      id,
+      label,
+      message,
+      onChange,
+      onValueChange,
+      options,
+      placeholder = 'Select item',
+      required = false,
+      size = 'Medium',
+      state = 'Default',
+      style,
+      value,
+      ...rest
+    },
+    ref
+  ) {
+    const [currentValue, setCurrentValue] = useControllableState({
+      value,
+      defaultValue,
+    });
+    const fieldIds = usePdxFieldIds({
+      id,
+      description,
+      message,
+      describedBy: ariaDescribedBy,
+    });
 
-  useEffect(() => {
-    if (value !== undefined) {
-      setInternalValue(value);
-    }
-  }, [value]);
-
-  const currentValue = value !== undefined ? value : internalValue;
-
-  const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const nextValue = event.target.value;
-    if (value === undefined) {
-      setInternalValue(nextValue);
-    }
-    const selected = options.find((option) => option.value === nextValue);
-    if (onChange) {
-      onChange(nextValue, selected);
-    }
-  };
-
-  const fullClassName =
-    `PdxSelect ${size} ${disabled ? 'Disabled' : ''} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
-
-  return (
-    <div
-      className={`PdxField ${fullClassName}`}
-      style={style as React.CSSProperties}
-      id={id}
-      {...dataProps}
-    >
-      {label && (
-        <div className="PdxFieldHeader">
-          <label className="PdxFieldLabel">{label}</label>
-        </div>
-      )}
-      {description && <div className="PdxFieldDescription">{description}</div>}
-      <select
-        className="PdxSelectControl"
-        disabled={disabled}
-        value={currentValue}
-        onChange={handleChange}
+    return (
+      <PdxField
+        className={mergeClassNames('PdxSelect', size, className)}
+        controlId={fieldIds.controlId}
+        dataAttributes={dataAttributes}
+        description={description}
+        descriptionId={fieldIds.descriptionId}
+        label={label}
+        message={message}
+        messageId={fieldIds.messageId}
+        required={required}
+        state={state}
+        style={style}
       >
-        {/* Keep empty value selectable state without showing it in the dropdown list. */}
-        <option value="" disabled hidden>
-          {placeholder}
-        </option>
-        {options.map((option) => (
-          <option
-            key={option.value}
-            value={option.value}
-            disabled={option.disabled}
+        <span className="PdxSelectControlWrapper">
+          <select
+            {...rest}
+            aria-describedby={fieldIds.describedBy}
+            aria-invalid={ariaInvalid ?? (state === 'Error' || undefined)}
+            className={mergeClassNames(
+              'PdxSelectControl',
+              state !== 'Default' && state,
+              controlClassName
+            )}
+            disabled={disabled}
+            id={fieldIds.controlId}
+            onChange={(event) => {
+              onChange?.(event);
+              const nextValue = event.currentTarget.value;
+              const option = options.find((item) => item.value === nextValue);
+              setCurrentValue(nextValue);
+              onValueChange?.(nextValue, option);
+            }}
+            ref={ref}
+            required={required}
+            value={currentValue}
           >
-            {option.label}
-          </option>
-        ))}
-      </select>
-      {message && <div className="PdxFieldMessage">{message}</div>}
-    </div>
-  );
-}
+            <option value="" disabled hidden>
+              {placeholder}
+            </option>
+            {options.map((option) => (
+              <option
+                key={option.value}
+                disabled={option.disabled}
+                value={option.value}
+              >
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            className="PdxSelectIndicator"
+            aria-hidden="true"
+            size={14}
+          />
+        </span>
+      </PdxField>
+    );
+  }
+);
 
 export default PdxSelect;

@@ -15,6 +15,7 @@ const meta: Meta<typeof PdxIconLink> = {
       description: '图标尺寸',
     },
     color: { control: 'color', description: '图标颜色' },
+    label: { control: 'text', description: '无障碍名称' },
     title: { control: 'text', description: '无障碍标题' },
   },
 };
@@ -54,6 +55,7 @@ export const Default: Story = {
   args: {
     to: '/home',
     icon: HomeIcon,
+    label: 'Home',
     size: 24,
   },
 };
@@ -62,6 +64,7 @@ export const WithTitle: Story = {
   args: {
     to: '/home',
     icon: HomeIcon,
+    label: 'Home',
     size: 24,
     title: 'Go to Home',
   },
@@ -71,6 +74,7 @@ export const CustomColor: Story = {
   args: {
     to: '/settings',
     icon: SettingsIcon,
+    label: 'Settings',
     size: 24,
     color: '#3b82f6',
     title: 'Settings',
@@ -80,10 +84,10 @@ export const CustomColor: Story = {
 export const Sizes: Story = {
   render: () => (
     <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-      <PdxIconLink to="/icon1" icon={HomeIcon} size={16} />
-      <PdxIconLink to="/icon2" icon={HomeIcon} size={24} />
-      <PdxIconLink to="/icon3" icon={HomeIcon} size={32} />
-      <PdxIconLink to="/icon4" icon={HomeIcon} size={48} />
+      <PdxIconLink to="/icon1" icon={HomeIcon} label="Home" size={16} />
+      <PdxIconLink to="/icon2" icon={HomeIcon} label="Home" size={24} />
+      <PdxIconLink to="/icon3" icon={HomeIcon} label="Home" size={32} />
+      <PdxIconLink to="/icon4" icon={HomeIcon} label="Home" size={48} />
     </div>
   ),
 };
@@ -91,10 +95,11 @@ export const Sizes: Story = {
 export const DifferentIcons: Story = {
   render: () => (
     <div style={{ display: 'flex', gap: '16px' }}>
-      <PdxIconLink to="/home" icon={HomeIcon} size={32} title="Home" />
+      <PdxIconLink to="/home" icon={HomeIcon} label="Home" size={32} />
       <PdxIconLink
         to="/settings"
         icon={SettingsIcon}
+        label="Settings"
         size={32}
         title="Settings"
       />

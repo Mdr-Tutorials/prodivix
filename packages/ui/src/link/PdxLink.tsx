@@ -1,59 +1,61 @@
-import React from 'react';
-import { Link, type To } from 'react-router';
-import { type PdxComponent } from '@prodivix/shared';
 import './PdxLink.scss';
+import {
+  getDataAttributes,
+  mergeClassNames,
+  type PdxDataAttributeProps,
+} from '../foundation/component';
+import { forwardRef, type ReactNode } from 'react';
+import { Link, type LinkProps, type To } from 'react-router';
 
-interface PdxLinkSpecificProps {
-  to: To;
-  text?: string;
-  title?: string;
+export interface PdxLinkProps
+  extends Omit<LinkProps, 'children' | 'to'>, PdxDataAttributeProps {
+  children?: ReactNode;
   disabled?: boolean;
+  text?: string;
+  to: To;
   underline?: boolean;
-  children?: React.ReactNode;
 }
 
-export interface PdxLinkProps extends PdxComponent, PdxLinkSpecificProps {}
-
-function PdxLink({
-  to,
-  text,
-  title,
-  disabled = false,
-  underline = true,
-  children,
-  className,
-  style,
-  id,
-  dataAttributes = {},
-  onClick,
-  as: LinkComponent = Link,
-}: PdxLinkProps) {
-  const content = children ?? text ?? 'Link';
-
-  const fullClassName =
-    `PdxLink ${disabled ? 'Disabled' : ''} ${underline ? '' : 'NoUnderline'} ${className || ''}`.trim();
-
-  const dataProps = { ...dataAttributes };
-
-  const Element = LinkComponent as React.ElementType;
-  const linkProps = {
+const PdxLink = forwardRef<HTMLAnchorElement, PdxLinkProps>(function PdxLink(
+  {
+    children,
+    className,
+    dataAttributes,
+    disabled = false,
+    onClick,
+    tabIndex,
+    text,
     to,
-    className: fullClassName,
-    style,
-    id,
-    title,
-    onClick: onClick,
-    ...dataProps,
-  };
-
-  const handleClick = disabled
-    ? (e: React.MouseEvent) => {
-        e.preventDefault();
-      }
-    : onClick;
-  linkProps.onClick = handleClick;
-
-  return <Element {...linkProps}>{content}</Element>;
-}
+    underline = true,
+    ...rest
+  },
+  ref
+) {
+  return (
+    <Link
+      {...rest}
+      {...getDataAttributes(dataAttributes)}
+      aria-disabled={disabled || undefined}
+      className={mergeClassNames(
+        'PdxLink',
+        !underline && 'NoUnderline',
+        disabled && 'Disabled',
+        className
+      )}
+      onClick={(event) => {
+        if (disabled) {
+          event.preventDefault();
+          return;
+        }
+        onClick?.(event);
+      }}
+      ref={ref}
+      tabIndex={disabled ? -1 : tabIndex}
+      to={to}
+    >
+      {children ?? text ?? 'Link'}
+    </Link>
+  );
+});
 
 export default PdxLink;

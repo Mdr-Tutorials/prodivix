@@ -1,6 +1,6 @@
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getComponentGroups } from '@/editor/features/blueprint/registry';
+import { usePaletteGroups } from '@/editor/features/blueprint/palette';
 import { SidebarComponentList } from './SidebarComponentList';
 import { SidebarExternalState } from './SidebarExternalState';
 import { SidebarHeader } from './SidebarHeader';
@@ -35,6 +35,7 @@ export function BlueprintEditorSidebar({
   const [isSearchOpen, setSearchOpen] = useState(false);
   const [activeLibraryId, setActiveLibraryId] = useState('builtIn');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const paletteGroups = usePaletteGroups();
 
   const libraryTabs = useMemo<LibraryTab[]>(
     () => [
@@ -68,8 +69,7 @@ export function BlueprintEditorSidebar({
   }, [activeLibraryId, libraryTabs]);
 
   const groups = useMemo(() => {
-    const rawGroups = getComponentGroups();
-    const scopedGroups = rawGroups.filter((group) => {
+    const scopedGroups = paletteGroups.filter((group) => {
       const groupSource = group.source ?? 'builtIn';
       if (activeLibraryTab?.source === 'external') {
         if (groupSource !== 'external') return false;
@@ -115,7 +115,7 @@ export function BlueprintEditorSidebar({
         return { ...group, items: nextItems };
       })
       .filter((value): value is NonNullable<typeof value> => Boolean(value));
-  }, [activeLibraryTab, normalizedQuery, t]);
+  }, [activeLibraryTab, normalizedQuery, paletteGroups, t]);
 
   const hasExternalItems = useMemo(
     () =>

@@ -1,69 +1,99 @@
+@use '../foundation/control' as control;
+
 .PdxNotification {
-  width: 320px;
-  padding: var(--spacing-md);
-  border-radius: var(--radius-md);
-  background-color: var(--bg-canvas);
+  --pdx-notification-color: var(--text-secondary);
+
+  display: grid;
+  width: min(360px, calc(100vw - 24px));
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 11px;
+  padding: 14px;
   border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-canvas);
+  box-shadow: var(--shadow-lg);
   color: var(--text-primary);
-  box-shadow: var(--shadow-md);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
+  font-family: var(--font-family-ui);
+
+  &.Success {
+    --pdx-notification-color: var(--success-color);
+  }
+
+  &.Warning {
+    --pdx-notification-color: var(--warning-color);
+  }
+
+  &.Danger {
+    --pdx-notification-color: var(--danger-color);
+  }
 }
 
-.PdxNotificationHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--spacing-sm);
+.PdxNotificationIcon {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: color-mix(
+    in srgb,
+    var(--pdx-notification-color) 10%,
+    var(--bg-panel)
+  );
+  color: var(--pdx-notification-color);
+}
+
+.PdxNotificationBody {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
 }
 
 .PdxNotificationTitle {
-  font-weight: 600;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-compact);
 }
 
 .PdxNotificationDescription {
-  font-size: 13px;
   color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+  overflow-wrap: anywhere;
 }
 
 .PdxNotificationActions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--spacing-sm);
+  padding-top: 5px;
 }
 
 .PdxNotificationClose {
-  border: none;
-  background: transparent;
-  cursor: pointer;
+  @include control.control-transition;
+
+  display: inline-flex;
   width: 26px;
   height: 26px;
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  font-size: 18px;
-  display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition:
-    background-color var(--motion-duration-fast) var(--motion-easing-standard),
-    color var(--motion-duration-fast) var(--motion-easing-standard);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
 
   &:hover {
-    background-color: var(--bg-raised);
+    border-color: var(--border-subtle);
+    background: var(--bg-raised);
     color: var(--text-primary);
   }
-}
 
-.PdxNotification.Success {
-  border-color: var(--success-color);
-}
-
-.PdxNotification.Warning {
-  border-color: var(--warning-color);
-}
-
-.PdxNotification.Danger {
-  border-color: var(--danger-color);
+  &:focus-visible {
+    @include control.focus-ring;
+  }
 }

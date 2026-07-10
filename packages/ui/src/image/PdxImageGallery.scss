@@ -1,153 +1,235 @@
+@use '../foundation/control';
+
 .PdxImageGallery {
+  --pdx-gallery-columns: 3;
+  --pdx-gallery-mobile-columns: 2;
+  --pdx-gallery-gap: var(--spacing-md);
+  --pdx-gallery-media-height: 144px;
+
+  box-sizing: border-box;
   width: 100%;
+  min-width: 0;
+  color: var(--text-primary);
+  font-family: var(--font-family-ui);
+}
 
-  &.Grid,
-  &.Masonry {
-    display: grid;
-    gap: var(--spacing-md);
-  }
+.PdxImageGallery.Grid {
+  display: grid;
+  grid-template-columns: repeat(var(--pdx-gallery-columns), minmax(0, 1fr));
+  gap: var(--pdx-gallery-gap);
+}
 
-  &.List {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
-  }
+.PdxImageGallery.Masonry {
+  column-count: var(--pdx-gallery-columns);
+  column-gap: var(--pdx-gallery-gap);
+}
 
-  &.None {
-    gap: 0;
-  }
+.PdxImageGallery.List {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pdx-gallery-gap);
+}
+
+.PdxImageGallery.GapNone {
+  --pdx-gallery-gap: 0;
+}
+
+.PdxImageGallery.GapSmall {
+  --pdx-gallery-gap: var(--spacing-sm);
+}
+
+.PdxImageGallery.GapLarge {
+  --pdx-gallery-gap: var(--spacing-lg);
+}
+
+.PdxImageGalleryItem {
+  min-width: 0;
+  margin: 0;
+  break-inside: avoid;
 
   &.Small {
-    gap: var(--spacing-sm);
-  }
-
-  &.Medium {
-    gap: var(--spacing-md);
+    --pdx-gallery-media-height: 88px;
   }
 
   &.Large {
-    gap: var(--spacing-lg);
+    --pdx-gallery-media-height: 220px;
+  }
+}
+
+.PdxImageGallery.Masonry .PdxImageGalleryItem {
+  margin-bottom: var(--pdx-gallery-gap);
+}
+
+.PdxImageGallerySurface {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--pdx-gallery-media-height);
+  display: block;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-raised);
+  color: inherit;
+  font: inherit;
+  transition:
+    border-color var(--motion-duration-fast) var(--motion-easing-standard),
+    box-shadow var(--motion-duration-fast) var(--motion-easing-standard),
+    opacity var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+button.PdxImageGallerySurface {
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: var(--border-strong);
   }
 
-  .PdxImageGallery-item {
-    position: relative;
-    overflow: hidden;
-    cursor: pointer;
-    transition: all var(--transition-normal);
-    background-color: var(--border-default);
-
-    &:hover {
-      transform: scale(1.02);
-      box-shadow: var(--shadow-md);
-    }
-
-    &.selected {
-      box-shadow: 0 0 0 3px var(--accent-color);
-    }
-
-    &.Small {
-      height: 64px;
-    }
-
-    &.Medium {
-      height: 128px;
-    }
-
-    &.Large {
-      height: 256px;
-    }
-
-    &.Square {
-      border-radius: var(--radius-none);
-    }
-
-    &.Rounded {
-      border-radius: var(--radius-md);
-    }
-
-    &.Circle {
-      border-radius: var(--radius-full);
-      aspect-ratio: 1;
-    }
+  &:focus-visible {
+    @include control.focus-ring;
   }
 
-  .PdxImageGallery-image {
-    width: 100%;
-    height: 100%;
+  &:disabled {
+    cursor: not-allowed;
+  }
+}
+
+.PdxImageGalleryItem.Selected .PdxImageGallerySurface {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 18%, transparent);
+}
+
+.PdxImageGalleryImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  color: var(--text-muted);
+
+  &.Contain,
+  &.ScaleDown {
+    background-color: var(--bg-panel);
+  }
+
+  &.Cover {
     object-fit: cover;
-    display: block;
-
-    &.Cover {
-      object-fit: cover;
-    }
-
-    &.Contain {
-      object-fit: contain;
-    }
-
-    &.Fill {
-      object-fit: fill;
-    }
-
-    &.None {
-      object-fit: none;
-    }
-
-    &.ScaleDown {
-      object-fit: scale-down;
-    }
   }
 
-  .PdxImageGallery-caption {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: var(--spacing-sm) var(--spacing-md);
-    background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
-    color: white;
-    font-size: 12px;
-    line-height: 1.4;
-    opacity: 0;
-    transition: opacity var(--transition-fast);
+  &.Contain {
+    object-fit: contain;
   }
 
-  .PdxImageGallery-item:hover .PdxImageGallery-caption {
-    opacity: 1;
+  &.Fill {
+    object-fit: fill;
   }
 
-  .PdxImageGallery-check {
-    position: absolute;
-    top: var(--spacing-sm);
-    right: var(--spacing-sm);
-    width: 24px;
-    height: 24px;
-    background-color: var(--accent-color);
-    border-radius: var(--radius-full);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
+  &.None {
+    object-fit: none;
   }
 
-  &.List .PdxImageGallery-item {
-    display: flex;
-    align-items: center;
-    height: auto;
+  &.ScaleDown {
+    object-fit: scale-down;
+  }
+}
 
-    .PdxImageGallery-image {
-      width: 200px;
-      height: 150px;
-      flex-shrink: 0;
-    }
+.PdxImageGalleryItem.Square .PdxImageGallerySurface {
+  border-radius: var(--radius-none);
+}
 
-    .PdxImageGallery-caption {
-      position: static;
-      padding: var(--spacing-md);
-      background: transparent;
-      color: var(--text-secondary);
-      opacity: 1;
-      flex: 1;
-    }
+.PdxImageGalleryItem.Circle .PdxImageGallerySurface {
+  width: min(100%, var(--pdx-gallery-media-height));
+  aspect-ratio: 1;
+  margin-inline: auto;
+  border-radius: var(--radius-full);
+}
+
+.PdxImageGalleryCaption {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: var(--spacing-xs) 2px 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.PdxImageGalleryItem.Circle .PdxImageGalleryCaption {
+  text-align: center;
+}
+
+.PdxImageGallerySelection {
+  position: absolute;
+  top: var(--spacing-xs);
+  right: var(--spacing-xs);
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--bg-canvas);
+  border-radius: var(--radius-full);
+  background-color: var(--accent-color);
+  color: var(--text-inverse);
+}
+
+.PdxImageGallery.List .PdxImageGalleryItem {
+  display: grid;
+  grid-template-columns: minmax(112px, 180px) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.PdxImageGallery.List .PdxImageGallerySurface {
+  height: 104px;
+}
+
+.PdxImageGallery.List .PdxImageGalleryCaption {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.PdxImageGalleryEmpty {
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-panel);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.PdxImageGallery.Disabled {
+  opacity: 0.52;
+}
+
+@media (max-width: 640px) {
+  .PdxImageGallery.Grid {
+    grid-template-columns: repeat(
+      var(--pdx-gallery-mobile-columns),
+      minmax(0, 1fr)
+    );
+  }
+
+  .PdxImageGallery.Masonry {
+    column-count: var(--pdx-gallery-mobile-columns);
+  }
+}
+
+@media (max-width: 420px) {
+  .PdxImageGallery.List .PdxImageGalleryItem {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .PdxImageGallerySurface {
+    transition-duration: 0.01ms;
   }
 }

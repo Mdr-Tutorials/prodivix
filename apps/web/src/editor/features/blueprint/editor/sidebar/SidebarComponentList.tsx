@@ -14,7 +14,7 @@ import {
 import { SidebarPreviewFrame } from './SidebarPreviewFrame';
 
 type SidebarComponentListProps = {
-  groups: ComponentGroup[];
+  groups: readonly ComponentGroup[];
   collapsedGroups: Record<string, boolean>;
   expandedPreviews: Record<string, boolean>;
   sizeSelections: Record<string, string>;
