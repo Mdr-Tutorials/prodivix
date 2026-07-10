@@ -91,6 +91,11 @@ export type PluginHostContext<TMap extends HostContributionPointMap> =
     generations: Map<string, number>;
     currentOwners: Map<string, PluginOwnerRef>;
     permissionsByOwner: Map<string, PermissionSnapshot>;
+    subscribePermission(
+      owner: PluginOwnerRef,
+      listener: (snapshot: PermissionSnapshot | undefined) => void
+    ): Readonly<{ dispose(): void }>;
+    notifyPermissionChanged(owner: PluginOwnerRef): void;
     operations: Map<string, PluginOperationLease>;
     listeners: Set<PluginHostListener>;
     registry: ContributionRegistry<TMap>;
@@ -216,6 +221,10 @@ export const createPluginHostContext = <TMap extends HostContributionPointMap>(
   const generations = new Map<string, number>();
   const currentOwners = new Map<string, PluginOwnerRef>();
   const permissionsByOwner = new Map<string, PermissionSnapshot>();
+  const permissionListeners = new Map<
+    string,
+    Set<(snapshot: PermissionSnapshot | undefined) => void>
+  >();
   const operations = new Map<string, PluginOperationLease>();
   const listeners = new Set<PluginHostListener>();
   const hostController = new AbortController();
@@ -226,6 +235,38 @@ export const createPluginHostContext = <TMap extends HostContributionPointMap>(
   );
   let fallbackId = 0;
   let registry: ContributionRegistry<TMap>;
+
+  const subscribePermission: PluginHostContext<TMap>['subscribePermission'] = (
+    owner,
+    listener
+  ) => {
+    const key = pluginOwnerKey(owner);
+    const ownerListeners = permissionListeners.get(key) ?? new Set();
+    ownerListeners.add(listener);
+    permissionListeners.set(key, ownerListeners);
+    let disposed = false;
+    return Object.freeze({
+      dispose: () => {
+        if (disposed) return;
+        disposed = true;
+        ownerListeners.delete(listener);
+        if (ownerListeners.size === 0) permissionListeners.delete(key);
+      },
+    });
+  };
+
+  const notifyPermissionChanged: PluginHostContext<TMap>['notifyPermissionChanged'] =
+    (owner) => {
+      const key = pluginOwnerKey(owner);
+      const snapshot = permissionsByOwner.get(key);
+      for (const listener of [...(permissionListeners.get(key) ?? [])]) {
+        try {
+          listener(snapshot);
+        } catch {
+          continue;
+        }
+      }
+    };
 
   const createId = (
     kind: 'operation' | 'audit-event' | 'runtime-session'
@@ -542,6 +583,7 @@ export const createPluginHostContext = <TMap extends HostContributionPointMap>(
       if (!loaded.ok) return loaded;
       const prepared = await prepareValidatedContributions({
         owner: record.owner,
+        attestation: record.source.attestation,
         manifest: record.manifest,
         permission: record.permission,
         descriptors: loaded.value,
@@ -620,6 +662,8 @@ export const createPluginHostContext = <TMap extends HostContributionPointMap>(
       generations,
       currentOwners,
       permissionsByOwner,
+      subscribePermission,
+      notifyPermissionChanged,
       operations,
       listeners,
       registry,

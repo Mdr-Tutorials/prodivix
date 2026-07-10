@@ -25,6 +25,7 @@ import type {
   PreparedContributionEntry,
 } from '#host/contribution/contribution.types';
 import type { PluginOwnerRef } from '#host/identity';
+import type { PluginPackageAttestation } from '#host/host.types';
 import type { PluginPackageReader } from '#host/host.types';
 import type { PluginResourceIntegrityService } from '#host/contribution/resourceIntegrity';
 import {
@@ -355,6 +356,7 @@ export const prepareValidatedContributions = async <
 >(
   context: Readonly<{
     owner: PluginOwnerRef;
+    attestation: PluginPackageAttestation;
     manifest: PluginManifestV1;
     permission: PermissionSnapshot;
     descriptors: readonly ValidatedContributionDescriptor<TMap>[];
@@ -372,6 +374,7 @@ export const prepareValidatedContributions = async <
     try {
       preparedResult = await descriptor.contract.prepare({
         owner: context.owner,
+        attestation: context.attestation,
         declaration: descriptor.declaration,
         descriptor: descriptor.descriptor,
         permission: permissionReader,

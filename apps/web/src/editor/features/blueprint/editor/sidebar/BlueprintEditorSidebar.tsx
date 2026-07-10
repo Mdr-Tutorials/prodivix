@@ -1,6 +1,6 @@
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { usePaletteGroups } from '@/editor/features/blueprint/palette';
+import { usePaletteGroups } from '@/plugins/platform';
 import { SidebarComponentList } from './SidebarComponentList';
 import { SidebarExternalState } from './SidebarExternalState';
 import { SidebarHeader } from './SidebarHeader';

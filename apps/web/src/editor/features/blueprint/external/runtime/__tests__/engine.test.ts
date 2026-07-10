@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ExternalLibraryProfile } from '@/editor/features/blueprint/external/runtime/types';
+import type { PaletteContributionService } from '@/plugins/platform';
 
 const runtimeMocks = vi.hoisted(() => ({
   loadExternalEsmModule: vi.fn(async () => ({ Button: {} })),
@@ -85,6 +86,16 @@ const createProfile = (): ExternalLibraryProfile => ({
   ],
 });
 
+const paletteContributions: PaletteContributionService = Object.freeze({
+  workspaceId: 'external-engine-test',
+  install: async () => {
+    throw new Error('The mocked registry owns Palette installation.');
+  },
+  disable: async () => {
+    throw new Error('The mocked registry owns Palette removal.');
+  },
+});
+
 describe('ensureExternalLibrary', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -104,8 +115,8 @@ describe('ensureExternalLibrary', () => {
     const profile = createProfile();
 
     await Promise.all([
-      ensureExternalLibrary(profile),
-      ensureExternalLibrary(profile),
+      ensureExternalLibrary(profile, { paletteContributions }),
+      ensureExternalLibrary(profile, { paletteContributions }),
     ]);
 
     expect(runtimeMocks.loadExternalEsmModule).toHaveBeenCalledTimes(1);
@@ -120,8 +131,8 @@ describe('ensureExternalLibrary', () => {
       await import('@/editor/features/blueprint/external/runtime/engine');
     const profile = createProfile();
 
-    await ensureExternalLibrary(profile);
-    await ensureExternalLibrary(profile);
+    await ensureExternalLibrary(profile, { paletteContributions });
+    await ensureExternalLibrary(profile, { paletteContributions });
 
     expect(runtimeMocks.loadExternalEsmModule).toHaveBeenCalledTimes(2);
     expect(

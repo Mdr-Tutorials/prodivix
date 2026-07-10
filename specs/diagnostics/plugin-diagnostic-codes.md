@@ -385,6 +385,240 @@
 - User action: 将 runtime 构建为低于 Host 上限的 self-contained ESM entry
 - Developer notes: package reader 限额与 Host 收到 bytes 后的二次检查都必须保留
 
+### `PLG-4013` Sandbox bootstrap 失败
+
+- Severity: `error`
+- Stage: `sandbox`
+- Retryable: true
+- Trigger: 专用 sandbox origin、broker frame、nonce/source 校验或 bootstrap transfer 无法建立
+- User action: 恢复专用 sandbox 部署与安全 headers 后重试 activation
+- Developer notes: 失败时不得回退到 same-origin Worker 或主线程 runtime
+
+### `PLG-4014` Sandbox handshake 不匹配
+
+- Severity: `error`
+- Stage: `sandbox`
+- Retryable: false
+- Trigger: runtime ready 超时，或 protocol version、artifact digest 与绑定 session context 不匹配
+- User action: 使用 Host 支持的 exact protocol 和已验证 runtime artifact 重新启动
+- Developer notes: ready 前不得发送 activation，也不得提交 activation transaction
+
+### `PLG-4015` Sandbox policy 无效
+
+- Severity: `error`
+- Stage: `sandbox`
+- Retryable: false
+- Trigger: iframe sandbox token、专用 origin、CSP、Permissions Policy 或 credential policy 不满足 Host 要求
+- User action: 使用无 cookie 的专用 origin 和规定的 production policy
+- Developer notes: 开发与生产使用同一安全 profile，不保留宽松 dev fallback
+
+### `PLG-4020` Protocol message 非法
+
+- Severity: `error`
+- Stage: `protocol`
+- Retryable: false
+- Trigger: MessagePort 收到非 string、非严格 JSON、超限或不符合 Runtime Envelope v1 的消息
+- User action: 发送受限 strict JSON，并满足 exact envelope 和 payload contract
+- Developer notes: malformed message fail closed，并终止当前 protocol session
+
+### `PLG-4021` Protocol contract 未注册
+
+- Severity: `error`
+- Stage: `protocol`
+- Retryable: false
+- Trigger: channel、method、kind 或 contract version 没有 exact contract
+- User action: 使用 Host 明确注册的 exact contract identity
+- Developer notes: 不做 latest、minor fallback 或隐式 payload conversion
+
+### `PLG-4022` Protocol sequence 非单调
+
+- Severity: `error`
+- Stage: `protocol`
+- Retryable: false
+- Trigger: 对端 sequence 重复、回退、跳号或超出安全整数上限
+- User action: 以全新 session 从 sequence 1 重启 runtime
+- Developer notes: sequence violation 视为 channel compromise，不能只丢弃单条消息
+
+### `PLG-4023` Protocol correlation 非法
+
+- Severity: `error`
+- Stage: `protocol`
+- Retryable: false
+- Trigger: response 缺少有效 replyTo、方向不匹配、重复回复或引用未知 pending request
+- User action: 每个 request 只使用绑定 message id 回复一次
+- Developer notes: 不能按插件 payload 中的 owner 或 request identity 做关联
+
+### `PLG-4024` Protocol response 已迟到
+
+- Severity: `warning`
+- Stage: `protocol`
+- Retryable: false
+- Trigger: response 在 request timeout、cancel 或 close 后到达
+- User action: 丢弃迟到结果，并修复 runtime 的取消传播
+- Developer notes: late response 不得恢复 state、commit transaction 或激活 proxy
+
+### `PLG-4025` Protocol request 超时
+
+- Severity: `error`
+- Stage: `protocol`
+- Retryable: true
+- Trigger: request 在 protocol deadline 内没有收到受验证 response
+- User action: 仅在当前 runtime session 仍 active 时重试
+- Developer notes: protocol timeout 与 Host lifecycle、Gateway timeout 使用不同 code
+
+### `PLG-4026` Protocol session 已关闭
+
+- Severity: `error`
+- Stage: `protocol`
+- Retryable: true
+- Trigger: request/event 在 endpoint close 后发送，或 pending request 因 close 被取消
+- User action: 重启 runtime session 后再发送消息
+- Developer notes: close 必须 exactly-once abort pending request 并抑制后续消息
+
+### `PLG-4030` Gateway capability 未在 Manifest 请求
+
+- Severity: `error`
+- Stage: `permission`
+- Retryable: false
+- Trigger: Gateway contract 推导出的 exact capability id/scope 不在 Plugin Manifest 中
+- User action: 在 Manifest 声明该 exact capability 和 reason 后重新安装
+- Developer notes: capability 由 contract 推导，不接受 payload 自报 capability
+
+### `PLG-4031` Gateway capability 当前被拒绝
+
+- Severity: `error`
+- Stage: `permission`
+- Retryable: false
+- Trigger: live permission snapshot 未 grant capability，或调用中途撤权
+- User action: 通过 Host 权限流程授权后，从当前 session 重新发起调用
+- Developer notes: mid-flight revoke 必须 abort service signal 并抑制迟到 result
+
+### `PLG-4032` Gateway request 不符合 contract
+
+- Severity: `error`
+- Stage: `gateway`
+- Retryable: false
+- Trigger: request payload 未通过 method-specific Schema、strict JSON 或 request byte limit
+- User action: 按 exact Gateway v1 contract 修正请求
+- Developer notes: validation 在 capability、audit 和 service effect 之前完成
+
+### `PLG-4033` Gateway response 不符合 contract
+
+- Severity: `error`
+- Stage: `gateway`
+- Retryable: false
+- Trigger: Host handler 返回值未通过 method-specific response Schema 或 byte limit
+- User action: 修复 Host service adapter 的稳定 projection
+- Developer notes: 非法 response 不得跨 MessagePort，且必须记录 failed outcome audit
+
+### `PLG-4034` Gateway handler 不可用
+
+- Severity: `error`
+- Stage: `gateway`
+- Retryable: true
+- Trigger: exact method/version 未注册，或对应 Host service port 未注入
+- User action: 恢复 Host Gateway composition 后重启插件
+- Developer notes: `secrets.read` 在 vault/redaction/consent 稳定前保持无 handler
+
+### `PLG-4035` Gateway request 超时
+
+- Severity: `error`
+- Stage: `gateway`
+- Retryable: true
+- Trigger: preflight audit、service 或 network operation 超过 method/policy deadline
+- User action: 确认前一次 effect 未完成后再重试
+- Developer notes: timeout 必须 abort 注入 service 的 signal 并抑制迟到 response
+
+### `PLG-4036` Gateway session 已过期
+
+- Severity: `error`
+- Stage: `gateway`
+- Retryable: false
+- Trigger: owner、installation、generation、plugin version 或 bound session 已不再 current
+- User action: 从当前 plugin generation 重新获取 session
+- Developer notes: stale generation 只能完成自身 cleanup，不能影响新 generation
+
+### `PLG-4037` Gateway handler 执行失败
+
+- Severity: `error`
+- Stage: `gateway`
+- Retryable: true
+- Trigger: 注入 Host service 抛错或无法返回受限结果
+- User action: 检查 Host service，再按操作幂等语义决定是否重试
+- Developer notes: 不把 Error、stack、store 或底层 handle 返回给插件
+
+### `PLG-4038` Gateway network policy 拒绝
+
+- Severity: `error`
+- Stage: `network`
+- Retryable: false
+- Trigger: URL、origin、method、path、header、redirect、content type、private target 或 byte limit 不符合 scope policy
+- User action: 使用 capability scope 明确允许的 HTTPS 请求
+- Developer notes: 每一跳重新校验；看不到 redirect Location 时 fail closed
+
+### `PLG-4039` Gateway request 被取消
+
+- Severity: `error`
+- Stage: `gateway`
+- Retryable: true
+- Trigger: caller、Host shutdown、disable 或 session disposal 在完成前取消调用
+- User action: 仅从 active session 且确认旧 effect 未完成时重试
+- Developer notes: cancellation 与 timeout、revoke、stale generation 保持独立诊断
+
+### `PLG-4040` Sandbox message quota 超限
+
+- Severity: `error`
+- Stage: `quota`
+- Retryable: false
+- Trigger: runtime 超出单条 message、消息速率或 pending request 上限
+- User action: 降低 runtime 流量并重启被终止的 session
+- Developer notes: quota violation 先终止 transport，再发布 diagnostic 和 cleanup
+
+### `PLG-4041` Sandbox heartbeat 超时
+
+- Severity: `error`
+- Stage: `quota`
+- Retryable: true
+- Trigger: runtime 连续错过配置的 heartbeat budget
+- User action: 检查 hang 或长任务后显式重试 activation
+- Developer notes: 浏览器无硬 heap cap，使用 heartbeat、bounded queue 和 Worker termination
+
+### `PLG-4042` Sandbox 已终止
+
+- Severity: `error`
+- Stage: `sandbox`
+- Retryable: true
+- Trigger: broker、Worker、protocol violation、crash 或 Host 命令终止当前 sandbox
+- User action: 检查稳定 reason code 后决定是否重启
+- Developer notes: 终止事件必须绑定 current owner/generation/session，旧事件不得改写新 snapshot
+
+### `PLG-4043` Gateway quota 超限
+
+- Severity: `error`
+- Stage: `quota`
+- Retryable: false
+- Trigger: 单 session 或 method 的 request rate/concurrency 超出 Host policy
+- User action: 降低 Gateway 调用频率或等待当前请求结束
+- Developer notes: quota 状态按 session/method 隔离，不跨 plugin generation 复用
+
+### `PLG-4060` Required Gateway audit 不可用
+
+- Severity: `error`
+- Stage: `audit`
+- Retryable: true
+- Trigger: required-before-effect contract 没有 audit store，或 preflight record 未能持久提交
+- User action: 恢复 Host 持久审计存储后重试敏感操作
+- Developer notes: preflight 失败时不得调用 service port 或产生 side effect
+
+### `PLG-4061` Gateway outcome audit 写入失败
+
+- Severity: `warning`
+- Stage: `audit`
+- Retryable: true
+- Trigger: best-effort preflight 或 outcome record 未能在有界时间内持久化
+- User action: 恢复 IndexedDB/audit backend，并检查 retention policy
+- Developer notes: audit 仅保存脱敏、受限 metadata 和 diagnostic code，不保存 body、content、Secret 或 Token
+
 ## 4. 实现约束
 
 1. `@prodivix/plugin-contracts` validator 与 `@prodivix/plugin-host` operation 必须返回 diagnostics 判别联合，不抛出面向宿主的裸校验异常。

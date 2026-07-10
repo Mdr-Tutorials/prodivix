@@ -31,6 +31,7 @@ export const useBlueprintDragDrop = ({
   pirDoc,
   currentPath,
   selectedId,
+  palette,
   updatePirDoc,
   onNodeSelect,
 }: UseBlueprintDragDropOptions) => {
@@ -128,7 +129,7 @@ export const useBlueprintDragDrop = ({
         doc,
         data as PaletteItemDragData,
         overData,
-        { currentPath, selectedId }
+        { currentPath, selectedId, palette }
       );
       nextNodeId = result.nextNodeId;
       return result.doc;

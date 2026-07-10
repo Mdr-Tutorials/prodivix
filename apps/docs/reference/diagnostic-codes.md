@@ -137,6 +137,32 @@ requestId
 | [`PLG-4010`](/reference/diagnostics/plg-4010) | Runtime artifact 读取失败               | `error`   |
 | [`PLG-4011`](/reference/diagnostics/plg-4011) | Runtime artifact 完整性不匹配           | `error`   |
 | [`PLG-4012`](/reference/diagnostics/plg-4012) | Runtime artifact 超出上限               | `error`   |
+| [`PLG-4013`](/reference/diagnostics/plg-4013) | Sandbox bootstrap 失败                  | `error`   |
+| [`PLG-4014`](/reference/diagnostics/plg-4014) | Sandbox handshake 不匹配                | `error`   |
+| [`PLG-4015`](/reference/diagnostics/plg-4015) | Sandbox policy 无效                     | `error`   |
+| [`PLG-4020`](/reference/diagnostics/plg-4020) | Protocol message 非法                   | `error`   |
+| [`PLG-4021`](/reference/diagnostics/plg-4021) | Protocol contract 未注册                | `error`   |
+| [`PLG-4022`](/reference/diagnostics/plg-4022) | Protocol sequence 非单调                | `error`   |
+| [`PLG-4023`](/reference/diagnostics/plg-4023) | Protocol correlation 非法               | `error`   |
+| [`PLG-4024`](/reference/diagnostics/plg-4024) | Protocol response 已迟到                | `warning` |
+| [`PLG-4025`](/reference/diagnostics/plg-4025) | Protocol request 超时                   | `error`   |
+| [`PLG-4026`](/reference/diagnostics/plg-4026) | Protocol session 已关闭                 | `error`   |
+| [`PLG-4030`](/reference/diagnostics/plg-4030) | Gateway capability 未在 Manifest 请求   | `error`   |
+| [`PLG-4031`](/reference/diagnostics/plg-4031) | Gateway capability 当前被拒绝           | `error`   |
+| [`PLG-4032`](/reference/diagnostics/plg-4032) | Gateway request 不符合 contract         | `error`   |
+| [`PLG-4033`](/reference/diagnostics/plg-4033) | Gateway response 不符合 contract        | `error`   |
+| [`PLG-4034`](/reference/diagnostics/plg-4034) | Gateway handler 不可用                  | `error`   |
+| [`PLG-4035`](/reference/diagnostics/plg-4035) | Gateway request 超时                    | `error`   |
+| [`PLG-4036`](/reference/diagnostics/plg-4036) | Gateway session 已过期                  | `error`   |
+| [`PLG-4037`](/reference/diagnostics/plg-4037) | Gateway handler 执行失败                | `error`   |
+| [`PLG-4038`](/reference/diagnostics/plg-4038) | Gateway network policy 拒绝             | `error`   |
+| [`PLG-4039`](/reference/diagnostics/plg-4039) | Gateway request 被取消                  | `error`   |
+| [`PLG-4040`](/reference/diagnostics/plg-4040) | Sandbox message quota 超限              | `error`   |
+| [`PLG-4041`](/reference/diagnostics/plg-4041) | Sandbox heartbeat 超时                  | `error`   |
+| [`PLG-4042`](/reference/diagnostics/plg-4042) | Sandbox 已终止                          | `error`   |
+| [`PLG-4043`](/reference/diagnostics/plg-4043) | Gateway quota 超限                      | `error`   |
+| [`PLG-4060`](/reference/diagnostics/plg-4060) | Required Gateway audit 不可用           | `error`   |
+| [`PLG-4061`](/reference/diagnostics/plg-4061) | Gateway outcome audit 写入失败          | `warning` |
 
 ### Editor
 

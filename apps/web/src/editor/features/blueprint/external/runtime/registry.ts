@@ -2,11 +2,8 @@ import {
   registerRuntimeComponent,
   unregisterRuntimeComponent,
 } from '@/pir/renderer/registry';
-import {
-  createPaletteContributionDescriptor,
-  disableTrustedPalettePlugin,
-  registerTrustedPaletteContribution,
-} from '@/editor/features/blueprint/palette';
+import { createPaletteContributionDescriptor } from '@/editor/features/blueprint/palette';
+import type { PaletteContributionService } from '@/plugins/platform';
 import {
   resetExternalRuntimeMetaStore,
   setExternalRuntimeMeta,
@@ -56,12 +53,12 @@ const toExternalDiagnostic = (
   retryable: diagnostic.retryable,
 });
 
-export const clearRegisteredExternalLibraries = async (): Promise<
-  ExternalLibraryDiagnostic[]
-> => {
+export const clearRegisteredExternalLibraries = async (
+  paletteContributions: PaletteContributionService
+): Promise<ExternalLibraryDiagnostic[]> => {
   const diagnostics: ExternalLibraryDiagnostic[] = [];
   for (const [libraryId, pluginId] of palettePluginIdByLibraryId) {
-    const result = await disableTrustedPalettePlugin(pluginId);
+    const result = await paletteContributions.disable(pluginId);
     diagnostics.push(
       ...result.diagnostics.map((diagnostic) =>
         toExternalDiagnostic(libraryId, diagnostic)
@@ -204,6 +201,7 @@ export const registerExternalRuntimeComponents = (
 };
 
 export const registerExternalGroups = async (
+  paletteContributions: PaletteContributionService,
   libraryId: string,
   version: string,
   groups: ExternalCanonicalGroup[]
@@ -215,7 +213,7 @@ export const registerExternalGroups = async (
     items: group.items.map(toPreviewItem),
   }));
   const pluginId = `@prodivix/core.external.${libraryId}`;
-  const result = await registerTrustedPaletteContribution({
+  const result = await paletteContributions.install({
     pluginId,
     displayName: `${libraryId} Core-Embedded Palette`,
     version,
@@ -233,11 +231,14 @@ export const registerExternalGroups = async (
   );
 };
 
-export const unregisterExternalLibraryRuntime = async (libraryId: string) => {
+export const unregisterExternalLibraryRuntime = async (
+  paletteContributions: PaletteContributionService,
+  libraryId: string
+) => {
   const pluginId = palettePluginIdByLibraryId.get(libraryId);
   const diagnostics: ExternalLibraryDiagnostic[] = [];
   if (pluginId) {
-    const result = await disableTrustedPalettePlugin(pluginId);
+    const result = await paletteContributions.disable(pluginId);
     diagnostics.push(
       ...result.diagnostics.map((diagnostic) =>
         toExternalDiagnostic(libraryId, diagnostic)

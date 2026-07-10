@@ -41,6 +41,9 @@ export type PermissionSnapshotReader = Readonly<{
 export type LivePermissionGuard = Readonly<{
   getSnapshot(): PermissionSnapshot | undefined;
   isGranted(capability: CapabilityIdentity): boolean;
+  subscribe(
+    listener: (snapshot: PermissionSnapshot | undefined) => void
+  ): Readonly<{ dispose(): void }>;
 }>;
 
 const freezeCapability = (capability: CapabilityIdentity): CapabilityIdentity =>

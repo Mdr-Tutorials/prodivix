@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import EditorBar from './EditorBar/EditorBar';
 import { EditorDebugFloatingBall } from './EditorDebugFloatingBall';
@@ -21,6 +21,8 @@ import {
 import { useEditorStore } from './store/useEditorStore';
 import { useSettingsStore } from './store/useSettingsStore';
 import { CURRENT_PIR_VERSION } from '@prodivix/shared/types/pir';
+import { WebPluginPlatformProvider } from '@/plugins/platform';
+import { createEditorPluginGatewayServices } from '@/editor/pluginGatewayServices';
 
 function EditorGlobalShortcuts({
   projectId,
@@ -125,6 +127,19 @@ function EditorGlobalShortcuts({
   return null;
 }
 
+function EditorSurface() {
+  return (
+    <div className="flex max-h-screen min-h-screen flex-row bg-[linear-gradient(120deg,var(--bg-canvas)_20%,var(--bg-panel)_100%)]">
+      <SettingsEffects />
+      <EditorBar />
+      <div className="min-h-screen flex-1 overflow-auto">
+        <Outlet />
+      </div>
+      <EditorDebugFloatingBall />
+    </div>
+  );
+}
+
 function Editor() {
   const { projectId } = useParams();
   const location = useLocation();
@@ -166,6 +181,11 @@ function Editor() {
     (state) => state.projectGlobalById
   );
   const workspaceReadonly = useEditorStore((state) => state.workspaceReadonly);
+  const pluginGatewayServices = useMemo(
+    () =>
+      projectId ? createEditorPluginGatewayServices(projectId) : undefined,
+    [projectId]
+  );
 
   useEffect(() => {
     if (!projectId) return;
@@ -408,15 +428,15 @@ function Editor() {
             </button>
           </div>
         </div>
+      ) : projectId && pluginGatewayServices ? (
+        <WebPluginPlatformProvider
+          workspaceId={projectId}
+          gatewayServices={pluginGatewayServices}
+        >
+          <EditorSurface />
+        </WebPluginPlatformProvider>
       ) : (
-        <div className="flex max-h-screen min-h-screen flex-row bg-[linear-gradient(120deg,var(--bg-canvas)_20%,var(--bg-panel)_100%)]">
-          <SettingsEffects />
-          <EditorBar />
-          <div className="min-h-screen flex-1 overflow-auto">
-            <Outlet />
-          </div>
-          <EditorDebugFloatingBall />
-        </div>
+        <EditorSurface />
       )}
     </EditorShortcutProvider>
   );

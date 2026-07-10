@@ -62,6 +62,7 @@ export const createPermissionLifecycle = <
           pluginOwnerKey(record.owner),
           record.permission
         );
+        context.notifyPermissionChanged(record.owner);
         diagnostics.push(...permissionResult.diagnostics);
 
         if (record.permission.deniedRequired.length > 0) {

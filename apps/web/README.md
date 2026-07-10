@@ -22,6 +22,7 @@ apps/web
 │   │   ├── resolvePirDocument.ts          #   主入口：直接 PIR / Workspace 快照 → PIRDocument
 │   │   └── resolveWorkspaceShape.ts       #   Workspace shape 检测 + 文档规范化挑选
 │   ├── core/            # 执行引擎、节点定义、Web Worker
+│   ├── plugins/         # workspace-scoped Web Plugin Platform 与只读 query service
 │   ├── components/      # 通用 UI 组件封装
 │   ├── auth/            # 鉴权 store + 页面
 │   ├── community/       # 社区/项目浏览
@@ -52,7 +53,18 @@ apps/web
 - **Workspace 同步**：文档 command patch (`PATCH /api/workspaces/:id/documents/:docId`) + 分区 rev 乐观并发（见 `specs/decisions/07.workspace-sync.md`）
 - **路由清单**：Route Manifest + Outlet 渲染链（见 `specs/decisions/08.route-manifest-outlet.md`）
 - **外部库运行时**：esm.sh + canonical external IR（见 `specs/decisions/17.external-library-runtime-and-adapter.md`）
+- **插件平台**：每个 workspace 只有一个 Host session，feature surface 只消费 typed query service（见 `specs/implementation/plugin-browser-sandbox-phase4.md`）
 - **Inspector Panel 架构**：每个面板独立 schema（见 `specs/decisions/21.inspector-panel-architecture.md`）
+
+## Plugin Sandbox 配置
+
+需要执行 Browser plugin runtime 时，在 Web 的 Vite 环境中设置：
+
+```dotenv
+VITE_PLUGIN_SANDBOX_URL=https://plugins.example.com/runtime-broker.html
+```
+
+该 URL 必须来自不携带 Prodivix 登录 Cookie 或用户数据的独立 origin，并按 `apps/plugin-sandbox` 构建产物提供 CSP 与 Permissions Policy。未配置时 Web Plugin Platform 仍支持受信任静态 contribution，但 runtime activation 会明确 fail closed；不得回退到普通 same-origin Worker 或同源 iframe。
 
 ## 类型规范
 

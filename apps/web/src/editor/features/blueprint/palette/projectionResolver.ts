@@ -23,10 +23,10 @@ import type {
   ComponentPreviewItem,
 } from '@/editor/features/blueprint/editor/model/types';
 import type {
-  BlueprintContributionPointMap,
   PaletteRuntimeProjection,
   ResolvedPaletteContribution,
 } from '@/editor/features/blueprint/palette/types';
+import type { WebContributionPointMap } from '@/plugins/platform/types';
 
 type ProjectionBinding = Readonly<{
   token: symbol;
@@ -39,9 +39,11 @@ type PaletteClaim = {
 };
 
 export type PaletteProjectionResolver = Readonly<{
-  contract: RegisteredContributionContract<BlueprintContributionPointMap>;
+  contract: RegisteredContributionContract<WebContributionPointMap>;
   bindProjection(
     input: Readonly<{
+      packageSourceId: string;
+      packageDigest: string;
       pluginId: string;
       contributionId: string;
       projection: PaletteRuntimeProjection;
@@ -49,8 +51,13 @@ export type PaletteProjectionResolver = Readonly<{
   ): Readonly<{ dispose(): void }>;
 }>;
 
-const projectionKey = (pluginId: string, contributionId: string): string =>
-  JSON.stringify([pluginId, contributionId]);
+const projectionKey = (
+  packageSourceId: string,
+  packageDigest: string,
+  pluginId: string,
+  contributionId: string
+): string =>
+  JSON.stringify([packageSourceId, packageDigest, pluginId, contributionId]);
 
 const claimKey = (kind: 'group' | 'item', id: string): string =>
   JSON.stringify([kind, id]);
@@ -293,7 +300,7 @@ export const createPaletteProjectionResolver =
     const claims = new Map<string, PaletteClaim>();
 
     const contract = defineContributionContract<
-      BlueprintContributionPointMap,
+      WebContributionPointMap,
       'paletteContribution',
       PaletteContributionV1
     >({
@@ -317,13 +324,18 @@ export const createPaletteProjectionResolver =
             ] satisfies [PluginDiagnostic])
         );
       },
-      prepare: async ({ owner, declaration, descriptor }) => {
+      prepare: async ({ owner, attestation, declaration, descriptor }) => {
         const identity = createContributionIdentity(
           owner.pluginId,
           declaration.id
         );
         const binding = bindings.get(
-          projectionKey(owner.pluginId, declaration.id)
+          projectionKey(
+            attestation.sourceId,
+            attestation.packageDigest,
+            owner.pluginId,
+            declaration.id
+          )
         );
         if (!binding) {
           return resolverFailure(
@@ -409,8 +421,19 @@ export const createPaletteProjectionResolver =
 
     return Object.freeze({
       contract,
-      bindProjection: ({ pluginId, contributionId, projection }) => {
-        const key = projectionKey(pluginId, contributionId);
+      bindProjection: ({
+        packageSourceId,
+        packageDigest,
+        pluginId,
+        contributionId,
+        projection,
+      }) => {
+        const key = projectionKey(
+          packageSourceId,
+          packageDigest,
+          pluginId,
+          contributionId
+        );
         const token = Symbol(key);
         bindings.set(key, { token, projection });
         let disposed = false;

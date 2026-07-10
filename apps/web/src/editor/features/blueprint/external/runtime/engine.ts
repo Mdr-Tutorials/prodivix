@@ -14,16 +14,20 @@ import type {
   ExternalLibraryDiagnostic,
   ExternalLibraryProfile,
 } from './types';
+import type { PaletteContributionService } from '@/plugins/platform';
 
 const inFlightEnsures = new Map<string, Promise<ExternalLibraryDiagnostic[]>>();
 
 export const ensureExternalLibrary = async (
   profile: ExternalLibraryProfile,
-  options: { signal?: AbortSignal } = {}
+  options: {
+    paletteContributions: PaletteContributionService;
+    signal?: AbortSignal;
+  }
 ): Promise<ExternalLibraryDiagnostic[]> => {
   if (options.signal?.aborted) return [];
   const descriptor = profile.descriptor();
-  const cacheKey = descriptor.libraryId;
+  const cacheKey = `${options.paletteContributions.workspaceId}\u0000${descriptor.libraryId}`;
   const current = inFlightEnsures.get(cacheKey);
   if (current) return current;
 
@@ -71,6 +75,7 @@ export const ensureExternalLibrary = async (
       );
 
       const paletteDiagnostics = await registerExternalGroups(
+        options.paletteContributions,
         descriptor.libraryId,
         descriptor.version,
         groupsWithManifest
@@ -78,7 +83,10 @@ export const ensureExternalLibrary = async (
       diagnostics.push(...paletteDiagnostics);
       if (paletteDiagnostics.some((item) => item.level === 'error')) {
         diagnostics.push(
-          ...(await unregisterExternalLibraryRuntime(descriptor.libraryId))
+          ...(await unregisterExternalLibraryRuntime(
+            options.paletteContributions,
+            descriptor.libraryId
+          ))
         );
         return diagnostics;
       }
@@ -89,7 +97,10 @@ export const ensureExternalLibrary = async (
         )
       ) {
         diagnostics.push(
-          ...(await unregisterExternalLibraryRuntime(descriptor.libraryId))
+          ...(await unregisterExternalLibraryRuntime(
+            options.paletteContributions,
+            descriptor.libraryId
+          ))
         );
       }
     } catch (error) {

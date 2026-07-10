@@ -9,6 +9,9 @@ const repoRoot = path.resolve(
 );
 const port = Number(process.env.E2E_PORT ?? 4173);
 const baseURL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${port}`;
+const sandboxPort = Number(process.env.E2E_SANDBOX_PORT ?? 4174);
+const sandboxBaseURL =
+  process.env.E2E_SANDBOX_BASE_URL ?? `http://127.0.0.1:${sandboxPort}`;
 const browserChannel = process.env.E2E_BROWSER_CHANNEL;
 
 export default defineConfig({
@@ -23,13 +26,22 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  webServer: {
-    command: `pnpm --filter @prodivix/web build && pnpm --filter @prodivix/web preview --host 127.0.0.1 --port ${port}`,
-    cwd: repoRoot,
-    reuseExistingServer: process.env.CI !== 'true',
-    timeout: 120_000,
-    url: baseURL,
-  },
+  webServer: [
+    {
+      command: `pnpm --filter @prodivix/plugin-sandbox build && pnpm --filter @prodivix/plugin-sandbox preview --host 127.0.0.1 --port ${sandboxPort}`,
+      cwd: repoRoot,
+      reuseExistingServer: process.env.CI !== 'true',
+      timeout: 120_000,
+      url: `${sandboxBaseURL}/runtime-broker.html`,
+    },
+    {
+      command: `pnpm --filter @prodivix/web build && pnpm --filter @prodivix/web preview --host 127.0.0.1 --port ${port}`,
+      cwd: repoRoot,
+      reuseExistingServer: process.env.CI !== 'true',
+      timeout: 120_000,
+      url: baseURL,
+    },
+  ],
   projects: [
     {
       name: 'chromium',

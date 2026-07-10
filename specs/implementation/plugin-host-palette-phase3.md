@@ -4,6 +4,7 @@
 > 完成日期：2026-07-10
 > 对应 ADR：`specs/decisions/29.plugin-extension-points.md`
 > 前置实现：`specs/implementation/plugin-host-core-phase2.md`
+> Phase 4.4 后续状态：Palette contract/resolver 保留，module-scope Host、registry adapter 与 React hook 已迁入 workspace-scoped Web Plugin Platform。
 
 ## 1. 目标
 
@@ -156,7 +157,7 @@ MUI / Ant Design 等现有 profile 继续由 ESM loader 取得真实 React compo
 
 ### 4.3 消费面
 
-`palette/registry.ts` 对 Host reader 建立 revision snapshot 和稳定索引：
+`plugins/platform/paletteQueryService.ts` 对当前 workspace Host reader 建立 revision snapshot 和稳定索引：
 
 - `groups`
 - `itemsById`
@@ -169,24 +170,28 @@ React 使用 `useSyncExternalStore` 订阅 Host batch event。Sidebar 只对 sna
 ```text
 apps/web/src/editor/features/blueprint/palette/
   descriptor.ts
-  host.ts
   index.ts
-  nativeContribution.ts
   projectionResolver.ts
-  registry.ts
   types.ts
-  usePaletteGroups.ts
-  __tests__/paletteHost.test.tsx
+
+apps/web/src/plugins/platform/
+  createWebPluginPlatform.ts
+  createWorkspaceWebPluginPlatform.ts
+  nativeCorePlugin.ts
+  paletteQueryService.ts
+  WebPluginPlatformProvider.tsx
+  __tests__/webPluginPlatform.test.tsx
 ```
 
 职责：
 
 - `descriptor.ts`：从 trusted runtime projection 提取 JSON descriptor。
 - `projectionResolver.ts`：Schema bridge、运行时 hydration、业务 ID claim 和 dispose lease。
-- `host.ts`：web composition root、core trust policy、package source、audit ring buffer 和 per-plugin serialization。
-- `registry.ts`：Host reader 的只读 revision snapshot 与查询索引。
-- `nativeContribution.ts`：`@prodivix/core` 启动注册。
-- `usePaletteGroups.ts`：React external-store adapter。
+- `createWebPluginPlatform.ts`：workspace Host composition、trusted package source、policy、audit 与 cleanup。
+- `createWorkspaceWebPluginPlatform.ts`：Browser adapter、Gateway 与 workspace audit composition。
+- `nativeCorePlugin.ts`：`@prodivix/core` 启动注册。
+- `paletteQueryService.ts`：Host reader 的只读 revision snapshot 与查询索引。
+- `WebPluginPlatformProvider.tsx`：React external-store adapter、query/runtime service injection 与串行 workspace lifecycle。
 
 ## 6. 执行阶段
 
@@ -244,15 +249,15 @@ Phase 3 首个真实扩展点暴露并修正了一个 Host 类型约束问题：
 
 ## 8. Phase 4 输入
 
-Phase 4 的详细实施事实源是 `specs/implementation/plugin-browser-sandbox-phase4.md`。Phase 4.0 已先完成 Manifest point 解耦、verified runtime artifact 与 Host shutdown；后续继续复用当前 typed registry、contract 和 resolver 入口，并新增：
+Phase 4 的详细实施事实源是 `specs/implementation/plugin-browser-sandbox-phase4.md`。Phase 4.0-4.4 已完成 Manifest point 解耦、verified runtime artifact、Host shutdown、protocol、Browser Sandbox、Gateway 与 workspace-scoped Web Plugin Platform；后续继续复用当前 typed registry、contract 和 resolver 入口：
 
-1. transport-neutral sandbox message protocol；
-2. isolated/opaque origin 与严格 CSP；
-3. Host Gateway capability enforcement；
-4. runtime implementation identity binding；
-5. workspace-scoped Web Plugin Platform，替换当前 Palette module singleton；
-6. Ant Design official plugin 试点，再迁移 MUI；
-7. 删除 core 中对应 external profile、manifest、renderer/codegen/icon 专属分支；
-8. Radix 所需 compound template、slot/cardinality 与 portal-safe policy contract。
+1. [x] transport-neutral sandbox message protocol；
+2. [x] isolated/opaque origin 与严格 CSP；
+3. [x] Host Gateway capability enforcement；
+4. [ ] runtime implementation identity binding；
+5. [x] workspace-scoped Web Plugin Platform，替换 Palette module singleton；
+6. [ ] Ant Design official plugin 试点，再迁移 MUI；
+7. [ ] 删除 core 中对应 external profile、manifest、renderer/codegen/icon 专属分支；
+8. [ ] Radix 所需 compound template、slot/cardinality 与 portal-safe policy contract。
 
 Phase 4 不应恢复旧 Blueprint registry，也不应为 official/community plugin 建立第二套 Palette 数据路径。

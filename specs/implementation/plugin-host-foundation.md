@@ -5,7 +5,7 @@
 - Phase 1：Manifest 契约包、validator 与 PLG diagnostics 已完成
 - Phase 2：`@prodivix/plugin-host` Host Core 已完成
 - Phase 3：Palette contract、resolver 与 Blueprint surface 闭环已完成
-- Phase 4.0：Manifest point 解耦、verified runtime artifact port 与 Host shutdown 已完成；Browser Sandbox、Host Gateway 与 official plugin 尚未实现
+- Phase 4.0-4.4：Host ports、versioned protocol、Browser Sandbox、Host Gateway、quota、persistent audit 与 workspace-scoped Web Platform 已完成；implementation binding 与 official plugin 尚未实现
 - 日期：2026-07-10
 - 对应 ADR：`specs/decisions/29.plugin-extension-points.md`
 - 关联 ADR：
@@ -17,7 +17,7 @@
 
 ## Context
 
-`native-catalog-convergence-plan.md` 已完成 ADR 29 的内置侧收敛，`@prodivix/plugin-contracts` 已提供 Plugin Manifest 与 Palette v1 validator，`@prodivix/plugin-host` 已提供 transport-neutral lifecycle、permission、owner-aware registry、transaction、runtime port 与 audit。Phase 3 Palette surface 闭环也已完成；当前缺口是 Browser Sandbox、Host Gateway 与 official plugin 迁移，而不是 Host Core 或 Palette registry。Phase 4 的详细实施事实源是 `specs/implementation/plugin-browser-sandbox-phase4.md`。
+`native-catalog-convergence-plan.md` 已完成 ADR 29 的内置侧收敛，`@prodivix/plugin-contracts`、`@prodivix/plugin-host`、`@prodivix/plugin-protocol` 与 `@prodivix/plugin-browser` 已分别提供 contract、Host Core、wire protocol、Browser Sandbox 与 Gateway。Phase 3 Palette surface 和 Phase 4.0-4.4 安全/平台底座均已完成；当前缺口是 official contribution contracts、implementation binding 与 official plugin 迁移。Phase 4 的详细实施事实源是 `specs/implementation/plugin-browser-sandbox-phase4.md`。
 
 本计划是 ADR 29 的第二份实现文档，覆盖 Phase 1（扩展点契约）和 Phase 2（宿主与注册表）的基础工程，并用 `paletteContribution` 建立第一条端到端闭环。
 
@@ -326,9 +326,10 @@ Palette 被选为第一条闭环，是因为内置与 external profile 原先只
 ### Phase 4：Browser Sandbox
 
 - [x] 按 `plugin-browser-sandbox-phase4.md` 解耦 Manifest point，并实现 verified runtime artifact 与 Host shutdown port。
-- [ ] 定义 transport-neutral sandbox protocol，并实现 opaque/cross-origin broker + Dedicated Worker。
-- [ ] 实现 Capability Host Gateway、quota、persistent audit、runtime implementation binding 与 crash cleanup。
-- [ ] 将 Web 收敛为单一 workspace-scoped Plugin Host，删除 Palette 私有 Host。
+- [x] 定义 transport-neutral sandbox protocol，并实现 opaque/cross-origin broker + Dedicated Worker。
+- [x] 实现 Capability Host Gateway、quota、persistent audit 与 crash cleanup。
+- [x] 将 Web 收敛为单一 workspace-scoped Plugin Host，删除 Palette 私有 Host。
+- [ ] 实现 Host-side runtime implementation binding registry 与 lifecycle proxy invalidation。
 - [ ] 将 Ant Design 迁移为首个 official plugin 并直接删除 core 专属分支。
 - [ ] 用 MUI 验证 contract 可复用性；Radix 在 compound/portal contract 通过后迁移。
 
@@ -360,7 +361,7 @@ Palette 被选为第一条闭环，是因为内置与 external profile 原先只
 - [x] 未授权 contribution 无法写入 registry。
 - [x] 激活失败不残留任何 contribution。
 - [x] 插件停用或 runtime crash 后不残留 Host-owned contribution 或订阅。
-- [ ] Browser Gateway handle cleanup 由 Phase 4 具体 sandbox adapter 验证。
+- [x] Browser Gateway handle cleanup 由 Phase 4 sandbox adapter 与 dispose/abort 测试验证。
 - [x] Registry 不依赖 React、DOM、Blueprint 或具体外部库。
 - [x] Diagnostics 能定位到 plugin id、manifest path、contribution id 和 capability。
 

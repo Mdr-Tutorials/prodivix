@@ -25,6 +25,12 @@ const owner = createPluginOwnerRef(
   'installation-1',
   1
 );
+const attestation = Object.freeze({
+  sourceId: 'test-source',
+  packageDigest: 'sha256-test-package',
+  trustLevel: 'development' as const,
+  publisherVerified: false,
+});
 
 const createManifest = (
   source: PluginManifestV1['contributes'][number]['source']
@@ -165,6 +171,7 @@ describe('contribution preparation', () => {
 
     const prepared = await prepareValidatedContributions({
       owner,
+      attestation,
       manifest,
       permission: createPermission(manifest),
       descriptors: loaded.value,

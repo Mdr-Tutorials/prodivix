@@ -10,6 +10,23 @@
       "outputs": []
     },
     "test": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@prodivix/plugin-contracts#test": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "@prodivix/plugin-host#test": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "@prodivix/plugin-protocol#test": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "@prodivix/plugin-browser#test": {
+      "dependsOn": ["build"],
       "outputs": []
     },
     "dev": {

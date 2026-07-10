@@ -57,6 +57,7 @@ import {
   resolveRouteRuntimeContext,
 } from '@prodivix/shared/router';
 import type { AutosaveMode } from '@/editor/features/blueprint/editor/model/autosave';
+import { usePaletteQueryService } from '@/plugins/platform';
 
 const CAPABILITY_PIR_DOCUMENT_UPDATE = 'core.pir.graph.replace@1.0';
 const CAPABILITY_ROUTE_MANIFEST_UPDATE = 'core.route.manifest.update@1.0';
@@ -128,6 +129,7 @@ type InteractionRequest = {
  * - DnD 结果 -> PIR 树变换 -> 选中态与面板状态同步
  */
 export const useBlueprintEditorController = () => {
+  const palette = usePaletteQueryService();
   const [newPath, setNewPath] = useState('');
   const panelLayout = useSettingsStore((state) => state.global.panelLayout);
   const [isLibraryCollapsed, setLibraryCollapsed] = useState(
@@ -793,7 +795,11 @@ export const useBlueprintEditorController = () => {
     updatePirDoc((doc) => {
       const root = materializePirRoot(doc);
       const createId = createNodeIdFactory(doc);
-      const newNode = createNodeFromPaletteItem(itemId, createId);
+      const newNode = createNodeFromPaletteItem({
+        itemId,
+        createId,
+        palette,
+      });
       nextNodeId = newNode.id;
 
       if (targetId !== root.id) {
@@ -846,6 +852,7 @@ export const useBlueprintEditorController = () => {
     pirDoc,
     currentPath,
     selectedId,
+    palette,
     updatePirDoc,
     onNodeSelect: handleNodeSelect,
   });

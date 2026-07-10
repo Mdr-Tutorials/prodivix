@@ -12,7 +12,13 @@ import type {
   ExternalLibraryDiagnostic,
   ExternalLibraryProfile,
 } from './runtime/types';
+import type { PaletteContributionService } from '@/plugins/platform';
 export type { ExternalLibraryDiagnostic } from './runtime/types';
+
+export type ExternalLibraryRuntimeOptions = Readonly<{
+  paletteContributions: PaletteContributionService;
+  signal?: AbortSignal;
+}>;
 
 const DEFAULT_LIBRARY_IDS: string[] = [];
 const LEGACY_ICON_LIBRARY_IDS = new Set([
@@ -163,7 +169,7 @@ export const getConfiguredExternalLibraries = () =>
 
 export const ensureExternalLibraryById = async (
   libraryId: string,
-  options: { signal?: AbortSignal } = {}
+  options: ExternalLibraryRuntimeOptions
 ): Promise<ExternalLibraryDiagnostic[]> => {
   if (options.signal?.aborted) return [];
   ensureBootstrap();
@@ -192,13 +198,15 @@ export const ensureExternalLibraryById = async (
 };
 
 export const ensureConfiguredExternalLibraries = async (
-  libraryIds: string[] = getConfiguredExternalLibraryIds(),
-  options: { signal?: AbortSignal } = {}
+  libraryIds: string[],
+  options: ExternalLibraryRuntimeOptions
 ): Promise<ExternalLibraryDiagnostic[]> => {
   if (options.signal?.aborted) return [];
   ensureBootstrap();
   if (libraryIds.length === 0) {
-    const cleanupDiagnostics = await clearRegisteredExternalLibraries();
+    const cleanupDiagnostics = await clearRegisteredExternalLibraries(
+      options.paletteContributions
+    );
     setLatestDiagnostics(cleanupDiagnostics);
     Array.from(externalLibraryStateById.keys()).forEach((libraryId) => {
       if (!libraryIds.includes(libraryId)) {
@@ -227,7 +235,9 @@ export const ensureConfiguredExternalLibraries = async (
     emitExternalLibraryStates();
     return diagnostics;
   }
-  const cleanupDiagnostics = await clearRegisteredExternalLibraries();
+  const cleanupDiagnostics = await clearRegisteredExternalLibraries(
+    options.paletteContributions
+  );
   setLoadingState(true);
   try {
     const uniqueIds = [...new Set(libraryIds)];
@@ -250,8 +260,13 @@ export const ensureConfiguredExternalLibraries = async (
   }
 };
 
-export const ensureDefaultExternalLibrary = () =>
-  ensureExternalLibraryById('antd');
+export const clearExternalLibraryRuntime = (
+  paletteContributions: PaletteContributionService
+) => clearRegisteredExternalLibraries(paletteContributions);
+
+export const ensureDefaultExternalLibrary = (
+  options: ExternalLibraryRuntimeOptions
+) => ensureExternalLibraryById('antd', options);
 
 export const getRegisteredExternalLibraryIds = () => {
   ensureBootstrap();
@@ -296,7 +311,7 @@ export const getExternalLibraryStates = () =>
   Array.from(externalLibraryStateById.values());
 export const retryExternalLibraryById = (
   libraryId: string,
-  options: { signal?: AbortSignal } = {}
+  options: ExternalLibraryRuntimeOptions
 ) => ensureExternalLibraryById(libraryId, options);
 
 export const subscribeExternalLibraryDiagnostics = (

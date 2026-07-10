@@ -1,0 +1,48 @@
+{
+  "name": "@prodivix/plugin-protocol",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Transport-neutral strict JSON protocol for Prodivix plugin runtimes",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "imports": {
+    "#protocol/*": {
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "pnpm run clean && pnpm run generate && tsc -p tsconfig.json && node scripts/copy-schema.mjs",
+    "check:generated": "node scripts/generate-protocol.mjs --check",
+    "clean": "node -e \"const fs=require('node:fs'); fs.rmSync('dist',{recursive:true,force:true}); fs.rmSync('tsconfig.tsbuildinfo',{force:true})\"",
+    "generate": "node scripts/generate-protocol.mjs",
+    "test": "pnpm run check:generated && pnpm run typecheck && vitest --config vitest.config.ts --run",
+    "test:watch": "vitest --config vitest.config.ts",
+    "typecheck": "tsc -b tsconfig.test.json --pretty false"
+  },
+  "dependencies": {
+    "@prodivix/plugin-contracts": "workspace:*",
+    "jsonc-parser": "^3.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "ajv": "^8.20.0",
+    "json-schema-to-typescript": "^15.0.4",
+    "prettier": "^3.9.4",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.3",
+    "vitest": "^4.1.9"
+  }
+}

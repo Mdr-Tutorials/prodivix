@@ -4,6 +4,7 @@ import type {
 } from '@prodivix/plugin-contracts';
 import type { PermissionSnapshotReader } from '#host/capability/permissionSnapshot';
 import type { PluginOwnerRef } from '#host/identity';
+import type { PluginPackageAttestation } from '#host/host.types';
 import type { PluginHostResult } from '#host/result';
 import type {
   HostContributionPoint,
@@ -13,6 +14,7 @@ import type {
 
 export type ContributionPrepareContext<TDescriptor> = Readonly<{
   owner: PluginOwnerRef;
+  attestation: PluginPackageAttestation;
   declaration: ContributionDeclaration;
   descriptor: TDescriptor;
   permission: PermissionSnapshotReader;

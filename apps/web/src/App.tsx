@@ -1,5 +1,6 @@
 import { Suspense, lazy, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
+import { Navigate } from 'react-router';
 import './App.scss';
 import Home from './home/Home';
 import { AuthPage } from './auth/AuthPage';
@@ -126,7 +127,7 @@ export const createRoutes = (t: TFunction) => [
       },
       {
         path: 'blueprint',
-        element: withEditorSuspense(<BlueprintEditor />),
+        element: <Navigate to="/editor" replace />,
       },
       {
         path: 'nodegraph',

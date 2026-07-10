@@ -22,7 +22,7 @@ import type { ComponentNode, PIRDocument } from '@prodivix/shared/types/pir';
 import { materializePirRoot } from '@/pir/graph';
 import { createRadixNodeFromPaletteItem } from '@/editor/features/blueprint/editor/model/radix';
 import { buildLayoutPatternNode } from '@/editor/features/blueprint/layoutPatterns';
-import { getPaletteItemById } from '@/editor/features/blueprint/palette';
+import type { PaletteQueryService } from '@/plugins/platform';
 
 const collectTypeCounts = (
   node: ComponentNode,
@@ -167,12 +167,21 @@ const PALETTE_NODE_DEFAULTS: Record<
   pagination: { type: 'PdxPagination', props: { page: 2, total: 50 } },
 };
 
-export const createNodeFromPaletteItem = (
-  itemId: string,
-  createId: (type: string) => string,
-  variantProps?: Record<string, unknown>,
-  selectedSize?: string
-): ComponentNode => {
+export type CreateNodeFromPaletteItemInput = Readonly<{
+  itemId: string;
+  createId: (type: string) => string;
+  palette: PaletteQueryService;
+  variantProps?: Record<string, unknown>;
+  selectedSize?: string;
+}>;
+
+export const createNodeFromPaletteItem = ({
+  itemId,
+  createId,
+  palette,
+  variantProps,
+  selectedSize,
+}: CreateNodeFromPaletteItemInput): ComponentNode => {
   const toPascalCase = (value: string) =>
     value
       .split(/[-_]/)
@@ -198,7 +207,7 @@ export const createNodeFromPaletteItem = (
 
   if (itemId.startsWith('layout-pattern-')) {
     const patternId = itemId.replace('layout-pattern-', '');
-    const registryItem = getPaletteItemById(itemId);
+    const registryItem = palette.getItemById(itemId);
     const patternNode = buildLayoutPatternNode({
       patternId,
       createId,
@@ -422,7 +431,7 @@ export const createNodeFromPaletteItem = (
       ],
     };
   }
-  const registryItem = getPaletteItemById(itemId);
+  const registryItem = palette.getItemById(itemId);
   if (registryItem?.runtimeType) {
     const inferredText = inferDefaultText(registryItem.name);
     return {

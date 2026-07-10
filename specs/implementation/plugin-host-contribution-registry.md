@@ -46,7 +46,7 @@ type WebContributionPointMap = {
 type ContributionContract<
   TMap extends HostContributionPointMap,
   TPoint extends keyof TMap & ContributionPoint,
-  TDescriptor extends JsonValue,
+  TDescriptor,
 > = {
   point: TPoint;
   contractVersion: string;
@@ -104,8 +104,9 @@ resource path 即使已通过 Manifest semantic validation，reader 仍必须限
 ### 4.3 Prepare context
 
 ```ts
-type ContributionPrepareContext<TDescriptor extends JsonValue> = {
+type ContributionPrepareContext<TDescriptor> = {
   owner: PluginOwnerRef;
+  attestation: PluginPackageAttestation;
   declaration: ContributionDeclaration;
   descriptor: TDescriptor;
   permission: PermissionSnapshotReader;
@@ -113,6 +114,8 @@ type ContributionPrepareContext<TDescriptor extends JsonValue> = {
   signal: AbortSignal;
 };
 ```
+
+`attestation` 是安装层验证后传入的只读 package identity，至少包含 `sourceId`、`packageDigest`、`trustLevel` 与 `publisherVerified`。需要绑定宿主 runtime projection 或 build-time implementation 的 resolver 必须同时使用 package attestation 与 contribution identity，不能只按 `pluginId/contributionId` 查询 module-scope side channel；否则并发 generation replacement 可能读取另一 package 的实现。
 
 Prepare context 不暴露：
 

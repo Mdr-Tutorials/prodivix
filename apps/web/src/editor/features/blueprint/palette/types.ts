@@ -6,10 +6,6 @@ export type ResolvedPaletteContribution = Readonly<{
   groups: readonly ComponentGroup[];
 }>;
 
-export type BlueprintContributionPointMap = {
-  paletteContribution: ResolvedPaletteContribution;
-};
-
 export type PaletteRuntimeProjection = Readonly<{
   groups: readonly ComponentGroup[];
 }>;

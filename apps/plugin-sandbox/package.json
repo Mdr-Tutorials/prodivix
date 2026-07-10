@@ -1,0 +1,16 @@
+{
+  "name": "@prodivix/plugin-sandbox",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Dedicated no-cookie static origin for Prodivix plugin runtime and UI sandboxes",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "pnpm run build && node scripts/serve.mjs --port 4174",
+    "preview": "node scripts/serve.mjs",
+    "test": "node scripts/check-dist-policy.mjs --source-only"
+  },
+  "devDependencies": {
+    "vite": "^8.1.3"
+  }
+}

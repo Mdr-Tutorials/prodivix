@@ -29,7 +29,7 @@ import {
   isLayoutPatternRootNode,
 } from '@/editor/features/blueprint/layoutPatterns/dataAttributes';
 import { getExternalRuntimeMetaByType } from '@/editor/features/blueprint/external/runtime/metaStore';
-import { usePaletteRegistrySnapshot } from '@/editor/features/blueprint/palette';
+import { usePaletteRegistrySnapshot } from '@/plugins/platform';
 import { resolveInspectorPanels } from '@/editor/features/blueprint/editor/inspector/panels/registry';
 import {
   createMountedCssDocumentId,

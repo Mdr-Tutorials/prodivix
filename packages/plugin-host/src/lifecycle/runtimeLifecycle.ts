@@ -90,6 +90,7 @@ export const createRuntimeLifecycle = <TMap extends HostContributionPointMap>(
     );
     const prepared = await prepareValidatedContributions({
       owner: record.owner,
+      attestation: record.source.attestation,
       manifest: record.manifest,
       permission: record.permission,
       descriptors,
@@ -374,6 +375,9 @@ export const createRuntimeLifecycle = <TMap extends HostContributionPointMap>(
               isCapabilityGranted(current.permission, capability)
             );
           },
+          subscribe: (
+            listener: Parameters<typeof context.subscribePermission>[1]
+          ) => context.subscribePermission(record.owner, listener),
         });
         const scopedTransaction = createScopedContributionTransaction({
           transaction,

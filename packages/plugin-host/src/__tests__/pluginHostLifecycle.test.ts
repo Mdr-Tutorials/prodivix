@@ -7,6 +7,7 @@ import {
 } from '@prodivix/plugin-contracts';
 import type { PluginAuditEvent } from '#host/audit/audit.types';
 import { resolvePermissionSnapshot } from '#host/capability/permissionResolution';
+import type { PermissionSnapshot } from '#host/capability/permissionSnapshot';
 import { defineContributionContract } from '#host/contribution/contributionContract';
 import { createPluginHost } from '#host/lifecycle/createPluginHost';
 import type { PluginPackageSource } from '#host/host.types';
@@ -128,6 +129,8 @@ type RuntimeControl = {
   mode: 'success' | 'failure' | 'pending';
   pendingResolve?: (result: PluginHostResult<PluginRuntimeSession>) => void;
   terminate?: (reasonCode: string) => void;
+  permissionNotifications: Array<PermissionSnapshot | undefined>;
+  disposePermissionSubscription?: () => void;
 };
 
 const createRuntimeControl = (): RuntimeControl => ({
@@ -137,6 +140,7 @@ const createRuntimeControl = (): RuntimeControl => ({
   disposedRuntimeContributionCount: 0,
   deactivationFails: false,
   mode: 'success',
+  permissionNotifications: [],
 });
 
 const createSession = (
@@ -149,6 +153,8 @@ const createSession = (
     terminationListener?.({ sessionToken, reasonCode });
   return {
     deactivate: async (reason) => {
+      control.disposePermissionSubscription?.();
+      control.disposePermissionSubscription = undefined;
       control.deactivationCount += 1;
       control.deactivationReasons.push(reason);
       if (control.deactivationFails) {
@@ -259,6 +265,11 @@ const createHarness = (
             }
           );
         }
+        const permissionSubscription = input.permission.subscribe((snapshot) =>
+          control.permissionNotifications.push(snapshot)
+        );
+        control.disposePermissionSubscription = () =>
+          permissionSubscription.dispose();
         return pluginHostSuccess(createSession(control, input.sessionToken));
       },
     },
@@ -685,6 +696,11 @@ describe('Plugin Host lifecycle', () => {
     expect(reconciled.value.runtime).toBe('inactive');
     expect(harness.host.contributions.list('paletteContribution')).toEqual([]);
     expect(harness.control.deactivationCount).toBe(1);
+    expect(
+      harness.control.permissionNotifications.map(
+        (snapshot) => snapshot?.permissionRevision
+      )
+    ).toEqual([2]);
   });
 
   it('revokes an optional registration capability without blocking runtime', async () => {
@@ -703,6 +719,11 @@ describe('Plugin Host lifecycle', () => {
     expect(reconciled.value.runtime).toBe('active');
     expect(harness.host.contributions.list('paletteContribution')).toEqual([]);
     expect(harness.control.deactivationCount).toBe(0);
+    expect(
+      harness.control.permissionNotifications.map(
+        (snapshot) => snapshot?.permissionRevision
+      )
+    ).toEqual([2]);
   });
 
   it('handles current-session transport termination without removing static contributions', async () => {

@@ -14,7 +14,13 @@
       "path": "./packages/plugin-contracts"
     },
     {
+      "path": "./packages/plugin-protocol"
+    },
+    {
       "path": "./packages/plugin-host"
+    },
+    {
+      "path": "./packages/plugin-browser"
     },
     {
       "path": "./packages/ui"

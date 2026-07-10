@@ -26,11 +26,9 @@
   "scripts": {
     "build": "pnpm run clean && tsc -p tsconfig.json",
     "clean": "node -e \"const fs=require('node:fs'); fs.rmSync('dist',{recursive:true,force:true}); fs.rmSync('tsconfig.tsbuildinfo',{force:true})\"",
-    "pretest": "pnpm --filter @prodivix/plugin-contracts build",
     "test": "pnpm run typecheck && vitest --config vitest.config.ts --run",
-    "pretest:watch": "pnpm --filter @prodivix/plugin-contracts build",
     "test:watch": "vitest --config vitest.config.ts",
-    "typecheck": "tsc -p tsconfig.test.json"
+    "typecheck": "tsc -b tsconfig.test.json --pretty false"
   },
   "dependencies": {
     "@prodivix/plugin-contracts": "workspace:*"

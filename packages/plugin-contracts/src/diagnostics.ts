@@ -41,6 +41,32 @@ export const PLUGIN_DIAGNOSTIC_CODES = {
   RUNTIME_ARTIFACT_READ_FAILED: 'PLG-4010',
   RUNTIME_ARTIFACT_INTEGRITY_MISMATCH: 'PLG-4011',
   RUNTIME_ARTIFACT_LIMIT: 'PLG-4012',
+  SANDBOX_BOOTSTRAP_FAILED: 'PLG-4013',
+  SANDBOX_HANDSHAKE_FAILED: 'PLG-4014',
+  SANDBOX_POLICY_INVALID: 'PLG-4015',
+  MALFORMED_PROTOCOL_MESSAGE: 'PLG-4020',
+  UNKNOWN_PROTOCOL_CONTRACT: 'PLG-4021',
+  PROTOCOL_SEQUENCE_VIOLATION: 'PLG-4022',
+  PROTOCOL_CORRELATION_VIOLATION: 'PLG-4023',
+  LATE_PROTOCOL_RESPONSE: 'PLG-4024',
+  PROTOCOL_REQUEST_TIMEOUT: 'PLG-4025',
+  PROTOCOL_SESSION_CLOSED: 'PLG-4026',
+  GATEWAY_CAPABILITY_NOT_REQUESTED: 'PLG-4030',
+  GATEWAY_CAPABILITY_DENIED: 'PLG-4031',
+  GATEWAY_REQUEST_INVALID: 'PLG-4032',
+  GATEWAY_RESPONSE_INVALID: 'PLG-4033',
+  GATEWAY_HANDLER_UNAVAILABLE: 'PLG-4034',
+  GATEWAY_REQUEST_TIMEOUT: 'PLG-4035',
+  GATEWAY_SESSION_STALE: 'PLG-4036',
+  GATEWAY_HANDLER_FAILED: 'PLG-4037',
+  GATEWAY_NETWORK_POLICY_DENIED: 'PLG-4038',
+  GATEWAY_REQUEST_ABORTED: 'PLG-4039',
+  SANDBOX_MESSAGE_QUOTA_EXCEEDED: 'PLG-4040',
+  SANDBOX_HEARTBEAT_TIMEOUT: 'PLG-4041',
+  SANDBOX_TERMINATED: 'PLG-4042',
+  GATEWAY_QUOTA_EXCEEDED: 'PLG-4043',
+  GATEWAY_AUDIT_UNAVAILABLE: 'PLG-4060',
+  GATEWAY_AUDIT_WRITE_FAILED: 'PLG-4061',
 } as const;
 
 export type PluginDiagnosticCode =
@@ -55,6 +81,11 @@ export type PluginDiagnosticStage =
   | 'permission'
   | 'registry'
   | 'runtime'
+  | 'protocol'
+  | 'gateway'
+  | 'network'
+  | 'sandbox'
+  | 'quota'
   | 'cleanup'
   | 'audit';
 
@@ -353,6 +384,152 @@ export const PLUGIN_DIAGNOSTIC_DEFINITIONS = {
     PLUGIN_DIAGNOSTIC_CODES.RUNTIME_ARTIFACT_LIMIT,
     'runtime',
     'Reduce the self-contained runtime artifact below the Host byte limit.'
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.SANDBOX_BOOTSTRAP_FAILED]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.SANDBOX_BOOTSTRAP_FAILED,
+    'sandbox',
+    'Restore the dedicated sandbox origin and retry runtime startup.',
+    { retryable: true }
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.SANDBOX_HANDSHAKE_FAILED]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.SANDBOX_HANDSHAKE_FAILED,
+    'sandbox',
+    'Restart the runtime using an exact supported protocol and verified bootstrap.'
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.SANDBOX_POLICY_INVALID]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.SANDBOX_POLICY_INVALID,
+    'sandbox',
+    'Use the dedicated no-cookie sandbox origin with the required iframe and response policies.'
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.MALFORMED_PROTOCOL_MESSAGE]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.MALFORMED_PROTOCOL_MESSAGE,
+    'protocol',
+    'Send a bounded strict JSON message that satisfies Runtime Envelope v1.'
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.UNKNOWN_PROTOCOL_CONTRACT]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.UNKNOWN_PROTOCOL_CONTRACT,
+    'protocol',
+    'Use an exact channel, method, direction, and contract version registered by the Host.'
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.PROTOCOL_SEQUENCE_VIOLATION]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.PROTOCOL_SEQUENCE_VIOLATION,
+    'protocol',
+    'Restart the isolated runtime with a fresh monotonically sequenced channel.'
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.PROTOCOL_CORRELATION_VIOLATION]:
+    definePluginDiagnostic(
+      PLUGIN_DIAGNOSTIC_CODES.PROTOCOL_CORRELATION_VIOLATION,
+      'protocol',
+      'Reply exactly once to a pending request using its bound identity.'
+    ),
+  [PLUGIN_DIAGNOSTIC_CODES.LATE_PROTOCOL_RESPONSE]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.LATE_PROTOCOL_RESPONSE,
+    'protocol',
+    'Discard the late response and keep the canceled request closed.',
+    { severity: 'warning' }
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.PROTOCOL_REQUEST_TIMEOUT]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.PROTOCOL_REQUEST_TIMEOUT,
+    'protocol',
+    'Retry the request only while the bound runtime session remains active.',
+    { retryable: true }
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.PROTOCOL_SESSION_CLOSED]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.PROTOCOL_SESSION_CLOSED,
+    'protocol',
+    'Restart the plugin runtime before sending another protocol message.',
+    { retryable: true }
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.GATEWAY_CAPABILITY_NOT_REQUESTED]:
+    definePluginDiagnostic(
+      PLUGIN_DIAGNOSTIC_CODES.GATEWAY_CAPABILITY_NOT_REQUESTED,
+      'permission',
+      'Declare the exact capability id and scope in the Plugin Manifest before invoking this Gateway method.'
+    ),
+  [PLUGIN_DIAGNOSTIC_CODES.GATEWAY_CAPABILITY_DENIED]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.GATEWAY_CAPABILITY_DENIED,
+    'permission',
+    'Request permission through the Host before retrying the Gateway call.'
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.GATEWAY_REQUEST_INVALID]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.GATEWAY_REQUEST_INVALID,
+    'gateway',
+    'Send a bounded request that satisfies the exact Gateway method contract.'
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.GATEWAY_RESPONSE_INVALID]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.GATEWAY_RESPONSE_INVALID,
+    'gateway',
+    'Fix the Host handler so it returns the exact versioned Gateway response contract.'
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.GATEWAY_HANDLER_UNAVAILABLE]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.GATEWAY_HANDLER_UNAVAILABLE,
+    'gateway',
+    'Register the exact frozen Gateway method and service port before activating the plugin.',
+    { retryable: true }
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.GATEWAY_REQUEST_TIMEOUT]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.GATEWAY_REQUEST_TIMEOUT,
+    'gateway',
+    'Retry only while the bound plugin session and capability grant remain active.',
+    { retryable: true }
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.GATEWAY_SESSION_STALE]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.GATEWAY_SESSION_STALE,
+    'gateway',
+    'Restart the call from the current plugin generation and permission snapshot.'
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.GATEWAY_HANDLER_FAILED]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.GATEWAY_HANDLER_FAILED,
+    'gateway',
+    'Inspect the Host service and retry only when the operation is known to be safe.',
+    { retryable: true }
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.GATEWAY_NETWORK_POLICY_DENIED]:
+    definePluginDiagnostic(
+      PLUGIN_DIAGNOSTIC_CODES.GATEWAY_NETWORK_POLICY_DENIED,
+      'network',
+      'Use an HTTPS target, method, path, headers, and redirect allowed by the bound Host network scope.'
+    ),
+  [PLUGIN_DIAGNOSTIC_CODES.GATEWAY_REQUEST_ABORTED]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.GATEWAY_REQUEST_ABORTED,
+    'gateway',
+    'Restart the call only from an active session when the previous effect is known not to have completed.',
+    { retryable: true }
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.SANDBOX_MESSAGE_QUOTA_EXCEEDED]:
+    definePluginDiagnostic(
+      PLUGIN_DIAGNOSTIC_CODES.SANDBOX_MESSAGE_QUOTA_EXCEEDED,
+      'quota',
+      'Reduce runtime message frequency or restart the terminated plugin session.'
+    ),
+  [PLUGIN_DIAGNOSTIC_CODES.SANDBOX_HEARTBEAT_TIMEOUT]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.SANDBOX_HEARTBEAT_TIMEOUT,
+    'quota',
+    'Inspect the unresponsive runtime before retrying activation.',
+    { retryable: true }
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.SANDBOX_TERMINATED]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.SANDBOX_TERMINATED,
+    'sandbox',
+    'Inspect the stable termination reason before restarting the isolated runtime.',
+    { retryable: true }
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.GATEWAY_QUOTA_EXCEEDED]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.GATEWAY_QUOTA_EXCEEDED,
+    'quota',
+    'Reduce Gateway request rate or concurrency before retrying.'
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.GATEWAY_AUDIT_UNAVAILABLE]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.GATEWAY_AUDIT_UNAVAILABLE,
+    'audit',
+    'Restore durable Host audit storage before retrying the sensitive Gateway operation.',
+    { retryable: true }
+  ),
+  [PLUGIN_DIAGNOSTIC_CODES.GATEWAY_AUDIT_WRITE_FAILED]: definePluginDiagnostic(
+    PLUGIN_DIAGNOSTIC_CODES.GATEWAY_AUDIT_WRITE_FAILED,
+    'audit',
+    'Restore persistent audit storage and inspect its bounded retention policy.',
+    { severity: 'warning', retryable: true }
   ),
 } satisfies Record<PluginDiagnosticCode, PluginDiagnosticDefinition>;
 

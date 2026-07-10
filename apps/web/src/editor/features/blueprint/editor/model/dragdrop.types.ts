@@ -1,4 +1,5 @@
 import type { PIRDocument } from '@prodivix/shared/types/pir';
+import type { PaletteQueryService } from '@/plugins/platform';
 import type { TreeDropPlacement } from '@/editor/features/blueprint/editor/model/tree';
 
 export type TreeDropHint = {
@@ -53,6 +54,7 @@ export type UseBlueprintDragDropOptions = {
   pirDoc: PIRDocument;
   currentPath: string;
   selectedId?: string;
+  palette: PaletteQueryService;
   updatePirDoc: (updater: (doc: PIRDocument) => PIRDocument) => void;
   onNodeSelect: (nodeId: string) => void;
 };

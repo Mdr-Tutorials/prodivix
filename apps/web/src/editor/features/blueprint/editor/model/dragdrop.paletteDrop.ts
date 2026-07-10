@@ -11,6 +11,7 @@ import {
 } from '@/editor/features/blueprint/editor/model/tree';
 import type { ComponentNode, PIRDocument } from '@prodivix/shared/types/pir';
 import { materializePirRoot, normalizeTreeToUiGraph } from '@/pir/graph';
+import type { PaletteQueryService } from '@/plugins/platform';
 import type { DragOverData, PaletteItemDragData } from './dragdrop.types';
 
 export type PaletteDropResult = {
@@ -25,6 +26,7 @@ export const applyPaletteItemDrop = (
   context: {
     currentPath: string;
     selectedId?: string;
+    palette: PaletteQueryService;
   }
 ): PaletteDropResult => {
   const itemId = String(data.itemId);
@@ -40,12 +42,13 @@ export const applyPaletteItemDrop = (
     (dropKind === 'canvas' ? (context.selectedId ?? 'root') : 'root');
 
   const createId = createNodeIdFactory(doc);
-  const newNode = createNodeFromPaletteItem(
+  const newNode = createNodeFromPaletteItem({
     itemId,
     createId,
+    palette: context.palette,
     variantProps,
-    selectedSize
-  );
+    selectedSize,
+  });
   let nextNodeId = newNode.id;
 
   if (dropNodeId) {

@@ -8,11 +8,14 @@ import { externalLibraryConfigUpdatedEvent } from '@/editor/features/blueprint/e
 import { isAbortError } from '@/infra/api';
 import { useEditorStore } from '@/editor/store/useEditorStore';
 import { buildExternalLibrariesValueFromWorkspace } from '@/editor/features/resources/workspaceExternalLibraries';
+import { useWebPluginRuntimeServices } from '@/plugins/platform';
 
 type RetryExternalLibrary = (libraryId: string) => Promise<void>;
 type ExternalModule = typeof import('@/editor/features/blueprint/external');
 
 export const useExternalLibraryRuntime = () => {
+  const { paletteContributions, registerCleanup } =
+    useWebPluginRuntimeServices();
   const workspaceDocumentsById = useEditorStore(
     (state) => state.workspaceDocumentsById
   );
@@ -67,7 +70,9 @@ export const useExternalLibraryRuntime = () => {
       try {
         await mod.ensureConfiguredExternalLibraries(
           libraryIds,
-          controller ? { signal: controller.signal } : {}
+          controller
+            ? { paletteContributions, signal: controller.signal }
+            : { paletteContributions }
         );
       } finally {
         if (reloadControllerRef.current === controller) {
@@ -97,10 +102,15 @@ export const useExternalLibraryRuntime = () => {
     let unsubscribeDiagnostics: (() => void) | undefined;
     let unsubscribeLoading: (() => void) | undefined;
     let unsubscribeStates: (() => void) | undefined;
+    let workspaceCleanup: ReturnType<typeof registerCleanup> | undefined;
 
     void import('@/editor/features/blueprint/external')
       .then((mod) => {
+        if (disposed) return;
         externalModuleRef.current = mod;
+        workspaceCleanup = registerCleanup(async () => {
+          await mod.clearExternalLibraryRuntime(paletteContributions);
+        });
         unsubscribeDiagnostics = mod.subscribeExternalLibraryDiagnostics(
           (diagnostics) => {
             if (disposed) return;
@@ -118,7 +128,9 @@ export const useExternalLibraryRuntime = () => {
           setExternalLibraryStates(states);
         });
         setRetryExternalLibrary(() => async (libraryId: string) => {
-          await mod.retryExternalLibraryById(libraryId);
+          await mod.retryExternalLibraryById(libraryId, {
+            paletteContributions,
+          });
         });
         const libraryIds = getConfiguredLibraryIds(mod);
         setExternalLibraryOptions(getConfiguredLibraryOptions(mod));
@@ -131,7 +143,9 @@ export const useExternalLibraryRuntime = () => {
         void mod
           .ensureConfiguredExternalLibraries(
             libraryIds,
-            controller ? { signal: controller.signal } : {}
+            controller
+              ? { paletteContributions, signal: controller.signal }
+              : { paletteContributions }
           )
           .catch((error) => {
             if (isAbortError(error)) return;
@@ -156,8 +170,25 @@ export const useExternalLibraryRuntime = () => {
       unsubscribeDiagnostics?.();
       unsubscribeLoading?.();
       unsubscribeStates?.();
+      if (workspaceCleanup) {
+        const cleanup = workspaceCleanup;
+        void cleanup
+          .run()
+          .catch((error) => {
+            console.warn(
+              '[blueprint] failed to clear workspace external runtime',
+              error
+            );
+          })
+          .finally(() => cleanup.dispose());
+      }
     };
-  }, [getConfiguredLibraryIds, getConfiguredLibraryOptions]);
+  }, [
+    getConfiguredLibraryIds,
+    getConfiguredLibraryOptions,
+    paletteContributions,
+    registerCleanup,
+  ]);
 
   useEffect(() => {
     const handleConfigUpdated = (event: Event) => {
@@ -182,7 +213,9 @@ export const useExternalLibraryRuntime = () => {
         void externalModuleRef.current
           .ensureConfiguredExternalLibraries(
             nextIds,
-            controller ? { signal: controller.signal } : {}
+            controller
+              ? { paletteContributions, signal: controller.signal }
+              : { paletteContributions }
           )
           .catch((error) => {
             if (isAbortError(error)) return;
@@ -215,7 +248,7 @@ export const useExternalLibraryRuntime = () => {
         handleConfigUpdated
       );
     };
-  }, [getConfiguredLibraryOptions]);
+  }, [getConfiguredLibraryOptions, paletteContributions]);
 
   return {
     externalDiagnostics,

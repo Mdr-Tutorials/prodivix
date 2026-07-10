@@ -1,0 +1,527 @@
+/**
+ * Generated from specs/plugins/runtime/gateway-envelope-v1.schema.json.
+ * DO NOT EDIT. Run `pnpm --filter @prodivix/plugin-protocol generate`.
+ */
+
+export const GATEWAY_ENVELOPE_V1_SCHEMA_ID =
+  'https://prodivix.dev/schemas/gateway-envelope-v1.schema.json';
+export const GATEWAY_ENVELOPE_V1_SCHEMA_VERSION = '1.0';
+export const GATEWAY_ENVELOPE_V1_SCHEMA: object = {
+  $schema: 'https://json-schema.org/draft/2020-12/schema',
+  $id: 'https://prodivix.dev/schemas/gateway-envelope-v1.schema.json',
+  title: 'GatewayContractMessageV1',
+  description: 'Phase 4 capability-scoped Host Gateway payload contracts.',
+  'x-prodivix-contract-version': '1.0',
+  oneOf: [
+    { $ref: '#/$defs/healthPingRequest' },
+    { $ref: '#/$defs/healthPingResponse' },
+    { $ref: '#/$defs/telemetryEmitRequest' },
+    { $ref: '#/$defs/telemetryEmitResponse' },
+    { $ref: '#/$defs/workspaceReadSummaryRequest' },
+    { $ref: '#/$defs/workspaceReadSummaryResponse' },
+    { $ref: '#/$defs/workspaceDispatchIntentRequest' },
+    { $ref: '#/$defs/workspaceDispatchIntentResponse' },
+    { $ref: '#/$defs/documentReadRequest' },
+    { $ref: '#/$defs/documentReadResponse' },
+    { $ref: '#/$defs/documentApplyPatchRequest' },
+    { $ref: '#/$defs/documentApplyPatchResponse' },
+    { $ref: '#/$defs/networkRequestRequest' },
+    { $ref: '#/$defs/networkRequestResponse' },
+  ],
+  $defs: {
+    contractMessage: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['kind', 'method', 'contractVersion', 'payload'],
+      properties: {
+        kind: { enum: ['request', 'response'] },
+        method: { type: 'string' },
+        contractVersion: { const: '1.0' },
+        payload: true,
+      },
+    },
+    scope: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 160,
+      pattern: '^[a-z0-9*]+(?:[._/:-][a-z0-9*]+)*$',
+    },
+    revision: { type: 'integer', minimum: 0, maximum: 9007199254740991 },
+    stringMap: {
+      type: 'object',
+      maxProperties: 32,
+      propertyNames: { minLength: 1, maxLength: 96 },
+      additionalProperties: { type: 'string', maxLength: 4096 },
+    },
+    safeDiagnostic: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['code', 'message'],
+      properties: {
+        code: { type: 'string', pattern: '^[A-Z]+-[0-9]{4}$' },
+        message: { type: 'string', minLength: 1, maxLength: 512 },
+        meta: {
+          type: 'object',
+          maxProperties: 16,
+          additionalProperties: {
+            type: ['null', 'boolean', 'number', 'string'],
+          },
+        },
+      },
+    },
+    gatewayFailure: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['ok', 'diagnostics'],
+      properties: {
+        ok: { const: false },
+        diagnostics: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 16,
+          items: { $ref: '#/$defs/safeDiagnostic' },
+        },
+      },
+    },
+    healthPingRequest: {
+      allOf: [
+        { $ref: '#/$defs/contractMessage' },
+        {
+          properties: {
+            kind: { const: 'request' },
+            method: { const: 'runtime.health/ping' },
+            payload: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['nonce'],
+              properties: {
+                nonce: { type: 'string', minLength: 1, maxLength: 128 },
+              },
+            },
+          },
+        },
+      ],
+    },
+    healthPingResponse: {
+      allOf: [
+        { $ref: '#/$defs/contractMessage' },
+        {
+          properties: {
+            kind: { const: 'response' },
+            method: { const: 'runtime.health/ping' },
+            payload: {
+              oneOf: [
+                {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['ok', 'result'],
+                  properties: {
+                    ok: { const: true },
+                    result: {
+                      type: 'object',
+                      additionalProperties: false,
+                      required: ['nonce'],
+                      properties: {
+                        nonce: { type: 'string', minLength: 1, maxLength: 128 },
+                      },
+                    },
+                  },
+                },
+                { $ref: '#/$defs/gatewayFailure' },
+              ],
+            },
+          },
+        },
+      ],
+    },
+    telemetryEmitRequest: {
+      allOf: [
+        { $ref: '#/$defs/contractMessage' },
+        {
+          properties: {
+            kind: { const: 'request' },
+            method: { const: 'telemetry/emit' },
+            payload: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['name', 'level'],
+              properties: {
+                name: {
+                  type: 'string',
+                  minLength: 1,
+                  maxLength: 96,
+                  pattern: '^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$',
+                },
+                level: { enum: ['debug', 'info', 'warning', 'error'] },
+                attributes: { $ref: '#/$defs/stringMap' },
+              },
+            },
+          },
+        },
+      ],
+    },
+    telemetryEmitResponse: {
+      allOf: [
+        { $ref: '#/$defs/contractMessage' },
+        {
+          properties: {
+            kind: { const: 'response' },
+            method: { const: 'telemetry/emit' },
+            payload: {
+              oneOf: [
+                {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['ok', 'result'],
+                  properties: {
+                    ok: { const: true },
+                    result: {
+                      type: 'object',
+                      additionalProperties: false,
+                      required: ['accepted'],
+                      properties: { accepted: { const: true } },
+                    },
+                  },
+                },
+                { $ref: '#/$defs/gatewayFailure' },
+              ],
+            },
+          },
+        },
+      ],
+    },
+    workspaceReadSummaryRequest: {
+      allOf: [
+        { $ref: '#/$defs/contractMessage' },
+        {
+          properties: {
+            kind: { const: 'request' },
+            method: { const: 'workspace/read-summary' },
+            payload: {
+              type: 'object',
+              additionalProperties: false,
+              maxProperties: 0,
+            },
+          },
+        },
+      ],
+    },
+    workspaceReadSummaryResponse: {
+      allOf: [
+        { $ref: '#/$defs/contractMessage' },
+        {
+          properties: {
+            kind: { const: 'response' },
+            method: { const: 'workspace/read-summary' },
+            payload: {
+              oneOf: [
+                {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['ok', 'result'],
+                  properties: {
+                    ok: { const: true },
+                    result: {
+                      type: 'object',
+                      additionalProperties: false,
+                      required: [
+                        'workspaceId',
+                        'revision',
+                        'documentCount',
+                        'routeCount',
+                        'componentCount',
+                      ],
+                      properties: {
+                        workspaceId: {
+                          type: 'string',
+                          minLength: 1,
+                          maxLength: 256,
+                        },
+                        revision: { $ref: '#/$defs/revision' },
+                        documentCount: {
+                          type: 'integer',
+                          minimum: 0,
+                          maximum: 1000000,
+                        },
+                        routeCount: {
+                          type: 'integer',
+                          minimum: 0,
+                          maximum: 1000000,
+                        },
+                        componentCount: {
+                          type: 'integer',
+                          minimum: 0,
+                          maximum: 1000000,
+                        },
+                      },
+                    },
+                  },
+                },
+                { $ref: '#/$defs/gatewayFailure' },
+              ],
+            },
+          },
+        },
+      ],
+    },
+    workspaceDispatchIntentRequest: {
+      allOf: [
+        { $ref: '#/$defs/contractMessage' },
+        {
+          properties: {
+            kind: { const: 'request' },
+            method: { const: 'workspace/dispatch-intent' },
+            payload: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['intentId', 'payload'],
+              properties: {
+                intentId: {
+                  type: 'string',
+                  minLength: 1,
+                  maxLength: 128,
+                  pattern: '^[a-z][A-Za-z0-9]*(?:[._-][A-Za-z0-9]+)*$',
+                },
+                payload: {
+                  $ref: 'runtime-envelope-v1.schema.json#/$defs/jsonValue',
+                },
+                expectedRevision: { $ref: '#/$defs/revision' },
+              },
+            },
+          },
+        },
+      ],
+    },
+    workspaceDispatchIntentResponse: {
+      allOf: [
+        { $ref: '#/$defs/contractMessage' },
+        {
+          properties: {
+            kind: { const: 'response' },
+            method: { const: 'workspace/dispatch-intent' },
+            payload: {
+              oneOf: [
+                {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['ok', 'result'],
+                  properties: {
+                    ok: { const: true },
+                    result: {
+                      type: 'object',
+                      additionalProperties: false,
+                      required: ['accepted', 'operationId', 'revision'],
+                      properties: {
+                        accepted: { const: true },
+                        operationId: {
+                          type: 'string',
+                          minLength: 1,
+                          maxLength: 128,
+                        },
+                        revision: { $ref: '#/$defs/revision' },
+                      },
+                    },
+                  },
+                },
+                { $ref: '#/$defs/gatewayFailure' },
+              ],
+            },
+          },
+        },
+      ],
+    },
+    documentReadRequest: {
+      allOf: [
+        { $ref: '#/$defs/contractMessage' },
+        {
+          properties: {
+            kind: { const: 'request' },
+            method: { const: 'document/read' },
+            payload: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['documentId', 'scope'],
+              properties: {
+                documentId: { type: 'string', minLength: 1, maxLength: 256 },
+                scope: { $ref: '#/$defs/scope' },
+              },
+            },
+          },
+        },
+      ],
+    },
+    documentReadResponse: {
+      allOf: [
+        { $ref: '#/$defs/contractMessage' },
+        {
+          properties: {
+            kind: { const: 'response' },
+            method: { const: 'document/read' },
+            payload: {
+              oneOf: [
+                {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['ok', 'result'],
+                  properties: {
+                    ok: { const: true },
+                    result: {
+                      type: 'object',
+                      additionalProperties: false,
+                      required: ['documentId', 'revision', 'content'],
+                      properties: {
+                        documentId: {
+                          type: 'string',
+                          minLength: 1,
+                          maxLength: 256,
+                        },
+                        revision: { $ref: '#/$defs/revision' },
+                        content: {
+                          $ref: 'runtime-envelope-v1.schema.json#/$defs/jsonValue',
+                        },
+                      },
+                    },
+                  },
+                },
+                { $ref: '#/$defs/gatewayFailure' },
+              ],
+            },
+          },
+        },
+      ],
+    },
+    documentApplyPatchRequest: {
+      allOf: [
+        { $ref: '#/$defs/contractMessage' },
+        {
+          properties: {
+            kind: { const: 'request' },
+            method: { const: 'document/apply-patch' },
+            payload: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['documentId', 'scope', 'baseRevision', 'patch'],
+              properties: {
+                documentId: { type: 'string', minLength: 1, maxLength: 256 },
+                scope: { $ref: '#/$defs/scope' },
+                baseRevision: { $ref: '#/$defs/revision' },
+                patch: {
+                  $ref: 'runtime-envelope-v1.schema.json#/$defs/jsonValue',
+                },
+              },
+            },
+          },
+        },
+      ],
+    },
+    documentApplyPatchResponse: {
+      allOf: [
+        { $ref: '#/$defs/contractMessage' },
+        {
+          properties: {
+            kind: { const: 'response' },
+            method: { const: 'document/apply-patch' },
+            payload: {
+              oneOf: [
+                {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['ok', 'result'],
+                  properties: {
+                    ok: { const: true },
+                    result: {
+                      type: 'object',
+                      additionalProperties: false,
+                      required: ['documentId', 'revision', 'applied'],
+                      properties: {
+                        documentId: {
+                          type: 'string',
+                          minLength: 1,
+                          maxLength: 256,
+                        },
+                        revision: { $ref: '#/$defs/revision' },
+                        applied: { const: true },
+                      },
+                    },
+                  },
+                },
+                { $ref: '#/$defs/gatewayFailure' },
+              ],
+            },
+          },
+        },
+      ],
+    },
+    networkRequestRequest: {
+      allOf: [
+        { $ref: '#/$defs/contractMessage' },
+        {
+          properties: {
+            kind: { const: 'request' },
+            method: { const: 'network/request' },
+            payload: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['scope', 'url', 'method'],
+              properties: {
+                scope: { $ref: '#/$defs/scope' },
+                url: { type: 'string', minLength: 1, maxLength: 2048 },
+                method: { enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] },
+                headers: { $ref: '#/$defs/stringMap' },
+                body: { type: 'string', maxLength: 262144 },
+              },
+            },
+          },
+        },
+      ],
+    },
+    networkRequestResponse: {
+      allOf: [
+        { $ref: '#/$defs/contractMessage' },
+        {
+          properties: {
+            kind: { const: 'response' },
+            method: { const: 'network/request' },
+            payload: {
+              oneOf: [
+                {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['ok', 'result'],
+                  properties: {
+                    ok: { const: true },
+                    result: {
+                      type: 'object',
+                      additionalProperties: false,
+                      required: [
+                        'url',
+                        'status',
+                        'headers',
+                        'body',
+                        'bodyBytes',
+                        'redirected',
+                      ],
+                      properties: {
+                        url: { type: 'string', minLength: 1, maxLength: 2048 },
+                        status: { type: 'integer', minimum: 100, maximum: 599 },
+                        headers: { $ref: '#/$defs/stringMap' },
+                        body: { type: 'string', maxLength: 1048576 },
+                        bodyBytes: {
+                          type: 'integer',
+                          minimum: 0,
+                          maximum: 1048576,
+                        },
+                        redirected: { type: 'boolean' },
+                      },
+                    },
+                  },
+                },
+                { $ref: '#/$defs/gatewayFailure' },
+              ],
+            },
+          },
+        },
+      ],
+    },
+  },
+};
