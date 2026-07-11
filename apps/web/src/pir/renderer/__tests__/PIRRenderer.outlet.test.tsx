@@ -5,7 +5,7 @@ import {
   type WorkspaceRouteManifest,
 } from '@prodivix/shared/router';
 import type { ComponentNode, PIRDocument } from '@prodivix/shared/types/pir';
-import { normalizeTreeToUiGraph } from '@/pir/graph/normalize';
+import { normalizeTreeToUiGraph } from '@prodivix/pir';
 import { PIRRenderer } from '@/pir/renderer/PIRRenderer';
 
 const createPirDoc = (root: ComponentNode): PIRDocument => ({

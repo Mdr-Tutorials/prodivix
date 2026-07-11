@@ -22,7 +22,6 @@ import {
   validateBlueprintComposition,
   type BlueprintCompositionIssue,
 } from '@/editor/features/blueprint/editor/model/composition';
-import type { PIRDocument } from '@prodivix/shared/types/pir';
 import {
   collectGraphSubtreeIds,
   getParentMap,
@@ -31,8 +30,7 @@ import {
   materializePirRoot,
   moveNode,
   removeNode,
-} from '@/pir/graph';
-import { normalizeAnimationDefinition } from '@/editor/features/animation/animationEditorModel';
+} from '@prodivix/pir';
 import {
   openExternalNavigateTarget,
   resolveNavigateTarget as resolveBrowserNavigateTarget,
@@ -44,11 +42,15 @@ import {
 } from '@/pir/renderer/routeDebug';
 import {
   DEFAULT_BLUEPRINT_STATE,
+  selectActiveDocumentEditSeq,
+  selectActivePirDocumentRecord,
+  selectActiveRouteNodeId,
+  selectRouteManifest,
+  selectWorkspace,
   useEditorStore,
 } from '@/editor/store/useEditorStore';
 import { useSettingsStore } from '@/editor/store/useSettingsStore';
 import { useAuthStore } from '@/auth/useAuthStore';
-import { editorApi } from '@/editor/editorApi';
 import { useEditorShortcut } from '@/editor/shortcuts';
 import {
   composeRouteManifestWithModules,
@@ -60,22 +62,15 @@ import {
 } from '@prodivix/shared/router';
 import type { AutosaveMode } from '@/editor/features/blueprint/editor/model/autosave';
 import { usePaletteQueryService } from '@/plugins/platform';
+import { createNodeDeleteTransaction } from '@prodivix/workspace';
 
 const CAPABILITY_PIR_DOCUMENT_UPDATE = 'core.pir.graph.replace@1.0';
-const CAPABILITY_ROUTE_MANIFEST_UPDATE = 'core.route.manifest.update@1.0';
 
 const createRouteId = () => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID();
   }
   return `route-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-};
-
-const createIntentId = () => {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID();
-  }
-  return `intent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 };
 
 type BlueprintInteractionMode = 'design' | 'interactive';
@@ -126,7 +121,7 @@ type InteractionRequest = {
  * Blueprint 编辑器的编排层（controller）。
  *
  * 复杂链路集中在这里：
- * - UI 交互 -> updatePirDoc -> autosave（workspace/project）
+ * - UI 交互 -> Workspace Command -> autosave（workspace/project）
  * - Canvas 内置动作 -> 导航确认/图执行事件 -> 页面或外部系统
  * - DnD 结果 -> PIR 树变换 -> 选中态与面板状态同步
  */
@@ -167,24 +162,27 @@ export const useBlueprintEditorController = () => {
     (state) => state.runtimeStateByProject[blueprintKey]
   );
   const patchRuntimeState = useEditorStore((state) => state.patchRuntimeState);
-  const pirDoc = useEditorStore((state) => state.pirDoc);
-  const pirDocRevision = useEditorStore((state) => state.pirDocRevision);
-  const updatePirDoc = useEditorStore((state) => state.updatePirDoc);
-  const workspaceId = useEditorStore((state) => state.workspaceId);
-  const workspaceRev = useEditorStore((state) => state.workspaceRev);
-  const routeRev = useEditorStore((state) => state.routeRev);
-  const activeDocumentId = useEditorStore((state) => state.activeDocumentId);
-  const activeDocumentContentRev = useEditorStore((state) =>
-    state.activeDocumentId
-      ? state.workspaceDocumentsById[state.activeDocumentId]?.contentRev
-      : undefined
+  const workspace = useEditorStore(selectWorkspace)!;
+  const activePirDocument = useEditorStore(selectActivePirDocumentRecord)!;
+  const pirDoc = activePirDocument.content;
+  const documentEditSeq = useEditorStore(selectActiveDocumentEditSeq);
+  const updateActivePirDocument = useEditorStore(
+    (state) => state.updateActivePirDocument
   );
+  const dispatchWorkspaceCommand = useEditorStore(
+    (state) => state.dispatchWorkspaceCommand
+  );
+  const dispatchWorkspaceTransaction = useEditorStore(
+    (state) => state.dispatchWorkspaceTransaction
+  );
+  const workspaceId = workspace.id;
+  const activeDocumentId = activePirDocument.id;
   const workspaceCapabilitiesLoaded = useEditorStore(
     (state) => state.workspaceCapabilitiesLoaded
   );
   const workspaceReadonly = useEditorStore((state) => state.workspaceReadonly);
-  const routeManifest = useEditorStore((state) => state.routeManifest);
-  const activeRouteNodeId = useEditorStore((state) => state.activeRouteNodeId);
+  const routeManifest = useEditorStore(selectRouteManifest)!;
+  const activeRouteNodeId = useEditorStore(selectActiveRouteNodeId);
   const applyRouteIntent = useEditorStore((state) => state.applyRouteIntent);
   const setActiveRouteNodeId = useEditorStore(
     (state) => state.setActiveRouteNodeId
@@ -193,15 +191,8 @@ export const useBlueprintEditorController = () => {
     (state) =>
       state.workspaceCapabilities[CAPABILITY_PIR_DOCUMENT_UPDATE] === true
   );
-  const canUpdateRouteManifest = useEditorStore(
-    (state) =>
-      state.workspaceCapabilities[CAPABILITY_ROUTE_MANIFEST_UPDATE] === true
-  );
   const applyWorkspaceMutation = useEditorStore(
     (state) => state.applyWorkspaceMutation
-  );
-  const markLocalWorkspaceDocumentSaved = useEditorStore(
-    (state) => state.markLocalWorkspaceDocumentSaved
   );
   const token = useAuthStore((state) => state.token);
   const autosaveMode = useSettingsStore(
@@ -268,11 +259,16 @@ export const useBlueprintEditorController = () => {
       : activeRoutePath;
   const setPreviewPath = useCallback(
     (path: string) => {
+      const normalizedPath = normalizeRoutePath(path);
       setBlueprintState(blueprintKey, {
-        routePreviewPath: normalizeRoutePath(path),
+        routePreviewPath: normalizedPath,
       });
+      const matchedRoute = routes.find(
+        (route) => route.path === normalizedPath
+      );
+      if (matchedRoute) setActiveRouteNodeId(matchedRoute.id);
     },
-    [blueprintKey, setBlueprintState]
+    [blueprintKey, routes, setActiveRouteNodeId, setBlueprintState]
   );
   const exactPreviewRoute = useMemo(() => {
     const normalizedPreviewPath = normalizeRoutePath(previewPath);
@@ -309,7 +305,7 @@ export const useBlueprintEditorController = () => {
       activationConstraint: { distance: 6 },
     })
   );
-  // 保存链路：pirDoc 变化 -> useBlueprintAutosave -> editorApi 保存 -> applyWorkspaceMutation
+  // 保存链路：Command edit sequence -> autosave -> server mutation ack。
   const {
     saveStatus,
     saveTransport,
@@ -321,18 +317,15 @@ export const useBlueprintEditorController = () => {
   } = useBlueprintAutosave({
     token,
     projectId: projectId ?? undefined,
-    pirDoc,
-    pirDocRevision,
+    documentEditSeq,
     autosaveMode,
     autosaveIntervalMs: autosaveInterval * 1000,
-    workspaceId,
-    activeDocumentId: activeDocumentId ?? undefined,
-    activeDocumentContentRev,
+    workspace,
+    activeDocument: activePirDocument,
     canUpdateWorkspaceDocument,
     workspaceCapabilitiesLoaded,
     workspaceReadonly,
     applyWorkspaceMutation,
-    markLocalWorkspaceDocumentSaved,
   });
 
   useEditorShortcut('Mod+S', saveNow, {
@@ -341,75 +334,6 @@ export const useBlueprintEditorController = () => {
     enabled: autosaveMode === 'manual' && hasPendingChanges,
     allowInEditable: true,
   });
-  const routeSyncRequestSeqRef = useRef(0);
-  const syncedRouteManifestRef = useRef<string>(JSON.stringify(routeManifest));
-
-  useEffect(() => {
-    if (!workspaceId) return;
-    if (typeof routeRev !== 'number' || routeRev <= 0) return;
-    syncedRouteManifestRef.current = JSON.stringify(routeManifest);
-  }, [workspaceId, routeRev]);
-
-  useEffect(() => {
-    if (!token) return;
-    if (!workspaceId) return;
-    if (workspaceReadonly) return;
-    if (!workspaceCapabilitiesLoaded) return;
-    if (!canUpdateRouteManifest) return;
-    if (typeof workspaceRev !== 'number' || workspaceRev <= 0) return;
-    if (typeof routeRev !== 'number' || routeRev <= 0) return;
-
-    const serializedRouteManifest = JSON.stringify(routeManifest);
-    if (serializedRouteManifest === syncedRouteManifestRef.current) return;
-
-    let disposed = false;
-    const requestSeq = routeSyncRequestSeqRef.current + 1;
-    routeSyncRequestSeqRef.current = requestSeq;
-    const timeoutId = window.setTimeout(() => {
-      void editorApi
-        .applyWorkspaceIntent(token, workspaceId, {
-          expectedWorkspaceRev: workspaceRev,
-          expectedRouteRev: routeRev,
-          intent: {
-            id: createIntentId(),
-            namespace: 'core.route',
-            type: 'manifest.update',
-            version: '1.0',
-            payload: { routeManifest },
-            issuedAt: new Date().toISOString(),
-          },
-        })
-        .then((mutation) => {
-          if (disposed || routeSyncRequestSeqRef.current !== requestSeq) {
-            return;
-          }
-          applyWorkspaceMutation(mutation);
-          syncedRouteManifestRef.current = serializedRouteManifest;
-        })
-        .catch((error) => {
-          if (disposed || routeSyncRequestSeqRef.current !== requestSeq) {
-            return;
-          }
-          console.warn('[blueprint] route manifest sync failed', error);
-        });
-    }, 500);
-
-    return () => {
-      disposed = true;
-      window.clearTimeout(timeoutId);
-    };
-  }, [
-    applyWorkspaceMutation,
-    canUpdateRouteManifest,
-    routeManifest,
-    routeRev,
-    token,
-    workspaceCapabilitiesLoaded,
-    workspaceId,
-    workspaceReadonly,
-    workspaceRev,
-  ]);
-
   const handleAddRouteAtPath = (path: string) => {
     if (workspaceReadonly) return;
     const value = path.trim();
@@ -619,6 +543,9 @@ export const useBlueprintEditorController = () => {
 
     if (navigationResult.kind === 'internal') {
       setPreviewPath(navigationResult.runtimeContext.currentPath);
+      setActiveRouteNodeId(
+        navigationResult.runtimeContext.activeRouteNodeId ?? undefined
+      );
       logRouteDebug('preview path updated', {
         from: previewPath,
         to: navigationResult.runtimeContext.currentPath,
@@ -795,31 +722,27 @@ export const useBlueprintEditorController = () => {
     selection: PaletteItemSelection = {}
   ) => {
     if (workspaceReadonly) return;
-    let nextNodeId = '';
-    let nextCompositionIssue: BlueprintCompositionIssue | undefined;
-    updatePirDoc((doc) => {
-      const result = applyPaletteItemInsertion(doc, palette, {
-        workspaceId: workspaceId ?? `project:${blueprintKey}`,
-        documentId: activeDocumentId ?? `pir:${currentPath}`,
-        itemId,
-        preferredTargetId: selectedId ?? doc.ui.graph.rootId,
-        selection,
-      });
-      if (result.ok === false) {
-        nextCompositionIssue = result.compositionIssue;
-        return doc;
-      }
-      nextNodeId = result.nextNodeId;
-      return result.doc;
+    const result = applyPaletteItemInsertion(pirDoc, palette, {
+      workspaceId,
+      documentId: activeDocumentId,
+      documentType: activePirDocument.type,
+      itemId,
+      preferredTargetId: selectedId ?? pirDoc.ui.graph.rootId,
+      selection,
     });
-    if (nextCompositionIssue) setCompositionIssue(nextCompositionIssue);
-    if (nextNodeId) {
-      setCompositionIssue(undefined);
-      handleNodeSelect(nextNodeId);
+    if (result.ok === false) {
+      if (result.compositionIssue) {
+        setCompositionIssue(result.compositionIssue);
+      }
+      return;
     }
+    const applied = dispatchWorkspaceCommand(result.command);
+    if (!applied?.ok) return;
+    setCompositionIssue(undefined);
+    handleNodeSelect(result.nextNodeId);
   };
 
-  // 拖拽链路：DndContext 事件 -> useBlueprintDragDrop -> updatePirDoc -> 选中态更新
+  // 拖拽链路：DndContext 事件 -> Command -> 选中态更新。
   const {
     activePaletteItemId,
     treeDropHint,
@@ -829,95 +752,58 @@ export const useBlueprintEditorController = () => {
     handleDragEnd,
   } = useBlueprintDragDrop({
     pirDoc,
-    workspaceId: workspaceId ?? `project:${blueprintKey}`,
-    documentId: activeDocumentId ?? `pir:${currentPath}`,
+    workspaceId,
+    documentId: activeDocumentId,
     selectedId,
     palette,
-    updatePirDoc,
+    documentType: activePirDocument.type,
+    updateActivePirDocument,
+    dispatchWorkspaceCommand,
     onNodeSelect: handleNodeSelect,
     onCompositionIssue: setCompositionIssue,
   });
 
-  const handleDeleteSelected = () => {
+  const deleteBlueprintNode = (nodeId: string) => {
     if (workspaceReadonly) return;
-    if (!selectedId) return;
-    let nextSelectedId: string | undefined;
-    let removed = false;
+    if (!nodeId || nodeId === pirDoc.ui.graph.rootId) return;
+    const parent = getParentMap(pirDoc.ui.graph)[nodeId];
+    if (!parent) return;
     const removedNodeIds = new Set<string>();
-    let nextCompositionIssue: BlueprintCompositionIssue | undefined;
-    updatePirDoc((doc) => {
-      if (selectedId === doc.ui.graph.rootId) return doc;
-      const parent = getParentMap(doc.ui.graph)[selectedId];
-      if (!parent) return doc;
-      collectGraphSubtreeIds(doc.ui.graph, selectedId, removedNodeIds);
-      const graph = removeNode(doc.ui.graph, selectedId);
-      removed = graph !== doc.ui.graph;
-      if (!removed) return doc;
-      nextSelectedId = parent.parentId;
-      const nextDoc = {
-        ...doc,
-        ui: { graph },
-      };
-      const issue = validateBlueprintComposition(nextDoc.ui.graph, palette, [
-        parent.parentId,
-      ]);
-      if (issue) {
-        nextCompositionIssue = issue;
-        removed = false;
-        return doc;
-      }
-      return cleanupDeletedNodeAnimationBindings(nextDoc);
-    });
-    if (nextCompositionIssue) setCompositionIssue(nextCompositionIssue);
-    if (removed) {
-      setCompositionIssue(undefined);
-      setBlueprintState(blueprintKey, {
-        selectedId: nextSelectedId,
-        hiddenNodeIds: hiddenNodeIds.filter((id) => !removedNodeIds.has(id)),
-      });
+    collectGraphSubtreeIds(pirDoc.ui.graph, nodeId, removedNodeIds);
+    const graph = removeNode(pirDoc.ui.graph, nodeId);
+    if (graph === pirDoc.ui.graph) return;
+    const issue = validateBlueprintComposition(graph, palette, [
+      parent.parentId,
+    ]);
+    if (issue) {
+      setCompositionIssue(issue);
+      return;
     }
+    const transaction = createNodeDeleteTransaction({
+      workspace,
+      document: activePirDocument,
+      afterGraph: graph,
+      removedNodeIds,
+      label: 'Delete component',
+    });
+    if (!transaction) return;
+    const applied = dispatchWorkspaceTransaction(transaction);
+    if (!applied?.ok) return;
+    setCompositionIssue(undefined);
+    setBlueprintState(blueprintKey, {
+      ...(selectedId && removedNodeIds.has(selectedId)
+        ? { selectedId: parent.parentId }
+        : {}),
+      hiddenNodeIds: hiddenNodeIds.filter((id) => !removedNodeIds.has(id)),
+    });
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedId) deleteBlueprintNode(selectedId);
   };
 
   const handleDeleteNode = (nodeId: string) => {
-    if (workspaceReadonly) return;
-    if (!nodeId) return;
-    let nextSelectedId: string | undefined;
-    let removed = false;
-    const removedNodeIds = new Set<string>();
-    let nextCompositionIssue: BlueprintCompositionIssue | undefined;
-    updatePirDoc((doc) => {
-      if (nodeId === doc.ui.graph.rootId) return doc;
-      const parent = getParentMap(doc.ui.graph)[nodeId];
-      if (!parent) return doc;
-      collectGraphSubtreeIds(doc.ui.graph, nodeId, removedNodeIds);
-      const graph = removeNode(doc.ui.graph, nodeId);
-      removed = graph !== doc.ui.graph;
-      if (!removed) return doc;
-      if (selectedId === nodeId) {
-        nextSelectedId = parent.parentId;
-      }
-      const nextDoc = {
-        ...doc,
-        ui: { graph },
-      };
-      const issue = validateBlueprintComposition(nextDoc.ui.graph, palette, [
-        parent.parentId,
-      ]);
-      if (issue) {
-        nextCompositionIssue = issue;
-        removed = false;
-        return doc;
-      }
-      return cleanupDeletedNodeAnimationBindings(nextDoc);
-    });
-    if (nextCompositionIssue) setCompositionIssue(nextCompositionIssue);
-    if (removed) {
-      setCompositionIssue(undefined);
-      setBlueprintState(blueprintKey, {
-        ...(selectedId === nodeId ? { selectedId: nextSelectedId } : {}),
-        hiddenNodeIds: hiddenNodeIds.filter((id) => !removedNodeIds.has(id)),
-      });
-    }
+    deleteBlueprintNode(nodeId);
   };
 
   const handleCopyNode = (nodeId: string) => {
@@ -925,7 +811,7 @@ export const useBlueprintEditorController = () => {
     if (!nodeId) return;
     let nextNodeId = '';
     let nextCompositionIssue: BlueprintCompositionIssue | undefined;
-    updatePirDoc((doc) => {
+    updateActivePirDocument((doc) => {
       if (nodeId === doc.ui.graph.rootId) return doc;
       const parent = getParentMap(doc.ui.graph)[nodeId];
       if (!parent) return doc;
@@ -969,7 +855,7 @@ export const useBlueprintEditorController = () => {
     if (!nodeId) return;
     let moved = false;
     let nextCompositionIssue: BlueprintCompositionIssue | undefined;
-    updatePirDoc((doc) => {
+    updateActivePirDocument((doc) => {
       if (nodeId === doc.ui.graph.rootId) return doc;
       const parent = getParentMap(doc.ui.graph)[nodeId];
       if (!parent || parent.regionName) return doc;
@@ -1114,51 +1000,6 @@ export const useBlueprintEditorController = () => {
       zoomStep,
       onZoomChange: handleZoomChange,
       onResetView: handleResetView,
-    },
-  };
-};
-
-const cleanupDeletedNodeAnimationBindings = (doc: PIRDocument): PIRDocument => {
-  const animation = normalizeAnimationDefinition(doc.animation);
-  if (!animation) return doc;
-
-  const validNodeIds = new Set(Object.keys(doc.ui.graph.nodesById));
-
-  let changed = false;
-  const nextTimelines = animation.timelines.map((timeline) => {
-    let timelineChanged = false;
-    const nextBindings = timeline.bindings.reduce<typeof timeline.bindings>(
-      (result, binding) => {
-        const targetNodeId = binding.targetNodeId.trim();
-        if (!targetNodeId || !validNodeIds.has(targetNodeId)) {
-          timelineChanged = true;
-          return result;
-        }
-        if (targetNodeId !== binding.targetNodeId) {
-          timelineChanged = true;
-          result.push({ ...binding, targetNodeId });
-          return result;
-        }
-        result.push(binding);
-        return result;
-      },
-      []
-    );
-    if (!timelineChanged) return timeline;
-    changed = true;
-    return {
-      ...timeline,
-      bindings: nextBindings,
-    };
-  });
-
-  if (!changed) return doc;
-
-  return {
-    ...doc,
-    animation: {
-      ...animation,
-      timelines: nextTimelines,
     },
   };
 };

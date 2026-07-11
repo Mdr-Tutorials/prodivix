@@ -335,6 +335,7 @@ function EditorHome() {
           description: project.localRecord.description,
           resourceType: project.localRecord.resourceType,
           workspace: project.localRecord.workspace,
+          settings: project.localRecord.workspaceSettings,
         });
       await markLocalProjectSynced(project.id, {
         remoteProjectId: remoteProject.id,

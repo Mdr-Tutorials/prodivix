@@ -46,6 +46,9 @@ import {
   joinWorkspaceResourcePath,
   RESOURCE_ROOTS,
 } from './workspaceResourceDocuments';
+import type { WorkspaceSnapshot } from '@prodivix/workspace';
+
+const EMPTY_WORKSPACE_DOCUMENTS: WorkspaceSnapshot['docsById'] = {};
 
 type ProjectFileManagerProps = {
   embedded?: boolean;
@@ -95,11 +98,11 @@ export function ProjectFileManager({
   const { t } = useTranslation('editor');
   const { projectId } = useParams();
   const token = useAuthStore((state) => state.token);
-  const workspaceId = useEditorStore((state) => state.workspaceId);
-  const workspaceRev = useEditorStore((state) => state.workspaceRev);
-  const workspaceDocumentsById = useEditorStore(
-    (state) => state.workspaceDocumentsById
-  );
+  const workspace = useEditorStore((state) => state.workspace);
+  const workspaceId = workspace?.id;
+  const workspaceRev = workspace?.workspaceRev;
+  const workspaceDocumentsById =
+    workspace?.docsById ?? EMPTY_WORKSPACE_DOCUMENTS;
   const applyWorkspaceMutation = useEditorStore(
     (state) => state.applyWorkspaceMutation
   );
@@ -189,7 +192,7 @@ export function ProjectFileManager({
     isEditingGitignore || fileTemplateOptions.length > 0;
 
   const persistProjectFile = async (file: ProjectFile) => {
-    if (!token || !workspaceId || !workspaceRev) return;
+    if (!token || !workspace || !workspaceId || !workspaceRev) return;
     const path = joinWorkspaceResourcePath(
       RESOURCE_ROOTS.projectFiles,
       file.path
@@ -210,7 +213,7 @@ export function ProjectFileManager({
       if (!request) return;
       const mutation = await editorApi.patchWorkspaceDocument(
         token,
-        workspaceId,
+        workspace,
         existing.id,
         request
       );
@@ -219,7 +222,7 @@ export function ProjectFileManager({
     }
     const mutation = await editorApi.applyWorkspaceIntent(
       token,
-      workspaceId,
+      workspace,
       createWorkspaceResourceDocumentRequest({
         workspaceRev,
         documentId: createWorkspaceResourceDocumentId('project_config', path),

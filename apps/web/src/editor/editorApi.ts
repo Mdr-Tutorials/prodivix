@@ -1,11 +1,13 @@
 import type { PIRDocument } from '@prodivix/shared/types/pir';
 import { apiRequest } from '@/infra/api';
+import { validatePirDocument, type PirValidationIssue } from '@prodivix/pir';
 import {
-  validatePirDocument,
-  type PirValidationIssue,
-} from '@/pir/validator/validator';
-import type { WorkspaceCodeDocumentContent } from '@/workspace';
-import { isWorkspaceCodeDocumentContent } from '@/workspace';
+  decodeWorkspaceMutation,
+  decodeWorkspaceSnapshot,
+  encodeWorkspaceSnapshot,
+  type WorkspaceSnapshot,
+} from '@prodivix/workspace';
+import type { WorkspaceCommandEnvelope } from '@prodivix/workspace';
 
 export type ProjectResourceType = 'project' | 'component' | 'nodegraph';
 
@@ -25,41 +27,6 @@ export type ProjectDetail = ProjectSummary & {
   pir: PIRDocument;
 };
 
-export type WorkspaceDocumentType =
-  | 'pir-page'
-  | 'pir-layout'
-  | 'pir-component'
-  | 'pir-graph'
-  | 'pir-animation'
-  | 'code'
-  | 'asset'
-  | 'project-config';
-
-export type WorkspacePatchOperation = {
-  op: 'add' | 'remove' | 'replace' | 'move' | 'copy' | 'test';
-  path: string;
-  from?: string;
-  value?: unknown;
-};
-
-export type WorkspaceCommandEnvelope = {
-  id: string;
-  namespace: string;
-  type: string;
-  version: string;
-  issuedAt: string;
-  forwardOps: WorkspacePatchOperation[];
-  reverseOps: WorkspacePatchOperation[];
-  target: {
-    workspaceId: string;
-    documentId?: string;
-  };
-  mergeKey?: string;
-  label?: string;
-  domainHint?:
-    'pir' | 'workspace' | 'route' | 'nodegraph' | 'animation' | 'code';
-};
-
 export type WorkspaceIntentEnvelope = {
   id: string;
   namespace: string;
@@ -72,41 +39,6 @@ export type WorkspaceIntentEnvelope = {
     clientId?: string;
   };
   issuedAt: string;
-};
-
-export type WorkspaceDocumentRecord = {
-  id: string;
-  type: WorkspaceDocumentType;
-  path: string;
-  contentRev: number;
-  metaRev: number;
-  content: PIRDocument | WorkspaceCodeDocumentContent | unknown;
-  updatedAt?: string;
-};
-
-export type WorkspaceSnapshot = {
-  id: string;
-  workspaceRev: number;
-  routeRev: number;
-  opSeq: number;
-  tree: Record<string, unknown>;
-  documents: WorkspaceDocumentRecord[];
-  routeManifest: Record<string, unknown>;
-  settings?: Record<string, unknown>;
-  activeRouteNodeId?: string;
-};
-
-export type WorkspaceMutationDocumentRecord = WorkspaceDocumentRecord;
-
-export type WorkspaceMutationResponse = {
-  workspaceId: string;
-  workspaceRev: number;
-  routeRev: number;
-  opSeq: number;
-  tree?: Record<string, unknown>;
-  updatedDocuments?: WorkspaceMutationDocumentRecord[];
-  removedDocumentIds?: string[];
-  acceptedMutationId?: string;
 };
 
 export type WorkspaceCapabilitiesResponse = {
@@ -125,6 +57,7 @@ export type ImportLocalProjectRequest = {
   description?: string;
   resourceType: ProjectResourceType;
   workspace: WorkspaceSnapshot;
+  settings: Record<string, unknown>;
 };
 
 const JSON_HEADERS = {
@@ -167,45 +100,6 @@ const validateProjectDetail = (
   return { ...project, pir: validateAndUnwrapPir(origin, project.pir) };
 };
 
-const isPirWorkspaceDocumentType = (type: WorkspaceDocumentType): boolean =>
-  type === 'pir-page' || type === 'pir-layout' || type === 'pir-component';
-
-const validateWorkspaceDocument = (
-  workspaceId: string,
-  document: WorkspaceDocumentRecord
-): WorkspaceDocumentRecord => {
-  if (isPirWorkspaceDocumentType(document.type)) {
-    return {
-      ...document,
-      content: validateAndUnwrapPir(
-        `workspace.${workspaceId}/document.${document.id}`,
-        document.content
-      ),
-    };
-  }
-
-  if (document.type === 'code') {
-    if (!isWorkspaceCodeDocumentContent(document.content)) {
-      throw new Error(
-        `Workspace code document ${document.id} must use the code content wrapper.`
-      );
-    }
-    return document;
-  }
-
-  return document;
-};
-
-const validateWorkspaceSnapshot = (
-  workspace: WorkspaceSnapshot
-): WorkspaceSnapshot => {
-  if (!workspace?.documents?.length) return workspace;
-  const documents = workspace.documents.map((document) =>
-    validateWorkspaceDocument(workspace.id, document)
-  );
-  return { ...workspace, documents };
-};
-
 export const editorApi = {
   listProjects: async (token: string, options: RequestInit = {}) =>
     request<{ projects: ProjectSummary[] }>(token, '/projects', options),
@@ -229,16 +123,21 @@ export const editorApi = {
     token: string,
     data: ImportLocalProjectRequest
   ) => {
+    const { workspace, settings, ...project } = data;
     const response = await request<{
       project: ProjectSummary;
-      workspace: WorkspaceSnapshot;
+      workspace: unknown;
     }>(token, '/workspaces/import-local-project', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        ...project,
+        workspace: encodeWorkspaceSnapshot(workspace, settings),
+      }),
     });
+    const decoded = decodeWorkspaceSnapshot(response.workspace);
     return {
       project: response.project,
-      workspace: validateWorkspaceSnapshot(response.workspace),
+      ...decoded,
     };
   },
 
@@ -279,12 +178,12 @@ export const editorApi = {
     workspaceId: string,
     options: RequestInit = {}
   ) => {
-    const response = await request<{ workspace: WorkspaceSnapshot }>(
+    const response = await request<{ workspace: unknown }>(
       token,
       `/workspaces/${encodeURIComponent(workspaceId)}`,
       options
     );
-    return { workspace: validateWorkspaceSnapshot(response.workspace) };
+    return decodeWorkspaceSnapshot(response.workspace);
   },
 
   getWorkspaceCapabilities: async (
@@ -300,41 +199,45 @@ export const editorApi = {
 
   patchWorkspaceDocument: async (
     token: string,
-    workspaceId: string,
+    workspace: WorkspaceSnapshot,
     documentId: string,
     data: PatchWorkspaceDocumentRequest
-  ) =>
-    request<WorkspaceMutationResponse>(
+  ) => {
+    const response = await request<unknown>(
       token,
-      `/workspaces/${encodeURIComponent(workspaceId)}/documents/${encodeURIComponent(documentId)}`,
+      `/workspaces/${encodeURIComponent(workspace.id)}/documents/${encodeURIComponent(documentId)}`,
       {
         method: 'PATCH',
         body: JSON.stringify(data),
       }
-    ),
+    );
+    return decodeWorkspaceMutation(response, workspace);
+  },
 
   applyWorkspaceIntent: async (
     token: string,
-    workspaceId: string,
+    workspace: WorkspaceSnapshot,
     data: {
       expectedWorkspaceRev: number;
       expectedRouteRev?: number;
       intent: WorkspaceIntentEnvelope;
       clientMutationId?: string;
     }
-  ) =>
-    request<WorkspaceMutationResponse>(
+  ) => {
+    const response = await request<unknown>(
       token,
-      `/workspaces/${encodeURIComponent(workspaceId)}/intents`,
+      `/workspaces/${encodeURIComponent(workspace.id)}/intents`,
       {
         method: 'POST',
         body: JSON.stringify(data),
       }
-    ),
+    );
+    return decodeWorkspaceMutation(response, workspace);
+  },
 
   applyWorkspaceBatch: async (
     token: string,
-    workspaceId: string,
+    workspace: WorkspaceSnapshot,
     data: {
       expectedWorkspaceRev: number;
       expectedRouteRev?: number;
@@ -352,15 +255,17 @@ export const editorApi = {
       >;
       clientBatchId?: string;
     }
-  ) =>
-    request<WorkspaceMutationResponse>(
+  ) => {
+    const response = await request<unknown>(
       token,
-      `/workspaces/${encodeURIComponent(workspaceId)}/batch`,
+      `/workspaces/${encodeURIComponent(workspace.id)}/batch`,
       {
         method: 'POST',
         body: JSON.stringify(data),
       }
-    ),
+    );
+    return decodeWorkspaceMutation(response, workspace);
+  },
 
   saveProjectPir: async (token: string, projectId: string, pir: PIRDocument) =>
     request<{ project: ProjectDetail }>(

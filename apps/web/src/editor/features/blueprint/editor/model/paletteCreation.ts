@@ -13,12 +13,13 @@ import {
   normalizeTreeToUiGraph,
   type InstantiatedUiFragment,
   type UiGraphFragmentInsertionTarget,
-} from '@/pir/graph';
-import { validatePirDocument } from '@/pir/validator/validator';
+} from '@prodivix/pir';
+import { validatePirDocument } from '@prodivix/pir';
 import {
   applyWorkspaceDocumentCommand,
   type WorkspaceCommandEnvelope,
-} from '@/workspace';
+  type WorkspacePirDocumentType,
+} from '@prodivix/workspace';
 import type {
   PaletteItemCreationRecipe,
   PaletteQueryService,
@@ -372,6 +373,7 @@ export const applyPaletteItemInsertion = (
   input: Readonly<{
     workspaceId: string;
     documentId: string;
+    documentType: WorkspacePirDocumentType;
     itemId: string;
     preferredTargetId?: string;
     selection?: PaletteItemSelection;
@@ -460,6 +462,7 @@ export const applyPaletteItemInsertion = (
     workspaceId: input.workspaceId,
     documentId: input.documentId,
     domain: 'pir',
+    documentType: input.documentType,
   });
   if (applied.ok === false) {
     return {

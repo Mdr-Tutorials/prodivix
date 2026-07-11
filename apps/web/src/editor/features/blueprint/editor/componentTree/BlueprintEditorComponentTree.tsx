@@ -8,8 +8,12 @@ import {
   composeRouteManifestWithModules,
   flattenRouteManifest,
 } from '@prodivix/shared/router';
-import { useEditorStore } from '@/editor/store/useEditorStore';
-import { materializePirRoot } from '@/pir/graph';
+import {
+  selectActivePirDocument,
+  selectRouteManifest,
+  useEditorStore,
+} from '@/editor/store/useEditorStore';
+import { materializePirRoot } from '@prodivix/pir';
 import { BlueprintTreeNode } from './BlueprintTreeNode';
 import {
   collectBranchExpandedKeys,
@@ -49,8 +53,8 @@ export function BlueprintEditorComponentTree({
   onOpenRoutePath,
 }: BlueprintEditorComponentTreeProps) {
   const { t } = useTranslation('blueprint');
-  const pirDoc = useEditorStore((state) => state.pirDoc);
-  const routeManifest = useEditorStore((state) => state.routeManifest);
+  const pirDoc = useEditorStore(selectActivePirDocument)!;
+  const routeManifest = useEditorStore(selectRouteManifest)!;
   const rootNode = useMemo(() => materializePirRoot(pirDoc), [pirDoc]);
   const outletRoutePaths = useMemo(() => {
     const result: Record<string, string> = {};

@@ -19,7 +19,7 @@ import {
   TREE_SELECT_OPTIONS,
 } from '@/editor/features/blueprint/catalog/sampleData';
 import type { ComponentNode, PIRDocument } from '@prodivix/shared/types/pir';
-import { materializePirRoot } from '@/pir/graph';
+import { materializePirRoot } from '@prodivix/pir';
 import { buildLayoutPatternNode } from '@/editor/features/blueprint/layoutPatterns';
 import type { PaletteQueryService } from '@/plugins/platform';
 

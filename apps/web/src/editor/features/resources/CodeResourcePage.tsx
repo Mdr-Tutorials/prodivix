@@ -12,13 +12,12 @@ import { useEditorShortcut } from '@/editor/shortcuts';
 import { useEditorStore } from '@/editor/store/useEditorStore';
 import { codeMirrorTypographyTheme } from '@/editor/codeMirrorTypography';
 import {
-  getResourceManagerCodeCreateRequestStorageKey,
   getResourceManagerCodeSelectionStorageKey,
   resolveDefaultCodeKindByParentPath,
   resolveTemplateByCodeKind,
   type CodeFileKind,
 } from './codeResourceModel';
-import { isWorkspaceCodeDocumentContent } from '@/workspace';
+import { isWorkspaceCodeDocumentContent } from '@prodivix/workspace';
 import {
   createWorkspaceDirectoryIntentRequest,
   createWorkspaceCodeDocumentIntentRequest,
@@ -27,7 +26,8 @@ import {
   renameWorkspaceDirectoryIntentRequest,
   renameWorkspaceCodeDocumentIntentRequest,
   type WorkspaceCodeDocumentLanguage,
-} from '@/workspace';
+  type WorkspaceSnapshot,
+} from '@prodivix/workspace';
 import {
   buildCodeResourceTreeFromWorkspaceVfs,
   findCodeResourceNodeById,
@@ -37,7 +37,12 @@ import {
 
 type CodeResourcePageProps = {
   embedded?: boolean;
+  requestedCreateFolder?: 'scripts' | 'styles' | 'shaders' | null;
+  onCreateRequestConsumed?: () => void;
 };
+
+const EMPTY_WORKSPACE_DOCUMENTS: WorkspaceSnapshot['docsById'] = {};
+const EMPTY_WORKSPACE_TREE: WorkspaceSnapshot['treeById'] = {};
 
 const resolveLanguageExtensionByName = (name: string) => {
   const lower = name.toLowerCase();
@@ -96,12 +101,17 @@ const isWorkspaceVfsFolder = (
   node: ReturnType<typeof findCodeResourceNodeById>
 ) => node?.type === 'folder' && node.source === 'workspace-vfs';
 
-export function CodeResourcePage({ embedded = false }: CodeResourcePageProps) {
+export function CodeResourcePage({
+  embedded = false,
+  requestedCreateFolder,
+  onCreateRequestConsumed,
+}: CodeResourcePageProps) {
   const { t } = useTranslation('editor');
   const { projectId } = useParams();
   const token = useAuthStore((state) => state.token);
-  const workspaceId = useEditorStore((state) => state.workspaceId);
-  const workspaceRev = useEditorStore((state) => state.workspaceRev);
+  const workspace = useEditorStore((state) => state.workspace);
+  const workspaceId = workspace?.id;
+  const workspaceRev = workspace?.workspaceRev;
   const workspaceReadonly = useEditorStore((state) => state.workspaceReadonly);
   const workspaceCapabilities = useEditorStore(
     (state) => state.workspaceCapabilities
@@ -109,11 +119,10 @@ export function CodeResourcePage({ embedded = false }: CodeResourcePageProps) {
   const workspaceCapabilitiesLoaded = useEditorStore(
     (state) => state.workspaceCapabilitiesLoaded
   );
-  const workspaceDocumentsById = useEditorStore(
-    (state) => state.workspaceDocumentsById
-  );
-  const treeRootId = useEditorStore((state) => state.treeRootId);
-  const treeById = useEditorStore((state) => state.treeById);
+  const workspaceDocumentsById =
+    workspace?.docsById ?? EMPTY_WORKSPACE_DOCUMENTS;
+  const treeRootId = workspace?.treeRootId;
+  const treeById = workspace?.treeById ?? EMPTY_WORKSPACE_TREE;
   const applyWorkspaceMutation = useEditorStore(
     (state) => state.applyWorkspaceMutation
   );
@@ -222,7 +231,7 @@ export function CodeResourcePage({ embedded = false }: CodeResourcePageProps) {
     parentId: string,
     kind?: CodeFileKind
   ) => {
-    if (!token || !workspaceId || typeof workspaceRev !== 'number') return;
+    if (!token || !workspace || !workspaceId || !workspaceRev) return;
     if (!canCreateCodeDocument) return;
     const resolvedKind = kind ?? resolveDefaultKindByParent(parentId);
     const template = resolveTemplateByCodeKind(resolvedKind);
@@ -261,7 +270,7 @@ export function CodeResourcePage({ embedded = false }: CodeResourcePageProps) {
     }
     const mutation = await editorApi.applyWorkspaceIntent(
       token,
-      workspaceId,
+      workspace,
       createWorkspaceCodeDocumentIntentRequest({
         workspaceRev,
         intentId: createIntentId(),
@@ -280,7 +289,7 @@ export function CodeResourcePage({ embedded = false }: CodeResourcePageProps) {
   };
 
   const handleCreateFolder = async (parentId: string) => {
-    if (!token || !workspaceId || typeof workspaceRev !== 'number') return;
+    if (!token || !workspace || !workspaceId || !workspaceRev) return;
     if (!canCreateDirectory) return;
     const parent = findCodeResourceNodeById(tree, parentId);
     const resolvedParentId = parent?.type === 'folder' ? parent.id : tree.id;
@@ -298,7 +307,7 @@ export function CodeResourcePage({ embedded = false }: CodeResourcePageProps) {
     const nodeId = `dir_${createIntentId().replace(/[^a-zA-Z0-9]+/g, '_')}`;
     const mutation = await editorApi.applyWorkspaceIntent(
       token,
-      workspaceId,
+      workspace,
       createWorkspaceDirectoryIntentRequest({
         workspaceRev,
         intentId: createIntentId(),
@@ -315,26 +324,31 @@ export function CodeResourcePage({ embedded = false }: CodeResourcePageProps) {
   };
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
     if (!canCreateCodeDocument) return;
-    const requestKey = getResourceManagerCodeCreateRequestStorageKey(projectId);
-    const requestedFolder = window.localStorage.getItem(requestKey);
-    const requestedKind = resolveCodeKindByFolder(requestedFolder);
-    if (!requestedKind || !requestedFolder) return;
-    window.localStorage.removeItem(requestKey);
+    const requestedKind = resolveCodeKindByFolder(
+      requestedCreateFolder ?? null
+    );
+    if (!requestedKind || !requestedCreateFolder) return;
     const parentId =
-      findCodeResourceNodeById(tree, `dir_${requestedFolder}`)?.id ?? tree.id;
+      findCodeResourceNodeById(tree, `dir_${requestedCreateFolder}`)?.id ??
+      tree.id;
+    onCreateRequestConsumed?.();
     void handleCreateCodeFile(parentId, requestedKind);
-  }, [canCreateCodeDocument, projectId, tree]);
+  }, [
+    canCreateCodeDocument,
+    onCreateRequestConsumed,
+    requestedCreateFolder,
+    tree,
+  ]);
 
   const handleRenameCodeFile = async (nodeId: string, nextName: string) => {
-    if (!token || !workspaceId || typeof workspaceRev !== 'number') return;
+    if (!token || !workspace || !workspaceId || !workspaceRev) return;
     const node = findCodeResourceNodeById(tree, nodeId);
     if (node?.type === 'folder') {
       if (!canRenameDirectory || node.id === tree.id) return;
       const mutation = await editorApi.applyWorkspaceIntent(
         token,
-        workspaceId,
+        workspace,
         renameWorkspaceDirectoryIntentRequest({
           workspaceRev,
           intentId: createIntentId(),
@@ -360,7 +374,7 @@ export function CodeResourcePage({ embedded = false }: CodeResourcePageProps) {
     if (nextPath === currentPath) return;
     const mutation = await editorApi.applyWorkspaceIntent(
       token,
-      workspaceId,
+      workspace,
       renameWorkspaceCodeDocumentIntentRequest({
         workspaceRev,
         intentId: createIntentId(),
@@ -374,13 +388,13 @@ export function CodeResourcePage({ embedded = false }: CodeResourcePageProps) {
   };
 
   const handleDeleteCodeFile = async (nodeId: string) => {
-    if (!token || !workspaceId || typeof workspaceRev !== 'number') return;
+    if (!token || !workspace || !workspaceId || !workspaceRev) return;
     const node = findCodeResourceNodeById(tree, nodeId);
     if (node?.type === 'folder') {
       if (!canDeleteDirectory || node.id === tree.id) return;
       const mutation = await editorApi.applyWorkspaceIntent(
         token,
-        workspaceId,
+        workspace,
         deleteWorkspaceDirectoryIntentRequest({
           workspaceRev,
           intentId: createIntentId(),
@@ -397,7 +411,7 @@ export function CodeResourcePage({ embedded = false }: CodeResourcePageProps) {
     if (!document || document.type !== 'code') return;
     const mutation = await editorApi.applyWorkspaceIntent(
       token,
-      workspaceId,
+      workspace,
       deleteWorkspaceCodeDocumentIntentRequest({
         workspaceRev,
         intentId: createIntentId(),
@@ -413,7 +427,7 @@ export function CodeResourcePage({ embedded = false }: CodeResourcePageProps) {
 
   const handleSave = async () => {
     if (!selectedFile) return;
-    if (!token || !workspaceId) return;
+    if (!token || !workspace || !workspaceId) return;
     const document = workspaceDocumentsById[selectedFile.id];
     if (
       !document ||
@@ -425,7 +439,7 @@ export function CodeResourcePage({ embedded = false }: CodeResourcePageProps) {
     const previousSource = document.content.source;
     const mutation = await editorApi.patchWorkspaceDocument(
       token,
-      workspaceId,
+      workspace,
       document.id,
       {
         expectedContentRev: document.contentRev,

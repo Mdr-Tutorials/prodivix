@@ -7,7 +7,6 @@ import { I18nResourcePage } from './I18nResourcePage';
 import { ProjectFileManager } from './ProjectFileManager';
 import { ResourceOverviewPanel } from './ResourceOverviewPanel';
 import { PublicResourcePage } from './PublicResourcePage';
-import { getResourceManagerCodeCreateRequestStorageKey } from './codeResourceModel';
 import {
   buildOverviewSnapshot,
   getResourceManagerViewStorageKey,
@@ -15,15 +14,19 @@ import {
   type SectionId,
 } from './projectResourceOverview';
 import { useEditorStore } from '@/editor/store/useEditorStore';
+import type { WorkspaceSnapshot } from '@prodivix/workspace';
+
+const EMPTY_WORKSPACE_DOCUMENTS: WorkspaceSnapshot['docsById'] = {};
+const EMPTY_WORKSPACE_TREE: WorkspaceSnapshot['treeById'] = {};
 
 export function ProjectResources() {
   const { t } = useTranslation('editor');
   const { projectId } = useParams();
-  const workspaceDocumentsById = useEditorStore(
-    (state) => state.workspaceDocumentsById
-  );
-  const treeRootId = useEditorStore((state) => state.treeRootId);
-  const treeById = useEditorStore((state) => state.treeById);
+  const workspace = useEditorStore((state) => state.workspace);
+  const workspaceDocumentsById =
+    workspace?.docsById ?? EMPTY_WORKSPACE_DOCUMENTS;
+  const treeRootId = workspace?.treeRootId;
+  const treeById = workspace?.treeById ?? EMPTY_WORKSPACE_TREE;
   const [activeSection, setActiveSection] = useState<SectionId>(() => {
     if (typeof window === 'undefined') return 'overview';
     const raw = window.localStorage.getItem(
@@ -41,6 +44,9 @@ export function ProjectResources() {
     }
     return 'overview';
   });
+  const [pendingCodeFolder, setPendingCodeFolder] = useState<
+    'scripts' | 'styles' | 'shaders' | null
+  >(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -61,11 +67,7 @@ export function ProjectResources() {
   }, [activeSection, projectId, treeById, treeRootId, workspaceDocumentsById]);
 
   const createCodeAssetAndOpen = (folder: 'scripts' | 'styles' | 'shaders') => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(
-      getResourceManagerCodeCreateRequestStorageKey(projectId),
-      folder
-    );
+    setPendingCodeFolder(folder);
     setActiveSection('code');
   };
 
@@ -117,7 +119,13 @@ export function ProjectResources() {
 
       {activeSection === 'public' ? <PublicResourcePage embedded /> : null}
 
-      {activeSection === 'code' ? <CodeResourcePage embedded /> : null}
+      {activeSection === 'code' ? (
+        <CodeResourcePage
+          embedded
+          requestedCreateFolder={pendingCodeFolder}
+          onCreateRequestConsumed={() => setPendingCodeFolder(null)}
+        />
+      ) : null}
 
       {activeSection === 'i18n' ? <I18nResourcePage embedded /> : null}
 

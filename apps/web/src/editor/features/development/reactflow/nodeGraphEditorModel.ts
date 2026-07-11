@@ -45,7 +45,6 @@ export {
   createGraphId,
   createNodeId,
   createSwitchCaseId,
-  createStorageKey,
   isPlainObject,
   resolveColorModeFromDocument,
 } from './nodeGraphEditorUtils';
@@ -69,7 +68,6 @@ import {
   createGraphId,
   createNodeId,
   createSwitchCaseId,
-  createStorageKey,
   isPlainObject,
 } from './nodeGraphEditorUtils';
 
@@ -450,7 +448,6 @@ export const createNode = (
 export {
   createStarterGraph,
   ensureProjectGraphSnapshot,
-  loadProjectSnapshot,
   normalizeGraphDocuments,
 } from './nodeGraphProjectSnapshot';
 export {

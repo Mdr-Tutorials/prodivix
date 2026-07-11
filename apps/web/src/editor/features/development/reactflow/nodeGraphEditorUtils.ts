@@ -1,5 +1,3 @@
-const STORAGE_PREFIX = 'prodivix:nodegraph:native';
-
 const createId = (prefix: string, sliceLength: number) =>
   `${prefix}-${Date.now().toString(36)}-${Math.random()
     .toString(36)
@@ -10,8 +8,6 @@ export const isPlainObject = (
 ): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-export const createStorageKey = (projectId: string) =>
-  `${STORAGE_PREFIX}:${projectId}`;
 export const createNodeId = () => createId('node', 6);
 export const createGraphId = () => createId('graph', 6);
 export const createSwitchCaseId = () => createId('case', 5);

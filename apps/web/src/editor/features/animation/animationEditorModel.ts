@@ -8,7 +8,6 @@ import type {
   SvgFilterDefinition,
 } from '@prodivix/shared/types/pir';
 
-const STORAGE_PREFIX = 'prodivix:animation:native';
 const DEFAULT_TIMELINE_DURATION_MS = 1000;
 const DEFAULT_TIMELINE_NAME = 'Timeline';
 const DEFAULT_BINDING_TARGET_NODE_ID = 'root';
@@ -528,9 +527,6 @@ export const createEmptyAnimationDefinition = (): AnimationDefinition => ({
   timelines: [],
 });
 
-export const createAnimationStorageKey = (projectId: string) =>
-  `${STORAGE_PREFIX}:${projectId}`;
-
 export const createDefaultTimeline = (
   index: number = 0
 ): AnimationTimeline => ({
@@ -648,19 +644,3 @@ export const ensureAnimationDefinition = (
 export const serializeAnimationDefinition = (
   source: AnimationDefinition | null | undefined
 ) => JSON.stringify(source ?? createEmptyAnimationDefinition());
-
-export const loadProjectAnimationSnapshot = (
-  projectId: string
-): AnimationDefinition => {
-  const fallback = createEmptyAnimationDefinition();
-  if (typeof window === 'undefined') return fallback;
-  try {
-    const raw = window.localStorage.getItem(
-      createAnimationStorageKey(projectId)
-    );
-    if (!raw) return fallback;
-    return ensureAnimationDefinition(JSON.parse(raw));
-  } catch {
-    return fallback;
-  }
-};

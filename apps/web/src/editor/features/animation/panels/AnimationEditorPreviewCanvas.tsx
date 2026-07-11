@@ -8,7 +8,7 @@ import type {
   SvgFilterDefinition,
 } from '@prodivix/shared/types/pir';
 import { PIRRenderer } from '@/pir/renderer/PIRRenderer';
-import { materializePirRoot } from '@/pir/graph';
+import { materializePirRoot } from '@prodivix/pir';
 import { buildAnimationPreviewSnapshot } from '@/editor/features/animation/preview/animationPreview';
 
 type AnimationEditorPreviewCanvasProps = {

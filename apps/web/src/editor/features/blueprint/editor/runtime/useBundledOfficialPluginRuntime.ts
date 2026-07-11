@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PluginDiagnostic } from '@prodivix/plugin-contracts';
 import type { UiGraph } from '@prodivix/shared/types/pir';
-import { useEditorStore } from '@/editor/store/useEditorStore';
+import {
+  selectActivePirDocument,
+  selectWorkspaceDocumentsById,
+  useEditorStore,
+} from '@/editor/store/useEditorStore';
 import { buildExternalLibrariesValueFromWorkspace } from '@/editor/features/resources/workspaceExternalLibraries';
 import {
   validateBlueprintComposition,
@@ -28,10 +32,8 @@ export const useBundledOfficialPluginRuntime = () => {
   const { packages } = useWebPluginRuntimeServices();
   const palette = usePaletteQueryService();
   const extensions = useWebExtensionRegistrySnapshot();
-  const pirDoc = useEditorStore((state) => state.pirDoc);
-  const workspaceDocumentsById = useEditorStore(
-    (state) => state.workspaceDocumentsById
-  );
+  const pirDoc = useEditorStore(selectActivePirDocument)!;
+  const workspaceDocumentsById = useEditorStore(selectWorkspaceDocumentsById);
   const configuredLibraryIds = useMemo(
     () =>
       buildExternalLibrariesValueFromWorkspace(workspaceDocumentsById)

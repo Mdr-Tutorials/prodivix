@@ -5,11 +5,7 @@ import {
   normalizePersistedNode,
 } from './graphNodePersistence';
 import { DEFAULT_GRAPH_NAME } from './nodeGraphEditorConstants';
-import {
-  createGraphId,
-  createStorageKey,
-  isPlainObject,
-} from './nodeGraphEditorUtils';
+import { createGraphId, isPlainObject } from './nodeGraphEditorUtils';
 import { createNode } from './nodeGraphEditorModel';
 import type {
   GraphDocument,
@@ -175,49 +171,4 @@ export const ensureProjectGraphSnapshot = (
     activeGraphId,
     graphs: normalizedGraphs,
   };
-};
-
-export const loadProjectSnapshot = (
-  projectId: string
-): ProjectGraphSnapshot => {
-  const fallback = ensureProjectGraphSnapshot(undefined, {
-    fallbackGraphName: DEFAULT_GRAPH_NAME,
-  });
-  if (typeof window === 'undefined') return fallback;
-  try {
-    const raw = window.localStorage.getItem(createStorageKey(projectId));
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw) as unknown;
-    if (isPlainObject(parsed) && Array.isArray(parsed.graphs)) {
-      return ensureProjectGraphSnapshot(parsed, {
-        fallbackGraphName: DEFAULT_GRAPH_NAME,
-      });
-    }
-    if (
-      !isPlainObject(parsed) ||
-      !Array.isArray(parsed.nodes) ||
-      !Array.isArray(parsed.edges)
-    ) {
-      return fallback;
-    }
-    const migratedGraph: GraphDocument = {
-      id: createGraphId(),
-      name: DEFAULT_GRAPH_NAME,
-      nodes: parsed.nodes.map((node, index) =>
-        normalizePersistedNode(node, index)
-      ),
-      edges: parsed.edges.map(normalizePersistedEdge),
-    };
-    return ensureProjectGraphSnapshot(
-      {
-        activeGraphId: migratedGraph.id,
-        graphs: [migratedGraph],
-      },
-      {
-        fallbackGraphName: DEFAULT_GRAPH_NAME,
-      }
-    );
-  } catch {
-    return fallback;
-  }
 };

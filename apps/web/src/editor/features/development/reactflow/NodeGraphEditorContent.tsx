@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import {
   useEdgesState,
@@ -8,16 +7,17 @@ import {
   type Edge,
   type Node,
 } from '@xyflow/react';
-import { useEditorStore } from '@/editor/store/useEditorStore';
+import {
+  selectActivePirDocument,
+  useEditorStore,
+} from '@/editor/store/useEditorStore';
 import type { GraphNodeData, GraphNodeKind } from './GraphNode';
 
 import {
   applyNodeGraphEditorStateToGraphs,
   buildNodeGraphEditorState,
   createNode,
-  createStorageKey,
   ensureProjectGraphSnapshot,
-  loadProjectSnapshot,
   NODE_GRAPH_EDITOR_STATE_KEY,
   normalizeGraphDocuments,
   serializeGraphsForPirLogic,
@@ -64,14 +64,14 @@ const debugNodeGraph = (label: string, payload: Record<string, unknown>) => {
 const serializeEdges = (edges: Edge[]) => JSON.stringify(edges);
 
 export const NodeGraphEditorContent = () => {
-  const { projectId } = useParams();
   const { t } = useTranslation('editor');
-  const pirDoc = useEditorStore((state) => state.pirDoc);
-  const updatePirDoc = useEditorStore((state) => state.updatePirDoc);
-  const resolvedProjectId = projectId?.trim() || 'global';
-  const persistedSnapshot = useMemo(
-    () => loadProjectSnapshot(resolvedProjectId),
-    [resolvedProjectId]
+  const pirDoc = useEditorStore(selectActivePirDocument)!;
+  const updateActivePirDocument = useEditorStore(
+    (state) => state.updateActivePirDocument
+  );
+  const starterSnapshot = useMemo(
+    () => ensureProjectGraphSnapshot(undefined),
+    []
   );
   const pirGraphs = useMemo(
     () => normalizeGraphDocuments(pirDoc.logic?.graphs),
@@ -85,13 +85,11 @@ export const NodeGraphEditorContent = () => {
     if (!pirGraphs.length) return null;
     return ensureProjectGraphSnapshot({
       activeGraphId:
-        pirEditorState?.activeGraphId || persistedSnapshot.activeGraphId,
+        pirEditorState?.activeGraphId || starterSnapshot.activeGraphId,
       graphs: applyNodeGraphEditorStateToGraphs(pirGraphs, pirEditorState),
     });
-  }, [pirEditorState, pirGraphs, persistedSnapshot.activeGraphId]);
-  const initialSnapshot = useMemo(() => {
-    return pirSnapshot ?? persistedSnapshot;
-  }, [pirSnapshot, persistedSnapshot]);
+  }, [pirEditorState, pirGraphs, starterSnapshot.activeGraphId]);
+  const initialSnapshot = pirSnapshot ?? starterSnapshot;
   const initialActiveGraph = resolveActiveGraphFromSnapshot(initialSnapshot);
   const [graphDocs, setGraphDocs] = useState<GraphDocument[]>(
     initialSnapshot.graphs
@@ -186,32 +184,40 @@ export const NodeGraphEditorContent = () => {
       const nextEditorState = buildNodeGraphEditorState(committedSnapshot);
       const nextEditorStateSignature =
         serializeNodeGraphEditorState(nextEditorState);
-      updatePirDoc((doc) => {
-        const existingGraphs = serializeGraphsForPirLogic(
-          normalizeGraphDocuments(doc.logic?.graphs)
-        );
-        const existingEditorState = readNodeGraphEditorStateFromLogic(
-          doc.logic
-        );
-        if (
-          JSON.stringify(existingGraphs) === nextGraphsSignature &&
-          serializeNodeGraphEditorState(existingEditorState) ===
-            nextEditorStateSignature
-        ) {
-          return doc;
+      updateActivePirDocument(
+        (doc) => {
+          const existingGraphs = serializeGraphsForPirLogic(
+            normalizeGraphDocuments(doc.logic?.graphs)
+          );
+          const existingEditorState = readNodeGraphEditorStateFromLogic(
+            doc.logic
+          );
+          if (
+            JSON.stringify(existingGraphs) === nextGraphsSignature &&
+            serializeNodeGraphEditorState(existingEditorState) ===
+              nextEditorStateSignature
+          ) {
+            return doc;
+          }
+          const nextLogic = {
+            ...(doc.logic ?? {}),
+            graphs: nextPirGraphs,
+            [NODE_GRAPH_EDITOR_STATE_KEY]: nextEditorState,
+          };
+          return {
+            ...doc,
+            logic: nextLogic,
+          };
+        },
+        {
+          namespace: 'core.nodegraph',
+          type: 'graph.update',
+          mergeKey: `nodegraph:${activeGraphIdRef.current}`,
+          label: 'Update node graph',
         }
-        const nextLogic = {
-          ...(doc.logic ?? {}),
-          graphs: nextPirGraphs,
-          [NODE_GRAPH_EDITOR_STATE_KEY]: nextEditorState,
-        };
-        return {
-          ...doc,
-          logic: nextLogic,
-        };
-      });
+      );
     },
-    [edges, nodes, updatePirDoc]
+    [edges, nodes, updateActivePirDocument]
   );
 
   const currentSnapshot = useMemo(
@@ -283,97 +289,30 @@ export const NodeGraphEditorContent = () => {
 
   useEffect(() => {
     if (isDraggingNode) return;
-    const nextSnapshot = pirGraphs.length
-      ? ensureProjectGraphSnapshot({
-          activeGraphId:
-            pirEditorState?.activeGraphId ||
-            activeGraphIdRef.current ||
-            persistedSnapshot.activeGraphId,
-          graphs: applyNodeGraphEditorStateToGraphs(pirGraphs, pirEditorState),
-        })
-      : persistedSnapshot;
+    if (!pirGraphs.length) return;
+    const nextSnapshot = ensureProjectGraphSnapshot({
+      activeGraphId:
+        pirEditorState?.activeGraphId ||
+        activeGraphIdRef.current ||
+        starterSnapshot.activeGraphId,
+      graphs: applyNodeGraphEditorStateToGraphs(pirGraphs, pirEditorState),
+    });
     const nextSnapshotSignature = serializeSnapshotForPir(nextSnapshot);
     if (nextSnapshotSignature !== currentPirComparableSignatureRef.current) {
       applySnapshot(nextSnapshot);
     }
-    if (pirGraphs.length) {
-      if (pirEditorState) return;
-      updatePirDoc((doc) => {
-        const existingGraphs = normalizeGraphDocuments(doc.logic?.graphs);
-        if (!existingGraphs.length) return doc;
-        const migratedSnapshot = ensureProjectGraphSnapshot({
-          activeGraphId:
-            activeGraphIdRef.current || persistedSnapshot.activeGraphId,
-          graphs: existingGraphs,
-        });
-        const migratedGraphs = serializeGraphsForPirLogic(
-          migratedSnapshot.graphs
-        );
-        const migratedEditorState = buildNodeGraphEditorState(migratedSnapshot);
-        const existingEditorState = readNodeGraphEditorStateFromLogic(
-          doc.logic
-        );
-        const existingGraphsSignature = JSON.stringify(
-          serializeGraphsForPirLogic(existingGraphs)
-        );
-        if (
-          existingGraphsSignature === JSON.stringify(migratedGraphs) &&
-          serializeNodeGraphEditorState(existingEditorState) ===
-            serializeNodeGraphEditorState(migratedEditorState)
-        ) {
-          return doc;
-        }
-        const nextLogic = {
-          ...(doc.logic ?? {}),
-          graphs: migratedGraphs,
-          [NODE_GRAPH_EDITOR_STATE_KEY]: migratedEditorState,
-        };
-        return {
-          ...doc,
-          logic: nextLogic,
-        };
-      });
-      return;
-    }
-    updatePirDoc((doc) => {
-      const existingGraphs = normalizeGraphDocuments(doc.logic?.graphs);
-      if (existingGraphs.length) return doc;
-      const migratedSnapshot = ensureProjectGraphSnapshot(persistedSnapshot);
-      const migratedGraphs = serializeGraphsForPirLogic(
-        migratedSnapshot.graphs
-      );
-      const migratedEditorState = buildNodeGraphEditorState(migratedSnapshot);
-      const nextLogic = {
-        ...(doc.logic ?? {}),
-        graphs: migratedGraphs,
-        [NODE_GRAPH_EDITOR_STATE_KEY]: migratedEditorState,
-      };
-      return {
-        ...doc,
-        logic: nextLogic,
-      };
-    });
   }, [
     applySnapshot,
     isDraggingNode,
     pirEditorState,
     pirGraphs,
-    persistedSnapshot,
-    updatePirDoc,
+    starterSnapshot.activeGraphId,
   ]);
 
   useEffect(() => {
     if (isDraggingNode) return;
     commitCanvasToGraphDocs();
   }, [commitCanvasToGraphDocs, isDraggingNode]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(
-      createStorageKey(resolvedProjectId),
-      JSON.stringify(currentSnapshot)
-    );
-  }, [currentSnapshot, resolvedProjectId]);
 
   useEffect(() => {
     if (!hint) return;

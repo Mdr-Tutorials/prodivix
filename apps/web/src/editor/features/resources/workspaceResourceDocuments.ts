@@ -1,8 +1,4 @@
-import type {
-  PatchWorkspaceDocumentRequest,
-  WorkspaceDocumentRecord,
-} from '@/editor/editorApi';
-import type { WorkspaceVfsNode } from '@/editor/store/editorStore.types';
+import type { PatchWorkspaceDocumentRequest } from '@/editor/editorApi';
 import {
   collectRouteManifestDocumentRefs,
   type WorkspaceRouteManifest,
@@ -11,8 +7,10 @@ import {
   createWorkspaceDocumentIntentRequest,
   deleteWorkspaceDocumentIntentRequest,
   renameWorkspaceDocumentIntentRequest,
-  type StableWorkspaceDocumentType,
-} from '@/workspace';
+  type WorkspaceDocument,
+  type WorkspaceDocumentType,
+  type WorkspaceVfsNode,
+} from '@prodivix/workspace';
 
 export const RESOURCE_ROOTS = {
   public: '/public',
@@ -99,9 +97,9 @@ export const joinWorkspaceResourcePath = (...parts: string[]) =>
   normalizeWorkspaceResourcePath(parts.join('/'));
 
 export const listWorkspaceDocumentsByPrefix = (
-  documentsById: Record<string, WorkspaceDocumentRecord>,
+  documentsById: Record<string, WorkspaceDocument>,
   prefix: string,
-  type?: StableWorkspaceDocumentType
+  type?: WorkspaceDocumentType
 ) => {
   const normalizedPrefix = normalizeWorkspaceResourcePath(prefix);
   return Object.values(documentsById)
@@ -117,9 +115,9 @@ export const listWorkspaceDocumentsByPrefix = (
 };
 
 export const findWorkspaceDocumentByPath = (
-  documentsById: Record<string, WorkspaceDocumentRecord>,
+  documentsById: Record<string, WorkspaceDocument>,
   path: string,
-  type?: StableWorkspaceDocumentType
+  type?: WorkspaceDocumentType
 ) => {
   const normalizedPath = normalizeWorkspaceResourcePath(path);
   return Object.values(documentsById).find(
@@ -155,7 +153,7 @@ export const createWorkspaceConfigDocumentContent = <TValue>(
 });
 
 export const getWorkspaceConfigDocumentValue = <TValue>(
-  documentsById: Record<string, WorkspaceDocumentRecord>,
+  documentsById: Record<string, WorkspaceDocument>,
   path: string,
   fallback: TValue
 ): TValue => {
@@ -184,7 +182,7 @@ export const createWorkspaceResourceDocumentRequest = ({
   nodeId?: string;
   parentNodeId?: string;
   path: string;
-  type: StableWorkspaceDocumentType;
+  type: WorkspaceDocumentType;
   content: unknown;
 }) =>
   createWorkspaceDocumentIntentRequest({
@@ -208,7 +206,7 @@ export const renameWorkspaceResourceDocumentRequest = ({
   workspaceRev: number;
   documentId: string;
   path: string;
-  type: StableWorkspaceDocumentType;
+  type: WorkspaceDocumentType;
 }) =>
   renameWorkspaceDocumentIntentRequest({
     workspaceRev,
@@ -226,7 +224,7 @@ export const deleteWorkspaceResourceDocumentRequest = ({
 }: {
   workspaceRev: number;
   documentId: string;
-  type: StableWorkspaceDocumentType;
+  type: WorkspaceDocumentType;
 }) =>
   deleteWorkspaceDocumentIntentRequest({
     workspaceRev,
@@ -248,7 +246,7 @@ export const createWorkspaceResourceValuePatchRequest = <TValue>({
   label,
 }: {
   workspaceId: string;
-  document: WorkspaceDocumentRecord;
+  document: WorkspaceDocument;
   value: TValue;
   label?: string;
 }): PatchWorkspaceDocumentRequest | null => {

@@ -8,6 +8,18 @@
       "path": "./packages/shared"
     },
     {
+      "path": "./packages/diagnostics"
+    },
+    {
+      "path": "./packages/authoring"
+    },
+    {
+      "path": "./packages/pir"
+    },
+    {
+      "path": "./packages/workspace"
+    },
+    {
       "path": "./packages/ai"
     },
     {

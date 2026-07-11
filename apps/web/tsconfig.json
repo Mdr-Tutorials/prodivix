@@ -8,6 +8,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@prodivix/ai": ["../../packages/ai/src"],
+      "@prodivix/authoring": ["../../packages/authoring/src"],
+      "@prodivix/diagnostics": ["../../packages/diagnostics/src"],
       "@prodivix/i18n": ["../../packages/i18n/src"],
       "@prodivix/plugin-browser": ["../../packages/plugin-browser/src"],
       "@prodivix/plugin-antd": ["../../packages/plugin-antd/src"],
@@ -18,6 +20,7 @@
       "@prodivix/plugin-protocol": ["../../packages/plugin-protocol/src"],
       "@prodivix/plugin-radix": ["../../packages/plugin-radix/src"],
       "@prodivix/plugin-react-host": ["../../packages/plugin-react-host/src"],
+      "@prodivix/pir": ["../../packages/pir/src"],
       "@prodivix/prodivix-compiler": ["../../packages/prodivix-compiler/src"],
       "@prodivix/shared": ["../../packages/shared/src"],
       "@prodivix/shared/package.json": ["../../packages/shared/package.json"],
@@ -25,7 +28,8 @@
       "@prodivix/themes": ["../../packages/themes/src"],
       "@prodivix/themes/package.json": ["../../packages/themes/package.json"],
       "@prodivix/ui": ["../../packages/ui/src"],
-      "@prodivix/ui/package.json": ["../../packages/ui/package.json"]
+      "@prodivix/ui/package.json": ["../../packages/ui/package.json"],
+      "@prodivix/workspace": ["../../packages/workspace/src"]
     }
   },
   "include": ["src/**/*"],
@@ -33,6 +37,18 @@
   "references": [
     {
       "path": "../../packages/shared"
+    },
+    {
+      "path": "../../packages/diagnostics"
+    },
+    {
+      "path": "../../packages/authoring"
+    },
+    {
+      "path": "../../packages/pir"
+    },
+    {
+      "path": "../../packages/workspace"
     },
     {
       "path": "../../packages/ai"

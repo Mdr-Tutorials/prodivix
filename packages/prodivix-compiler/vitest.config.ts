@@ -5,6 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '#src': resolve(__dirname, 'src'),
+      '@prodivix/pir': resolve(__dirname, '../pir/src'),
       '@prodivix/shared': resolve(__dirname, '../shared/src'),
     },
   },

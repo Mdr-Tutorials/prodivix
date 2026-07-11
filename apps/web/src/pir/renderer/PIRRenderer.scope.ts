@@ -1,5 +1,5 @@
 import type { ComponentNode } from '@prodivix/shared/types/pir';
-import { deepResolveValueOrRef, readValueByPath } from '@/pir/shared/valueRef';
+import { deepResolveValueOrRef, readValueByPath } from '@prodivix/pir';
 import type { RenderContext } from './PIRRenderer.types';
 
 const resolvePathLikeString = (value: string, data: unknown): unknown => {

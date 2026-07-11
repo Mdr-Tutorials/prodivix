@@ -1,7 +1,11 @@
 import { useEffect, useMemo } from 'react';
-import { isWorkspacePirDocument } from '@/editor/store/editorStore.normalizers';
-import { useEditorStore } from '@/editor/store/useEditorStore';
-import { materializePirRoot } from '@/pir/graph';
+import { isWorkspacePirDocument } from '@prodivix/workspace';
+import {
+  selectRouteManifest,
+  selectWorkspaceDocumentsById,
+  useEditorStore,
+} from '@/editor/store/useEditorStore';
+import { materializePirRoot } from '@prodivix/pir';
 import { logRouteDebug } from '@/pir/renderer/routeDebug';
 import {
   composeRouteManifestWithModules,
@@ -10,10 +14,8 @@ import {
 } from '@prodivix/shared/router';
 
 export function useActiveRoutePreview(currentPath: string) {
-  const routeManifest = useEditorStore((state) => state.routeManifest);
-  const workspaceDocumentsById = useEditorStore(
-    (state) => state.workspaceDocumentsById
-  );
+  const routeManifest = useEditorStore(selectRouteManifest)!;
+  const workspaceDocumentsById = useEditorStore(selectWorkspaceDocumentsById);
   const composedRouteManifest = useMemo(
     () => composeRouteManifestWithModules(routeManifest).manifest,
     [routeManifest]

@@ -1,7 +1,9 @@
 import type { ComponentNode } from '@prodivix/shared/types/pir';
-import type { CodeSlotBinding } from '@/authoring';
-import type { WorkspaceDocumentRecord } from '@/editor/editorApi';
-import { isWorkspaceCodeDocumentContent } from '@/workspace';
+import type { CodeSlotBinding } from '@prodivix/authoring';
+import {
+  isWorkspaceCodeDocumentContent,
+  type WorkspaceDocument,
+} from '@prodivix/workspace';
 
 export type MountedCssEntry = {
   id: string;
@@ -173,7 +175,7 @@ export const upsertMountedCssBinding = (
 
 export const resolveMountedCssEntriesFromWorkspace = (
   node: ComponentNode,
-  documentsById: Record<string, WorkspaceDocumentRecord>
+  documentsById: Record<string, WorkspaceDocument>
 ): MountedCssEntry[] => {
   const entries = resolveMountedCssBindings(node)
     .map((binding) => {
@@ -203,7 +205,7 @@ export const resolveMountedCssEntriesFromWorkspace = (
 
 export const resolveMountedCssEntries = (
   node: ComponentNode,
-  documentsById: Record<string, WorkspaceDocumentRecord> = {}
+  documentsById: Record<string, WorkspaceDocument> = {}
 ): MountedCssEntry[] => {
   const entries: MountedCssEntry[] = resolveMountedCssEntriesFromWorkspace(
     node,

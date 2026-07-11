@@ -6,7 +6,7 @@ import {
   supportsChildrenForNode,
 } from '@/editor/features/blueprint/editor/model/tree';
 import type { PIRDocument } from '@prodivix/shared/types/pir';
-import { getParentMap, materializePirRoot, moveNode } from '@/pir/graph';
+import { getParentMap, materializePirRoot, moveNode } from '@prodivix/pir';
 import type { PaletteQueryService } from '@/plugins/platform';
 import {
   validateBlueprintComposition,

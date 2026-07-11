@@ -11,6 +11,10 @@ import {
   type PluginHostResult,
 } from '@prodivix/plugin-host';
 import { flattenRouteManifest } from '@prodivix/shared/router';
+import {
+  selectActivePirWorkspaceDocument,
+  type WorkspaceSnapshot,
+} from '@prodivix/workspace';
 import { useEditorStore } from '@/editor/store/useEditorStore';
 
 const unavailable = (method: string) =>
@@ -22,13 +26,11 @@ const unavailable = (method: string) =>
     ),
   ]);
 
-type EditorState = ReturnType<typeof useEditorStore.getState>;
-
 const requireWorkspaceState = (
   workspaceId: string
-): PluginHostResult<EditorState> => {
-  const state = useEditorStore.getState();
-  if (state.workspaceId !== workspaceId) {
+): PluginHostResult<WorkspaceSnapshot> => {
+  const workspace = useEditorStore.getState().workspace;
+  if (!workspace || workspace.id !== workspaceId) {
     return pluginHostFailure([
       createPluginDiagnostic(
         PLUGIN_DIAGNOSTIC_CODES.GATEWAY_SESSION_STALE,
@@ -37,7 +39,7 @@ const requireWorkspaceState = (
       ),
     ]);
   }
-  return pluginHostSuccess(state);
+  return pluginHostSuccess(workspace);
 };
 
 export const createEditorPluginGatewayServices = (
@@ -50,14 +52,17 @@ export const createEditorPluginGatewayServices = (
         if (current.ok === false) {
           return pluginHostFailure(current.diagnostics);
         }
-        const state = current.value;
+        const workspace = current.value;
+        const activePirDocument = selectActivePirWorkspaceDocument(workspace);
         return pluginHostSuccess(
           Object.freeze({
             workspaceId,
-            revision: state.workspaceRev ?? 0,
-            documentCount: Object.keys(state.workspaceDocumentsById).length,
-            routeCount: flattenRouteManifest(state.routeManifest).length,
-            componentCount: Object.keys(state.pirDoc.ui.graph.nodesById).length,
+            revision: workspace.workspaceRev,
+            documentCount: Object.keys(workspace.docsById).length,
+            routeCount: flattenRouteManifest(workspace.routeManifest).length,
+            componentCount: Object.keys(
+              activePirDocument?.content.ui.graph.nodesById ?? {}
+            ).length,
           })
         );
       },
@@ -69,8 +74,7 @@ export const createEditorPluginGatewayServices = (
         if (current.ok === false) {
           return pluginHostFailure(current.diagnostics);
         }
-        const document =
-          current.value.workspaceDocumentsById[request.documentId];
+        const document = current.value.docsById[request.documentId];
         if (!document) {
           return pluginHostFailure([
             createPluginDiagnostic(

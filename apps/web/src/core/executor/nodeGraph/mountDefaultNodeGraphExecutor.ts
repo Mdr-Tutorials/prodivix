@@ -6,7 +6,7 @@ import {
 import { executePirNodeGraph } from '@/core/executor/nodeGraph/nodeGraphExecutor';
 
 type MountDefaultNodeGraphExecutorOptions = {
-  getPirDoc: () => PIRDocument;
+  getActivePirDocument: () => PIRDocument | undefined;
 };
 
 /**
@@ -14,8 +14,8 @@ type MountDefaultNodeGraphExecutorOptions = {
  * executeGraph bridge -> default graph handler -> PIR graph executor。
  */
 export const mountDefaultNodeGraphExecutor = ({
-  getPirDoc,
+  getActivePirDocument,
 }: MountDefaultNodeGraphExecutorOptions) =>
   registerGraphExecutionHandler('*', (request: GraphExecutionRequest) =>
-    executePirNodeGraph(getPirDoc(), request)
+    executePirNodeGraph(getActivePirDocument(), request)
   );

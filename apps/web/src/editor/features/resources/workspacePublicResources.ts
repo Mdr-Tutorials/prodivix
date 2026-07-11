@@ -1,5 +1,4 @@
-import type { WorkspaceDocumentRecord } from '@/editor/editorApi';
-import type { WorkspaceVfsNode } from '@/editor/store/editorStore.types';
+import type { WorkspaceDocument, WorkspaceVfsNode } from '@prodivix/workspace';
 import {
   isWorkspaceAssetContent,
   normalizeWorkspaceResourcePath,
@@ -71,7 +70,7 @@ const createRoot = () =>
   );
 
 export const buildPublicResourceTreeFromWorkspace = (
-  documentsById: Record<string, WorkspaceDocumentRecord>,
+  documentsById: Record<string, WorkspaceDocument>,
   treeRootId: string | undefined,
   treeById: Record<string, WorkspaceVfsNode>
 ): PublicResourceNode => {

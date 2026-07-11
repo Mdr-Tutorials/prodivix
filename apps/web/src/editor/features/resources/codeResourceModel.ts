@@ -28,10 +28,6 @@ export const CODE_FILE_KINDS: CodeFileKind[] = [
 export const getResourceManagerCodeSelectionStorageKey = (projectId?: string) =>
   `prodivix.resourceManager.code.selection.${projectId?.trim() || 'default'}`;
 
-export const getResourceManagerCodeCreateRequestStorageKey = (
-  projectId?: string
-) => `prodivix.resourceManager.code.create.${projectId?.trim() || 'default'}`;
-
 export const resolveTemplateByCodeKind = (
   kind: CodeFileKind
 ): CodeFileTemplate => {

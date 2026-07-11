@@ -9,12 +9,16 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDroppable } from '@dnd-kit/core';
-import { useEditorStore } from '@/editor/store/useEditorStore';
+import {
+  selectActivePirDocument,
+  selectWorkspaceDocumentsById,
+  useEditorStore,
+} from '@/editor/store/useEditorStore';
 import { useSettingsStore } from '@/editor/store/useSettingsStore';
 import { PIRRenderer } from '@/pir/renderer/PIRRenderer';
 import type { RendererCodeArtifact } from '@/pir/renderer/PIRRenderer.types';
-import { materializePirRoot } from '@/pir/graph';
-import { isWorkspaceCodeDocumentContent } from '@/workspace';
+import { materializePirRoot } from '@prodivix/pir';
+import { isWorkspaceCodeDocumentContent } from '@prodivix/workspace';
 import {
   createOrderedComponentRegistry,
   parseResolverOrder,
@@ -91,10 +95,8 @@ export function BlueprintEditorCanvas({
   const diagnostics = useSettingsStore((state) => state.global.diagnostics);
   const [isPanning, setIsPanning] = useState(false);
   const extensionRegistry = useWebExtensionRegistrySnapshot();
-  const pirDoc = useEditorStore((state) => state.pirDoc);
-  const workspaceDocumentsById = useEditorStore(
-    (state) => state.workspaceDocumentsById
-  );
+  const pirDoc = useEditorStore(selectActivePirDocument)!;
+  const workspaceDocumentsById = useEditorStore(selectWorkspaceDocumentsById);
   const pirRoot = useMemo(() => materializePirRoot(pirDoc), [pirDoc]);
   const codeArtifacts = useMemo<RendererCodeArtifact[]>(() => {
     const artifacts: RendererCodeArtifact[] = [];

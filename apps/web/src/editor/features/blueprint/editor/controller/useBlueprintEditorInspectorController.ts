@@ -6,16 +6,33 @@ import {
   materializePirRoot,
   renameNodeId as renameUiGraphNodeId,
   updateUiGraphSubtree,
-} from '@/pir/graph';
+} from '@prodivix/pir';
 import type { IconRef } from '@/pir/renderer/iconRegistry';
 import type { TriggerEntry } from '@/editor/features/blueprint/editor/inspector/InspectorContext.types';
 import { createDefaultActionParams } from '@/pir/actions/registry';
 import { isIconRef, resolveIconRef } from '@/pir/renderer/iconRegistry';
-import { useEditorStore } from '@/editor/store/useEditorStore';
+import {
+  selectActivePirDocument,
+  selectActivePirDocumentRecord,
+  selectActiveRouteNodeId,
+  selectRouteManifest,
+  selectWorkspace,
+  selectWorkspaceDocumentsById,
+  useEditorStore,
+} from '@/editor/store/useEditorStore';
 import type { WorkspaceRouteNode } from '@/editor/store/useEditorStore';
 import { useAuthStore } from '@/auth/useAuthStore';
 import { editorApi } from '@/editor/editorApi';
-import { createWorkspaceCodeDocumentIntentRequest } from '@/workspace';
+import {
+  createNodeRenameTransaction,
+  createNodeSubtreeRemovalTransaction,
+  createWorkspaceCodeBindingTransaction,
+  createWorkspaceCodeDocumentIntentRequest,
+  type WorkspaceCodeDocumentContent,
+  type WorkspaceCommandEnvelope,
+  type WorkspaceDocument,
+} from '@prodivix/workspace';
+import { isLocalProjectId } from '@/editor/localProjectStore';
 import {
   composeRouteManifestWithModules,
   findRouteNodeParentInfo,
@@ -49,7 +66,6 @@ import {
 import { useMountedCssEditorState } from '@/editor/features/blueprint/editor/inspector/components/classProtocol/useMountedCssEditorState';
 import { getPrimaryTextField } from '@/editor/features/blueprint/editor/model/blueprintText';
 import { findNodeById } from '@/editor/features/blueprint/editor/controller/inspectorUtils';
-
 let persistedExpandedPanels: Record<string, boolean> = {};
 
 const createIntentId = () => {
@@ -69,13 +85,20 @@ export const useBlueprintEditorInspectorController = () => {
   const { projectId } = useParams();
   const blueprintKey = projectId ?? 'global';
   const token = useAuthStore((state) => state.token);
-  const pirDoc = useEditorStore((state) => state.pirDoc);
-  const updatePirDoc = useEditorStore((state) => state.updatePirDoc);
-  const workspaceId = useEditorStore((state) => state.workspaceId);
-  const workspaceRev = useEditorStore((state) => state.workspaceRev);
-  const workspaceDocumentsById = useEditorStore(
-    (state) => state.workspaceDocumentsById
+  const workspace = useEditorStore(selectWorkspace)!;
+  const activePirDocument = useEditorStore(selectActivePirDocumentRecord)!;
+  const pirDoc = useEditorStore(selectActivePirDocument)!;
+  const updateActivePirDocument = useEditorStore(
+    (state) => state.updateActivePirDocument
   );
+  const dispatchWorkspaceCommand = useEditorStore(
+    (state) => state.dispatchWorkspaceCommand
+  );
+  const dispatchWorkspaceTransaction = useEditorStore(
+    (state) => state.dispatchWorkspaceTransaction
+  );
+  const workspaceId = workspace.id;
+  const workspaceDocumentsById = useEditorStore(selectWorkspaceDocumentsById);
   const workspaceCapabilities = useEditorStore(
     (state) => state.workspaceCapabilities
   );
@@ -86,8 +109,8 @@ export const useBlueprintEditorInspectorController = () => {
   const applyWorkspaceMutation = useEditorStore(
     (state) => state.applyWorkspaceMutation
   );
-  const routeManifest = useEditorStore((state) => state.routeManifest);
-  const activeRouteNodeId = useEditorStore((state) => state.activeRouteNodeId);
+  const routeManifest = useEditorStore(selectRouteManifest)!;
+  const activeRouteNodeId = useEditorStore(selectActiveRouteNodeId);
   const applyRouteIntent = useEditorStore((state) => state.applyRouteIntent);
   const bindOutletToRoute = useEditorStore((state) => state.bindOutletToRoute);
   const setBlueprintState = useEditorStore((state) => state.setBlueprintState);
@@ -390,47 +413,67 @@ export const useBlueprintEditorInspectorController = () => {
     if (!selectedNode?.id) return;
     const currentSelectedId = selectedNode.id;
     const currentPatternId = getLayoutPatternId(selectedNode);
-    updatePirDoc((doc) => {
-      const result = updateUiGraphSubtree(
-        doc.ui.graph,
-        selectedNode.id,
-        updater
-      );
-      if (!result.changed) return doc;
-      const nextDoc = {
-        ...doc,
-        ui: { graph: result.graph },
-      };
-      const nextRoot = materializePirRoot(nextDoc);
-      const keptSelection = findNodeById(nextRoot, currentSelectedId);
-      if (keptSelection) return nextDoc;
-      if (!currentPatternId) return nextDoc;
-      const patternRootId = findLayoutPatternRootId(nextRoot, currentPatternId);
-      if (patternRootId) {
-        setBlueprintState(blueprintKey, { selectedId: patternRootId });
-      }
-      return nextDoc;
+    const result = updateUiGraphSubtree(
+      pirDoc.ui.graph,
+      selectedNode.id,
+      updater
+    );
+    if (!result.changed) return;
+    const removedNodeIds = Object.keys(pirDoc.ui.graph.nodesById).filter(
+      (nodeId) => !result.graph.nodesById[nodeId]
+    );
+    const applied = removedNodeIds.length
+      ? (() => {
+          const transaction = createNodeSubtreeRemovalTransaction({
+            workspace,
+            document: activePirDocument,
+            afterGraph: result.graph,
+            removedNodeIds,
+            label: 'Update component subtree',
+          });
+          return transaction ? dispatchWorkspaceTransaction(transaction) : null;
+        })()
+      : updateActivePirDocument(
+          (doc) => ({ ...doc, ui: { graph: result.graph } }),
+          {
+            namespace: 'core.blueprint',
+            type: 'node.update',
+            label: 'Update component',
+          }
+        );
+    if (!applied?.ok) return;
+    const nextRoot = materializePirRoot({
+      ...pirDoc,
+      ui: { graph: result.graph },
     });
+    if (findNodeById(nextRoot, currentSelectedId) || !currentPatternId) return;
+    const patternRootId = findLayoutPatternRootId(nextRoot, currentPatternId);
+    if (patternRootId) {
+      setBlueprintState(blueprintKey, { selectedId: patternRootId });
+    }
   };
 
   const applyRename = () => {
     if (!selectedNode?.id || !canApply) return;
     const nextId = trimmedDraftId;
-    updatePirDoc((doc) => {
-      const graph = renameUiGraphNodeId(doc.ui.graph, selectedNode.id, nextId);
-      if (graph === doc.ui.graph) return doc;
-      return {
-        ...doc,
-        ui: { graph },
-      };
+    const graph = renameUiGraphNodeId(pirDoc.ui.graph, selectedNode.id, nextId);
+    if (graph === pirDoc.ui.graph) return;
+    const transaction = createNodeRenameTransaction({
+      workspace,
+      document: activePirDocument,
+      afterGraph: graph,
+      nodeIdMap: { [selectedNode.id]: nextId },
     });
+    if (!transaction) return;
+    const applied = dispatchWorkspaceTransaction(transaction);
+    if (!applied?.ok) return;
     setBlueprintState(blueprintKey, { selectedId: nextId });
   };
 
   const mountSelectedNodeToAnimation = useCallback(() => {
     const targetNodeId = selectedNode?.id?.trim();
     if (!targetNodeId) return;
-    updatePirDoc((doc) => {
+    updateActivePirDocument((doc) => {
       const animation = normalizeAnimationDefinition(doc.animation) ?? {
         version: 1 as const,
         timelines: [],
@@ -483,12 +526,12 @@ export const useBlueprintEditorInspectorController = () => {
         },
       };
     });
-  }, [selectedNode?.id, updatePirDoc]);
+  }, [selectedNode?.id, updateActivePirDocument]);
 
   const unmountSelectedNodeFromAnimation = useCallback(() => {
     const targetNodeId = selectedNode?.id?.trim();
     if (!targetNodeId) return;
-    updatePirDoc((doc) => {
+    updateActivePirDocument((doc) => {
       const animation = normalizeAnimationDefinition(doc.animation);
       if (!animation) return doc;
       let changed = false;
@@ -514,7 +557,7 @@ export const useBlueprintEditorInspectorController = () => {
         },
       };
     });
-  }, [selectedNode?.id, updatePirDoc]);
+  }, [selectedNode?.id, updateActivePirDocument]);
 
   const openAnimationEditor = useCallback(() => {
     const resolvedProjectId = projectId?.trim();
@@ -640,17 +683,10 @@ export const useBlueprintEditorInspectorController = () => {
 
   const saveMountedCssToVfs = useCallback(
     async (value: string) => {
-      if (!selectedNode?.id || !token || !workspaceId || workspaceRev == null) {
-        return false;
-      }
+      if (!selectedNode?.id) return false;
       if (workspaceReadonly) return false;
-      if (
-        workspaceCapabilitiesLoaded &&
-        workspaceCapabilities['core.workspace.code-document.create@1.0'] !==
-          true
-      ) {
-        return false;
-      }
+      const localWorkspace = isLocalProjectId(projectId);
+      if (!localWorkspace && !token) return false;
 
       const existingEntry = mountedCssEntries[0];
       const source = value || '/* Mounted CSS */\n';
@@ -665,74 +701,127 @@ export const useBlueprintEditorInspectorController = () => {
           typeof document.content.source === 'string'
             ? document.content.source
             : '';
+        if (source === previousSource) return true;
+        const issuedAt = new Date().toISOString();
+        const command: WorkspaceCommandEnvelope = {
+          id: createIntentId(),
+          namespace: 'core.code',
+          type: 'source.update',
+          version: '1.0',
+          issuedAt,
+          forwardOps: [{ op: 'replace', path: '/source', value: source }],
+          reverseOps: [
+            { op: 'replace', path: '/source', value: previousSource },
+          ],
+          target: { workspaceId, documentId },
+          domainHint: 'code',
+          label: 'Update mounted CSS',
+        };
+        const applied = dispatchWorkspaceCommand(command);
+        if (!applied?.ok) return false;
+        if (localWorkspace) return true;
+        if (!token) return false;
+
         const mutation = await editorApi.patchWorkspaceDocument(
           token,
-          workspaceId,
+          workspace,
           documentId,
           {
             expectedContentRev: document.contentRev,
-            command: {
-              id: createIntentId(),
-              namespace: 'core.code',
-              type: 'source.update',
-              version: '1.0',
-              issuedAt: new Date().toISOString(),
-              forwardOps: [{ op: 'replace', path: '/source', value: source }],
-              reverseOps: [
-                { op: 'replace', path: '/source', value: previousSource },
-              ],
-              target: { workspaceId, documentId },
-            },
+            command,
           }
         );
         applyWorkspaceMutation(mutation);
         return true;
       }
 
+      if (
+        workspaceCapabilitiesLoaded &&
+        workspaceCapabilities['core.workspace.code-document.create@1.0'] !==
+          true
+      ) {
+        return false;
+      }
+
       const documentId = createMountedCssDocumentId(selectedNode.id);
+      const path = createMountedCssPath(selectedNode.id);
+      const issuedAt = new Date().toISOString();
+      const codeContent: WorkspaceCodeDocumentContent = {
+        language: 'css',
+        source,
+        metadata: {
+          slotKind: 'mounted-css',
+          ownerKind: 'pir-node',
+          ownerId: selectedNode.id,
+        },
+      };
+      const document: WorkspaceDocument = {
+        id: documentId,
+        type: 'code',
+        name: path.split('/').at(-1) ?? `${documentId}.css`,
+        path,
+        contentRev: 1,
+        metaRev: 1,
+        content: codeContent,
+      };
+      const graphResult = updateUiGraphSubtree(
+        pirDoc.ui.graph,
+        selectedNode.id,
+        (current) =>
+          upsertMountedCssBinding(current, {
+            slotId: createMountedCssSlotId(current.id),
+            reference: { artifactId: documentId },
+          })
+      );
+      if (!graphResult.changed) return false;
+      const transaction = createWorkspaceCodeBindingTransaction({
+        workspace,
+        ownerDocument: activePirDocument,
+        codeDocument: document,
+        afterGraph: graphResult.graph,
+        transactionId: createIntentId(),
+        issuedAt,
+        label: 'Create and bind mounted CSS',
+      });
+      if (!transaction) return false;
+      const applied = dispatchWorkspaceTransaction(transaction);
+      if (!applied?.ok) return false;
+      if (localWorkspace) return true;
+      if (!token) return false;
+
       const request = createWorkspaceCodeDocumentIntentRequest({
-        workspaceRev,
+        workspaceRev: workspace.workspaceRev,
         intentId: createIntentId(),
-        issuedAt: new Date().toISOString(),
+        issuedAt,
         documentId,
         nodeId: createMountedCssNodeId(selectedNode.id),
-        path: createMountedCssPath(selectedNode.id),
-        content: {
-          language: 'css',
-          source,
-          metadata: {
-            slotKind: 'mounted-css',
-            ownerKind: 'pir-node',
-            ownerId: selectedNode.id,
-          },
-        },
+        path,
+        content: codeContent,
       });
       const mutation = await editorApi.applyWorkspaceIntent(
         token,
-        workspaceId,
+        workspace,
         request
       );
       applyWorkspaceMutation(mutation);
-      updateSelectedNode((current) =>
-        upsertMountedCssBinding(current, {
-          slotId: createMountedCssSlotId(current.id),
-          reference: { artifactId: documentId },
-        })
-      );
       return true;
     },
     [
+      activePirDocument.id,
       applyWorkspaceMutation,
+      dispatchWorkspaceCommand,
+      dispatchWorkspaceTransaction,
       mountedCssEntries,
+      pirDoc.ui.graph,
+      projectId,
       selectedNode?.id,
       token,
-      updateSelectedNode,
       workspaceCapabilities,
       workspaceCapabilitiesLoaded,
       workspaceDocumentsById,
+      workspace,
       workspaceId,
       workspaceReadonly,
-      workspaceRev,
     ]
   );
 

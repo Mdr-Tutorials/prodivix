@@ -5,7 +5,7 @@ import type {
   PIRDocument,
   ValueOrRef,
 } from '@prodivix/shared/types/pir';
-import { materializePirRoot } from '#src/graph/materialize';
+import { materializePirRoot } from '@prodivix/pir';
 import type { DiagnosticBag } from '#src/core/diagnostics';
 
 export type CanonicalText = ValueOrRef | undefined;

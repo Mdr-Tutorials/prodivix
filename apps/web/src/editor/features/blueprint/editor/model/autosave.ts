@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/auth/authApi';
-import { editorApi, type WorkspaceCommandEnvelope } from '@/editor/editorApi';
+import { editorApi } from '@/editor/editorApi';
 import type { PIRDocument } from '@prodivix/shared/types/pir';
-import { validatePirDocument } from '@/pir/validator/validator';
+import type {
+  WorkspaceCommandEnvelope,
+  WorkspacePirDocument,
+  WorkspaceSnapshot,
+} from '@prodivix/workspace';
+import { validatePirDocument } from '@prodivix/pir';
 import { isLocalProjectId } from '@/editor/localProjectStore';
 
 export type AutosaveMode = 'manual' | 'on-change' | 'interval';
@@ -18,21 +23,15 @@ type WorkspaceMutation = Awaited<
 type UseBlueprintAutosaveOptions = {
   token: string | null;
   projectId?: string;
-  pirDoc: PIRDocument;
-  pirDocRevision: number;
+  workspace: WorkspaceSnapshot;
+  activeDocument: WorkspacePirDocument;
+  documentEditSeq: number;
   autosaveMode: AutosaveMode;
   autosaveIntervalMs: number;
-  workspaceId?: string;
-  activeDocumentId?: string;
-  activeDocumentContentRev?: number;
   canUpdateWorkspaceDocument: boolean;
   workspaceCapabilitiesLoaded: boolean;
   workspaceReadonly: boolean;
   applyWorkspaceMutation: (mutation: WorkspaceMutation) => void;
-  markLocalWorkspaceDocumentSaved: (
-    workspaceId: string,
-    documentId: string
-  ) => void;
 };
 
 type UseBlueprintAutosaveResult = {
@@ -87,25 +86,26 @@ const resolveApiErrorMessage = (error: unknown): string | null => {
 export const useBlueprintAutosave = ({
   token,
   projectId,
-  pirDoc,
-  pirDocRevision,
+  workspace,
+  activeDocument,
+  documentEditSeq,
   autosaveMode,
   autosaveIntervalMs,
-  workspaceId,
-  activeDocumentId,
-  activeDocumentContentRev,
   canUpdateWorkspaceDocument,
   workspaceCapabilitiesLoaded,
   workspaceReadonly,
   applyWorkspaceMutation,
-  markLocalWorkspaceDocumentSaved,
 }: UseBlueprintAutosaveOptions): UseBlueprintAutosaveResult => {
+  const pirDoc = activeDocument.content;
+  const workspaceId = workspace.id;
+  const activeDocumentId = activeDocument.id;
+  const activeDocumentContentRev = activeDocument.contentRev;
   const { t } = useTranslation('blueprint');
   const saveRequestSeqRef = useRef(0);
   const isSavingRef = useRef(false);
   const lastSavedGraphRef = useRef(pirDoc.ui.graph);
   const [trackedDocumentId, setTrackedDocumentId] = useState(activeDocumentId);
-  const [lastSavedRevision, setLastSavedRevision] = useState(pirDocRevision);
+  const [lastSavedEditSeq, setLastSavedEditSeq] = useState(documentEditSeq);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [saveTransport, setSaveTransport] = useState<SaveTransport>(null);
   const [saveMessage, setSaveMessage] = useState('');
@@ -121,12 +121,12 @@ export const useBlueprintAutosave = ({
     if (trackedDocumentId === activeDocumentId) return;
     lastSavedGraphRef.current = pirDoc.ui.graph;
     setTrackedDocumentId(activeDocumentId);
-    setLastSavedRevision(pirDocRevision);
-  }, [activeDocumentId, pirDoc, pirDocRevision, trackedDocumentId]);
+    setLastSavedEditSeq(documentEditSeq);
+  }, [activeDocumentId, documentEditSeq, pirDoc, trackedDocumentId]);
 
   const hasPendingChanges =
     trackedDocumentId === activeDocumentId &&
-    pirDocRevision > lastSavedRevision;
+    documentEditSeq > lastSavedEditSeq;
   const normalizedAutosaveIntervalMs = Math.max(
     1000,
     Number.isFinite(autosaveIntervalMs) ? Math.round(autosaveIntervalMs) : 1000
@@ -224,7 +224,7 @@ export const useBlueprintAutosave = ({
     if (hasWorkspaceTarget && !workspaceCapabilitiesLoaded) return;
     if (isSavingRef.current) return;
 
-    const targetRevision = pirDocRevision;
+    const targetEditSeq = documentEditSeq;
     const validation = validatePirDocument(pirDoc);
     if (validation.hasError) {
       setSaveTransport(null);
@@ -239,11 +239,8 @@ export const useBlueprintAutosave = ({
     }
 
     if (projectId && isLocalProjectId(projectId)) {
-      if (workspaceId && activeDocumentId) {
-        markLocalWorkspaceDocumentSaved(workspaceId, activeDocumentId);
-      }
       lastSavedGraphRef.current = pirDoc.ui.graph;
-      setLastSavedRevision((previous) => Math.max(previous, targetRevision));
+      setLastSavedEditSeq((previous) => Math.max(previous, targetEditSeq));
       setSaveTransport('local');
       setSaveStatus('saved');
       setSaveMessage(
@@ -276,7 +273,7 @@ export const useBlueprintAutosave = ({
       setSaveStatus('saving');
       setSaveMessage('');
       editorApi
-        .patchWorkspaceDocument(token, workspaceId, activeDocumentId, {
+        .patchWorkspaceDocument(token, workspace, activeDocumentId, {
           expectedContentRev: activeDocumentContentRev,
           command,
         })
@@ -286,9 +283,7 @@ export const useBlueprintAutosave = ({
           }
           applyWorkspaceMutation(mutation);
           lastSavedGraphRef.current = pirDoc.ui.graph;
-          setLastSavedRevision((previous) =>
-            Math.max(previous, targetRevision)
-          );
+          setLastSavedEditSeq((previous) => Math.max(previous, targetEditSeq));
           setSaveStatus('saved');
           setSaveMessage('');
         })
@@ -319,14 +314,14 @@ export const useBlueprintAutosave = ({
     canUpdateWorkspaceDocument,
     hasPendingChanges,
     hasWorkspaceTarget,
-    markLocalWorkspaceDocumentSaved,
     pirDoc,
-    pirDocRevision,
+    documentEditSeq,
     projectId,
     t,
     token,
     workspaceCapabilitiesLoaded,
     workspaceId,
+    workspace,
     workspaceReadonly,
     workspaceRetryMessage,
     workspaceUnavailableMessage,

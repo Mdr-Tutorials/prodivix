@@ -3,11 +3,14 @@ import type { PaletteQueryService } from '@/plugins/platform';
 import { applyPaletteItemInsertion } from '@/editor/features/blueprint/editor/model/paletteCreation';
 import type { BlueprintCompositionIssue } from '@/editor/features/blueprint/editor/model/composition';
 import type { DragOverData, PaletteItemDragData } from './dragdrop.types';
+import type { WorkspacePirDocumentType } from '@prodivix/workspace';
+import type { WorkspaceCommandEnvelope } from '@prodivix/workspace';
 
 export type PaletteDropResult = {
   doc: PIRDocument;
   nextNodeId: string;
   compositionIssue?: BlueprintCompositionIssue;
+  command?: WorkspaceCommandEnvelope;
 };
 
 export const applyPaletteItemDrop = (
@@ -17,6 +20,7 @@ export const applyPaletteItemDrop = (
   context: {
     workspaceId: string;
     documentId: string;
+    documentType: WorkspacePirDocumentType;
     selectedId?: string;
     palette: PaletteQueryService;
   }
@@ -39,6 +43,7 @@ export const applyPaletteItemDrop = (
   const result = applyPaletteItemInsertion(doc, context.palette, {
     workspaceId: context.workspaceId,
     documentId: context.documentId,
+    documentType: context.documentType,
     itemId,
     preferredTargetId,
     selection: { variantProps, selectedSize, selectedStatus },
@@ -52,5 +57,9 @@ export const applyPaletteItemDrop = (
         : {}),
     };
   }
-  return { doc: result.doc, nextNodeId: result.nextNodeId };
+  return {
+    doc: result.doc,
+    nextNodeId: result.nextNodeId,
+    command: result.command,
+  };
 };

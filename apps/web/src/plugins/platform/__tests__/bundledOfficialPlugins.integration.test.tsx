@@ -138,6 +138,7 @@ const insertPaletteItem = (
     {
       workspaceId: platform.workspaceId,
       documentId: `document:${itemId}`,
+      documentType: 'pir-page',
       itemId,
       preferredTargetId: 'root',
       commandId: `command:${itemId}`,

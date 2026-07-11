@@ -18,7 +18,11 @@ import {
   LOCAL_WORKSPACE_CAPABILITIES,
   saveLocalWorkspaceSnapshot,
 } from './localProjectStore';
-import { useEditorStore } from './store/useEditorStore';
+import {
+  selectActivePirDocument,
+  selectWorkspace,
+  useEditorStore,
+} from './store/useEditorStore';
 import { useSettingsStore } from './store/useSettingsStore';
 import { CURRENT_PIR_VERSION } from '@prodivix/shared/types/pir';
 import { WebPluginPlatformProvider } from '@/plugins/platform';
@@ -149,7 +153,6 @@ function Editor() {
   const token = useAuthStore((state) => state.token);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated());
   const setProject = useEditorStore((state) => state.setProject);
-  const setPirDoc = useEditorStore((state) => state.setPirDoc);
   const setWorkspaceSnapshot = useEditorStore(
     (state) => state.setWorkspaceSnapshot
   );
@@ -165,27 +168,26 @@ function Editor() {
   const clearWorkspaceState = useEditorStore(
     (state) => state.clearWorkspaceState
   );
-  const workspaceId = useEditorStore((state) => state.workspaceId);
-  const workspaceRev = useEditorStore((state) => state.workspaceRev);
-  const routeRev = useEditorStore((state) => state.routeRev);
-  const opSeq = useEditorStore((state) => state.opSeq);
-  const treeRootId = useEditorStore((state) => state.treeRootId);
-  const treeById = useEditorStore((state) => state.treeById);
-  const workspaceDocumentsById = useEditorStore(
-    (state) => state.workspaceDocumentsById
-  );
-  const routeManifest = useEditorStore((state) => state.routeManifest);
-  const activeRouteNodeId = useEditorStore((state) => state.activeRouteNodeId);
+  const workspace = useEditorStore(selectWorkspace);
   const globalSettings = useSettingsStore((state) => state.global);
   const projectGlobalById = useSettingsStore(
     (state) => state.projectGlobalById
   );
   const workspaceReadonly = useEditorStore((state) => state.workspaceReadonly);
+  const isProjectWorkspaceLoaded =
+    !projectId || Boolean(workspace && workspace.id === projectId);
+  const showWorkspaceLoading =
+    Boolean(projectId) && !showLoadError && !isProjectWorkspaceLoaded;
   const pluginGatewayServices = useMemo(
     () =>
       projectId ? createEditorPluginGatewayServices(projectId) : undefined,
     [projectId]
   );
+
+  useEffect(() => {
+    if (projectId) return;
+    clearWorkspaceState();
+  }, [clearWorkspaceState, projectId]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -211,7 +213,7 @@ function Editor() {
           isPublic: project.isPublic,
           starsCount: project.starsCount,
         });
-        hydrateWorkspaceSettings(project.workspace.settings);
+        hydrateWorkspaceSettings(project.workspaceSettings);
         setWorkspaceSnapshot(project.workspace);
         setWorkspaceReadonly(isReadonlyCache);
         setWorkspaceCapabilities(
@@ -242,19 +244,25 @@ function Editor() {
   ]);
 
   useEffect(() => {
-    if (!projectId || !isAuthenticated || !token) return;
+    if (!projectId) return;
     if (isLocalProjectId(projectId)) return;
+    clearWorkspaceState();
+    setLoadError(null);
+    if (!isAuthenticated || !token) {
+      setLoadError('Authentication is required to open this workspace.');
+      return;
+    }
     let cancelled = false;
     const controller =
       typeof AbortController === 'function' ? new AbortController() : null;
     const requestOptions: RequestInit = controller
       ? { signal: controller.signal }
       : {};
-    setLoadError(null);
-
-    editorApi
-      .getProject(token, projectId, requestOptions)
-      .then(({ project }) => {
+    void Promise.all([
+      editorApi.getProject(token, projectId, requestOptions),
+      editorApi.getWorkspace(token, projectId, requestOptions),
+    ])
+      .then(([{ project }, workspaceEnvelope]) => {
         if (cancelled) return;
         setWorkspaceReadonly(false);
         setProject({
@@ -265,37 +273,24 @@ function Editor() {
           isPublic: project.isPublic,
           starsCount: project.starsCount,
         });
-        editorApi
-          .getWorkspace(token, projectId, requestOptions)
-          .then(({ workspace }) => {
+        hydrateWorkspaceSettings(workspaceEnvelope.settings);
+        setWorkspaceSnapshot(workspaceEnvelope.workspace);
+        void editorApi
+          .getWorkspaceCapabilities(
+            token,
+            workspaceEnvelope.workspace.id,
+            requestOptions
+          )
+          .then((response) => {
             if (cancelled) return;
-            hydrateWorkspaceSettings(workspace.settings);
-            setWorkspaceSnapshot(workspace);
-            editorApi
-              .getWorkspaceCapabilities(token, workspace.id, requestOptions)
-              .then((response) => {
-                if (cancelled) return;
-                setWorkspaceCapabilities(
-                  response.workspaceId,
-                  response.capabilities
-                );
-              })
-              .catch((error: unknown) => {
-                if (cancelled || isAbortError(error)) return;
-                setWorkspaceCapabilities(workspace.id, {});
-              });
+            setWorkspaceCapabilities(
+              response.workspaceId,
+              response.capabilities
+            );
           })
           .catch((error: unknown) => {
             if (cancelled || isAbortError(error)) return;
-            clearWorkspaceState();
-            if (error instanceof ApiError && error.status === 422) {
-              setLoadError(
-                error.message ||
-                  `This project uses a legacy PIR document and cannot be opened in ${CURRENT_PIR_VERSION}.`
-              );
-              return;
-            }
-            setPirDoc(project.pir);
+            setWorkspaceCapabilities(workspaceEnvelope.workspace.id, {});
           });
       })
       .catch((error: unknown) => {
@@ -323,7 +318,6 @@ function Editor() {
     token,
     clearWorkspaceState,
     hydrateWorkspaceSettings,
-    setPirDoc,
     setProject,
     setWorkspaceCapabilities,
     setWorkspaceReadonly,
@@ -333,24 +327,12 @@ function Editor() {
   useEffect(() => {
     if (!projectId || !isLocalProjectId(projectId)) return;
     if (workspaceReadonly) return;
-    if (workspaceId !== projectId || !treeRootId) return;
-    const documents = Object.values(workspaceDocumentsById);
-    if (!documents.length) return;
+    if (!workspace || workspace.id !== projectId) return;
 
     const timeoutId = window.setTimeout(() => {
-      void saveLocalWorkspaceSnapshot(projectId, {
-        id: workspaceId,
-        workspaceRev: workspaceRev ?? 1,
-        routeRev: routeRev ?? 1,
-        opSeq: opSeq ?? 1,
-        tree: {
-          treeRootId,
-          treeById,
-        },
-        documents,
-        routeManifest,
-        settings: { global: globalSettings, projectGlobalById },
-        activeRouteNodeId,
+      void saveLocalWorkspaceSnapshot(projectId, workspace, {
+        global: globalSettings,
+        projectGlobalById,
       })
         .then((saved) => {
           if (!saved) return;
@@ -370,33 +352,26 @@ function Editor() {
 
     return () => window.clearTimeout(timeoutId);
   }, [
-    activeRouteNodeId,
     globalSettings,
     projectId,
     projectGlobalById,
-    routeManifest,
-    routeRev,
-    opSeq,
     setProject,
-    treeById,
-    treeRootId,
-    workspaceDocumentsById,
-    workspaceId,
+    workspace,
     workspaceReadonly,
-    workspaceRev,
   ]);
 
   useEffect(() => {
-    if (showLoadError) return;
+    if (showLoadError || showWorkspaceLoading) return;
     const unmountBridge = mountGraphExecutionBridge();
     const unmountNodeGraphExecutor = mountDefaultNodeGraphExecutor({
-      getPirDoc: () => useEditorStore.getState().pirDoc,
+      getActivePirDocument: () =>
+        selectActivePirDocument(useEditorStore.getState()),
     });
     return () => {
       unmountNodeGraphExecutor();
       unmountBridge();
     };
-  }, [showLoadError]);
+  }, [showLoadError, showWorkspaceLoading]);
 
   return (
     <EditorShortcutProvider>
@@ -427,6 +402,10 @@ function Editor() {
               Back to projects
             </button>
           </div>
+        </div>
+      ) : showWorkspaceLoading ? (
+        <div className="flex min-h-screen items-center justify-center bg-(--bg-canvas) text-sm text-(--text-secondary)">
+          Loading workspace…
         </div>
       ) : projectId && pluginGatewayServices ? (
         <WebPluginPlatformProvider

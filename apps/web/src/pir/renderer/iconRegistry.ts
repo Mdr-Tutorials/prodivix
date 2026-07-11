@@ -56,9 +56,7 @@ type IconProviderRecord = {
   error: string | null;
 };
 
-const ICON_LIBRARY_IDS_STORAGE_KEY = 'prodivix.iconLibraryIds';
 const DEFAULT_ICON_LIBRARY_IDS: string[] = [];
-const iconLibraryConfigUpdatedEvent = 'prodivix:icon-library-config-updated';
 
 const iconProviders = new Map<string, IconProviderRecord>();
 const iconFallbackComponentCache = new Map<string, IconComponent>();
@@ -67,7 +65,6 @@ const registryListeners = new Set<() => void>();
 let registryRevision = 0;
 let configuredIconLibraryIds = new Set<string>();
 let iconLibraryConfigLoaded = false;
-let iconLibraryConfigSubscribed = false;
 
 const normalizeProvider = (provider: string) => provider.trim().toLowerCase();
 const normalizeKey = (value: string) => value.trim().toLowerCase();
@@ -136,24 +133,9 @@ const normalizeConfiguredIconLibraryIds = (libraryIds: string[]) =>
     (libraryId) => libraryId.length > 0
   );
 
-const readConfiguredIconLibraryIdsFromStorage = () => {
-  if (typeof window === 'undefined') return [...DEFAULT_ICON_LIBRARY_IDS];
-  try {
-    const raw = window.localStorage.getItem(ICON_LIBRARY_IDS_STORAGE_KEY);
-    if (raw === null) return [...DEFAULT_ICON_LIBRARY_IDS];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [...DEFAULT_ICON_LIBRARY_IDS];
-    return normalizeConfiguredIconLibraryIds(
-      parsed.filter((item): item is string => typeof item === 'string')
-    );
-  } catch {
-    return [...DEFAULT_ICON_LIBRARY_IDS];
-  }
-};
-
 const ensureIconLibraryConfigurationLoaded = () => {
   if (iconLibraryConfigLoaded) return;
-  configuredIconLibraryIds = new Set(readConfiguredIconLibraryIdsFromStorage());
+  configuredIconLibraryIds = new Set(DEFAULT_ICON_LIBRARY_IDS);
   iconLibraryConfigLoaded = true;
 };
 
@@ -189,39 +171,8 @@ const applyConfiguredIconLibraryIds = (libraryIds: string[]) => {
   return nextIds;
 };
 
-const ensureIconLibraryConfigSubscribed = () => {
-  if (iconLibraryConfigSubscribed || typeof window === 'undefined') return;
-  window.addEventListener(iconLibraryConfigUpdatedEvent, (event) => {
-    const detail = (event as CustomEvent<{ libraryIds?: unknown }>).detail;
-    if (Array.isArray(detail?.libraryIds)) {
-      const eventIds = detail.libraryIds.filter(
-        (item): item is string => typeof item === 'string'
-      );
-      applyConfiguredIconLibraryIds(eventIds);
-      return;
-    }
-    applyConfiguredIconLibraryIds(readConfiguredIconLibraryIdsFromStorage());
-  });
-  iconLibraryConfigSubscribed = true;
-};
-
-const persistConfiguredIconLibraryIds = (libraryIds: string[]) => {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(
-    ICON_LIBRARY_IDS_STORAGE_KEY,
-    JSON.stringify(libraryIds)
-  );
-  window.dispatchEvent(
-    new CustomEvent(iconLibraryConfigUpdatedEvent, {
-      detail: { libraryIds },
-    })
-  );
-};
-
 export const setConfiguredIconLibraryIds = (libraryIds: string[]) => {
-  const nextIds = applyConfiguredIconLibraryIds(libraryIds);
-  persistConfiguredIconLibraryIds(nextIds);
-  return nextIds;
+  return applyConfiguredIconLibraryIds(libraryIds);
 };
 
 export const getRegisteredIconLibraries = (): IconLibraryMeta[] => {
@@ -251,7 +202,6 @@ export const registerIconProvider = (
 ) => {
   if (!provider.trim()) return;
   ensureIconLibraryConfigurationLoaded();
-  ensureIconLibraryConfigSubscribed();
   const normalizedId = normalizeProvider(provider);
   const normalizedRegistration: IconProviderRegistration =
     typeof registration === 'function'

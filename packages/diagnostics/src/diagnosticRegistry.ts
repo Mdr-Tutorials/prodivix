@@ -1,0 +1,15 @@
+export {
+  copyReportAction,
+  createDefinition,
+  createExemptionAction,
+  openDocsAction,
+  openSourceAction,
+  openTargetAction,
+  retryAction,
+  type DiagnosticDefinition,
+  type DiagnosticPlacement,
+  type DiagnosticRegistryEntry,
+  upstreamEvidence,
+  uxEvidence,
+  uxStandardEvidence,
+} from './diagnosticShared';

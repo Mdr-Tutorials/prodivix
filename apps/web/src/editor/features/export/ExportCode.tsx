@@ -1,23 +1,26 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
-import { useEditorStore } from '@/editor/store/useEditorStore';
+import {
+  selectActivePirDocument,
+  selectWorkspace,
+  useEditorStore,
+} from '@/editor/store/useEditorStore';
 import {
   generateReactBundle,
   type ReactExportFile,
   type ReactGeneratorCodeArtifact,
 } from '@prodivix/prodivix-compiler';
-import { validatePirDocument } from '@/pir/validator/validator';
+import { validatePirDocument } from '@prodivix/pir';
 import {
   projectWorkspaceToProdivixFiles,
-  type StableWorkspaceSnapshot,
+  createWorkspaceCodeArtifactProvider,
   type WorkspaceProjectionIssue,
-} from '@/workspace';
+} from '@prodivix/workspace';
 import {
   createAuthoringEnvironment,
   createCodeArtifactProviderRegistry,
-  createWorkspaceCodeArtifactProvider,
-} from '@/authoring';
+} from '@prodivix/authoring';
 import { flattenPublicFiles } from '@/editor/features/resources/publicTree';
 import { flattenEnabledProjectFiles } from '@/editor/features/resources/projectFileStore';
 import { useCodegenPolicySnapshot } from '@/plugins/platform';
@@ -83,7 +86,7 @@ export function ExportCode() {
   const { t } = useTranslation('export');
   const { projectId } = useParams();
   const codegenPolicySnapshot = useCodegenPolicySnapshot();
-  const pirDoc = useEditorStore((state) => state.pirDoc);
+  const pirDoc = useEditorStore(selectActivePirDocument)!;
   const projectName = useEditorStore((state) =>
     projectId ? state.projectsById[projectId]?.name : undefined
   );
@@ -91,18 +94,10 @@ export function ExportCode() {
     (state) =>
       (projectId ? state.projectsById[projectId]?.type : undefined) ?? 'project'
   );
-  const workspaceId = useEditorStore((state) => state.workspaceId);
-  const workspaceRev = useEditorStore((state) => state.workspaceRev);
-  const routeRev = useEditorStore((state) => state.routeRev);
-  const opSeq = useEditorStore((state) => state.opSeq);
-  const treeRootId = useEditorStore((state) => state.treeRootId);
-  const treeById = useEditorStore((state) => state.treeById);
-  const workspaceDocumentsById = useEditorStore(
-    (state) => state.workspaceDocumentsById
-  );
-  const routeManifest = useEditorStore((state) => state.routeManifest);
-  const activeDocumentId = useEditorStore((state) => state.activeDocumentId);
-  const activeRouteNodeId = useEditorStore((state) => state.activeRouteNodeId);
+  const workspaceSnapshot = useEditorStore(selectWorkspace);
+  const workspaceDocumentsById = workspaceSnapshot?.docsById ?? {};
+  const treeRootId = workspaceSnapshot?.treeRootId;
+  const treeById = workspaceSnapshot?.treeById ?? {};
   const [copied, setCopied] = useState(false);
   const [downloadingZip, setDownloadingZip] = useState(false);
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
@@ -115,32 +110,6 @@ export function ExportCode() {
   const pirValidation = useMemo(() => validatePirDocument(pirDoc), [pirDoc]);
   const hasPirValidationError = pirValidation.hasError;
   const validatedPirDoc = pirValidation.document;
-  const workspaceSnapshot = useMemo<StableWorkspaceSnapshot | null>(() => {
-    if (!workspaceId || !treeRootId) return null;
-    return {
-      id: workspaceId,
-      workspaceRev: workspaceRev ?? 0,
-      routeRev: routeRev ?? 0,
-      opSeq: opSeq ?? 0,
-      treeRootId,
-      treeById,
-      docsById: workspaceDocumentsById,
-      routeManifest,
-      ...(activeDocumentId ? { activeDocumentId } : {}),
-      ...(activeRouteNodeId ? { activeRouteNodeId } : {}),
-    };
-  }, [
-    activeDocumentId,
-    activeRouteNodeId,
-    opSeq,
-    routeManifest,
-    routeRev,
-    treeById,
-    treeRootId,
-    workspaceDocumentsById,
-    workspaceId,
-    workspaceRev,
-  ]);
   const codeArtifacts = useMemo<ReactGeneratorCodeArtifact[]>(() => {
     if (!workspaceSnapshot) return [];
     const artifactRegistry = createCodeArtifactProviderRegistry();
@@ -181,7 +150,7 @@ export function ExportCode() {
     [publicTree]
   );
   const exportContributions = useMemo(() => {
-    if (projectType !== 'project') return [];
+    if (projectType !== 'project' || !workspaceSnapshot) return [];
     return [
       ...createWorkspaceResourceExportContributions({
         workspaceDocumentsById,
@@ -189,7 +158,7 @@ export function ExportCode() {
         publicFiles,
       }),
       ...createRouteGraphExportContributions({
-        routeManifest,
+        routeManifest: workspaceSnapshot.routeManifest,
         workspaceDocumentsById,
         codeArtifacts,
       }),
@@ -199,7 +168,7 @@ export function ExportCode() {
     enabledProjectFiles,
     projectType,
     publicFiles,
-    routeManifest,
+    workspaceSnapshot,
     workspaceDocumentsById,
   ]);
 

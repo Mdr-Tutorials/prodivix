@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
 import { useAuthStore } from '@/auth/useAuthStore';
 import { editorApi } from '@/editor/editorApi';
-import { useEditorStore } from '@/editor/store/useEditorStore';
+import { selectWorkspace, useEditorStore } from '@/editor/store/useEditorStore';
 import { useSettingsStore } from '@/editor/store/useSettingsStore';
 import {
   applyThemePreference,
@@ -28,9 +28,10 @@ export const SettingsEffects = () => {
   const { projectId } = useParams();
   const token = useAuthStore((state) => state.token);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated());
-  const workspaceId = useEditorStore((state) => state.workspaceId);
-  const workspaceRev = useEditorStore((state) => state.workspaceRev);
-  const routeRev = useEditorStore((state) => state.routeRev);
+  const workspace = useEditorStore(selectWorkspace);
+  const workspaceId = workspace?.id;
+  const workspaceRev = workspace?.workspaceRev;
+  const routeRev = workspace?.routeRev;
   const workspaceCapabilitiesLoaded = useEditorStore(
     (state) => state.workspaceCapabilitiesLoaded
   );
@@ -90,8 +91,9 @@ export const SettingsEffects = () => {
   }, [workspaceId, serializedSettingsPayload]);
 
   useEffect(() => {
+    if (!projectId) return;
     if (!isAuthenticated || !token) return;
-    if (!workspaceId) return;
+    if (!workspace) return;
     if (!workspaceCapabilitiesLoaded || !canUpdateWorkspaceSettings) return;
     if (typeof workspaceRev !== 'number' || workspaceRev <= 0) return;
     if (serializedSettingsPayload === syncedSettingsPayloadRef.current) return;
@@ -101,7 +103,7 @@ export const SettingsEffects = () => {
     settingsSyncRequestSeqRef.current = requestSeq;
     const timeoutId = window.setTimeout(() => {
       void editorApi
-        .applyWorkspaceIntent(token, workspaceId, {
+        .applyWorkspaceIntent(token, workspace, {
           expectedWorkspaceRev: workspaceRev,
           ...(typeof routeRev === 'number' && routeRev > 0
             ? { expectedRouteRev: routeRev }
@@ -141,10 +143,12 @@ export const SettingsEffects = () => {
     serializedSettingsPayload,
     settingsPayload,
     isAuthenticated,
+    projectId,
     token,
     workspaceCapabilitiesLoaded,
     workspaceId,
     workspaceRev,
+    workspace,
   ]);
 
   useEffect(() => {

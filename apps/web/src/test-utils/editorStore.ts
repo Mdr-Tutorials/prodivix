@@ -1,11 +1,12 @@
 import type { ComponentNode, PIRDocument } from '@prodivix/shared/types/pir';
+import type { WorkspaceSnapshot } from '@prodivix/workspace';
 import {
   createGlobalDefaults,
   type GlobalSettingsState,
 } from '@/editor/features/settings/SettingsDefaults';
 import { useEditorStore } from '@/editor/store/useEditorStore';
 import { useSettingsStore } from '@/editor/store/useSettingsStore';
-import { normalizePirDocument } from '@/pir/resolvePirDocument';
+import { normalizePirDocument } from '@prodivix/pir';
 
 type EditorState = ReturnType<typeof useEditorStore.getState>;
 
@@ -22,29 +23,68 @@ export const createPirDoc = (children: ComponentNode[] = []): PIRDocument => ({
   }),
 });
 
+export const createEditorWorkspace = (
+  pirDocument: PIRDocument = createPirDoc()
+): WorkspaceSnapshot => ({
+  id: 'workspace-test',
+  workspaceRev: 1,
+  routeRev: 1,
+  opSeq: 1,
+  treeRootId: 'root',
+  treeById: {
+    root: {
+      id: 'root',
+      kind: 'dir',
+      name: '/',
+      parentId: null,
+      children: ['pages'],
+    },
+    pages: {
+      id: 'pages',
+      kind: 'dir',
+      name: 'pages',
+      parentId: 'root',
+      children: ['doc-page-home'],
+    },
+    'doc-page-home': {
+      id: 'doc-page-home',
+      kind: 'doc',
+      name: 'home.pir.json',
+      parentId: 'pages',
+      docId: 'page-home',
+    },
+  },
+  docsById: {
+    'page-home': {
+      id: 'page-home',
+      type: 'pir-page',
+      path: '/pages/home.pir.json',
+      contentRev: 1,
+      metaRev: 1,
+      content: pirDocument,
+    },
+  },
+  routeManifest: {
+    version: '1',
+    root: {
+      id: 'root-route',
+      children: [{ id: 'route-home', index: true, pageDocId: 'page-home' }],
+    },
+  },
+  activeDocumentId: 'page-home',
+  activeRouteNodeId: 'route-home',
+});
+
 export const resetEditorStore = (overrides: Partial<EditorState> = {}) => {
   const state = useEditorStore.getState();
   useEditorStore.setState(
     {
       ...state,
-      pirDoc: createPirDoc(),
-      pirDocRevision: 0,
-      workspaceId: undefined,
-      workspaceRev: undefined,
-      routeRev: undefined,
-      opSeq: undefined,
-      activeDocumentId: undefined,
-      workspaceDocumentsById: {},
-      treeRootId: undefined,
-      treeById: {},
+      workspace: null,
+      documentEditSeqById: {},
       workspaceCapabilities: {},
       workspaceCapabilitiesLoaded: false,
       workspaceReadonly: false,
-      routeManifest: {
-        version: '1',
-        root: { id: 'root', children: [] },
-      },
-      activeRouteNodeId: undefined,
       blueprintStateByProject: {},
       runtimeStateByProject: {},
       projectsById: {},

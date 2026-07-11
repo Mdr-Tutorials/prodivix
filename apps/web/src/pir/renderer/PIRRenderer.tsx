@@ -4,7 +4,7 @@ import {
   isBuiltInActionName,
   type BuiltInActionContext,
 } from '@/pir/actions/registry';
-import { materializeUiTree } from '@/pir/graph/materialize';
+import { materializeUiTree } from '@prodivix/pir';
 import { defaultComponentRegistry } from './registry';
 import { resolveLinkCapability } from './capabilities';
 import { PIRNode } from './PIRNode';

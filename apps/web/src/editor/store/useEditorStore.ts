@@ -1,23 +1,23 @@
 import { create } from 'zustand';
 import { createBlueprintSlice } from './editorStore.blueprintSlice';
-import { createPirSlice } from './editorStore.pirSlice';
 import { createProjectSlice } from './editorStore.projectSlice';
 import { createRouteSlice } from './editorStore.routeSlice';
 import { createWorkspaceSlice } from './editorStore.workspaceSlice';
 import type { EditorStore } from './editorStore.shape';
 
-export { createDefaultPirDoc } from '@/pir/resolvePirDocument';
 export {
   DEFAULT_BLUEPRINT_STATE,
   type BlueprintState,
-  type RouteIntent,
   type WorkspaceRouteManifest,
   type WorkspaceRouteNode,
   type WorkspaceVfsNode,
 } from './editorStore.types';
+export type { WorkspaceRouteIntent } from '@prodivix/workspace';
+export * from './editorStore.selectors';
+export type { EditorStore } from './editorStore.shape';
+export type { UpdateActivePirDocumentOptions } from './editorStore.workspaceSlice';
 
 export const useEditorStore = create<EditorStore>()((...args) => ({
-  ...createPirSlice(...args),
   ...createWorkspaceSlice(...args),
   ...createRouteSlice(...args),
   ...createBlueprintSlice(...args),

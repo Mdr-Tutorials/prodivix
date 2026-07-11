@@ -6,7 +6,7 @@ import { PdxEmpty } from '@prodivix/ui';
 import { communityApi, type CommunityProjectDetail } from './communityApi';
 import { PIRRenderer } from '@/pir/renderer/PIRRenderer';
 import { isAbortError } from '@/infra/api';
-import { resolvePirDocument } from '@/pir/resolvePirDocument';
+import { resolvePirDocument } from '@prodivix/pir';
 import { useAuthStore } from '@/auth/useAuthStore';
 import { editorApi } from '@/editor/editorApi';
 import { useEditorStore } from '@/editor/store/useEditorStore';
@@ -38,7 +38,6 @@ export function CommunityDetailPage() {
   const token = useAuthStore((state) => state.token);
   const currentUser = useAuthStore((state) => state.user);
   const setEditorProject = useEditorStore((state) => state.setProject);
-  const setPirDoc = useEditorStore((state) => state.setPirDoc);
   const [project, setCommunityProject] =
     useState<CommunityProjectDetail | null>(null);
   const [isLoading, setLoading] = useState(false);
@@ -132,8 +131,6 @@ export function CommunityDetailPage() {
         isPublic: createdProject.isPublic,
         starsCount: createdProject.starsCount,
       });
-      setPirDoc(pirDoc);
-
       if (createdProject.resourceType === 'component') {
         navigate(`/editor/project/${createdProject.id}/component`);
       } else if (createdProject.resourceType === 'nodegraph') {

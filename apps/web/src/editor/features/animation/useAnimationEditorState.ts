@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'react-router';
 import type {
   AnimationBinding,
   AnimationDefinition,
@@ -7,16 +6,18 @@ import type {
   AnimationTrack,
   SvgFilterDefinition,
 } from '@prodivix/shared/types/pir';
-import { useEditorStore } from '@/editor/store/useEditorStore';
-import { materializePirRoot } from '@/pir/graph';
 import {
-  createAnimationStorageKey,
+  selectActivePirDocument,
+  useEditorStore,
+} from '@/editor/store/useEditorStore';
+import { materializePirRoot } from '@prodivix/pir';
+import {
   createDefaultBinding,
   createDefaultSvgFilter,
   createDefaultSvgPrimitive,
   createDefaultTimeline,
   createDefaultTrack,
-  loadProjectAnimationSnapshot,
+  createEmptyAnimationDefinition,
   normalizeAnimationDefinition,
   serializeAnimationDefinition,
 } from './animationEditorModel';
@@ -46,22 +47,17 @@ const clampZoom = (value: number) =>
   Math.min(4, Math.max(0.2, Math.round(value * 100) / 100));
 
 export const useAnimationEditorState = () => {
-  const { projectId } = useParams();
-  const pirDoc = useEditorStore((state) => state.pirDoc);
-  const updatePirDoc = useEditorStore((state) => state.updatePirDoc);
-  const resolvedProjectId = projectId?.trim() || 'global';
-
-  const persistedAnimation = useMemo(
-    () => loadProjectAnimationSnapshot(resolvedProjectId),
-    [resolvedProjectId]
+  const pirDoc = useEditorStore(selectActivePirDocument)!;
+  const updateActivePirDocument = useEditorStore(
+    (state) => state.updateActivePirDocument
   );
   const pirAnimation = useMemo(
     () => normalizeAnimationDefinition(pirDoc.animation),
     [pirDoc.animation]
   );
   const initialAnimation = useMemo(
-    () => pirAnimation ?? persistedAnimation,
-    [pirAnimation, persistedAnimation]
+    () => pirAnimation ?? createEmptyAnimationDefinition(),
+    [pirAnimation]
   );
   const [animation, setAnimation] =
     useState<AnimationDefinition>(initialAnimation);
@@ -77,27 +73,8 @@ export const useAnimationEditorState = () => {
   }, [currentSignature]);
 
   useEffect(() => {
-    const nextAnimation = pirAnimation ?? persistedAnimation;
+    const nextAnimation = pirAnimation ?? createEmptyAnimationDefinition();
     const nextSignature = serializeAnimationDefinition(nextAnimation);
-    if (!pirAnimation) {
-      if (nextSignature !== currentSignatureRef.current) {
-        setAnimation(nextAnimation);
-        currentSignatureRef.current = nextSignature;
-      }
-      committedSignatureRef.current = nextSignature;
-      updatePirDoc((doc) => {
-        const existingSignature = serializeAnimationDefinition(
-          normalizeAnimationDefinition(doc.animation)
-        );
-        if (existingSignature === nextSignature) return doc;
-        return {
-          ...doc,
-          animation: nextAnimation,
-        };
-      });
-      return;
-    }
-
     if (nextSignature === currentSignatureRef.current) {
       committedSignatureRef.current = nextSignature;
       return;
@@ -110,34 +87,30 @@ export const useAnimationEditorState = () => {
     setAnimation(nextAnimation);
     currentSignatureRef.current = nextSignature;
     committedSignatureRef.current = nextSignature;
-  }, [pirAnimation, persistedAnimation, updatePirDoc]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(
-        createAnimationStorageKey(resolvedProjectId),
-        currentSignature
-      );
-    } catch {
-      // ignore
-    }
-  }, [currentSignature, resolvedProjectId]);
+  }, [pirAnimation]);
 
   useEffect(() => {
     if (currentSignature === committedSignatureRef.current) return;
     committedSignatureRef.current = currentSignature;
-    updatePirDoc((doc) => {
-      const existingSignature = serializeAnimationDefinition(
-        normalizeAnimationDefinition(doc.animation)
-      );
-      if (existingSignature === currentSignature) return doc;
-      return {
-        ...doc,
-        animation,
-      };
-    });
-  }, [animation, currentSignature, updatePirDoc]);
+    updateActivePirDocument(
+      (doc) => {
+        const existingSignature = serializeAnimationDefinition(
+          normalizeAnimationDefinition(doc.animation)
+        );
+        if (existingSignature === currentSignature) return doc;
+        return {
+          ...doc,
+          animation,
+        };
+      },
+      {
+        namespace: 'core.animation',
+        type: 'definition.update',
+        mergeKey: 'animation-definition',
+        label: 'Update animation',
+      }
+    );
+  }, [animation, currentSignature, updateActivePirDocument]);
 
   const activeTimelineId = resolveActiveTimelineId(animation);
   const activeTimeline = useMemo(
@@ -1095,9 +1068,6 @@ export const useAnimationEditorState = () => {
     animation,
     setAnimation,
     pirDoc,
-    updatePirDoc,
-    resolvedProjectId,
-    persistedAnimation,
     pirAnimation,
     initialAnimation,
     currentSignature,

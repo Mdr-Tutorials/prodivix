@@ -6,7 +6,10 @@ import type { ComponentNode } from '@prodivix/shared/types/pir';
 import { useInspectorContext } from '@/editor/features/blueprint/editor/inspector/InspectorContext';
 import { InspectorRow } from '@/editor/features/blueprint/editor/inspector/components/InspectorRow';
 import { buildCodeResourceFilesFromWorkspaceDocuments } from '@/editor/features/resources/workspaceCodeResources';
-import { useEditorStore } from '@/editor/store/useEditorStore';
+import {
+  selectWorkspaceDocumentsById,
+  useEditorStore,
+} from '@/editor/store/useEditorStore';
 import type {
   InspectorPanelDefinition,
   InspectorPanelRenderProps,
@@ -83,9 +86,7 @@ function ExternalCodePanelView({
 }: InspectorPanelRenderProps) {
   const navigate = useNavigate();
   const { t, projectId } = useInspectorContext();
-  const workspaceDocumentsById = useEditorStore(
-    (state) => state.workspaceDocumentsById
-  );
+  const workspaceDocumentsById = useEditorStore(selectWorkspaceDocumentsById);
   const externalCode = readExternalCodeConfig(node) ?? {};
   const isMounted = externalCode.enabled === true;
   const selectedLanguage = externalCode.language ?? 'ts';

@@ -8,7 +8,7 @@ import {
   createDiagnostic,
   isDiagnosticDomain,
   type ProdivixDiagnosticDomain,
-} from '@/diagnostics';
+} from '@prodivix/diagnostics';
 
 type ApiRequestOptions = Omit<RequestInit, 'headers'> & {
   headers?: HeadersInit;

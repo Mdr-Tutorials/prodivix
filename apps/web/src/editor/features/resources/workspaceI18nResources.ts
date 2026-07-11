@@ -1,4 +1,4 @@
-import type { WorkspaceDocumentRecord } from '@/editor/editorApi';
+import type { WorkspaceDocument } from '@prodivix/workspace';
 import {
   createDefaultI18nStore,
   normalizeI18nStore,
@@ -46,7 +46,7 @@ export const normalizeI18nResourceValue = (
 };
 
 export const getWorkspaceI18nResourceDocument = (
-  documentsById: Record<string, WorkspaceDocumentRecord>
+  documentsById: Record<string, WorkspaceDocument>
 ) =>
   findWorkspaceDocumentByPath(
     documentsById,
@@ -55,7 +55,7 @@ export const getWorkspaceI18nResourceDocument = (
   );
 
 export const buildI18nResourceValueFromWorkspace = (
-  documentsById: Record<string, WorkspaceDocumentRecord>
+  documentsById: Record<string, WorkspaceDocument>
 ): WorkspaceI18nResourceValue => {
   const document = getWorkspaceI18nResourceDocument(documentsById);
   if (!document || !isWorkspaceConfigContent(document.content)) {

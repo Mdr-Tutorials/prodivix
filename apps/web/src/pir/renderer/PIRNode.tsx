@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import type { ComponentNode } from '@prodivix/shared/types/pir';
 import { isBuiltInActionName } from '@/pir/actions/registry';
-import { deepResolveValueOrRef, readValueByPath } from '@/pir/shared/valueRef';
+import { deepResolveValueOrRef, readValueByPath } from '@prodivix/pir';
 import { resolveLinkCapability } from './capabilities';
 import type {
   AdapterContext,

@@ -1,4 +1,4 @@
-import type { WorkspaceDocumentRecord } from '@/editor/editorApi';
+import type { WorkspaceDocument } from '@prodivix/workspace';
 import {
   normalizeExternalComponentLibraryIds,
   normalizeLibraryIds,
@@ -92,7 +92,7 @@ export const normalizeExternalLibrariesValue = (
 };
 
 export const getWorkspaceExternalLibrariesDocument = (
-  documentsById: Record<string, WorkspaceDocumentRecord>
+  documentsById: Record<string, WorkspaceDocument>
 ) =>
   findWorkspaceDocumentByPath(
     documentsById,
@@ -101,7 +101,7 @@ export const getWorkspaceExternalLibrariesDocument = (
   );
 
 export const buildExternalLibrariesValueFromWorkspace = (
-  documentsById: Record<string, WorkspaceDocumentRecord>
+  documentsById: Record<string, WorkspaceDocument>
 ): WorkspaceExternalLibrariesValue => {
   const document = getWorkspaceExternalLibrariesDocument(documentsById);
   if (!document || !isWorkspaceConfigContent(document.content)) {

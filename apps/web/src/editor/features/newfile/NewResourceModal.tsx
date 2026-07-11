@@ -3,10 +3,8 @@ import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { PdxButton, PdxInput, PdxTextarea } from '@prodivix/ui';
 import { Box, Layers, Workflow } from 'lucide-react';
-import {
-  useEditorStore,
-  createDefaultPirDoc,
-} from '@/editor/store/useEditorStore';
+import { useEditorStore } from '@/editor/store/useEditorStore';
+import { createDefaultPirDoc } from '@prodivix/pir';
 import { useAuthStore } from '@/auth/useAuthStore';
 import { editorApi, type ProjectSummary } from '@/editor/editorApi';
 import {
@@ -34,10 +32,6 @@ function NewResourceModal({
   const token = useAuthStore((state) => state.token);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated());
   const setProject = useEditorStore((state) => state.setProject);
-  const setPirDoc = useEditorStore((state) => state.setPirDoc);
-  const setWorkspaceSnapshot = useEditorStore(
-    (state) => state.setWorkspaceSnapshot
-  );
 
   // State
   const [name, setName] = useState('');
@@ -72,7 +66,6 @@ function NewResourceModal({
           isPublic: project.isPublic,
           starsCount: project.starsCount,
         });
-        setWorkspaceSnapshot(project.workspace);
         onCreated?.(project);
 
         onClose();
@@ -101,7 +94,6 @@ function NewResourceModal({
         isPublic: project.isPublic,
         starsCount: project.starsCount,
       });
-      setPirDoc(initialPir);
       onCreated?.(project);
 
       onClose();

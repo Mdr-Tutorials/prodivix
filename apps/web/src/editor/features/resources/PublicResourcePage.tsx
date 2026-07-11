@@ -30,7 +30,8 @@ import {
   createWorkspaceDirectoryIntentRequest,
   deleteWorkspaceDirectoryIntentRequest,
   renameWorkspaceDirectoryIntentRequest,
-} from '@/workspace';
+  type WorkspaceSnapshot,
+} from '@prodivix/workspace';
 import {
   createResourceIntentId,
   createWorkspaceResourceDocumentId,
@@ -49,20 +50,23 @@ type PublicResourcePageProps = {
   embedded?: boolean;
 };
 
+const EMPTY_WORKSPACE_DOCUMENTS: WorkspaceSnapshot['docsById'] = {};
+const EMPTY_WORKSPACE_TREE: WorkspaceSnapshot['treeById'] = {};
+
 export function PublicResourcePage({
   embedded = false,
 }: PublicResourcePageProps) {
   const { t } = useTranslation('editor');
   const { projectId } = useParams();
   const token = useAuthStore((state) => state.token);
-  const workspaceId = useEditorStore((state) => state.workspaceId);
-  const workspaceRev = useEditorStore((state) => state.workspaceRev);
-  const workspaceDocumentsById = useEditorStore(
-    (state) => state.workspaceDocumentsById
-  );
-  const routeManifest = useEditorStore((state) => state.routeManifest);
-  const treeRootId = useEditorStore((state) => state.treeRootId);
-  const treeById = useEditorStore((state) => state.treeById);
+  const workspace = useEditorStore((state) => state.workspace);
+  const workspaceId = workspace?.id;
+  const workspaceRev = workspace?.workspaceRev;
+  const workspaceDocumentsById =
+    workspace?.docsById ?? EMPTY_WORKSPACE_DOCUMENTS;
+  const routeManifest = workspace?.routeManifest;
+  const treeRootId = workspace?.treeRootId;
+  const treeById = workspace?.treeById ?? EMPTY_WORKSPACE_TREE;
   const applyWorkspaceMutation = useEditorStore(
     (state) => state.applyWorkspaceMutation
   );
@@ -132,18 +136,19 @@ export function PublicResourcePage({
   const applyIntent = async (
     data: Parameters<typeof editorApi.applyWorkspaceIntent>[2]
   ) => {
-    if (!token || !workspaceId || !workspaceRev) return null;
+    const currentWorkspace = useEditorStore.getState().workspace;
+    if (!token || !currentWorkspace) return null;
     const mutation = await editorApi.applyWorkspaceIntent(
       token,
-      workspaceId,
-      data
+      currentWorkspace,
+      { ...data, expectedWorkspaceRev: currentWorkspace.workspaceRev }
     );
     applyWorkspaceMutation(mutation);
     return mutation;
   };
 
   const handleCreateFolder = async (parentId: string) => {
-    if (!token || !workspaceId || !workspaceRev) return;
+    if (!token || !workspace || !workspaceId || !workspaceRev) return;
     let parentNodeId = resolveWorkspaceParentNodeId(parentId);
     if (!parentNodeId) return;
     if (
@@ -152,7 +157,7 @@ export function PublicResourcePage({
     ) {
       const rootMutation = await editorApi.applyWorkspaceIntent(
         token,
-        workspaceId,
+        workspace,
         createWorkspaceDirectoryIntentRequest({
           workspaceRev,
           intentId: createResourceIntentId(),
@@ -173,8 +178,10 @@ export function PublicResourcePage({
       if (!parentNodeId) return;
     }
     const name = 'new-folder';
+    const currentWorkspace = useEditorStore.getState().workspace;
+    if (!currentWorkspace) return;
     const request = createWorkspaceDirectoryIntentRequest({
-      workspaceRev: useEditorStore.getState().workspaceRev ?? workspaceRev,
+      workspaceRev: currentWorkspace.workspaceRev,
       intentId: createResourceIntentId(),
       issuedAt: new Date().toISOString(),
       nodeId: `dir_public_${Date.now().toString(36)}`,
@@ -183,7 +190,7 @@ export function PublicResourcePage({
     });
     const mutation = await editorApi.applyWorkspaceIntent(
       token,
-      workspaceId,
+      currentWorkspace,
       request
     );
     applyWorkspaceMutation(mutation);
@@ -273,7 +280,10 @@ export function PublicResourcePage({
         })
       );
     } else {
-      if (isWorkspaceDocumentReferencedByRoute(routeManifest, nodeId)) {
+      if (
+        routeManifest &&
+        isWorkspaceDocumentReferencedByRoute(routeManifest, nodeId)
+      ) {
         window.alert(
           t('publicResource.routeReferencedDeleteBlocked', {
             defaultValue:

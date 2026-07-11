@@ -383,6 +383,7 @@ describe('workspace Web Plugin Platform', () => {
       {
         workspaceId: 'workspace-resource-fixture',
         documentId: 'document-resource-fixture',
+        documentType: 'pir-page',
         itemId: 'neutral-button',
         preferredTargetId: 'root',
         commandId: 'command-resource-fixture',

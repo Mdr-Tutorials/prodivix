@@ -1,32 +1,33 @@
 import type { StateCreator } from 'zustand';
-import type {
-  WorkspaceDocumentRecord,
-  WorkspaceMutationResponse,
-  WorkspaceSnapshot,
-} from '@/editor/editorApi';
-import { resolveCanonicalWorkspaceDocumentId } from '@/pir/resolvePirDocument';
+import type { PIRDocument } from '@prodivix/shared/types/pir';
+import { validatePirDocument } from '@prodivix/pir';
 import {
-  isWorkspacePirDocument,
-  normalizeRouteManifest,
-  normalizeWorkspaceDocument,
-  normalizeWorkspaceTree,
-  resolveActiveRouteNodeId,
-} from './editorStore.normalizers';
-import {
-  DEFAULT_ROUTE_MANIFEST,
-  type WorkspaceVfsNode,
-} from './editorStore.types';
+  applyWorkspaceCommand,
+  applyWorkspaceMutation as applyCanonicalWorkspaceMutation,
+  applyWorkspaceTransaction,
+  selectActivePirDocument,
+  type DecodedWorkspaceMutation,
+  type WorkspaceCommandApplyResult,
+  type WorkspaceCommandEnvelope,
+  type WorkspacePatchOperation,
+  type WorkspaceSnapshot,
+  type WorkspaceTransactionApplyResult,
+  type WorkspaceTransactionEnvelope,
+} from '@prodivix/workspace';
 import type { EditorStore } from './editorStore.shape';
 
+export type UpdateActivePirDocumentOptions = {
+  commandId?: string;
+  namespace?: string;
+  type?: string;
+  issuedAt?: string;
+  mergeKey?: string;
+  label?: string;
+};
+
 export interface WorkspaceSlice {
-  workspaceId?: string;
-  workspaceRev?: number;
-  routeRev?: number;
-  opSeq?: number;
-  activeDocumentId?: string;
-  workspaceDocumentsById: Record<string, WorkspaceDocumentRecord>;
-  treeRootId?: string;
-  treeById: Record<string, WorkspaceVfsNode>;
+  workspace: WorkspaceSnapshot | null;
+  documentEditSeqById: Record<string, number>;
   workspaceCapabilities: Record<string, boolean>;
   workspaceCapabilitiesLoaded: boolean;
   workspaceReadonly: boolean;
@@ -38,66 +39,134 @@ export interface WorkspaceSlice {
   setWorkspaceReadonly: (readonly: boolean) => void;
   clearWorkspaceState: () => void;
   setActiveDocumentId: (documentId: string | undefined) => void;
-  applyWorkspaceMutation: (mutation: WorkspaceMutationResponse) => void;
-  markLocalWorkspaceDocumentSaved: (
-    workspaceId: string,
-    documentId: string
-  ) => void;
+  applyWorkspaceMutation: (mutation: DecodedWorkspaceMutation) => void;
+  dispatchWorkspaceCommand: (
+    command: WorkspaceCommandEnvelope
+  ) => WorkspaceCommandApplyResult | null;
+  dispatchWorkspaceTransaction: (
+    transaction: WorkspaceTransactionEnvelope
+  ) => WorkspaceTransactionApplyResult | null;
+  updateActivePirDocument: (
+    updater: (document: PIRDocument) => PIRDocument,
+    options?: UpdateActivePirDocumentOptions
+  ) => WorkspaceCommandApplyResult | null;
 }
+
+const createCommandId = (): string => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `command-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+const incrementDocumentEditSequences = (
+  current: Record<string, number>,
+  documentIds: Iterable<string>
+): Record<string, number> => {
+  const uniqueDocumentIds = new Set(
+    [...documentIds].map((documentId) => documentId.trim()).filter(Boolean)
+  );
+  if (!uniqueDocumentIds.size) return current;
+  const next = { ...current };
+  uniqueDocumentIds.forEach((documentId) => {
+    next[documentId] = (next[documentId] ?? 0) + 1;
+  });
+  return next;
+};
+
+const appendOptionalDocumentPatch = (
+  forwardOps: WorkspacePatchOperation[],
+  reverseOps: WorkspacePatchOperation[],
+  path: string,
+  before: unknown,
+  after: unknown
+) => {
+  if (Object.is(before, after)) return;
+  if (before === undefined) {
+    forwardOps.push({ op: 'add', path, value: after });
+    reverseOps.unshift({ op: 'remove', path });
+    return;
+  }
+  if (after === undefined) {
+    forwardOps.push({ op: 'remove', path });
+    reverseOps.unshift({ op: 'add', path, value: before });
+    return;
+  }
+  forwardOps.push({ op: 'replace', path, value: after });
+  reverseOps.unshift({ op: 'replace', path, value: before });
+};
+
+const createPirDocumentUpdateCommand = (
+  workspace: WorkspaceSnapshot,
+  before: PIRDocument,
+  after: PIRDocument,
+  options: UpdateActivePirDocumentOptions
+): WorkspaceCommandEnvelope | null => {
+  const documentId = workspace.activeDocumentId;
+  if (!documentId || before.version !== after.version) return null;
+  const forwardOps: WorkspacePatchOperation[] = [];
+  const reverseOps: WorkspacePatchOperation[] = [];
+  appendOptionalDocumentPatch(
+    forwardOps,
+    reverseOps,
+    '/ui/graph',
+    before.ui.graph,
+    after.ui.graph
+  );
+  appendOptionalDocumentPatch(
+    forwardOps,
+    reverseOps,
+    '/logic',
+    before.logic,
+    after.logic
+  );
+  appendOptionalDocumentPatch(
+    forwardOps,
+    reverseOps,
+    '/animation',
+    before.animation,
+    after.animation
+  );
+  appendOptionalDocumentPatch(
+    forwardOps,
+    reverseOps,
+    '/metadata',
+    before.metadata,
+    after.metadata
+  );
+  if (!forwardOps.length) return null;
+  return {
+    id: options.commandId ?? createCommandId(),
+    namespace: options.namespace ?? 'core.pir',
+    type: options.type ?? 'document.update',
+    version: '1.0',
+    issuedAt: options.issuedAt ?? new Date().toISOString(),
+    forwardOps,
+    reverseOps,
+    target: { workspaceId: workspace.id, documentId },
+    domainHint: 'pir',
+    ...(options.mergeKey ? { mergeKey: options.mergeKey } : {}),
+    ...(options.label ? { label: options.label } : {}),
+  };
+};
 
 export const createWorkspaceSlice: StateCreator<
   EditorStore,
   [],
   [],
   WorkspaceSlice
-> = (set) => ({
-  workspaceId: undefined,
-  workspaceRev: undefined,
-  routeRev: undefined,
-  opSeq: undefined,
-  activeDocumentId: undefined,
-  workspaceDocumentsById: {},
-  treeRootId: undefined,
-  treeById: {},
+> = (set, get) => ({
+  workspace: null,
+  documentEditSeqById: {},
   workspaceCapabilities: {},
   workspaceCapabilitiesLoaded: false,
   workspaceReadonly: false,
   setWorkspaceSnapshot: (workspace) =>
     set((state) => {
-      const isSameWorkspace = state.workspaceId === workspace.id;
-      const nextDocumentsById: Record<string, WorkspaceDocumentRecord> = {};
-      workspace.documents.forEach((document) => {
-        nextDocumentsById[document.id] = normalizeWorkspaceDocument(document);
-      });
-
-      const nextActiveDocumentId =
-        state.activeDocumentId && nextDocumentsById[state.activeDocumentId]
-          ? state.activeDocumentId
-          : resolveCanonicalWorkspaceDocumentId(workspace.documents);
-      const { treeRootId, treeById } = normalizeWorkspaceTree(
-        workspace.tree,
-        nextDocumentsById
-      );
-      const activeDocument = nextActiveDocumentId
-        ? nextDocumentsById[nextActiveDocumentId]
-        : undefined;
-      const nextRouteManifest = normalizeRouteManifest(workspace.routeManifest);
-      const nextActiveRouteNodeId = resolveActiveRouteNodeId(
-        nextRouteManifest,
-        [workspace.activeRouteNodeId, state.activeRouteNodeId]
-      );
-
-      const nextPirDoc = isWorkspacePirDocument(activeDocument)
-        ? activeDocument.content
-        : state.pirDoc;
+      const isSameWorkspace = state.workspace?.id === workspace.id;
       return {
-        workspaceId: workspace.id,
-        workspaceRev: workspace.workspaceRev,
-        routeRev: workspace.routeRev,
-        opSeq: workspace.opSeq,
-        workspaceDocumentsById: nextDocumentsById,
-        treeRootId,
-        treeById,
+        workspace,
+        documentEditSeqById: {},
         workspaceCapabilities: isSameWorkspace
           ? state.workspaceCapabilities
           : {},
@@ -105,14 +174,6 @@ export const createWorkspaceSlice: StateCreator<
           ? state.workspaceCapabilitiesLoaded
           : false,
         workspaceReadonly: isSameWorkspace ? state.workspaceReadonly : false,
-        routeManifest: nextRouteManifest,
-        activeRouteNodeId: nextActiveRouteNodeId,
-        activeDocumentId: nextActiveDocumentId,
-        pirDoc: nextPirDoc,
-        pirDocRevision:
-          nextPirDoc === state.pirDoc
-            ? state.pirDocRevision
-            : state.pirDocRevision + 1,
       };
     }),
   setWorkspaceCapabilities: (workspaceId, capabilities) =>
@@ -120,7 +181,7 @@ export const createWorkspaceSlice: StateCreator<
       const normalizedWorkspaceId = workspaceId.trim();
       if (
         !normalizedWorkspaceId ||
-        normalizedWorkspaceId !== state.workspaceId
+        normalizedWorkspaceId !== state.workspace?.id
       ) {
         return state;
       }
@@ -133,129 +194,97 @@ export const createWorkspaceSlice: StateCreator<
     set({ workspaceReadonly: Boolean(readonly) }),
   clearWorkspaceState: () =>
     set({
-      workspaceId: undefined,
-      workspaceRev: undefined,
-      routeRev: undefined,
-      opSeq: undefined,
-      activeDocumentId: undefined,
-      workspaceDocumentsById: {},
-      treeRootId: undefined,
-      treeById: {},
+      workspace: null,
+      documentEditSeqById: {},
       workspaceCapabilities: {},
       workspaceCapabilitiesLoaded: false,
       workspaceReadonly: false,
-      routeManifest: DEFAULT_ROUTE_MANIFEST,
-      activeRouteNodeId: undefined,
       runtimeStateByProject: {},
     }),
   setActiveDocumentId: (documentId) =>
     set((state) => {
+      if (!state.workspace) return state;
       const normalizedDocumentId = documentId?.trim();
       if (!normalizedDocumentId) {
-        if (state.activeDocumentId === undefined) return state;
-        return { activeDocumentId: undefined };
+        if (state.workspace.activeDocumentId === undefined) return state;
+        const { activeDocumentId: _activeDocumentId, ...workspace } =
+          state.workspace;
+        return { workspace };
       }
-      const nextDocument = state.workspaceDocumentsById[normalizedDocumentId];
-      if (!nextDocument) {
+      if (!state.workspace.docsById[normalizedDocumentId]) return state;
+      if (state.workspace.activeDocumentId === normalizedDocumentId) {
         return state;
       }
-      if (!isWorkspacePirDocument(nextDocument)) {
-        return { activeDocumentId: normalizedDocumentId };
-      }
-      const pirDocChanged = nextDocument.content !== state.pirDoc;
       return {
-        activeDocumentId: normalizedDocumentId,
-        pirDoc: nextDocument.content,
-        pirDocRevision: pirDocChanged
-          ? state.pirDocRevision + 1
-          : state.pirDocRevision,
+        workspace: {
+          ...state.workspace,
+          activeDocumentId: normalizedDocumentId,
+        },
       };
     }),
   applyWorkspaceMutation: (mutation) =>
     set((state) => {
-      if (!state.workspaceId || state.workspaceId !== mutation.workspaceId) {
+      if (!state.workspace || state.workspace.id !== mutation.workspaceId) {
         return state;
       }
-
-      let nextDocumentsById = state.workspaceDocumentsById;
-      let nextPirDoc = state.pirDoc;
-      if (mutation.updatedDocuments?.length) {
-        nextDocumentsById = { ...state.workspaceDocumentsById };
-        mutation.updatedDocuments.forEach((document) => {
-          const previousDocument = nextDocumentsById[document.id];
-          const nextDocument = normalizeWorkspaceDocument({
-            ...previousDocument,
-            ...document,
-          });
-          nextDocumentsById[document.id] = nextDocument;
-          if (
-            document.id === state.activeDocumentId &&
-            isWorkspacePirDocument(nextDocument)
-          ) {
-            nextPirDoc = nextDocument.content;
-          }
-        });
-      }
-      if (mutation.removedDocumentIds?.length) {
-        nextDocumentsById =
-          nextDocumentsById === state.workspaceDocumentsById
-            ? { ...state.workspaceDocumentsById }
-            : nextDocumentsById;
-        mutation.removedDocumentIds.forEach((documentId) => {
-          delete nextDocumentsById[documentId];
-        });
-      }
-      const { treeRootId, treeById } = mutation.tree
-        ? normalizeWorkspaceTree(mutation.tree, nextDocumentsById)
-        : { treeRootId: state.treeRootId, treeById: state.treeById };
-      const nextActiveDocumentId =
-        state.activeDocumentId && nextDocumentsById[state.activeDocumentId]
-          ? state.activeDocumentId
-          : resolveCanonicalWorkspaceDocumentId(
-              Object.values(nextDocumentsById)
-            );
-      if (nextActiveDocumentId !== state.activeDocumentId) {
-        const nextActiveDocument = nextActiveDocumentId
-          ? nextDocumentsById[nextActiveDocumentId]
-          : undefined;
-        if (isWorkspacePirDocument(nextActiveDocument)) {
-          nextPirDoc = nextActiveDocument.content;
-        }
-      }
-
-      const pirDocChanged = nextPirDoc !== state.pirDoc;
-      return {
-        workspaceRev: mutation.workspaceRev,
-        routeRev: mutation.routeRev,
-        opSeq: mutation.opSeq,
-        workspaceDocumentsById: nextDocumentsById,
-        treeRootId,
-        treeById,
-        activeDocumentId: nextActiveDocumentId,
-        pirDoc: nextPirDoc,
-        pirDocRevision: pirDocChanged
-          ? state.pirDocRevision + 1
-          : state.pirDocRevision,
-      };
+      const workspace = applyCanonicalWorkspaceMutation(
+        state.workspace,
+        mutation
+      );
+      if (!mutation.removedDocumentIds.length) return { workspace };
+      const documentEditSeqById = { ...state.documentEditSeqById };
+      mutation.removedDocumentIds.forEach((documentId) => {
+        delete documentEditSeqById[documentId];
+      });
+      return { workspace, documentEditSeqById };
     }),
-  markLocalWorkspaceDocumentSaved: (workspaceId, documentId) =>
-    set((state) => {
-      if (!state.workspaceId || state.workspaceId !== workspaceId) {
-        return state;
-      }
-      if (state.workspaceReadonly) return state;
-      const document = state.workspaceDocumentsById[documentId];
-      if (!document) return state;
-      return {
-        opSeq: (state.opSeq ?? 1) + 1,
-        workspaceDocumentsById: {
-          ...state.workspaceDocumentsById,
-          [documentId]: {
-            ...document,
-            contentRev: document.contentRev + 1,
-            updatedAt: new Date().toISOString(),
-          },
-        },
-      };
-    }),
+  dispatchWorkspaceCommand: (command) => {
+    const state = get();
+    if (!state.workspace || state.workspaceReadonly) return null;
+    const result = applyWorkspaceCommand(state.workspace, command);
+    if (!result.ok) return result;
+    set((current) => ({
+      workspace: result.snapshot,
+      documentEditSeqById: command.target.documentId
+        ? incrementDocumentEditSequences(current.documentEditSeqById, [
+            command.target.documentId,
+          ])
+        : current.documentEditSeqById,
+    }));
+    return result;
+  },
+  dispatchWorkspaceTransaction: (transaction) => {
+    const state = get();
+    if (!state.workspace || state.workspaceReadonly) return null;
+    const result = applyWorkspaceTransaction(state.workspace, transaction);
+    if (!result.ok) return result;
+    const documentIds = transaction.commands.flatMap((command) =>
+      command.target.documentId ? [command.target.documentId] : []
+    );
+    set((current) => ({
+      workspace: result.snapshot,
+      documentEditSeqById: incrementDocumentEditSequences(
+        current.documentEditSeqById,
+        documentIds
+      ),
+    }));
+    return result;
+  },
+  updateActivePirDocument: (updater, options = {}) => {
+    const state = get();
+    if (!state.workspace || state.workspaceReadonly) return null;
+    const activeDocument = selectActivePirDocument(state.workspace);
+    if (!activeDocument) return null;
+    const candidate = updater(activeDocument.content);
+    if (candidate === activeDocument.content) return null;
+    const validation = validatePirDocument(candidate);
+    if (validation.hasError) return null;
+    const command = createPirDocumentUpdateCommand(
+      state.workspace,
+      activeDocument.content,
+      validation.document,
+      options
+    );
+    return command ? state.dispatchWorkspaceCommand(command) : null;
+  },
 });

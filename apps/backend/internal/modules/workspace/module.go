@@ -97,6 +97,12 @@ func ResolveCanonicalWorkspacePIR(snapshot *WorkspaceSnapshot) (json.RawMessage,
 	}
 	for _, document := range snapshot.Documents {
 		if document.Type == WorkspaceDocumentTypePIRPage &&
+			strings.TrimSpace(document.Path) == "/pir.json" {
+			return document.Content, true
+		}
+	}
+	for _, document := range snapshot.Documents {
+		if document.Type == WorkspaceDocumentTypePIRPage &&
 			(strings.TrimSpace(document.Path) == "/" || strings.TrimSpace(document.Path) == "") {
 			return document.Content, true
 		}
@@ -106,7 +112,7 @@ func ResolveCanonicalWorkspacePIR(snapshot *WorkspaceSnapshot) (json.RawMessage,
 			return document.Content, true
 		}
 	}
-	return snapshot.Documents[0].Content, true
+	return nil, false
 }
 
 func (module *Module) SyncProjectMirrorFromWorkspace(ctx context.Context, userID string, workspaceID string) {

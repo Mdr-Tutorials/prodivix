@@ -1,6 +1,8 @@
-import type { WorkspaceDocumentRecord } from '@/editor/editorApi';
-import type { WorkspaceVfsNode } from '@/editor/store/editorStore.types';
-import { isWorkspaceCodeDocumentContent } from '@/workspace';
+import {
+  isWorkspaceCodeDocumentContent,
+  type WorkspaceDocument,
+  type WorkspaceVfsNode,
+} from '@prodivix/workspace';
 import {
   inferMimeByCodeFileName,
   type CodeResourceNode,
@@ -80,7 +82,7 @@ const buildWorkspacePathByNodeId = (
 };
 
 export const buildCodeResourceTreeFromWorkspaceVfs = (
-  documentsById: Record<string, WorkspaceDocumentRecord>,
+  documentsById: Record<string, WorkspaceDocument>,
   treeRootId: string | undefined,
   treeById: Record<string, WorkspaceVfsNode>
 ): CodeResourceNode => {
@@ -183,7 +185,7 @@ export const flattenCodeResourceFiles = (
 };
 
 export const buildCodeResourceFilesFromWorkspaceDocuments = (
-  documentsById: Record<string, WorkspaceDocumentRecord>,
+  documentsById: Record<string, WorkspaceDocument>,
   treeRootId?: string,
   treeById: Record<string, WorkspaceVfsNode> = {}
 ) =>

@@ -1,6 +1,6 @@
 import { matchesBlueprintCompositionSequence } from '@prodivix/plugin-contracts';
 import type { UiGraph } from '@prodivix/shared/types/pir';
-import { getParentMap } from '@/pir/graph';
+import { getParentMap } from '@prodivix/pir';
 import type { PaletteQueryService } from '@/plugins/platform';
 
 export type BlueprintCompositionIssue = Readonly<{

@@ -1,4 +1,4 @@
-import type { WorkspaceDocumentRecord } from '@/editor/editorApi';
+import type { WorkspaceDocument } from '@prodivix/workspace';
 import {
   isWorkspaceConfigContent,
   normalizeWorkspaceResourcePath,
@@ -29,7 +29,7 @@ const inferProjectFileKind = (path: string): ProjectFileKind => {
 
 const normalizeProjectFile = (
   value: unknown,
-  document: WorkspaceDocumentRecord
+  document: WorkspaceDocument
 ): ProjectFile | null => {
   if (!isWorkspaceConfigContent<ProjectFileDocumentValue>(value)) return null;
   const file = value.value;
@@ -66,7 +66,7 @@ export const createProjectFileDocumentContent = (file: ProjectFile) => ({
 });
 
 export const buildProjectFilesFromWorkspace = (
-  documentsById: Record<string, WorkspaceDocumentRecord>
+  documentsById: Record<string, WorkspaceDocument>
 ): ProjectFile[] => {
   const files = Object.values(documentsById)
     .filter(

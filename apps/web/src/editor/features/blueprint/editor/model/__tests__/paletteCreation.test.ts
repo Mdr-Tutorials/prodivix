@@ -17,9 +17,9 @@ import {
   pushWorkspaceHistoryEntry,
   redoWorkspaceHistory,
   undoWorkspaceHistory,
-  type StableWorkspaceSnapshot,
+  type WorkspaceSnapshot,
   type WorkspaceHistoryScope,
-} from '@/workspace';
+} from '@prodivix/workspace';
 
 const owner = Object.freeze({
   pluginId: '@prodivix/plugin-fixture',
@@ -42,7 +42,7 @@ const createDocument = (): PIRDocument => ({
   },
 });
 
-const createWorkspace = (document: PIRDocument): StableWorkspaceSnapshot => ({
+const createWorkspace = (document: PIRDocument): WorkspaceSnapshot => ({
   id: 'workspace-fixture',
   workspaceRev: 1,
   routeRev: 1,
@@ -190,6 +190,7 @@ describe('Palette fragment creation', () => {
     const result = applyPaletteItemInsertion(document, palette, {
       workspaceId: 'workspace-fixture',
       documentId: 'document-fixture',
+      documentType: 'pir-page',
       itemId: item.id,
       preferredTargetId: 'root',
       selection: {
@@ -282,6 +283,7 @@ describe('Palette fragment creation', () => {
     const result = applyPaletteItemInsertion(createDocument(), palette, {
       workspaceId: 'workspace-fixture',
       documentId: 'document-fixture',
+      documentType: 'pir-page',
       itemId: item.id,
       commandId: 'command-direct',
       issuedAt: '2026-07-11T00:00:00.000Z',
@@ -318,6 +320,7 @@ describe('Palette fragment creation', () => {
     const result = applyPaletteItemInsertion(document, palette, {
       workspaceId: 'workspace-fixture',
       documentId: 'document-fixture',
+      documentType: 'pir-page',
       itemId: item.id,
       preferredTargetId: 'root',
       commandId: 'command-invalid',

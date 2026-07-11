@@ -47,12 +47,11 @@ paths:
     patch:
       summary: Patch one document with a command
       description: >
-        Apply one versioned CommandEnvelope to a PIR v1.3 graph-only document.
-        Document content changes are PATCH-only: the server applies
-        command.forwardOps, verifies command.reverseOps can restore the previous
-        document, validates the patched PIR, advances the document content
-        revision, and records the command in the operation log. Paths under
-        /ui/root and the document root path / are forbidden.
+        Apply one versioned CommandEnvelope to a Workspace document. The server
+        applies command.forwardOps, verifies command.reverseOps can restore the
+        previous document, runs document-type validation, advances contentRev,
+        and records the command in the operation log. PIR, code, and generic
+        documents use different patch-path policies.
       operationId: patchDocument
       parameters:
         - in: path
@@ -168,6 +167,7 @@ components:
       properties:
         workspace:
           $ref: '#/components/schemas/WorkspaceSnapshot'
+      additionalProperties: false
     GetCapabilitiesResponse:
       type: object
       required: [workspaceId, capabilities]
@@ -186,7 +186,16 @@ components:
     WorkspaceSnapshot:
       type: object
       required:
-        [id, workspaceRev, routeRev, opSeq, tree, documents, routeManifest]
+        [
+          id,
+          workspaceRev,
+          routeRev,
+          opSeq,
+          tree,
+          documents,
+          routeManifest,
+          settings,
+        ]
       properties:
         id:
           type: string
@@ -203,21 +212,28 @@ components:
           $ref: '#/components/schemas/WorkspaceTree'
         documents:
           type: array
+          minItems: 1
           items:
             $ref: '#/components/schemas/WorkspaceDocument'
         routeManifest:
           type: object
           additionalProperties: true
+        settings:
+          type: object
+          additionalProperties: true
+      additionalProperties: false
     WorkspaceTree:
       type: object
-      required: [rootId, nodes]
+      required: [treeRootId, treeById]
       properties:
-        rootId:
+        treeRootId:
           type: string
-        nodes:
-          type: array
-          items:
+        treeById:
+          type: object
+          minProperties: 1
+          additionalProperties:
             $ref: '#/components/schemas/WorkspaceTreeNode'
+      additionalProperties: false
     WorkspaceTreeNode:
       type: object
       required: [id, kind, name, parentId]
@@ -237,15 +253,15 @@ components:
             type: string
         docId:
           type: string
+      additionalProperties: false
     WorkspaceDocument:
       type: object
-      required: [id, type, path, contentRev, metaRev, content]
+      required: [id, type, path, contentRev, metaRev, content, updatedAt]
       properties:
         id:
           type: string
         type:
-          type: string
-          enum: [pir-page, pir-layout, pir-component, pir-graph, pir-animation]
+          $ref: '#/components/schemas/WorkspaceDocumentType'
         path:
           type: string
         contentRev:
@@ -255,11 +271,22 @@ components:
           type: integer
           minimum: 1
         content:
-          type: object
-          additionalProperties: true
+          description: JSON document content. Code documents use the language/source wrapper.
         updatedAt:
           type: string
           format: date-time
+      additionalProperties: false
+    WorkspaceDocumentType:
+      type: string
+      enum:
+        - pir-page
+        - pir-layout
+        - pir-component
+        - pir-graph
+        - pir-animation
+        - code
+        - asset
+        - project-config
     PatchDocumentRequest:
       type: object
       required: [expectedContentRev, command]
@@ -319,9 +346,11 @@ components:
       type: object
       required: [op, path]
       description: >
-        Restricted JSON Patch operation. Document PATCH allows paths under
-        /ui/graph, /logic, /animation, /metadata, and /x-* only. /ui/root and /
-        are forbidden. Array "-" is only valid for add.
+        Restricted JSON Patch operation. PIR documents allow /ui/graph, /logic,
+        /animation, /metadata, and /x-*; code documents allow /language, /source,
+        /metadata, and /x-*; other document types allow non-root paths. The
+        document root path / is always forbidden, and /ui/root is additionally
+        forbidden for PIR documents. Array "-" is only valid for add.
       properties:
         op:
           type: string
@@ -418,35 +447,26 @@ components:
           type: string
         workspaceRev:
           type: integer
+          minimum: 1
         routeRev:
           type: integer
+          minimum: 1
         updatedDocuments:
           type: array
           items:
-            type: object
-            required: [id, type, path, contentRev, metaRev, content, updatedAt]
-            properties:
-              id:
-                type: string
-              type:
-                $ref: '#/components/schemas/WorkspaceDocumentType'
-              path:
-                type: string
-              contentRev:
-                type: integer
-              metaRev:
-                type: integer
-              content:
-                type: object
-                additionalProperties: true
-              updatedAt:
-                type: string
-                format: date-time
-            additionalProperties: false
+            $ref: '#/components/schemas/WorkspaceDocument'
+        removedDocumentIds:
+          type: array
+          items:
+            type: string
+        tree:
+          $ref: '#/components/schemas/WorkspaceTree'
         opSeq:
           type: integer
+          minimum: 1
         acceptedMutationId:
           type: string
+      additionalProperties: false
     ErrorEnvelope:
       type: object
       required: [error]

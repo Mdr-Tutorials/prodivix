@@ -9,7 +9,7 @@ import {
   isAncestorOf,
   supportsChildrenForNode,
 } from '@/editor/features/blueprint/editor/model/tree';
-import { materializePirRoot } from '@/pir/graph';
+import { materializePirRoot } from '@prodivix/pir';
 import { getOverNodeId, resolveTreePlacement } from './dragdrop.placement';
 import { applyTreeSortDragEnd } from './dragdrop.treeMove';
 import { applyPaletteItemDrop } from './dragdrop.paletteDrop';
@@ -32,9 +32,11 @@ export const useBlueprintDragDrop = ({
   pirDoc,
   workspaceId,
   documentId,
+  documentType,
   selectedId,
   palette,
-  updatePirDoc,
+  updateActivePirDocument,
+  dispatchWorkspaceCommand,
   onNodeSelect,
   onCompositionIssue,
 }: UseBlueprintDragDropOptions) => {
@@ -119,19 +121,27 @@ export const useBlueprintDragDrop = ({
     if (data?.kind === 'tree-sort') {
       let compositionIssue: BlueprintCompositionIssue | undefined;
       let changed = false;
-      updatePirDoc((doc) => {
-        const next = applyTreeSortDragEnd(
-          doc,
-          event,
-          data as TreeSortDragData,
-          palette,
-          (issue) => {
-            compositionIssue = issue;
-          }
-        );
-        changed = next !== doc;
-        return next;
-      });
+      updateActivePirDocument(
+        (doc) => {
+          const next = applyTreeSortDragEnd(
+            doc,
+            event,
+            data as TreeSortDragData,
+            palette,
+            (issue) => {
+              compositionIssue = issue;
+            }
+          );
+          changed = next !== doc;
+          return next;
+        },
+        {
+          namespace: 'core.blueprint',
+          type: 'node.move',
+          mergeKey: 'blueprint-tree-move',
+          label: 'Move component',
+        }
+      );
       if (compositionIssue) onCompositionIssue?.(compositionIssue);
       else if (changed) onCompositionIssue?.(undefined);
       return;
@@ -140,19 +150,15 @@ export const useBlueprintDragDrop = ({
     if (data?.kind !== 'palette-item') return;
 
     const overData = over.data.current as DragOverData | null | undefined;
-    let nextNodeId = '';
-    let compositionIssue: BlueprintCompositionIssue | undefined;
-    updatePirDoc((doc) => {
-      const result = applyPaletteItemDrop(
-        doc,
-        data as PaletteItemDragData,
-        overData,
-        { workspaceId, documentId, selectedId, palette }
-      );
-      nextNodeId = result.nextNodeId;
-      compositionIssue = result.compositionIssue;
-      return result.doc;
-    });
+    const result = applyPaletteItemDrop(
+      pirDoc,
+      data as PaletteItemDragData,
+      overData,
+      { workspaceId, documentId, documentType, selectedId, palette }
+    );
+    const nextNodeId = result.nextNodeId;
+    const compositionIssue = result.compositionIssue;
+    if (result.command) dispatchWorkspaceCommand(result.command);
     if (compositionIssue) onCompositionIssue?.(compositionIssue);
     else if (nextNodeId) onCompositionIssue?.(undefined);
     if (nextNodeId) {

@@ -1,5 +1,5 @@
 import type { ComponentNode } from '@prodivix/shared/types/pir';
-import { materializePirRoot } from '#src/graph/materialize';
+import { materializePirRoot } from '@prodivix/pir';
 import type { CanonicalNode } from '#src/core/canonicalIR';
 import { buildCanonicalIR } from '#src/core/canonicalIR';
 import type { AdapterImportSpec } from '#src/core/adapter';

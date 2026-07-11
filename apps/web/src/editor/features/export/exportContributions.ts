@@ -12,7 +12,7 @@ import {
   type ReactGeneratorCodeArtifact,
 } from '@prodivix/prodivix-compiler';
 import type { WorkspaceRouteManifest } from '@prodivix/shared/router';
-import type { WorkspaceDocumentRecord } from '@/editor/editorApi';
+import type { WorkspaceDocument } from '@prodivix/workspace';
 import type { ProjectFile } from '@/editor/features/resources/projectFileStore';
 import type { PublicResourceNode } from '@/editor/features/resources/publicTree';
 import { LIBRARY_CATALOG } from '@/editor/features/resources/externalLibraryManager/libraryCatalog';
@@ -28,7 +28,7 @@ import {
 import { decodeDataUrlToBytes } from './exportBinary';
 
 type PublicExportFile = PublicResourceNode & { path: string };
-type WorkspaceDocumentsById = Record<string, WorkspaceDocumentRecord>;
+type WorkspaceDocumentsById = Record<string, WorkspaceDocument>;
 
 const projectFileKindByKind: Record<ProjectFile['kind'], ExportFileKind> = {
   gitignore: 'config',
@@ -101,7 +101,7 @@ const toDependencyVersion = (version: string) => {
 };
 
 const getI18nSourceTrace = (
-  document: WorkspaceDocumentRecord,
+  document: WorkspaceDocument,
   path: string
 ): ExportSourceTrace[] => [
   {
@@ -114,7 +114,7 @@ const getI18nSourceTrace = (
 ];
 
 const getExternalLibrarySourceTrace = (
-  document: WorkspaceDocumentRecord,
+  document: WorkspaceDocument,
   libraryId?: string
 ): ExportSourceTrace[] => [
   {

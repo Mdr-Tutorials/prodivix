@@ -33,6 +33,7 @@
     "test:watch": "vitest --config vitest.config.ts"
   },
   "dependencies": {
+    "@prodivix/pir": "workspace:*",
     "@prodivix/shared": "workspace:*",
     "@prodivix/themes": "workspace:*",
     "@prodivix/ui": "workspace:*"

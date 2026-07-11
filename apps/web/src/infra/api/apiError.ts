@@ -2,7 +2,7 @@ import type {
   ProdivixDiagnostic,
   ProdivixDiagnosticDomain,
   ProdivixDiagnosticSeverity,
-} from '@/diagnostics';
+} from '@prodivix/diagnostics';
 
 export type ApiErrorDiagnosticPayload = {
   code: string;

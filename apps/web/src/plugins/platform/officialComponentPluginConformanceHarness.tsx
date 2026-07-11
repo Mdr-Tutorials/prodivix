@@ -104,6 +104,7 @@ const insertPaletteItem = (platform: WebPluginPlatform, itemId: string) => {
     {
       workspaceId: platform.workspaceId,
       documentId: `official-plugin-conformance:${itemId}`,
+      documentType: 'pir-page',
       itemId,
       preferredTargetId: 'root',
       commandId: `official-plugin-conformance:${itemId}:insert`,

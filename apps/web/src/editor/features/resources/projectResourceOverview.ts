@@ -10,8 +10,7 @@ import {
 import { collectBestPracticeHints, flattenPublicFiles } from './publicTree';
 import { collectLocaleMissingStats } from './i18nStore';
 import { flattenEnabledProjectFiles } from './projectFileStore';
-import type { WorkspaceDocumentRecord } from '@/editor/editorApi';
-import type { WorkspaceVfsNode } from '@/editor/store/editorStore.types';
+import type { WorkspaceDocument, WorkspaceVfsNode } from '@prodivix/workspace';
 import {
   buildCodeResourceFilesFromWorkspaceDocuments,
   buildCodeResourceTreeFromWorkspaceVfs,
@@ -97,7 +96,7 @@ export type OverviewSnapshot = {
 
 export const buildOverviewSnapshot = (
   projectId?: string,
-  workspaceDocumentsById: Record<string, WorkspaceDocumentRecord> = {},
+  workspaceDocumentsById: Record<string, WorkspaceDocument> = {},
   treeRootId?: string,
   treeById: Record<string, WorkspaceVfsNode> = {}
 ): OverviewSnapshot => {

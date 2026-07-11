@@ -1,5 +1,5 @@
 import { type PIRDocument } from '@prodivix/shared/types/pir';
-import { normalizePirDocument } from '@/pir/resolvePirDocument';
+import { normalizePirDocument } from '@prodivix/pir';
 
 export const testDoc: PIRDocument = normalizePirDocument({
   version: '1.0',
