@@ -24,7 +24,7 @@ npm install -g pnpm
 ## 克隆仓库
 
 ```bash
-git clone https://github.com/Prodivix/prodivix.git
+git clone https://github.com/Mdr-Tutorials/prodivix.git
 cd prodivix
 ```
 

@@ -1,146 +1,126 @@
 # 简介
 
-Prodivix（简称 Prodivix）是一款**浏览器内运行**的面向现代 Web 开发的**可视化前端构建平台**。它以**页面**为基本组织单元，以**组件**为核心构建模块，支持从原型设计到生产部署的全流程开发。
+Prodivix 是一款处于 alpha 阶段的浏览器原生 Web 应用作者环境。长期目标是让蓝图、节点图、动画与代码在同一个 Workspace 中协作，并让预览、导出、诊断和验证共享可追溯的语义链路。
 
-## 设计理念
+当前产品阶段是 **G0 Passed / G1 Foundation**：Truth & Change Kernel 已形成可重复验证的闭环，语义化的视觉与代码混合作者环境仍在建设。架构文档中的长期能力不等于已经交付的产品功能。
 
-> "融合蓝图、节点图与代码；贯通设计、开发、测试、构建与部署；面向跨领域前端开发、快速 MVP 开发，以及前端学习的优质选择。"
+## 核心原则
 
-Prodivix 的核心设计理念是：
+### Canonical Workspace VFS 是唯一作者态真相
 
-1. **低门槛，高上限** - 初学者可以通过可视化界面快速上手，专业开发者可以深入定制每个细节
-2. **设计即开发** - 打破设计与开发的边界，让设计稿直接转化为可运行代码
-3. **一次设计，多端运行** - 通过 PIR 中间表示，支持导出为多种前端框架代码
-4. **开放生态** - 完全开源，鼓励社区贡献组件、模板和最佳实践
+Workspace VFS 统一持有：
 
-## 核心特性
+- Workspace metadata 与 Route Manifest
+- PIR page、layout 与 component documents
+- 独立的 NodeGraph (`pir-graph`) 与 Animation (`pir-animation`) documents
+- Code Documents、Assets 与 Project Config
 
-### 可视化蓝图编辑器
+PIR 是 Workspace 中的核心领域文档，但不是整个项目的唯一真相源。PIR 内部的 UI 保存态使用规范化的 `ui.graph`；需要树结构时，通过 `materializeUiTree` 生成临时读取视图，而不是再保存一份可漂移的树。
 
-蓝图编辑器是 Prodivix 的核心功能，提供直观的拖拽式 UI 设计体验：
+### 所有领域修改共享一条写入路径
 
-- **组件面板** - 从丰富的组件库中拖拽组件到画布
-- **组件树** - 层级化管理页面结构，支持拖拽排序
-- **属性检查器** - 实时编辑组件属性，即时预览效果
-- **视口工具栏** - 缩放、平移、重置视口，适配不同设计场景
+```mermaid
+flowchart LR
+  Editors["Blueprint / NodeGraph / Animation / Code / Resources"]
+  Commands["Workspace Command / Transaction / History"]
+  Outbox["Durable outbox + local replica"]
+  Commit["Atomic WorkspaceOperation Commit"]
+  VFS["Confirmed Canonical Workspace VFS"]
 
-### AI 辅助开发
-
-Prodivix 的 AI 能力采用重前端、轻后端的设计。当前版本在蓝图编辑器右下角提供最小 AI 助手闭环：
-
-- **Mock / OpenAI-compatible Provider** - 可在本地模拟，也可直接连接兼容 OpenAI Chat Completions 的服务
-- **模型发现** - 可从 `{baseURL}/models` 读取可用模型基础信息
-- **结构化计划** - 根据当前路由和选中节点上下文生成可审阅计划
-- **调试可见** - Hover 查看真实 Prompt 和模型原始返回文本，便于排查解析问题
-
-### PIR 中间表示
-
-PIR（Modular Intermediate Representation）是 Prodivix 的核心创新：
-
-```json
-{
-  "type": "PdxButton",
-  "props": {
-    "variant": "primary",
-    "size": "medium"
-  },
-  "children": ["点击我"]
-}
+  Editors --> Commands --> Outbox --> Commit --> VFS
 ```
 
-PIR 是一种框架无关的组件描述格式，可以转换为：
+编辑器先通过 `@prodivix/workspace` 形成 Command 或 Transaction，并记录可撤销、重做和审计的 History。远端 exact request 在发送前进入 `@prodivix/workspace-sync` 的 durable outbox，再由后端执行强幂等 Atomic Commit。Settings 使用独立的 durable outbox 与 Settings Commit。
 
-| 目标框架 | 输出格式              |
-| -------- | --------------------- |
-| React    | JSX + Hooks           |
-| Vue 3    | SFC + Composition API |
-| Angular  | 组件类 + 模板         |
-| SolidJS  | JSX + 响应式          |
-| 原生 Web | HTML + CSS + JS       |
+旧 document `PATCH`、`POST /intents`、Project PIR 作者态镜像以及绕过 outbox 的直写入口已经被 Hard Cut。
 
-### 一键部署
+### Core package 拥有领域语义，Web 负责组合
 
-Prodivix 内置多种部署选项：
+| 能力域                                                | 当前 owner                                             |
+| ----------------------------------------------------- | ------------------------------------------------------ |
+| Workspace VFS、Command、Transaction、History          | `@prodivix/workspace`                                  |
+| Outbox、local replica、revision conflict、commit wire | `@prodivix/workspace-sync`                             |
+| PIR graph、materialization、normalization、validation | `@prodivix/pir`                                        |
+| Route contract、codec、matching 与 validation         | `@prodivix/router`                                     |
+| NodeGraph / Animation 领域内核                        | `@prodivix/nodegraph` / `@prodivix/animation`          |
+| Runtime contract 与浏览器 adapter                     | `@prodivix/runtime-core` / `@prodivix/runtime-browser` |
+| Code Authoring / Symbol Environment                   | `@prodivix/authoring`                                  |
+| 诊断 contract、registry 与 presentation               | `@prodivix/diagnostics`                                |
+| React PIR projection                                  | `@prodivix/pir-react-renderer`                         |
+| Workspace / PIR export                                | `@prodivix/prodivix-compiler`                          |
 
-- **静态托管** - GitHub Pages、Vercel、Netlify
-- **Web3 部署** - IPFS、Arweave 去中心化存储
-- **自托管** - 导出静态文件，部署到任意服务器
+`apps/web` 不再拥有 `src/core`、私有 PIR renderer、私有 Router Core 或私有 PIR validator。Web 中仍存在的 `src/pir` 与 `src/router` 只承载应用专用 adapter。
 
-## 系统架构
+## 三编辑器与共享代码作者环境
 
+Prodivix 保持三种主要视觉编辑器：
+
+- **Blueprint** 维护 PIR UI graph、属性、布局和事件绑定。
+- **NodeGraph** 维护逻辑图及其端口与执行语义。
+- **Animation** 维护 timeline、binding、track、filter 与关键帧。
+
+复杂 handler、executor、mounted CSS、adapter、easing、shader 和 timeline script 不应作为裸字符串散落在编辑器状态中。它们通过 CodeSlot 指向 Workspace code document / CodeArtifact，由共享 Code Authoring Environment 提供 CodeReference、符号、作用域与诊断查询。
+
+当前已经存在 CodeArtifact、CodeReference、CodeSlot、Authoring Registry 与 CodeMirror/Monaco 相关基础，但真实 TypeScript/JavaScript/CSS/GLSL/WGSL Language Service、definition/reference/rename、稳定 visual/code round-trip 和完整代码工作区尚未通过 G1 Gate。
+
+## 当前产品状态
+
+### G0：Passed
+
+`pnpm run verify:g0` 已验证以下非浏览器 Truth & Change Kernel 边界：
+
+- Canonical Workspace VFS 与单一生产写入协议
+- Command / Transaction History、undo/redo 与 replay
+- Operation / Settings 双 durable outbox、正式 local replica 与恢复
+- Atomic Commit、revision partition、强幂等与显式冲突解决
+- Workspace、Route 与 PIR 的 codec / semantic validation 组合
+- Issues 聚合、稳定 target、SourceSpan、Quick Fix 边界与编辑器回跳
+- Living Golden App 的创建、编辑、保存规划、恢复、冲突、完整 Workspace React/Vite export 与进程内 build
+
+G0 通过不包含浏览器行为、视觉回归、独立导出项目安装和完整应用交付链。
+
+### G1：Foundation
+
+G1 正在建立语义化的视觉与代码混合作者环境。当前已有 Code Authoring contract、Workspace code documents、React/Vite export 与 SourceTrace 基础；以下关键 Gate 仍未通过：
+
+- 真实 Language Service 与增量索引
+- visual/code 双向 round-trip，且未知代码不丢失
+- 从各编辑器和 Issues 跳转到真实 definition / reference
+- 独立导出项目的 install、typecheck、test、build 与 browser smoke
+- 稳定、可验证的 Component Contract
+
+### 其他能力
+
+- NodeGraph 已有独立领域 package 和执行内核，Animation 已有 contract、normalizer、基础 evaluator 与浏览器 preview projection；完整跨域行为验证仍属于后续 Gate。
+- Plugin Host、Browser Sandbox 与 Ant Design / MUI / Radix 官方插件已有较多基础，但 public SDK、签名、Marketplace 与完整 conformance 尚未完成。
+- AI gateway、provider、streaming、tool 与 trace 有基础；真实 Workspace 写入必须继续走 Command、outbox、验证与审阅链路，目前不能视为自治开发闭环。
+- React/Vite 是当前 Golden target。Vue、Angular、Svelte、Solid、Web Components 等多 target 仍是路线图，不是当前完成项。
+- 多设备协作、生产部署闭环、监控回映射与团队级 Local-first 尚未完成。
+
+## 系统组成
+
+```text
+apps/
+  web             React 编辑器与产品组合层
+  backend         Go + PostgreSQL 持久化与 API
+  plugin-sandbox  独立 origin 的 Browser plugin runtime broker
+  cli             尚未接入 Workspace 的 CLI 基础工程
+  vscode          VS Code 扩展基础
+  docs            VitePress 文档站
+
+packages/
+  workspace / workspace-sync / pir / router
+  nodegraph / animation / runtime-core / runtime-browser
+  authoring / diagnostics / pir-react-renderer
+  prodivix-compiler / golden-conformance
+  plugin-* / ui / themes / shared / ai / i18n
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                          Prodivix                              │
-├─────────────┬──────────────┬────────────┬───────────────┬───────────┤
-│   apps/web  │ apps/backend │  apps/cli  │  apps/vscode  │ apps/docs │
-│ (React 编辑器)│ (Go + PG 服务)│ (命令行工具)│ (VS Code 扩展) │ (VitePress)│
-├─────────────┴──────────────┴────────────┴───────────────┴───────────┤
-│                            packages/                                 │
-├──────┬──────────────┬────────┬────────┬──────┬──────┬───────────────┤
-│  ui  │ prodivix-compiler │ shared │ themes │ i18n │  ai  │vscode-debugger│
-└──────┴──────────────┴────────┴────────┴──────┴──────┴───────────────┘
-```
 
-前端编辑器统一收敛到 **PIR**，由后端 **Workspace VFS** 持久化；
-前后端共用当前 **PIR** 校验逻辑（`apps/web/src/pir/validator` ↔ `apps/backend/internal/modules/workspace/pir_validator.go`）。
+## 继续阅读
 
-## 与同类工具对比
+- [快速开始](/guide/getting-started)
+- [项目结构](/guide/project-structure)
+- [PIR 规范](/reference/pir-spec)
+- [AI 助手](/guide/ai-assistant)
 
-| 特性       |      Prodivix      | Figma to Code | 传统 IDE  |
-| ---------- | :----------------: | :-----------: | :-------: |
-| 可视化设计 |         ✅         |      ✅       |    ❌     |
-| 逻辑编排   | ✅ (节点图 + 代码) |      ❌       | ✅ (代码) |
-| 多框架导出 |         ✅         |     部分      |    ❌     |
-| 实时预览   |         ✅         |      ✅       |  需配置   |
-| 调试支持   |         ✅         |      ❌       |    ✅     |
-| 开源免费   |         ✅         |      ❌       |   部分    |
-| 本地运行   |         ✅         |      ❌       |    ✅     |
-| 外部库集成 |         ✅         |      ❌       |    ✅     |
-| 协作编辑   |         ✅         |      ✅       |    ❌     |
-
-## 功能实现状态
-
-### 已完成功能 ✅
-
-| 功能模块          | 说明                                                                                             |
-| ----------------- | ------------------------------------------------------------------------------------------------ |
-| 蓝图编辑器        | 拖拽式 UI 设计、组件树、Inspector Panel 架构、布局范式                                           |
-| 组件库            | 75+ 内置组件；Ant Design / MUI / Radix 以 bundled official plugin 按 workspace 启用              |
-| 插件平台          | Manifest、Host lifecycle、Browser Sandbox、Gateway 与六类 official contribution contract         |
-| 外部库渲染与导出  | verified package artifact + React Host ABI + serializable Codegen Policy，不执行 remote fallback |
-| PIR 渲染器        | 运行时渲染、ValueRef 解析、列表渲染、数据作用域                                                  |
-| React 代码生成    | PIR → JSX + Hooks（mitosis 桥接）                                                                |
-| Workspace VFS     | 多文档工作区、文件树、路由清单、文档级保存                                                       |
-| 同步协议          | 分区 rev 乐观并发（workspaceRev/routeRev/contentRev）+ 冲突检测                                  |
-| 路由清单 + Outlet | 多级路由 / 布局路由 / Outlet 占位 + 编辑器结构诊断                                               |
-| PIR 双端校验      | 前后端共用 v1.3 graph 校验（循环 / 孤立节点 / 父子关系）                                         |
-| 后端服务          | 用户认证、项目管理、Workspace 同步、Capability 协商                                              |
-| 国际化            | 支持中文、英文                                                                                   |
-| AI 助手           | Provider 抽象（Mock / OpenAI 兼容）+ 模型发现 + 调试可见                                         |
-
-### 开发中功能 🚧
-
-| 功能模块     | 说明                             |
-| ------------ | -------------------------------- |
-| 节点图编辑器 | 可视化逻辑编排（基础框架已搭建） |
-| 动画编辑器   | 时间线和关键帧编辑               |
-| 调试系统     | 断点、状态监控、时间线           |
-| 执行引擎     | 节点图运行时执行                 |
-
-### 计划功能 📋
-
-- Vue 3 / Angular / Solid / Svelte / Qwik 代码生成
-- 原生 HTML/CSS/JS 导出
-- 团队协作（CRDT 作为 rev 模式后置层，见 `specs/decisions/07.workspace-sync.md`）
-- public plugin SDK、签名审核、marketplace 与更多 extension point surface
-- 类协议样式编辑器（`specs/decisions/16.class-protocol-editor.md`）
-- LLM 深度集成（`specs/decisions/22.llm-integration-architecture.md`）
-- GitHub App 与 Git 集成（`specs/decisions/23.github-app-integration.md`）
-- 文件上传 API
-- OAuth 第三方登录
-
-## 下一步
-
-- [快速开始](/guide/getting-started) - 5 分钟内创建你的第一个项目
-- [AI 助手](/guide/ai-assistant) - 配置 LLM Provider 并查看调试输出
-- [PIR 规范](/reference/pir-spec) - 了解中间表示格式
+全局阶段、退出 Gate 与当前证据以 `specs/roadmap/global-phases.md` 和 `specs/roadmap/g0-closure-evidence.md` 为准。

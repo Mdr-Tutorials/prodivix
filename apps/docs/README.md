@@ -1,53 +1,56 @@
 # @prodivix/docs
 
-Prodivix 官方文档站点，基于 VitePress。
+Prodivix 的 VitePress 文档站。当前产品阶段为 **G0 Passed / G1 Foundation**；面向产品用户的文案必须区分已经验证的能力、基础实现与长期路线图，不能把 Accepted ADR 或存在 UI 误写成已交付闭环。
 
-## 目录结构
+## 当前目录
 
 ```text
-apps/docs
+apps/docs/
 ├── .vitepress/
-│   └── config.mts       # 站点配置（侧栏、导航、主题）
-├── guide/               # 使用与开发指南
-│   ├── introduction.md
-│   ├── getting-started.md
-│   ├── blueprint-editor.md
-│   ├── node-graph.md
-│   ├── ai-assistant.md
-│   ├── pir.md
-│   ├── components.md
-│   ├── i18n.md
-│   ├── theming.md
-│   ├── export.md
-│   ├── deployment.md
-│   └── project-structure.md
-├── api/                 # API 文档
-│   ├── backend.md       #   后端 REST/Workspace 同步 API
-│   ├── cli.md           #   CLI 命令参考
-│   └── components.md    #   内置组件 props 参考
-├── reference/           # 规范与参考
-│   ├── pir-spec.md
-│   ├── component-spec.md
-│   ├── node-spec.md
-│   └── diagnostic-codes.md
-├── community/           # 社区与协作
+│   └── config.mts                         # 导航、侧栏与站点配置
+├── api/
+│   ├── backend.md
+│   ├── cli.md
+│   └── components.md
+├── community/
 │   ├── changelog.md
 │   ├── contributing.md
 │   └── development.md
-├── public/              # 静态资源
-├── index.md             # 首页
+├── guide/
+│   ├── ai-assistant.md
+│   ├── getting-started.md
+│   ├── introduction.md
+│   └── project-structure.md
+├── reference/
+│   ├── diagnostics/                       # 从 specs catalog 生成的诊断页面
+│   ├── authoring-symbol-environment.md
+│   ├── code-diagnostics.md
+│   ├── diagnostic-codes.md
+│   ├── pir-spec.md
+│   ├── plugin-package-and-blueprint-template.md
+│   └── ux-diagnostics.md
+├── public/
+│   └── logo.svg
+├── index.md
 └── package.json
 ```
 
-## 与 specs/ 的关系
+## 与 `specs/` 的关系
 
-`apps/docs` 面向终端用户与生态贡献者，描述「能做什么」。
-`specs/` 面向核心实现者，承载 ADR、契约、迁移计划等内部决策（参见 `specs/decisions/README.md`）。两者各有边界，不要把 ADR 复制到面向用户的 guide 中。
+- `apps/docs` 提供可导航的产品指南、API 入口和公开参考，内容必须反映当前实现边界。
+- `specs/` 承载权威 schema、协议、ADR、ImplementationStatus、Global Phase 和验证证据。
+- 全局进度以 `specs/roadmap/global-phases.md` 为准，G0 证据以 `specs/roadmap/g0-closure-evidence.md` 为准。
+- PIR schema 以 `specs/pir/PIR-current.json` 与 `PIR-current.version.json` 为准；Workspace 同步 wire contract 以 `specs/api/workspace-sync.openapi.yaml` 为准。
+- 诊断页面由根脚本生成。不要直接维护 `reference/diagnostics/` 中的生成文件。
+
+文档可以解释 ADR，但不复制一份会独立漂移的规范，也不把 `DecisionStatus: Accepted` 等同于 `ProductGateStatus: Passed`。
 
 ## 常用命令
 
 ```bash
-pnpm dev:docs             # 本地预览（默认端口 5174）
-pnpm build:docs           # 构建静态站点
-cd apps/docs && pnpm preview
+pnpm dev:docs
+pnpm build:docs
+pnpm --filter @prodivix/docs preview
+pnpm run docs:diagnostics
+pnpm run docs:diagnostics:check
 ```

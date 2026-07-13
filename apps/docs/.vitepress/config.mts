@@ -6,7 +6,7 @@ const base = process.env.VITEPRESS_BASE ?? '/';
 export default defineConfig({
   base,
   title: 'Prodivix',
-  description: '可视化前端开发平台 - 从设计到部署的一站式解决方案',
+  description: '浏览器原生的语义化 Web 应用作者环境（alpha）',
   lang: 'zh-CN',
   lastUpdated: true,
 
@@ -19,7 +19,7 @@ export default defineConfig({
       'meta',
       {
         property: 'og:description',
-        content: '可视化前端开发平台 - 从设计到部署的一站式解决方案',
+        content: '浏览器原生的语义化 Web 应用作者环境（alpha）',
       },
     ],
   ],
@@ -116,7 +116,6 @@ export default defineConfig({
                 { text: 'WKS-4001', link: '/reference/diagnostics/wks-4001' },
                 { text: 'WKS-4002', link: '/reference/diagnostics/wks-4002' },
                 { text: 'WKS-4003', link: '/reference/diagnostics/wks-4003' },
-                { text: 'WKS-5001', link: '/reference/diagnostics/wks-5001' },
                 { text: 'WKS-5002', link: '/reference/diagnostics/wks-5002' },
                 { text: 'WKS-9001', link: '/reference/diagnostics/wks-9001' },
               ],
@@ -397,7 +396,7 @@ export default defineConfig({
     socialLinks: [
       {
         icon: 'github',
-        link: 'https://github.com/Prodivix/prodivix',
+        link: 'https://github.com/Mdr-Tutorials/prodivix',
       },
     ],
 

@@ -1,37 +1,23 @@
 # 项目结构
 
-Prodivix 采用 Monorepo 架构，使用 pnpm workspace 和 Turborepo 管理。本文档只保留当前仓库里真实存在、并且对理解系统边界最有用的结构说明。
+Prodivix 使用 pnpm workspace 与 Turborepo 管理 Monorepo。当前产品阶段为 **G0 Passed / G1 Foundation**；目录和 package owner 以真实仓库与 Core boundary 为准，不再把历史 Web 私有实现当作当前架构。
 
-## 整体结构
+## 顶层结构
 
 ```text
 prodivix/
-├── apps/
-│   ├── web/            # Web 编辑器主应用
-│   ├── backend/        # Go 后端服务
-│   ├── cli/            # 命令行工具
-│   ├── docs/           # 文档站点
-│   └── vscode/         # VS Code 扩展
-├── packages/
-│   ├── ai/             # AI provider 与任务工具
-│   ├── eslint-plugin-prodivix/
-│   ├── i18n/
-│   ├── plugin-contracts/ # Plugin Manifest 与 contribution contracts
-│   ├── plugin-host/      # transport-neutral lifecycle / permission / registry
-│   ├── plugin-protocol/  # versioned JSON wire protocol
-│   ├── plugin-browser/   # Browser sandbox 与 Gateway transport
-│   ├── plugin-package/   # deterministic artifact 与 bundled catalog
-│   ├── plugin-react-host/# official React projection ABI
-│   ├── plugin-antd/      # bundled Ant Design official plugin
-│   ├── plugin-mui/       # bundled Material UI official plugin
-│   ├── plugin-radix/     # bundled Radix UI official plugin
-│   ├── prodivix-compiler/
-│   ├── shared/         # 共享 LLM、类型和脚本
-│   ├── themes/         # 主题与设计令牌
-│   ├── ui/             # 组件库
-│   └── vscode-debugger/
-├── specs/              # 规范、诊断码、设计决策、实现记录
-├── tests/              # E2E 测试
+├── apps/                 # 可运行应用与产品 adapter
+│   ├── backend/
+│   ├── cli/
+│   ├── docs/
+│   ├── plugin-sandbox/
+│   ├── vscode/
+│   └── web/
+├── packages/             # Transport-neutral Core、projection 与共享包
+├── scripts/              # 构建、验证、代码生成与边界检查
+├── specs/                # ADR、协议、路线图、诊断码与实现记录
+├── tests/                # 跨应用 E2E
+├── deploy/               # 部署组合配置
 ├── package.json
 ├── pnpm-workspace.yaml
 ├── turbo.json
@@ -42,213 +28,174 @@ prodivix/
 
 ### `apps/web`
 
-Web 编辑器是主应用，核心代码集中在 `src/`：
+Web 是 React 编辑器与产品组合层：
 
 ```text
 apps/web/src/
-├── App.tsx
-├── main.tsx
 ├── ai/
-├── auth/                 # 登录、会话、个人资料
-├── authoring/            # Code Authoring / Symbol Environment
-├── community/            # 社区页
+├── auth/
+├── community/
 ├── components/
-├── core/                 # 执行器、节点、Worker、类型
-├── debug/                # 断点、状态、时间线
-├── diagnostics/          # 诊断模型与注册表
-├── editor/               # 编辑器主流程与功能区
+├── debug/
+├── editor/
 │   ├── features/
 │   │   ├── animation/
 │   │   ├── blueprint/
-│   │   ├── development/
-│   │   │   └── reactflow/
+│   │   ├── development/       # NodeGraph Web surface
 │   │   ├── export/
+│   │   ├── issues/
 │   │   ├── newfile/
 │   │   ├── resources/
+│   │   ├── revisionConflict/
 │   │   └── settings/
 │   ├── shortcuts/
-│   └── store/
-├── esm-bridge/           # React / React DOM 兼容桥接
+│   ├── store/                 # Canonical Workspace 与 UI composition
+│   └── workspaceSync/         # IndexedDB outbox / replica / recovery adapters
+├── esm-bridge/
 ├── home/
 ├── i18n/
-├── infra/api/            # API 客户端与错误处理
-├── pir/                  # AST / 转换 / 图 / 生成 / 渲染 / 校验
+├── infra/api/
 ├── mock/
-├── plugins/              # Web Plugin Platform composition 与 surface bridge
-├── router/
+├── pir/                       # Web action / AST / converter adapters
+├── plugins/                   # workspace-scoped Plugin Platform composition
+├── router/                    # Web route/code-slot adapter
 ├── shortcuts/
 ├── test-utils/
 ├── theme/
-├── workspace/
-└── utils/
+├── App.tsx
+└── main.tsx
 ```
 
-这里有几处比较关键的分层：
+重要边界：
 
-- `src/pir` 是 PIR 数据与读写链路的核心。
-- `src/editor/features/blueprint` 是蓝图编辑器的主实现。
-- `src/editor/features/development/reactflow` 是节点图编辑器相关实现。
-- `src/diagnostics` 是前端诊断域的统一入口。
-- `src/esm-bridge` 负责浏览器端对 React 运行时的桥接。
-- `src/plugins/platform` 组合 workspace-scoped Plugin Host、bundled official catalog 与编辑器查询服务。
+- 不存在 `apps/web/src/core`。Runtime Core 与 NodeGraph 内核由 `packages/runtime-core` 和 `packages/nodegraph` 持有。
+- `apps/web/src/pir` 不拥有 canonical PIR validator、resolver 或 React renderer；它们分别位于 `packages/pir` 和 `packages/pir-react-renderer`。
+- `apps/web/src/router` 不拥有 Router Core；route contract、codec、matching、mutation 与 validation 位于 `packages/router`。
+- Zustand store 保存一个 canonical `WorkspaceSnapshot` 与产品 UI 状态，不保存第二份 PIR、Route 或 document mirror。
+- 领域写入由 `@prodivix/workspace` Command / Transaction 形成，再通过 `editor/workspaceSync` adapter 与 `@prodivix/workspace-sync` durable outbox 提交。
 
 ### `apps/backend`
 
-后端已经改成标准 Go 项目布局，不再是扁平文件结构：
-
 ```text
 apps/backend/
-├── cmd/
-│   └── server/
+├── cmd/server/
 ├── internal/
 │   ├── app/
 │   ├── config/
 │   ├── modules/
 │   │   ├── auth/
-│   │   ├── integrations/github/
+│   │   ├── integrations/
 │   │   ├── project/
 │   │   └── workspace/
 │   └── platform/
 │       ├── database/
 │       └── http/
-├── Dockerfile
-├── README.md
 ├── server.go
+├── Dockerfile
 ├── docker-compose.yml
 ├── go.mod
 └── go.sum
 ```
 
-这里的重点是：
+- `modules/project` 负责项目元数据、社区读取和显式发布投影。
+- `modules/workspace` 负责 snapshot 读取、capability、Atomic WorkspaceOperation Commit、Settings Commit、VFS / Route / PIR 校验与事务持久化。
+- 后端没有公开的 Intent 或直接 document PATCH 写入入口。`patch*.go` 是 Atomic Commit 内部的受校验 patch 应用器。
+- 数据库迁移当前内嵌在 `internal/platform/database/database.go`，不是独立的 `migrations/` 目录。
 
-- `cmd/server` 是启动入口。
-- `internal/modules/workspace` 承担 workspace、intent、patch、PIR 校验等核心逻辑。
-- `internal/modules/auth`、`project`、`integrations/github` 分别负责认证、项目与第三方集成。
-- `internal/platform` 放公共基础设施层。
+### `apps/plugin-sandbox`
+
+独立 origin 的 Browser plugin runtime broker，包含 runtime broker、UI conformance、安全策略、构建与部署验证脚本。Web 只通过受限协议连接它，不回退到同源 iframe 或普通 same-origin Worker。
 
 ### `apps/cli`
 
-```text
-apps/cli/
-├── bin/prodivix.js
-├── src/
-│   ├── cli.ts
-│   ├── commands/
-│   └── utils/
-├── test/
-└── package.json
-```
+Commander 基础工程，当前只有 `build` 与 `export` 命令入口，尚未接入 Canonical Workspace、同步、生产导出或部署闭环。它不是 G0 写入链路的独立 client。
 
 ### `apps/docs`
 
-```text
-apps/docs/
-├── .vitepress/
-├── api/
-├── community/
-├── guide/
-├── reference/
-├── public/
-├── index.md
-└── package.json
-```
+VitePress 文档站，包含 guide、reference、API、community 与自动生成的 diagnostics 页面。全局产品阶段以 `specs/roadmap/global-phases.md` 为准。
 
 ### `apps/vscode`
 
-```text
-apps/vscode/
-├── src/
-│   ├── commands/
-│   ├── debugger/
-│   ├── extension.ts
-│   ├── index.ts
-│   ├── language/
-│   └── test/
-└── package.json
-```
+VS Code 扩展基础，当前 `src/` 包含 commands、language、tests 与扩展入口。调试适配器的共享实现位于 `packages/vscode-debugger`。
 
-## 共享包
+## Core 与共享 package
 
-### `packages/ui`
+### Truth & Change Kernel
 
-UI 组件库按组件类别分组，样式主要跟随组件文件放置：
+| Package                   | Owner 边界                                                                                              |
+| ------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `packages/workspace`      | Canonical Workspace VFS、codec、validator、selector、Command、Transaction、History 与 projection        |
+| `packages/workspace-sync` | Atomic Commit wire、revision、durable outbox、local replica、semantic diff / rebase 与 conflict session |
+| `packages/pir`            | PIR graph、normalization、materialization、fragment、ValueRef、resolver 与 validator                    |
+| `packages/router`         | Route contract、codec、matching、navigation、mutation、composition 与 validator                         |
+| `packages/diagnostics`    | 跨领域 diagnostic contract、registry、collection 与 presentation                                        |
+| `packages/authoring`      | CodeArtifact、CodeReference、CodeScope、CodeSlot 与 Authoring Environment registry                      |
 
-```text
-packages/ui/
-├── .storybook/
-├── src/
-│   ├── button/
-│   ├── container/
-│   ├── data/
-│   ├── embed/
-│   ├── feedback/
-│   ├── form/
-│   ├── icon/
-│   ├── image/
-│   ├── input/
-│   ├── link/
-│   ├── nav/
-│   ├── text/
-│   ├── video/
-│   └── index.ts
-└── package.json
-```
+### Behavior 与 Runtime
 
-### `packages/ai`
+| Package                    | Owner 边界                                                                         |
+| -------------------------- | ---------------------------------------------------------------------------------- |
+| `packages/nodegraph`       | Transport-neutral NodeGraph contract、codec、validation、selection 与 executor     |
+| `packages/animation`       | Transport-neutral Animation contract、normalization、authoring helper 与 evaluator |
+| `packages/runtime-core`    | Transport-neutral execution contract 与 executor registry                          |
+| `packages/runtime-browser` | Browser execution adapter 与 animation preview projection                          |
+
+这些 package 已构成 G0/G1 的领域基础，但 NodeGraph、Animation 与跨域行为的完整生命周期、冲突和 Verification Evidence 仍属于后续产品 Gate。
+
+### Projection、Compiler 与 Golden
+
+| Package                       | Owner 边界                                                                                   |
+| ----------------------------- | -------------------------------------------------------------------------------------------- |
+| `packages/pir-react-renderer` | PIR 的 React projection、component registry、interaction port 与 icon provider               |
+| `packages/prodivix-compiler`  | PIR / Workspace export、Export Program 与 target planning                                    |
+| `packages/golden-conformance` | Living Golden App，验证 G0 修改、恢复、冲突、完整 Workspace React/Vite export 与进程内 build |
+
+Golden 当前不包含独立项目依赖安装、typecheck、runtime behavior、browser smoke 或视觉回归；这些仍是 G1+ Gate。
+
+### Plugin Platform
 
 ```text
-packages/ai/
-├── src/
-│   ├── providers/
-│   ├── settings/
-│   ├── tasks/
-│   └── validation/
-└── package.json
+plugin-contracts   Serializable contracts 与 manifest validation
+plugin-protocol    Versioned strict JSON wire protocol
+plugin-host        Transport-neutral lifecycle、permission 与 registry
+plugin-browser     Browser sandbox / Gateway transport adapter
+plugin-package     Deterministic bundled artifact 与 package source
+plugin-react-host  Official React projection ABI
+plugin-antd        Bundled Ant Design official plugin
+plugin-mui         Bundled Material UI official plugin
+plugin-radix       Bundled Radix official plugin
 ```
 
-### `packages/shared`
+这些基础不等于 public SDK、签名审核、Marketplace 或完整生态 Gate 已完成。
 
-```text
-packages/shared/
-├── scripts/
-├── src/
-│   ├── llm/
-│   └── types/
-└── package.json
-```
+### 其他共享包
 
-### `packages/themes`
-
-```text
-packages/themes/
-├── base/
-├── manifests/
-├── presets/
-├── semantic/
-├── src/
-└── utils/
-```
-
-### 其他包
-
-- `packages/i18n`：公共国际化资源与转换脚本。
-- `packages/plugin-contracts` / `plugin-host` / `plugin-protocol` / `plugin-browser`：插件契约、生命周期、协议与 Browser sandbox。
-- `packages/plugin-package` / `plugin-react-host`：deterministic package artifact 与 official React projection ABI。
-- `packages/plugin-antd` / `plugin-mui` / `plugin-radix`：三个 bundled official component plugin。
-- `packages/prodivix-compiler`：PIR 编译入口包。
+- `packages/ui`：SCSS 组件库与 Storybook。
+- `packages/themes`：设计令牌、主题 manifest、preset 与工具。
+- `packages/ai`：AI provider、settings、task 与 validation 基础。
+- `packages/i18n`：共享国际化资源。
+- `packages/shared`：仍在使用的共享类型与辅助代码；新领域语义应进入明确 owner package。
 - `packages/eslint-plugin-prodivix`：仓库自定义 ESLint 规则。
-- `packages/vscode-debugger`：VS Code 调试适配器。
+- `packages/vscode-debugger`：VS Code Debug Adapter。
 
-## 规范文档
+## 规范与验证
 
-`specs/` 现在主要分成几类：
+```text
+specs/
+├── api/             # OpenAPI 等传输协议
+├── decisions/       # Architecture Decision Records
+├── diagnostics/     # 诊断码 catalog
+├── implementation/  # 实施方案、review 与任务拆分
+├── pir/             # PIR contract 与 schema
+├── roadmap/         # Global Phase 与 Gate 证据
+├── router/          # Router 领域规范
+└── workspace/       # Workspace 模型规范
+```
 
-- `specs/pir/`：PIR contract 与 schema。
-- `specs/diagnostics/`：诊断码文档。
-- `specs/decisions/`：设计决策。
-- `specs/implementation/`：实现方案和任务拆分。
-- `specs/api/`、`specs/router/`、`specs/workspace/`：协议与领域文档。
+G0 的完整验证入口为：
 
-## 说明
+```bash
+pnpm run verify:g0
+```
 
-这份结构文档的目标是帮你快速判断“代码应该放哪里、职责边界在哪里”。如果某个目录已经被拆分或收敛，优先相信这里的说明和真实文件树。
+它验证 Core boundaries、生产写入 Hard Cut、诊断 catalog、13 个核心 package 与 Golden、Web 类型和恢复 adapter，以及后端 Workspace contract。它不是浏览器、视觉或独立导出项目验证入口。

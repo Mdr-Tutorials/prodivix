@@ -2,7 +2,7 @@
 
 This file provides Claude Code-specific guidance for working in this repository.
 
-**Primary rule source:** read `AGENTS.md` first. It contains the cross-agent project architecture, PIR write/read model, and coding rules. This file should stay complementary: Claude-specific workflow notes, command shortcuts, and implementation map only.
+**Primary rule source:** read `AGENTS.md` first. It contains the cross-agent project architecture, Workspace VFS write/read model, and coding rules. This file should stay complementary: Claude-specific workflow notes, command shortcuts, and implementation map only.
 
 ## Claude Operating Rules
 
@@ -10,13 +10,13 @@ This file provides Claude Code-specific guidance for working in this repository.
 2. At the start of a new coding session, run `git fetch` and check whether the current branch is behind its remote before editing. Integrate remote changes non-destructively if needed.
 3. Use UTF-8 for reading and writing documentation.
 4. Prefer `git ls-files`, `git diff --name-only`, and `git grep` for repository discovery. Avoid broad recursive scans that enter `node_modules`.
-5. Do not commit or push unless explicitly asked.
+5. Do not commit or push unless explicitly asked. When asked without a branch strategy, sync and push `main` directly; do not create a feature branch or pull request unless the user requests one.
 6. If dependency installation or updates modify `pnpm-lock.yaml`, accept the package-manager-generated lockfile changes instead of manually editing the lockfile.
 7. Do not force all documentation into English. Match the target audience and existing file context: root `README.md` is English, `README.zh-CN.md` is Simplified Chinese, and Chinese specs / decisions may remain Chinese.
 
 ## Project Summary
 
-Prodivix is an industrial browser-side visual front-end development tool. The product shape is three visual editors plus a shared **Code Authoring Environment**:
+Prodivix is an industrial browser-side visual front-end development tool. The current product gate is **G0 Passed / G1 Foundation**. The product shape is three visual editors plus a shared **Code Authoring Environment**:
 
 ```text
 Blueprint / NodeGraph / Animation / Inspector / Resources / AI / Issues
@@ -25,18 +25,19 @@ Blueprint / NodeGraph / Animation / Inspector / Resources / AI / Issues
     -> CodeArtifact / CodeSymbol / CodeScope / Diagnostics
 ```
 
-The durable data architecture centers on **PIR** as the validated source of truth:
+The durable data architecture centers on the **Canonical Workspace VFS** as the only authoring source of truth. PIR UI documents, NodeGraph documents, Animation documents, Code documents, Assets, Config, and RouteManifest remain separate domain-owned records inside that Workspace:
 
 ```text
-Editors / AI
-    -> Command / Intent / Patch
-    -> PIR ui.graph
-    -> Schema + graph semantic validation
-    -> Workspace VFS / Backend / Git
-    -> materializeUiTree when Renderer or Code Generator needs a tree view
+Editors / AI / Plugins / Importers
+    -> local Intent or Action Proposal planner
+    -> reversible Domain Command / atomic Transaction
+    -> Workspace + domain validation / local History
+    -> Durable Operation or Settings Outbox
+    -> strong-idempotent Atomic Commit
+    -> Canonical Backend Workspace / confirmed local replica / Git projection
 ```
 
-The current PIR write format is the normalized `ui.graph` model:
+Intent is planner input only, not a remote protocol. Patch is an internal reversible Command operation, not an independent persistence endpoint. The current PIR UI write format is the normalized `ui.graph` model:
 
 - `rootId`
 - `nodesById`
@@ -56,16 +57,23 @@ Editors and AI flows should not directly overwrite tree-shaped UI state. Tree vi
 
 ## Repository Map
 
-- `apps/web` - primary browser editor: Blueprint, Node Graph, Animation, Code Authoring Environment, Inspector, PIR runtime, external library runtime.
-- `apps/backend` - Go backend: auth, projects, Workspace VFS, sync, backend PIR validation, integrations.
+- `apps/web` - React editor surfaces and browser composition/adapters for Blueprint, NodeGraph, Animation, Code, Issues, plugins, and Workspace recovery.
+- `apps/backend` - Go backend: auth, project metadata/publication, canonical Workspace persistence, Atomic Commit, validation, and integrations.
 - `apps/cli` - CLI tooling.
 - `apps/docs` - standalone VitePress documentation site. Do not use it as the root README.
 - `apps/vscode` - VS Code extension for PIR language/debugging support.
 - `packages/ai` - AI provider abstractions and shared AI utilities.
-- `packages/shared` - shared types, schemas, and validation utilities.
+- `packages/workspace` / `packages/workspace-sync` - canonical Workspace semantics, History, revision/conflict, Outbox, Atomic Commit planning, and local replica.
+- `packages/pir` / `packages/pir-react-renderer` - PIR domain semantics and the React read projection.
+- `packages/router` - RouteManifest codec, matching, and navigation semantics.
+- `packages/nodegraph` / `packages/animation` - transport-neutral domain contracts, codecs, and deterministic execution/evaluation.
+- `packages/runtime-core` / `packages/runtime-browser` - runtime ports/registries and browser-specific adapters.
+- `packages/authoring` / `packages/diagnostics` - code authoring symbol/slot environment and Issues contracts.
+- `packages/golden-conformance` - Living Golden App and G0 non-browser conformance.
+- `packages/shared` - genuinely cross-domain types and utilities; do not move domain ownership back here.
 - `packages/ui` - shared UI package, styled with SCSS.
 - `packages/themes` - theme manifests and semantic design tokens.
-- `packages/prodivix-compiler` - PIR code generation package.
+- `packages/prodivix-compiler` - domain compilation, ExportProgram, and production export planning.
 - `specs` - architecture decisions, PIR contracts, diagnostic codes, RFCs, and implementation plans.
 
 ## Common Commands
@@ -95,14 +103,15 @@ pnpm test:web
 pnpm test:e2e:smoke
 pnpm format
 pnpm docs:diagnostics:check
+pnpm verify:g0
 ```
 
 ### Targeted Web Checks
 
-If the local `pnpm --filter @prodivix/web test` shim fails because `apps/web/node_modules/vitest/vitest.mjs` is missing, use the workspace Vitest entrypoint from `apps/web`:
+For the Web test suite:
 
 ```bash
-node ..\..\node_modules\vitest\vitest.mjs --config vitest.config.ts --run --maxWorkers=1
+pnpm --filter @prodivix/web test
 ```
 
 For type checking:
@@ -143,21 +152,26 @@ Prefer tests around user-visible behavior, public APIs, state outcomes, and stab
 - `apps/web/src/editor/features/blueprint` - Blueprint editor: canvas, component tree, sidebar, inspector, palette data, external libraries, layout patterns.
 - `apps/web/src/editor/features/development` - Node Graph editor.
 - `apps/web/src/editor/features/animation` - Animation editor.
+- `apps/web/src/editor/features/issues` - revision-aware Issues composition, providers, navigation, and Quick Fix wiring.
+- `apps/web/src/editor/workspaceSync` - browser IndexedDB adapters, outbox executors, local replica adoption, and recovery effects.
 - `apps/web/src/editor/store` - editor and supporting Zustand stores.
-- `apps/web/src/pir` - PIR schema, validation, rendering, and generation.
-- `apps/web/src/authoring` - stable Authoring Symbol Environment primitives and provider registries used by Code Authoring Environment.
+- `apps/web/src/pir` - Web-only PIR actions, AST/conversion adapters, and compatibility-facing schema glue; PIR domain semantics live in `@prodivix/pir`, rendering in `@prodivix/pir-react-renderer`.
+- Authoring core lives in `@prodivix/authoring`; Web must not recreate a private authoring registry.
 
 ### Backend Areas
 
 - `apps/backend/internal/modules/auth` - auth and session behavior.
-- `apps/backend/internal/modules/project` - project metadata.
-- `apps/backend/internal/modules/workspace` - Workspace VFS, routes, intents, patches, PIR validation.
+- `apps/backend/internal/modules/project` - project metadata and explicit publication projection; never an authoring PIR mirror.
+- `apps/backend/internal/modules/workspace` - canonical Workspace snapshots, Atomic Operation/Settings Commit, routes, validation, and atomic project/workspace import.
 - `apps/backend/internal/modules/integrations` - third-party integrations such as GitHub App work.
 
 ### Specs to Check First
 
-- `specs/pir/pir-contract-v1.3.md` for current PIR graph contract.
+- `specs/roadmap/global-phases.md` for the only global product phase and gate definitions.
+- `specs/roadmap/g0-closure-evidence.md` for the verified G0 boundary and reproduction command.
+- `specs/pir/PIR-contract-v1.3.md` for the current PIR graph contract.
 - `specs/decisions/README.md` for architecture decision navigation.
+- `specs/decisions/37.verified-semantic-authoring-architecture.md` for the current seven-plane architecture and G1 direction.
 - `specs/decisions/28.code-authoring-environment.md` for code-owned ownership, code slots, library capability levels, and shared authoring boundaries.
 - `specs/decisions/25.authoring-symbol-environment.md` for authoring symbols, scopes, references, and diagnostic contracts.
 - `specs/implementation/authoring-symbol-environment-phase1.md` for Phase 1 authoring contracts.

@@ -5,67 +5,84 @@
 
 Language: English | [简体中文](README.zh-CN.md)
 
-Prodivix is an open-source, browser-based visual development environment for modern front-end applications. It combines a visual blueprint editor, node-graph logic editing, animation authoring, workspace persistence, and code generation around a shared intermediate representation: **PIR**.
+Prodivix is an open-source, browser-based visual development environment for modern front-end applications. It combines blueprint editing, node-graph logic, animation authoring, code authoring, workspace persistence, diagnostics, preview, and production export around a canonical Workspace VFS.
 
-The project is still in active alpha development. The repository is the source code workspace for the editor, backend service, CLI, VS Code extension, shared packages, architecture decisions, and implementation specifications.
+The **Canonical Workspace VFS is the single source of authoring truth**. PIR owns normalized UI documents; NodeGraph and Animation use their own Workspace document types, while route manifests, code documents, assets, and configuration remain first-class records. `CodeReference` connects domain documents to code without embedding the source into a single giant JSON file.
+
+Prodivix is in active alpha development. The current product gate is **G0 Passed / G1 Foundation**: the Truth & Change Kernel has a repeatable closure, while the semantic hybrid visual/code authoring environment is still being built.
 
 ## Project Goals
 
 Prodivix is built around several long-term constraints:
 
-- **PIR as the source of truth**: UI, logic, animation, routing, and code generation should converge on a validated intermediate representation.
-- **Visual editing without a ceiling**: visual workflows should support direct code, external packages, diagnostics, and generated production code.
-- **Local-first engineering**: the editor should remain useful in local development while still supporting backend-backed workspaces, sync, and future collaboration.
-- **Explicit architecture**: durable contracts are captured in `specs/` before they become hard-to-change implementation details.
+- **One canonical authoring truth**: Workspace, Route, PIR, Code, Asset, and Config documents live in the Canonical Workspace VFS rather than editor-private mirrors.
+- **One durable write path**: production authoring changes are planned as Domain Commands or Transactions, persisted through the Durable Outbox, and synchronized through an Atomic `WorkspaceOperation` Commit.
+- **Visual editing without a ceiling**: visual workflows coexist with real code, external packages, diagnostics, source navigation, and production export.
+- **Local-first recovery**: confirmed snapshots, pending operations, retry, conflict recovery, and offline reopening use the formal local replica and Outbox contracts.
+- **Evidence-based product gates**: architecture decisions, implementation status, and product-gate status are tracked separately under `specs/`.
 
 ## Repository Layout
 
 ```text
 .
 ├── apps/
-│   ├── web/          # Browser editor: blueprint, inspector, PIR runtime, code authoring
-│   ├── backend/      # Go backend: auth, projects, workspace sync, PIR validation
-│   ├── cli/          # Command-line tooling
-│   ├── vscode/       # VS Code extension and PIR debugging support
-│   └── docs/         # Standalone VitePress documentation site
+│   ├── web/                  # Browser editor and application composition root
+│   ├── backend/              # Go backend, Atomic Commit, persistence, and sync APIs
+│   ├── cli/                  # Command-line tooling
+│   ├── vscode/               # VS Code extension and debugger integration
+│   ├── docs/                 # VitePress documentation site
+│   └── plugin-sandbox/       # Browser plugin sandbox application
 ├── packages/
-│   ├── ai/           # AI provider abstractions and shared AI utilities
-│   ├── i18n/         # Internationalization resources
-│   ├── prodivix-compiler/ # PIR code generation package
-│   ├── shared/       # Shared types, schemas, and validation utilities
-│   ├── themes/       # Theme manifests and semantic design tokens
-│   ├── ui/           # Shared UI components
-│   └── vscode-debugger/
-├── scripts/          # Repository automation and generated documentation scripts
-├── specs/            # Architecture decisions, contracts, RFCs, and implementation plans
-├── tests/            # Repository-level tests
+│   ├── animation/            # Animation contracts, authoring helpers, and evaluation
+│   ├── authoring/            # Code authoring and symbol-environment contracts
+│   ├── diagnostics/          # Diagnostic contracts, catalogs, and collections
+│   ├── golden-conformance/   # Living Golden App and G0 conformance gate
+│   ├── nodegraph/            # NodeGraph model, validation, and execution kernel
+│   ├── pir/                  # PIR normalization, graph, materialization, and validation
+│   ├── pir-react-renderer/   # React projection of framework-neutral PIR
+│   ├── router/               # Route contracts, matching, composition, and validation
+│   ├── runtime-core/         # Transport-neutral execution contracts and registries
+│   ├── runtime-browser/      # Browser runtime adapters and animation projections
+│   ├── workspace/            # Canonical Workspace VFS, commands, history, and projection
+│   ├── workspace-sync/       # Atomic Commit planning, Outbox, conflict, and recovery
+│   ├── prodivix-compiler/    # Production export and code generation
+│   ├── ai/                   # Shared AI provider and runtime foundations
+│   ├── i18n/                 # Internationalization resources
+│   ├── shared/               # Remaining cross-domain primitives
+│   ├── themes/               # Theme manifests and semantic design tokens
+│   ├── ui/                   # Shared UI components
+│   ├── vscode-debugger/      # PIR debug adapter for VS Code
+│   └── plugin-*/             # Plugin contracts, hosts, tooling, and official adapters
+├── scripts/                  # Repository automation and verification entry points
+├── specs/                    # Decisions, contracts, roadmaps, and implementation plans
+├── tests/                    # Repository-level and E2E tests
 └── package.json
 ```
 
 ## Current Status
 
-| Area                                | Status                                       |
-| ----------------------------------- | -------------------------------------------- |
-| Blueprint editor                    | Active development                           |
-| PIR v1.3 graph model and validation | Active development                           |
-| Workspace VFS and backend sync      | Active development                           |
-| External library runtime            | Active development                           |
-| AI-assisted authoring               | Foundation in place                          |
-| Node graph editor                   | Early implementation                         |
-| Animation editor                    | Planned / early implementation               |
-| Multi-framework code generation     | Incremental; React path is the current focus |
+| Area                                     | Status                                                                                                                                                          |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Overall product gate                     | **G0 Passed / G1 Foundation**                                                                                                                                   |
+| Truth & Change Kernel                    | G0 passed: canonical truth, History, Atomic Commit, revision conflicts, Durable Outbox, local replica, and production write Hard Cut are in place               |
+| Diagnostics and Issues                   | G0 passed: revision-aware aggregation, stable targets, source spans, Quick Fix boundaries, and editor navigation are covered                                    |
+| Golden conformance and React/Vite export | G0 non-browser closure passed; standalone install, typecheck, tests, browser smoke, and broader runtime verification remain later gates                         |
+| Semantic visual/code authoring           | G1 foundation: `CodeArtifact`, `CodeReference`, Code Slots, and authoring registries exist; real language services and controlled round-trip remain in progress |
+| Blueprint, Route, and PIR authoring      | Active development on the canonical Workspace contracts                                                                                                         |
+| NodeGraph and Animation                  | Independent domain/runtime kernels are hard-cut from Web; lifecycle, composition, and end-to-end behavior verification remain later work                        |
+| AI-assisted authoring                    | Foundation only; AI may propose planner input but must use the same Command, Outbox, and Atomic Commit path as human edits                                      |
 
-For detailed plans and architectural decisions, see `specs/`.
+The global phase definition and evidence are maintained in [`specs/roadmap/global-phases.md`](specs/roadmap/global-phases.md) and [`specs/roadmap/g0-closure-evidence.md`](specs/roadmap/g0-closure-evidence.md).
 
 ## Getting Started
 
 ### Requirements
 
 - Node.js 22 or newer
-- pnpm 10 or newer
-- Go 1.22 or newer
+- pnpm 11.9.0 (Corepack recommended)
+- Go 1.24 or newer
 - Git
-- PostgreSQL for backend-backed workspace flows
+- PostgreSQL for backend-backed Workspace flows
 
 ### Install
 
@@ -77,14 +94,14 @@ pnpm install
 
 ### Run Locally
 
-For day-to-day development, start the backend and web editor in separate terminals:
+For day-to-day development, start the backend and Web editor in separate terminals:
 
 ```bash
 pnpm dev:backend
 pnpm dev:web
 ```
 
-Backend-backed workspace, auth, sync, and project persistence flows require PostgreSQL. Start a local database from `apps/backend` with `docker compose up -d`; backend dependencies are managed by Go modules and can be preloaded with `go mod download`. See `apps/backend/README.md` for backend-specific setup.
+Backend-backed Workspace, authentication, synchronization, and project persistence require PostgreSQL. From `apps/backend`, run `docker compose up -d` to start a local database. Backend dependencies are managed by Go modules and can be preloaded with `go mod download`. See [`apps/backend/README.md`](apps/backend/README.md) for backend-specific setup.
 
 On Windows, `scripts\start-dev.bat` can open the native PostgreSQL, backend, Web editor, and UI Storybook processes together. Copy `.env.example` to `.env.local` to override the local PostgreSQL connection or `PRODIVIX_PG_BIN`; the database and backend launchers read the same `BACKEND_DB_URL`.
 
@@ -102,61 +119,90 @@ Common entry points:
 
 Repository-level commands:
 
-| Command                       | Description                                            |
-| ----------------------------- | ------------------------------------------------------ |
-| `pnpm build`                  | Build all packages and applications through Turbo      |
-| `pnpm lint`                   | Run lint tasks                                         |
-| `pnpm test`                   | Run repository tests through Turbo                     |
-| `pnpm test:e2e:smoke`         | Run the smoke E2E suite                                |
-| `pnpm format`                 | Format TypeScript, Markdown, JSON, styles, and Go code |
-| `pnpm docs:diagnostics:check` | Check generated diagnostic documentation               |
+| Command               | Description                                             |
+| --------------------- | ------------------------------------------------------- |
+| `pnpm build`          | Build packages and applications through Turbo           |
+| `pnpm lint`           | Run lint and repository boundary checks                 |
+| `pnpm test`           | Run repository tests through Turbo                      |
+| `pnpm test:golden`    | Run the Living Golden App conformance suite             |
+| `pnpm run verify:g0`  | Re-run the complete eight-stage G0 closure verification |
+| `pnpm test:e2e:smoke` | Run the smoke E2E suite                                 |
+| `pnpm run format`     | Format TypeScript, Markdown, JSON, styles, and Go code  |
 
-## Documentation
-
-The root README is only the repository entry point. Detailed documentation lives in dedicated locations:
-
-| Location                             | Audience                                 | Purpose                                 |
-| ------------------------------------ | ---------------------------------------- | --------------------------------------- |
-| `apps/docs/`                         | Users and ecosystem contributors         | Standalone VitePress documentation site |
-| `apps/docs/guide/getting-started.md` | New local developers                     | Detailed local setup guide              |
-| `apps/docs/reference/pir-spec.md`    | PIR readers                              | Current PIR reference documentation     |
-| `specs/decisions/`                   | Core maintainers                         | Architecture decision records           |
-| `specs/pir/`                         | Runtime and codegen maintainers          | Versioned PIR contracts and schemas     |
-| `specs/diagnostics/`                 | Editor, backend, and docs maintainers    | Diagnostic code definitions             |
-| `specs/implementation/`              | Contributors working on planned features | Implementation plans and task backlogs  |
+`pnpm run verify:g0` verifies the non-browser Truth & Change Kernel. It does not claim the later G1-G3 gates for standalone exported-project installation, browser behavior, visual regression, accessibility, performance, or formal `VerificationEvidence`.
 
 ## Architecture Overview
 
-At a high level, the editor writes user actions as commands, intents, or patches. Those changes update the normalized PIR graph. The graph is validated, persisted through workspace storage, and materialized into temporary structures only when a renderer or code generator needs a tree-shaped view.
+All durable authoring state belongs to the Canonical Workspace VFS. Domain planners convert user, AI, plugin, import, or recovery input into reversible Commands or Transactions. A production write then follows one durable path:
 
 ```text
-Editors / AI
-    -> Command / Intent / Patch
-    -> PIR ui.graph
-    -> Schema and graph validation
-    -> Workspace VFS / Backend / Git
-    -> Renderer / Preview / Code Generator
+Human gesture / AI proposal / plugin action
+    -> local domain planner
+    -> Domain Command / Transaction
+    -> Durable Operation Outbox
+    -> Atomic WorkspaceOperation Commit
+    -> confirmed revisions and local replica
 ```
 
-The durable architectural records are maintained under `specs/decisions/`. The current PIR schema and contracts are maintained under `specs/pir/`.
+The planned Command or Transaction is also applied locally to the Canonical Workspace VFS and recorded in Operation History. Remote acknowledgement advances the confirmed revision without creating a second authoring truth.
+
+`Intent` is allowed only as input to a local or AI planner. It is not a production transport, an Outbox entry kind, or an Atomic Commit wire operation.
+
+The canonical VFS owns several first-class document domains and projects them into consumers without creating another authoring truth:
+
+```text
+Canonical Workspace VFS
+    ├── workspace.json / route-manifest.json
+    ├── PIR UI documents: page / layout / component / normalized ui.graph
+    ├── NodeGraph and Animation documents: pir-graph / pir-animation
+    ├── code documents and CodeReference bindings
+    └── assets / configuration
+            -> validation / diagnostics
+            -> renderer / preview runtime
+            -> production export
+            -> backend / Git projections
+```
+
+PIR trees are materialized only as temporary read projections where a renderer or compiler needs them. Editors and AI do not persist a second tree-shaped source of truth.
+
+## Documentation
+
+The root README is the repository entry point. Current contracts and project status live in the following sources:
+
+| Location                                                                                                                           | Purpose                                                |
+| ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| [`apps/docs/`](apps/docs/)                                                                                                         | User and contributor documentation site                |
+| [`apps/docs/guide/getting-started.md`](apps/docs/guide/getting-started.md)                                                         | Detailed local setup                                   |
+| [`specs/roadmap/global-phases.md`](specs/roadmap/global-phases.md)                                                                 | Canonical G0-G6 product phases and current gate        |
+| [`specs/roadmap/g0-closure-evidence.md`](specs/roadmap/g0-closure-evidence.md)                                                     | Repeatable evidence for G0 Passed                      |
+| [`specs/workspace/workspace-model.md`](specs/workspace/workspace-model.md)                                                         | Canonical Workspace model                              |
+| [`specs/decisions/34.core-package-boundaries.md`](specs/decisions/34.core-package-boundaries.md)                                   | Core package ownership and dependency boundaries       |
+| [`specs/decisions/35.canonical-workspace-hard-cut.md`](specs/decisions/35.canonical-workspace-hard-cut.md)                         | Canonical Workspace Hard Cut                           |
+| [`specs/decisions/36.atomic-workspace-operation-commit.md`](specs/decisions/36.atomic-workspace-operation-commit.md)               | Atomic `WorkspaceOperation` Commit and Outbox boundary |
+| [`specs/decisions/37.verified-semantic-authoring-architecture.md`](specs/decisions/37.verified-semantic-authoring-architecture.md) | Verified semantic authoring architecture               |
+| [`apps/docs/reference/pir-spec.md`](apps/docs/reference/pir-spec.md)                                                               | PIR reference documentation                            |
+| [`specs/decisions/README.md`](specs/decisions/README.md)                                                                           | Architecture decision index                            |
+| [`specs/diagnostics/README.md`](specs/diagnostics/README.md)                                                                       | Diagnostic domains and code catalogs                   |
 
 ## Development Notes
 
 - `@prodivix/ui` styles are authored with SCSS.
 - Application-level styling uses Tailwind CSS 4 conventions.
 - Prefer package-local aliases such as `@/...` where they are configured.
+- Code-owned capabilities connect through the Code Authoring Environment and Authoring Symbol Environment; editors do not persist arbitrary code strings or scan one another's private state.
 - Avoid tests coupled to DOM hierarchy, internal classes, snapshots, or implementation details. Prefer user-visible behavior, public APIs, stable state results, and semantic outcomes.
 - Use Git-indexed discovery commands such as `git ls-files`, `git diff --name-only`, and `git grep` when scanning repository files.
 
 ## Contributing
 
-This project is evolving quickly. Before contributing a large change, read the relevant architecture decision or implementation plan in `specs/`, then keep the change scoped to the contract being implemented.
+This project evolves quickly and intentionally makes hard cuts while it is in alpha. Before a large change, read the relevant product phase, architecture decision, and implementation plan; do not add compatibility layers unless a current contract explicitly requires one.
 
 Useful starting points:
 
-- `AGENTS.md` for repository development guidance
-- `apps/docs/community/contributing.md` for contribution notes
-- `specs/decisions/README.md` for architecture decision navigation
+- [`AGENTS.md`](AGENTS.md) for shared repository architecture and development rules
+- [`CLAUDE.md`](CLAUDE.md) for Claude Code-specific repository notes
+- [`apps/docs/community/contributing.md`](apps/docs/community/contributing.md) for contribution guidance
+- [`specs/decisions/README.md`](specs/decisions/README.md) for architecture decision navigation
 
 ## License
 

@@ -2,6 +2,13 @@
 
 你是一名资深前端开发工程师，正在开发一款叫 Prodivix 的工业级浏览器端可视化前端开发工具。以下是这款工具的核心架构。
 
+## 当前全局阶段
+
+- 当前 Product Gate：`G0 Passed / G1 Foundation`。
+- `specs/roadmap/global-phases.md` 是 Global Phase 的唯一来源，`specs/roadmap/g0-closure-evidence.md` 保存 G0 的可重复验证边界。
+- G0 通过表示 Truth & Change Kernel 的非浏览器闭环已经成立，不表示真实 Language Service、视觉/代码双向编辑、独立导出项目验证、ExecutionProvider 或多框架 Target 已经完成。
+- Canonical Workspace VFS 是作者态唯一真相。PIR、NodeGraph、Animation、Code、Assets、Config 与 RouteManifest 是 Workspace 内由各领域 owner 管理的文档或清单；PIR 不是整个项目的单一巨型 JSON。
+
 ```mermaid
 flowchart TD
     %% 核心作者态文件系统
@@ -9,7 +16,9 @@ flowchart TD
         direction TB
 
         WorkspaceCore[workspace.json / route-manifest.json]
-        PIR((PIR Core JSON<br>ui.graph / logic / animation<br>CodeReference)):::core
+        PIR((PIR UI Documents<br>page / layout / component<br>normalized ui.graph)):::core
+        NodeGraphDocs[NodeGraph Documents<br>pir-graph]
+        AnimationDocs[Animation Documents<br>pir-animation]
         CodeDocuments[Code Documents<br>TS / CSS / Shader / Adapter]
         VFSAssets[Assets / Config]
     end
@@ -59,12 +68,12 @@ flowchart TD
     NodeGraph -->|"executor / transform slot"| CodeEnv
     AnimEditor -->|"easing / shader / timeline script slot"| CodeEnv
     CodeEnv -->|"edit / index / diagnostics"| CodeDocuments
-    CodeEnv -->|"CodeReference / diagnostics"| PIR
+    CodeEnv -->|"CodeReference / diagnostics"| PIR & NodeGraphDocs & AnimationDocs
 
     %% 编辑器到 VFS 内核心 JSON 的连接
     Blueprint -->|"ui"| PIR
-    NodeGraph -->|"logic"| PIR
-    AnimEditor -->|"animation"| PIR
+    NodeGraph -->|"node graph document"| NodeGraphDocs
+    AnimEditor -->|"animation document"| AnimationDocs
 
     %% ----------------- 左侧：资源与项目 -----------------
     subgraph Assets [资源与依赖]
@@ -89,11 +98,17 @@ flowchart TD
 
     %% ----------------- 核心功能扩展 -----------------
     LLM[LLM 辅助开发]
-    CommandLayer[Command / Intent / Patch]
+    Planner[Intent / Action Proposal Planner]
+    CommandLayer[Domain Command / Transaction]
+    DurableChange[Durable Operation / Settings Outbox]
+    AtomicCommit[Atomic WorkspaceOperation / Settings Commit]
 
     LLM -->|"code context / patch proposal"| CodeEnv
-    LLM -->|"intent"| CommandLayer
-    CommandLayer -->|"validated workspace patch"| WorkspaceCore & PIR & CodeDocuments & VFSAssets
+    LLM -->|"intent / proposal"| Planner
+    Planner --> CommandLayer
+    Blueprint & NodeGraph & AnimEditor --> CommandLayer
+    CommandLayer -->|"validated local apply + History"| WorkspaceCore & PIR & NodeGraphDocs & AnimationDocs & CodeDocuments & VFSAssets
+    CommandLayer --> DurableChange --> AtomicCommit
 
     %% ----------------- 右侧：后端与 Git -----------------
     subgraph BackendSys [后端与社区]
@@ -101,7 +116,8 @@ flowchart TD
         Community --> OtherPlatform[其他平台上的社区]
     end
 
-    PIR <--> Backend
+    AtomicCommit --> Backend
+    WorkspaceCore & PIR & NodeGraphDocs & AnimationDocs & CodeDocuments & VFSAssets <--> Backend
 
     subgraph VersionControl [版本控制]
         Git[Git]:::infra
@@ -112,7 +128,7 @@ flowchart TD
         License --> Git
     end
 
-    WorkspaceCore & PIR & CodeDocuments & VFSAssets -->|"VFS 投影"| Git
+    WorkspaceCore & PIR & NodeGraphDocs & AnimationDocs & CodeDocuments & VFSAssets -->|"VFS 投影"| Git
 
     %% ----------------- 底部：编译与部署 -----------------
     subgraph Compilation [编译器与输出]
@@ -142,7 +158,7 @@ flowchart TD
     end
 
     %% 连接 VFS 内文档到编译器
-    WorkspaceCore & PIR & CodeDocuments & VFSAssets --> DomainCompilers
+    WorkspaceCore & PIR & NodeGraphDocs & AnimationDocs & CodeDocuments & VFSAssets --> DomainCompilers
     ExportBundle -->|生成源码 / 配置 / 资源| Git
 
     %% ----------------- 右下角：文档 -----------------
@@ -150,26 +166,36 @@ flowchart TD
     Tutorials[教程]
 ```
 
-## Workspace VFS 与 PIR Core JSON 读写链路
+## Workspace VFS 读写链路
 
 ```mermaid
 flowchart TD
     %% 写入侧：编辑器与 AI 不直接覆盖树结构
     Editors[蓝图 / 节点图 / 动画编辑器]
     LLM[LLM 辅助开发]
-    Commands[Command / Intent / Patch]
+    Extensions[插件 / 导入器]
+    Planner[Intent / Action Proposal Planner]
+    Commands[Domain Command / Transaction]
+    History[Local Apply / History / Validator]
+    Outbox[Durable Operation / Settings Outbox]
+    AtomicCommit[Atomic WorkspaceOperation / Settings Commit]
 
-    %% VFS 保存态：项目级作者态文件系统囊括 PIR Core JSON
+    %% VFS 保存态：项目级作者态文件系统囊括各领域文档
     subgraph VFS [Workspace VFS]
         direction TB
 
         WorkspaceCore[workspace.json / route-manifest.json]
-        Graph[PIR Core JSON<br>ui.graph<br>rootId / nodesById / childIdsById / regionsById]
-        CodeDocs[Code Documents / Assets / Config]
+        Graph[PIR UI Documents<br>page / layout / component<br>normalized ui.graph]
+        NodeGraphDocs[NodeGraph Documents / pir-graph]
+        AnimationDocs[Animation Documents / pir-animation]
+        CodeDocs[Code Documents]
+        Assets[Assets / Config]
     end
 
-    Validator[PIR Validator<br>Schema + Graph 语义校验]
-    Persistence[Backend / Git Projection]
+    Validators[Workspace + Domain Validators]
+    Persistence[Canonical Backend Workspace]
+    Replica[Confirmed Local Replica<br>+ Pending Operation Materialization]
+    GitProjection[Git Projection]
 
     %% 读取侧：需要树时只生成临时中间层
     Materialize[materializeUiTree<br>临时树中间层]
@@ -181,18 +207,24 @@ flowchart TD
     Codegen[Code Generator / Scaffold Writer]
 
     Editors --> Commands
-    LLM --> Commands
-    Commands --> Graph
-    Graph --> Validator
-    Validator --> Persistence
-    Persistence --> Graph
+    LLM --> Planner --> Commands
+    Extensions --> Planner
+    Commands --> History --> Validators
+    Validators --> WorkspaceCore & Graph & NodeGraphDocs & AnimationDocs & CodeDocs & Assets
+    Commands --> Outbox --> AtomicCommit --> Persistence
+    Persistence --> Replica
+    Persistence --> WorkspaceCore & Graph & NodeGraphDocs & AnimationDocs & CodeDocs & Assets
+    WorkspaceCore & Graph & NodeGraphDocs & AnimationDocs & CodeDocs & Assets --> GitProjection
     Graph --> Materialize
     Materialize --> Renderer
     Materialize --> ExportProgramBuilder
     CodeDocs --> CodeAuthoring
     CodeAuthoring --> ExportProgramBuilder
+    NodeGraphDocs & AnimationDocs & Assets --> ExportProgramBuilder
     ExportProgramBuilder --> ExportPlanner --> ExportBundle --> Codegen
 ```
+
+Intent 只允许作为本地或 AI planner 的输入；它不是远端 wire protocol。Patch 只允许作为 Command 内部的可逆、可校验操作，不是独立持久化入口。所有生产作者态远端写入必须先形成 `WorkspaceOperation`，持久化 exact request 到 Durable Outbox，再进入强幂等 Atomic Commit。Settings 使用独立但同样 durable、强幂等的 Settings Outbox / Commit。
 
 ## Code Authoring Environment 与作者态符号环境
 
@@ -204,6 +236,26 @@ Prodivix 是 Blueprint、NodeGraph、Animation 三编辑器架构。`specs/decis
 - PIR 可以引用代码，但不吞并代码源码和复杂库内部状态。复杂库按 Native / Adapted / Embedded / Code-only 能力等级接入，不逐库承诺完整可视化编辑。
 - code-owned 不等于黑盒放弃。Prodivix 仍应该提供编辑、引用、诊断、定位、预览和 AI patch 能力，并能从 Issues、Inspector、画布、节点图、动画轨道跳转到对应代码上下文。
 - 三编辑器、Inspector、Resources、AI 和 Issues 面板需要符号或诊断时，应通过 Code Authoring Environment 或其稳定查询接口，不直接扫描其他编辑器内部结构。
+
+## 核心 package owner
+
+| Package                        | 稳定职责                                                                       |
+| ------------------------------ | ------------------------------------------------------------------------------ |
+| `@prodivix/workspace`          | Canonical Workspace model、Codec、Validator、Command、Transaction、History     |
+| `@prodivix/workspace-sync`     | Revision、semantic conflict、Atomic Commit plan、Durable Outbox、local replica |
+| `@prodivix/pir`                | PIR normalize、graph mutation 与语义校验                                       |
+| `@prodivix/router`             | RouteManifest contract、codec、match/navigation 语义                           |
+| `@prodivix/nodegraph`          | 无 DOM NodeGraph contract、codec、executor 与 deterministic trace              |
+| `@prodivix/animation`          | Animation contract、codec、authoring factory 与确定性 evaluator                |
+| `@prodivix/runtime-core`       | transport-neutral runtime port 与 executor registry                            |
+| `@prodivix/runtime-browser`    | 浏览器专属 NodeGraph/Animation runtime adapter                                 |
+| `@prodivix/pir-react-renderer` | PIR 的 React projection；不拥有作者态真相                                      |
+| `@prodivix/authoring`          | CodeArtifact、CodeSymbol、CodeScope、slot 与诊断查询环境                       |
+| `@prodivix/diagnostics`        | Issues contract、provider snapshot、去重与 presentation                        |
+| `@prodivix/prodivix-compiler`  | Domain compiler、ExportProgram 与 Production Export Planner                    |
+| `@prodivix/golden-conformance` | Living Golden App 与 G0 非浏览器 conformance                                   |
+
+`apps/web` 只负责 React 编辑器表面、浏览器 adapter 和 composition root，不得重新拥有 transport-neutral Runtime、Router、NodeGraph、Animation、PIR Renderer、Workspace Sync Core 或 Authoring Core。后端 `projects` 只保存项目元数据与显式发布投影；不得恢复 Project PIR 作者态镜像或缺失 Workspace 的 lazy fallback。
 
 ## 代码规范
 
@@ -217,7 +269,7 @@ Prodivix 是 Blueprint、NodeGraph、Animation 三编辑器架构。`specs/decis
 7. 当且仅当需要测试时，补全测试。考虑边界条件。
 8. 不要加耦合测试，尤其不要写依赖 DOM 层级、内部 class、具体标签结构、`querySelector`、`closest`、`parentElement`、快照或实现细节的测试；优先测试用户可感知行为、公开 API、状态结果和稳定语义。
 9. 当完整的功能写好后，先运行 `pnpm run format` 来格式化代码。
-10. 仅在有明确提示的时候提交并推送。commit msg 使用纯英文，按照业界规范写法：使用 `type(scope): description` 格式。
+10. 仅在有明确提示的时候提交并推送。commit msg 使用纯英文，按照业界规范写法：使用 `type(scope): description` 格式。用户要求提交并推送且未指定分支时，先同步远端，然后直接提交并推送 `main`；不要自动创建功能分支或 PR。
 11. 在保持 monochrome-ui 设计风格的前提下，样式和 UX 设计可以模仿 Figma 和 Dify。
 12. 扫描文件名时，优先使用 `git ls-files`、`git diff --name-only` 等 Git 相关命令限定仓库文件，避免递归扫到 `node_modules` 等依赖目录。
 13. 依赖安装或更新导致锁文件变化时，无需手动修改锁文件，接受包管理器自然生成的锁文件变更。
@@ -226,9 +278,11 @@ Prodivix 是 Blueprint、NodeGraph、Animation 三编辑器架构。`specs/decis
 16. 项目处于 alpha 阶段，有重大更改时尽量做彻底重构，不要留兼容层，也没有把旧数据转换为新数据的义务。无需做最小方案，无需写兼容层。要做就要实现最能长期稳定、最符合软件工程原则的实现。
 17. 不追求最小修正。发现需要优化的地方应立即优化，并且力求最优；尤其是重复逻辑、错误抽象、临时补丁和会导致后续维护分叉的实现，应在当前改动中一并收敛。
 18. 测试文件按测试性质统一命名：示例/单元测试使用 `<subject>.test.ts(x)`，属性测试使用 `<subject>.property.test.ts(x)`，conformance 使用 `<subject>.conformance.test.ts(x)`，integration 使用 `<subject>.integration.test.ts(x)`，E2E 用户旅程使用 `<journey>.spec.ts`。不要用 `Properties`、`PropertyTest` 等变体制造命名分叉。
+19. 所有生产作者态领域写入都必须规划为可逆 `Command` 或原子 `Transaction`，再形成 `WorkspaceOperation` 进入 Durable Outbox 与 Atomic Commit；不得直接调用远端 transport、恢复旧 Intent/PATCH endpoint，或把 Project publication projection 当作作者态存储。
+20. `localStorage` 只保存主题、选择和视图等 UI 偏好。领域状态的浏览器持久化必须使用正式 local replica / outbox adapter；不得新增编辑器私有镜像作为第二真相源。
 
 ## 工具入口文件关系
 
-- `AGENTS.md` 是跨 AI 工具共享的主规则来源，记录项目架构、PIR 读写链路与通用开发规范。
+- `AGENTS.md` 是跨 AI 工具共享的主规则来源，记录项目架构、Workspace VFS 读写链路与通用开发规范。
 - `CLAUDE.md` 是 Claude Code 专用补充文件，用于记录 Claude 的命令速查、仓库路径索引、测试备注与文档边界。
 - 两者内容冲突时，以本文件的通用项目规则为准；工具专属执行细节以对应工具文件为准。

@@ -2,29 +2,35 @@
 
 ## 状态
 
-- Draft
+- DecisionStatus：Draft
+- ImplementationStatus：Implemented / Stabilizing
+- ProductGateStatus：G0 Passed / G1 Foundation
+- Global Phase：G0-G1
 - 日期：2026-07-02
+- 更新：2026-07-13
 - 关联：
   - `specs/router/route-manifest.md`
   - `specs/decisions/08.route-manifest-outlet.md`
   - `specs/decisions/09.component-route-composition.md`
   - `specs/decisions/13.route-runtime-contract.md`
+  - `specs/decisions/36.atomic-workspace-operation-commit.md`
   - `specs/diagnostics/route-diagnostic-codes.md`
+  - `specs/roadmap/global-phases.md`
 
 ## 1. 问题判断
 
-当前路由系统已经跨过“纯预览 path state”的阶段，但距离真正可用还有明显差距。核心问题不是字段不够，而是 **workspace route 与组件 route 的语义没有统一**。
+本计划启动时，路由系统已经跨过“纯预览 path state”的阶段，但 workspace route 与组件 route 仍存在两套语义。该问题是后续 Phase 0-5 的历史输入，不再代表 2026-07-13 的当前实现状态。
 
 当前实现事实：
 
-1. `apps/web/src/editor/store/editorStore.types.ts` 定义了 `WorkspaceRouteManifest` 和 `WorkspaceRouteNode`。
-2. `apps/web/src/editor/store/editorStore.routeIntent.ts` 能创建 page、child route、layout，并维护 workspace documents。
-3. `apps/web/src/editor/features/design/blueprint/editor/controller/useBlueprintEditorController.ts` 将 route manifest 同步到后端。
-4. `apps/web/src/editor/features/design/blueprint/editor/components/Canvas/useActiveRoutePreview.ts` 根据 active route materialize page doc。
-5. `apps/web/src/pir/renderer/PIRNode.tsx` 在 `PdxOutlet` 处注入 active route page。
-6. `packages/ui/src/nav/PdxRoute.tsx` 仍然拥有自己的 children path matcher。
+1. `@prodivix/router` 持有 `WorkspaceRouteManifest`、`WorkspaceRouteNode`、codec、route core 与 validator。
+2. `@prodivix/workspace` 的 `workspaceRouteIntent.ts` / `workspaceRouteIntentCommand.ts` 把本地 RouteIntent 规划为可逆 Command / Transaction；Intent 不进入远端 wire。
+3. Web route slice 只组合 planner 与作者态投影；远端 Route 写入通过 WorkspaceOperation、Durable Outbox 和 Atomic Commit 保存。
+4. `apps/web/src/editor/features/blueprint/editor/canvas/useActiveRoutePreview.ts` 通过 `RouteRuntimeContext.matchChain` materialize active page/layout。
+5. `@prodivix/pir-react-renderer` 的 `PIRNode.tsx` 根据同一 RouteRuntimeContext 处理 `PdxOutlet`；历史 owner `apps/web/src/pir/renderer/PIRNode.tsx` 已 Hard Cut 删除。
+6. `PdxRoute` 已收敛为 workspace/module route scope 投影，不再维护项目级 children path matcher。
 
-这说明项目级 route graph 已经存在，但 `PdxRoute`、导航 action、Outlet 注入、诊断和导出还没有共享同一个 route core。
+因此，项目级 RouteGraph、`PdxRoute`、导航 action、Outlet 预览、诊断和 export topology 已共享同一 route core。G1 仍需完成 React/Vite 导出中的 layout/route-outlet 组件组合、独立项目验证和可执行 runtime refs；这些缺口不回退 G0 的唯一真相与写入 Gate。
 
 ## 2. 目标架构
 
@@ -44,7 +50,7 @@ RouteManifest
 2. `PdxRoute` 只能消费 route context 或 route module projection。
 3. `PdxOutlet` 内容由 `matchChain` 决定，而不是临时 active route 拼接。
 4. Route runtime refs 使用 Code Authoring Environment。
-5. 后端、前端 store、renderer、export planner 共享同一套校验语义。
+5. 后端、Workspace、renderer 与 export planner 使用共享或 conformance-equivalent 的校验语义。
 
 ## 3. 已拍板产品语义
 
@@ -117,7 +123,7 @@ type ResolvedRouteGraph = {
 
 ## 5. Route Core API
 
-首批模块建议放在前端稳定模型层，例如 `apps/web/src/router/` 或 `apps/web/src/workspace/routeCore/`。若后端也需要复用同名规则，应同步一份 Go validator，测试样例保持一致。
+Route contract、codec、resolver 与 validator 的当前 owner 是 `@prodivix/router`；RouteIntent/Command planner 归 `@prodivix/workspace`，React 投影归 `@prodivix/pir-react-renderer`。后端使用 conformance-equivalent 的 Go validator，不在 Web 目录复制第二套 route core。
 
 首批 API：
 
@@ -147,9 +153,9 @@ API 规则：
 3. `resolveNavigateTarget` 支持 route id、relative path、absolute path 和 external URL；external URL 只返回外链结果，不进入 RouteGraph。
 4. `validateRouteManifest` 可以接收 document lookup 和 PIR outlet lookup adapter；core 本身不扫描 editor store。
 
-## 6. Command / Intent 契约
+## 6. Command / Intent 规划契约
 
-Route UI 调用 intent，intent 生成 command，command 执行 patch。Command 是 undo/redo、同步、AI dry-run/apply 和后端审计的统一入口。
+Route UI 可以提交本地 intent，intent planner 必须先生成可逆 Command / Transaction。Command 内部受限 PatchOp 只描述 forward/reverse apply，不是独立写协议；远端持久化以 WorkspaceOperation 为单位进入 Durable Outbox 与 Atomic Commit。Command / Transaction 是 undo/redo、同步、AI dry-run/apply 和后端审计的统一入口，Intent 不进入 wire。
 
 | Intent                    | 主要 patch 目标                                           | 必须提供 reverseOps | revision               |
 | ------------------------- | --------------------------------------------------------- | ------------------- | ---------------------- |
@@ -319,7 +325,7 @@ type RouteExportContribution = {
    - `resolveNavigateTarget`
    - `resolveOutletBinding`
    - `validateRouteManifest`
-2. [x] 将 `apps/web/src/editor/store/routeManifest.ts` 中的 path flatten 逻辑迁到 route core。
+2. [x] 将 `apps/web/src/editor/store/routeManifest.ts`（历史迁移源，现已删除）中的 path flatten 逻辑迁到 route core。
 3. [x] 将 `packages/ui/src/nav/PdxRoute.tsx` 的 matcher 替换为 route core 消费层。
 4. [x] 产出稳定 `RTE-xxxx` diagnostics。
 
@@ -353,7 +359,7 @@ type RouteExportContribution = {
 当前实现状态：
 
 - `RouteIntent` 已覆盖 `route.rename-segment`、`route.move`、`route.create-index`、`route.bind-outlet`、`route.unbind-outlet`、`route.attach-layout`、`route.detach-layout`、`route.delete` 和 `route.set-runtime-ref`。
-- `createRouteIntentCommand` 已能为每个 RouteIntent 生成 `core.route` / `WorkspaceCommandEnvelope`，当前 forward/reverse ops 以 `/routeManifest` 替换作为稳定收口点。
+- `@prodivix/workspace` 的 `createRouteIntentCommand` 已能为每个 RouteIntent 生成 `core.route` / `WorkspaceCommandEnvelope`，当前 forward/reverse ops 以 `/routeManifest` 替换作为稳定收口点。
 - Blueprint 地址栏 Routes 菜单已支持创建子路由、创建 index route、重命名、上下移动和删除。
 - Inspector Basic 面板已展示 active route 的 full path、segment/index、page/layout doc、outlet bindings、runtime refs 和 route validator diagnostics，并提供 attach/detach layout 操作入口。
 - 已提供 `collectRouteDocumentRefs` / `isWorkspaceDocumentReferencedByRoute`，Public Resource 删除入口接入基础引用拦截；`applyWorkspaceCommand` 也会拒绝删除仍被 RouteGraph 引用的 page/layout 文档。
@@ -384,7 +390,7 @@ type RouteExportContribution = {
 - 合成 route source trace 记录 `moduleId`、`mountId`、source route node、host route node 和 resolved path。
 - Blueprint 地址栏、内部导航路径反查和 active route preview 消费合成 RouteGraph，因此宿主 project 能预览挂载后的 module route。
 - `PdxRoute` 不再读取 children 上的 `data-route-path` / `data-route-index` / `data-route-fallback`；它只作为 workspace/module route scope 的投影组件。
-- renderer 已向 `PdxRoute` 注入合成后的 workspace route manifest、active route id，或由 `moduleScope` 解析出的 `RouteModule`。
+- `@prodivix/pir-react-renderer` 已向 `PdxRoute` 注入合成后的 workspace route manifest、active route id，或由 `moduleScope` 解析出的 `RouteModule`。
 - `PdxRoute` Inspector 已改为编辑 route scope、module scope 和 debug path。
 - Route document reference guard 已覆盖 `RouteModule` 内的 page/layout refs。
 
@@ -412,7 +418,7 @@ type RouteExportContribution = {
 
 当前实现状态：
 
-- shared route core 提供 `RouteRuntimeContext`、`ResolvedRouteMatch`、`resolveRouteRuntimeContext` 和 Phase 4 版 `resolveNavigateTarget`。
+- `@prodivix/router` 提供 `RouteRuntimeContext`、`ResolvedRouteMatch`、`resolveRouteRuntimeContext` 和 Phase 4 版 `resolveNavigateTarget`。
 - `resolveNavigateTarget` 能区分 route id、relative path、absolute path、external URL 和 unmatched target；external URL 只返回结果，不在 core 内产生副作用。
 - Blueprint controller 维护 concrete preview path，active route 继续使用稳定 route id；内置 navigate、地址栏和 canvas preview 消费同一个 route runtime resolver。
 - `PIRRenderer` 接收 `routeRuntimeContext`，并把 route params、search params、hash 和 route summary 注入 renderer params。
@@ -434,7 +440,7 @@ type RouteExportContribution = {
 
 任务：
 
-1. [x] 后端 `SaveRouteManifest` 前执行 manifest schema 和语义校验。
+1. [x] 原 `SaveRouteManifest`（历史独立写入口，现已删除）在写入前执行 manifest schema 和语义校验；当前 Workspace bootstrap import 与 Atomic WorkspaceOperation Commit 复用同一 validator。
 2. [x] `workspace_routes` 保存 normalized manifest。
 3. [x] Export Program Builder 读取 `ResolvedRouteGraph`。
 4. [x] Production Export Planner 为不同 target 输出对应 route topology。
@@ -442,13 +448,14 @@ type RouteExportContribution = {
 
 当前实现状态：
 
-- 后端以单事务 `ImportWorkspaceSnapshot` 完成项目 bootstrap；它与 `SaveRouteManifest` 在写入 `workspace_routes` 前调用同一份 route manifest validator。非法 root、重复 route id、重复 sibling path/index、非法 segment、缺失 module mount、空 runtime CodeReference 会被拒绝。
+- 后端以单事务 `ImportWorkspaceSnapshot` 完成项目 bootstrap；bootstrap 与 Atomic WorkspaceOperation Commit 在写入 `workspace_routes` 前调用同一份 route manifest validator。非法 root、重复 route id、重复 sibling path/index、非法 segment、缺失 module mount、空 runtime CodeReference 会被拒绝。
 - `workspace_routes.manifest_json` 继续保存经过 `normalizeJSONDocument` 的紧凑 JSON；语义校验发生在 normalized payload 上。
 - compiler 新增 `createRouteExportContribution`，从 `WorkspaceRouteManifest` 经 shared route core 的 `composeRouteManifestWithModules`、`flattenRouteManifest` 和 `validateRouteManifest` 生成 route topology contribution。
 - `ExportProgram` / `ExportProgramContribution` 支持 `routes: ExportRouteTopology`；`ProductionExportPlanner` 输出 `.prodivix/routes.json`，并把同一份 topology 写入 `.prodivix/export-manifest.json` 与 bundle metadata。
 - route topology 记录 route node、path、parent、page/layout doc id、module mount source trace、runtime loader/action/guard CodeReference，以及 generated file 映射。
 - Web 导出页的 React project export 会把当前 workspace RouteGraph 作为 export contribution 传入 compiler，不从画布组件树反推项目路由。
 - route diagnostics 进入 `ExportBundle.diagnostics`；出现 `source: 'route'` 的 error 时，bundle metadata 标记 `exportBlocked`，导出页禁用 ZIP 下载。
+- 当前 React/Vite exporter 已生成 route topology、page component 与 runtime reference；尚未支持的 layout/route-outlet composition 会产生 blocking diagnostic，不会被静默丢弃。
 
 验收：
 
