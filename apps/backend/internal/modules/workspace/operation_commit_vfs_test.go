@@ -145,14 +145,6 @@ func TestWorkspaceCommitRejectsNonCanonicalTreeState(t *testing.T) {
 		mutate func(*workspaceCommitState)
 	}{
 		{
-			name: "directory children missing",
-			mutate: func(state *workspaceCommitState) {
-				root := state.TreeByID["root"]
-				root.Children = nil
-				state.TreeByID["root"] = root
-			},
-		},
-		{
 			name: "path separator in node name",
 			mutate: func(state *workspaceCommitState) {
 				node := state.TreeByID["doc-node"]

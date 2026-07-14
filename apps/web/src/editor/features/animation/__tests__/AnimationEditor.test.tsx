@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyPirDocument } from '@prodivix/pir';
 import {
@@ -69,7 +70,11 @@ describe('AnimationEditor standalone document authoring', () => {
     const workspace = createWorkspace();
     useEditorStore.getState().setWorkspaceSnapshot(workspace);
 
-    render(<AnimationEditor />);
+    render(
+      <MemoryRouter>
+        <AnimationEditor />
+      </MemoryRouter>
+    );
 
     expect(screen.getByRole('status').textContent).toContain(
       'Choose a PIR target'

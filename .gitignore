@@ -48,6 +48,7 @@ apps/web/packages/
 apps/backend/dist/
 apps/backend/build/
 apps/backend/data/
+apps/backend/tmp/
 apps/docs/.vitepress/cache/
 apps/docs/.vitepress/dist/
 apps/docs/.vitepress/.temp/

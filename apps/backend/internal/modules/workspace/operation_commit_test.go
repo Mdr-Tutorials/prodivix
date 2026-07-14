@@ -44,6 +44,72 @@ func testDocumentCommitRequest(command WorkspaceCommandEnvelope) WorkspaceOperat
 	}
 }
 
+func TestWorkspaceCommitStateCanonicalizesEmptyDirectoryChildren(t *testing.T) {
+	tree, err := defaultWorkspaceTreeWithDocumentJSON("root", "doc_root", "/pir.json")
+	if err != nil {
+		t.Fatalf("create project workspace tree: %v", err)
+	}
+	workspace := WorkspaceRecord{
+		ID:         "ws_1",
+		TreeRootID: "root",
+		Tree:       tree,
+	}
+	document := WorkspaceDocumentRecord{
+		WorkspaceID: "ws_1",
+		ID:          "doc_root",
+		Type:        WorkspaceDocumentTypePIRPage,
+		Path:        "/pir.json",
+		ContentRev:  2,
+		MetaRev:     1,
+		Content:     defaultPIRDocument,
+	}
+	state, err := newWorkspaceCommitState(
+		workspace,
+		json.RawMessage(`{"version":"1","root":{"id":"root","pageDocId":"doc_root"}}`),
+		[]WorkspaceDocumentRecord{document},
+	)
+	if err != nil {
+		t.Fatalf("create commit state: %v", err)
+	}
+	for id, node := range state.TreeByID {
+		if node.Kind == "dir" && node.Children == nil {
+			t.Fatalf("project directory %s lost its explicit empty children array", id)
+		}
+	}
+
+	styles := state.TreeByID["dir_styles"]
+	styles.Children = nil
+	state.TreeByID["dir_styles"] = styles
+	command := WorkspaceCommandEnvelope{
+		ID:        "cmd_palette_insert_regression",
+		Namespace: "core.pir",
+		Type:      "document.update",
+		Version:   "1.0",
+		IssuedAt:  time.Date(2026, time.July, 12, 1, 0, 0, 0, time.UTC),
+		ForwardOps: []WorkspacePatchOp{
+			{Op: "add", Path: "/ui/graph/nodesById/inserted", Value: json.RawMessage(`{"id":"inserted","kind":"element","type":"div"}`)},
+			{Op: "add", Path: "/ui/graph/childIdsById/inserted", Value: json.RawMessage(`[]`)},
+			{Op: "add", Path: "/ui/graph/childIdsById/root/-", Value: json.RawMessage(`"inserted"`)},
+		},
+		ReverseOps: []WorkspacePatchOp{
+			{Op: "remove", Path: "/ui/graph/childIdsById/root/0"},
+			{Op: "remove", Path: "/ui/graph/childIdsById/inserted"},
+			{Op: "remove", Path: "/ui/graph/nodesById/inserted"},
+		},
+		Target: WorkspaceCommandTarget{
+			WorkspaceID: "ws_1",
+			DocumentID:  "doc_root",
+		},
+		DomainHint: "pir",
+	}
+	if err := state.apply([]WorkspaceCommandEnvelope{command}); err != nil {
+		t.Fatalf("apply palette insertion with an empty VFS directory: %v", err)
+	}
+	if state.TreeByID["dir_styles"].Children == nil {
+		t.Fatal("commit validation must canonicalize empty directory children")
+	}
+}
+
 func TestNormalizeWorkspaceOperationCommitKeepsDocumentCASPartitioned(t *testing.T) {
 	command := testCommitDocumentCommand(
 		"cmd_1",

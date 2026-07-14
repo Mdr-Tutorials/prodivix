@@ -60,7 +60,11 @@ func newWorkspaceCommitState(
 func cloneWorkspaceTreeByID(source map[string]workspaceVFSNode) map[string]workspaceVFSNode {
 	result := make(map[string]workspaceVFSNode, len(source))
 	for id, node := range source {
-		node.Children = append([]string(nil), node.Children...)
+		if node.Children != nil {
+			children := make([]string, len(node.Children))
+			copy(children, node.Children)
+			node.Children = children
+		}
 		if node.ParentID != nil {
 			parentID := *node.ParentID
 			node.ParentID = &parentID
@@ -68,6 +72,19 @@ func cloneWorkspaceTreeByID(source map[string]workspaceVFSNode) map[string]works
 		result[id] = node
 	}
 	return result
+}
+
+// normalizeWorkspaceTreeDirectoryChildren removes Go's incidental nil/empty
+// slice distinction after the wire boundary has already enforced an explicit
+// children array. Persisted projections still serialize every empty directory
+// as children: [].
+func normalizeWorkspaceTreeDirectoryChildren(treeByID map[string]workspaceVFSNode) {
+	for id, node := range treeByID {
+		if node.Kind == "dir" && node.Children == nil {
+			node.Children = []string{}
+			treeByID[id] = node
+		}
+	}
 }
 
 func cloneWorkspaceDocumentRecord(document WorkspaceDocumentRecord) WorkspaceDocumentRecord {
@@ -451,6 +468,7 @@ func (state *workspaceCommitState) validate() error {
 		}
 		state.Documents[id] = document
 	}
+	normalizeWorkspaceTreeDirectoryChildren(state.TreeByID)
 	if err := validateWorkspaceVFSState(workspaceVFSTree{
 		TreeRootID: state.TreeRootID,
 		TreeByID:   state.TreeByID,

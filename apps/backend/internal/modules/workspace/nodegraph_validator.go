@@ -6,144 +6,180 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/Prodivix/prodivix/apps/backend/internal/platform/nodegraphcontract"
 )
 
 var ErrNodeGraphValidationFailed = errors.New("NodeGraph validation failed")
 
 var defaultNodeGraphDocument = json.RawMessage(`{"version":1,"nodes":[],"edges":[]}`)
 
+type nodeGraphWireDocument struct {
+	Nodes []nodeGraphWireNode `json:"nodes"`
+	Edges []nodeGraphWireEdge `json:"edges"`
+}
+
+type nodeGraphWireNode struct {
+	ID       string                        `json:"id"`
+	Data     map[string]json.RawMessage    `json:"data"`
+	Ports    []nodeGraphWirePort           `json:"ports"`
+	Executor *nodeGraphWireExecutorBinding `json:"executor"`
+}
+
+type nodeGraphWirePort struct {
+	ID        string `json:"id"`
+	Direction string `json:"direction"`
+	Kind      string `json:"kind"`
+	TypeRef   string `json:"typeRef"`
+}
+
+type nodeGraphWireExecutorBinding struct {
+	Reference nodeGraphWireCodeReference `json:"reference"`
+}
+
+type nodeGraphWireCodeReference struct {
+	ArtifactID string                   `json:"artifactId"`
+	SourceSpan *nodeGraphWireSourceSpan `json:"sourceSpan"`
+}
+
+type nodeGraphWireSourceSpan struct {
+	ArtifactID string `json:"artifactId"`
+}
+
+type nodeGraphWireEdge struct {
+	ID           string  `json:"id"`
+	Source       string  `json:"source"`
+	Target       string  `json:"target"`
+	SourceHandle *string `json:"sourceHandle"`
+	TargetHandle *string `json:"targetHandle"`
+}
+
+type nodeGraphNodePorts struct {
+	declared bool
+	byID     map[string]nodeGraphWirePort
+}
+
 func validateNodeGraphDocument(payload json.RawMessage) error {
-	fields, err := decodeNodeGraphObject(payload, "/")
-	if err != nil {
-		return err
-	}
-	if err := rejectUnknownNodeGraphFields(fields, "/", "version", "nodes", "edges"); err != nil {
-		return err
-	}
-	for _, field := range []string{"version", "nodes", "edges"} {
-		if _, exists := fields[field]; !exists {
-			return nodeGraphValidationError("/%s is required", field)
-		}
+	if err := nodegraphcontract.ValidateDocument(payload); err != nil {
+		return nodeGraphValidationError("%v", err)
 	}
 
-	var version int
-	if err := json.Unmarshal(fields["version"], &version); err != nil || version != 1 {
-		return nodeGraphValidationError("/version must equal 1")
-	}
-	var nodes []json.RawMessage
-	if !isJSONArray(fields["nodes"]) || json.Unmarshal(fields["nodes"], &nodes) != nil {
-		return nodeGraphValidationError("/nodes must be an array")
-	}
-	var edges []json.RawMessage
-	if !isJSONArray(fields["edges"]) || json.Unmarshal(fields["edges"], &edges) != nil {
-		return nodeGraphValidationError("/edges must be an array")
+	var document nodeGraphWireDocument
+	if err := json.Unmarshal(payload, &document); err != nil {
+		return nodeGraphValidationError("/ must be a NodeGraph document")
 	}
 
-	nodeIDs := make(map[string]struct{}, len(nodes))
-	for index, rawNode := range nodes {
+	nodesByID := make(map[string]nodeGraphNodePorts, len(document.Nodes))
+	for index, node := range document.Nodes {
 		path := fmt.Sprintf("/nodes/%d", index)
-		node, err := decodeNodeGraphObject(rawNode, path)
-		if err != nil {
-			return err
+		if _, duplicate := nodesByID[node.ID]; duplicate {
+			return nodeGraphValidationError("%s duplicates node id %q", path+"/id", node.ID)
 		}
-		if err := rejectUnknownNodeGraphFields(node, path, "id", "type", "data"); err != nil {
-			return err
+
+		ports := nodeGraphNodePorts{
+			declared: node.Ports != nil,
+			byID:     make(map[string]nodeGraphWirePort, len(node.Ports)),
 		}
-		id, err := requireNodeGraphID(node, "id", path+"/id")
-		if err != nil {
-			return err
-		}
-		if _, duplicate := nodeIDs[id]; duplicate {
-			return nodeGraphValidationError("%s duplicates node id %q", path+"/id", id)
-		}
-		nodeIDs[id] = struct{}{}
-		if rawType, exists := node["type"]; exists {
-			if _, err := decodeNodeGraphCanonicalString(rawType, path+"/type"); err != nil {
-				return err
+		for portIndex, port := range node.Ports {
+			if _, duplicate := ports.byID[port.ID]; duplicate {
+				return nodeGraphValidationError(
+					"%s duplicates port id %q",
+					fmt.Sprintf("%s/ports/%d/id", path, portIndex),
+					port.ID,
+				)
 			}
+			ports.byID[port.ID] = port
 		}
-		data, exists := node["data"]
-		if !exists || !isJSONObject(data) {
-			return nodeGraphValidationError("%s must be an object", path+"/data")
+		nodesByID[node.ID] = ports
+
+		if node.Executor != nil && node.Executor.Reference.SourceSpan != nil &&
+			node.Executor.Reference.SourceSpan.ArtifactID != node.Executor.Reference.ArtifactID {
+			return nodeGraphValidationError(
+				"%s must use the referenced artifact",
+				path+"/executor/reference/sourceSpan/artifactId",
+			)
+		}
+		if nodeGraphDataKind(node.Data) == "code" {
+			if _, embedded := node.Data["code"]; embedded {
+				return nodeGraphValidationError("%s must bind source through executor", path+"/data/code")
+			}
+			if _, embedded := node.Data["codeLanguage"]; embedded {
+				return nodeGraphValidationError("%s must bind source through executor", path+"/data/codeLanguage")
+			}
 		}
 	}
 
-	edgeIDs := make(map[string]struct{}, len(edges))
-	for index, rawEdge := range edges {
+	edgeIDs := make(map[string]struct{}, len(document.Edges))
+	for index, edge := range document.Edges {
 		path := fmt.Sprintf("/edges/%d", index)
-		edge, err := decodeNodeGraphObject(rawEdge, path)
+		if _, duplicate := edgeIDs[edge.ID]; duplicate {
+			return nodeGraphValidationError("%s duplicates edge id %q", path+"/id", edge.ID)
+		}
+		edgeIDs[edge.ID] = struct{}{}
+
+		sourcePorts, sourceExists := nodesByID[edge.Source]
+		if !sourceExists {
+			return nodeGraphValidationError("%s references unknown node %q", path+"/source", edge.Source)
+		}
+		targetPorts, targetExists := nodesByID[edge.Target]
+		if !targetExists {
+			return nodeGraphValidationError("%s references unknown node %q", path+"/target", edge.Target)
+		}
+
+		sourcePort, hasSourcePort, err := resolveNodeGraphEdgePort(
+			sourcePorts,
+			edge.SourceHandle,
+			"output",
+			path+"/sourceHandle",
+		)
 		if err != nil {
 			return err
 		}
-		if err := rejectUnknownNodeGraphFields(edge, path, "id", "source", "target", "sourceHandle", "targetHandle"); err != nil {
-			return err
-		}
-		id, err := requireNodeGraphID(edge, "id", path+"/id")
+		targetPort, hasTargetPort, err := resolveNodeGraphEdgePort(
+			targetPorts,
+			edge.TargetHandle,
+			"input",
+			path+"/targetHandle",
+		)
 		if err != nil {
 			return err
 		}
-		if _, duplicate := edgeIDs[id]; duplicate {
-			return nodeGraphValidationError("%s duplicates edge id %q", path+"/id", id)
-		}
-		edgeIDs[id] = struct{}{}
-		source, err := requireNodeGraphID(edge, "source", path+"/source")
-		if err != nil {
-			return err
-		}
-		target, err := requireNodeGraphID(edge, "target", path+"/target")
-		if err != nil {
-			return err
-		}
-		if _, exists := nodeIDs[source]; !exists {
-			return nodeGraphValidationError("%s references unknown node %q", path+"/source", source)
-		}
-		if _, exists := nodeIDs[target]; !exists {
-			return nodeGraphValidationError("%s references unknown node %q", path+"/target", target)
-		}
-		for _, handle := range []string{"sourceHandle", "targetHandle"} {
-			rawHandle, exists := edge[handle]
-			if !exists || bytes.Equal(bytes.TrimSpace(rawHandle), []byte("null")) {
-				continue
-			}
-			var value string
-			if err := json.Unmarshal(rawHandle, &value); err != nil {
-				return nodeGraphValidationError("%s must be a string or null", path+"/"+handle)
-			}
+		if hasSourcePort && hasTargetPort &&
+			(sourcePort.Kind != targetPort.Kind ||
+				(sourcePort.TypeRef != "" && targetPort.TypeRef != "" && sourcePort.TypeRef != targetPort.TypeRef)) {
+			return nodeGraphValidationError("%s connects incompatible ports", path)
 		}
 	}
 	return nil
 }
 
-func decodeNodeGraphObject(payload json.RawMessage, path string) (map[string]json.RawMessage, error) {
-	if !isJSONObject(payload) {
-		return nil, nodeGraphValidationError("%s must be an object", path)
+func nodeGraphDataKind(data map[string]json.RawMessage) string {
+	var kind string
+	if rawKind, exists := data["kind"]; exists {
+		_ = json.Unmarshal(rawKind, &kind)
 	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(payload, &fields); err != nil {
-		return nil, nodeGraphValidationError("%s must be an object", path)
-	}
-	return fields, nil
+	return kind
 }
 
-func rejectUnknownNodeGraphFields(fields map[string]json.RawMessage, path string, allowed ...string) error {
-	allowedFields := make(map[string]struct{}, len(allowed))
-	for _, field := range allowed {
-		allowedFields[field] = struct{}{}
+func resolveNodeGraphEdgePort(
+	ports nodeGraphNodePorts,
+	handle *string,
+	direction string,
+	path string,
+) (nodeGraphWirePort, bool, error) {
+	if !ports.declared || handle == nil {
+		return nodeGraphWirePort{}, false, nil
 	}
-	for field := range fields {
-		if _, exists := allowedFields[field]; !exists {
-			return nodeGraphValidationError("%s contains unknown field %q", path, field)
-		}
+	port, exists := ports.byID[*handle]
+	if !exists || port.Direction != direction {
+		return nodeGraphWirePort{}, false, nodeGraphValidationError(
+			"%s references unknown %s port %q",
+			path,
+			direction,
+			*handle,
+		)
 	}
-	return nil
-}
-
-func requireNodeGraphID(fields map[string]json.RawMessage, field string, path string) (string, error) {
-	payload, exists := fields[field]
-	if !exists {
-		return "", nodeGraphValidationError("%s is required", path)
-	}
-	return decodeNodeGraphCanonicalString(payload, path)
+	return port, true, nil
 }
 
 func decodeNodeGraphCanonicalString(payload json.RawMessage, path string) (string, error) {

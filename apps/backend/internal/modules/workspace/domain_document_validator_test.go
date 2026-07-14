@@ -13,9 +13,9 @@ func TestStandaloneDomainDocumentValidation(t *testing.T) {
 		wantError    error
 	}{
 		{
-			name:         "nodegraph current",
+			name:         "nodegraph current ports and executor",
 			documentType: WorkspaceDocumentTypePIRGraph,
-			content:      `{"version":1,"nodes":[{"id":"source","type":"input","data":{}},{"id":"target","data":{}}],"edges":[{"id":"edge","source":"source","target":"target"}]}`,
+			content:      `{"version":1,"nodes":[{"id":"source","type":"graphNode","data":{"kind":"code"},"ports":[{"id":"out.control.next","direction":"output","kind":"control"}],"executor":{"slotId":"nodegraph-code-slot:source","reference":{"artifactId":"artifact-source","exportName":"run","sourceSpan":{"artifactId":"artifact-source","startLine":1,"startColumn":1,"endLine":1,"endColumn":4}}}},{"id":"target","data":{"kind":"process"},"ports":[{"id":"in.control.prev","direction":"input","kind":"control"}]}],"edges":[{"id":"edge","source":"source","target":"target","sourceHandle":"out.control.next","targetHandle":"in.control.prev"}]}`,
 		},
 		{
 			name:         "nodegraph rejects legacy maps",

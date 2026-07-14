@@ -44,8 +44,9 @@ function EditorBar() {
   const settingsLabel = projectId
     ? t('projectHome.actions.settings.label')
     : t('editorSettings', { ns: 'routes' });
+  const issuesLabel = t('bar.issues');
   const barIconGroupClassName =
-    'flex flex-col items-center gap-[14px] [--icon-link-color:var(--editor-bar-icon)] [--icon-link-hover-color:var(--editor-bar-icon-hover)]';
+    'flex flex-col items-center gap-[14px] [--icon-link-badge-background:var(--text-primary)] [--icon-link-badge-color:var(--text-inverse)] [--icon-link-color:var(--editor-bar-icon)] [--icon-link-hover-color:var(--editor-bar-icon-hover)]';
   const barEdgeGroupClassName =
     'flex flex-col items-center gap-[12px] [--icon-link-color:var(--editor-bar-icon)] [--icon-link-hover-color:var(--editor-bar-icon-hover)]';
 
@@ -123,20 +124,24 @@ function EditorBar() {
                 title={t('projectHome.actions.resources.label')}
                 to={`${basePath}/resources`}
               />
-              <div className="relative">
-                <PdxIconLink
-                  icon={<CircleAlert size={22} />}
-                  label={t('bar.issues')}
-                  size={22}
-                  title={`${t('bar.issues')} · Alt+0`}
-                  to={`${basePath}/issues`}
-                />
-                {blockingIssueCount > 0 && (
-                  <span className="pointer-events-none absolute -top-1 -right-2 min-w-4 rounded-full bg-(--text-primary) px-1 text-center text-[9px] leading-4 text-(--editor-bar-bg)">
-                    {blockingIssueCount > 99 ? '99+' : blockingIssueCount}
-                  </span>
-                )}
-              </div>
+              <PdxIconLink
+                badge={
+                  blockingIssueCount > 0
+                    ? blockingIssueCount > 99
+                      ? '99+'
+                      : blockingIssueCount
+                    : undefined
+                }
+                icon={<CircleAlert size={22} />}
+                label={
+                  blockingIssueCount > 0
+                    ? `${issuesLabel} (${blockingIssueCount})`
+                    : issuesLabel
+                }
+                size={22}
+                title={`${issuesLabel} · Alt+0`}
+                to={`${basePath}/issues`}
+              />
               <PdxIconLink
                 icon={<TestTube size={22} />}
                 label={t('projectHome.actions.testing.label')}

@@ -15,6 +15,7 @@ const meta: Meta<typeof PdxIconLink> = {
       description: '图标尺寸',
     },
     color: { control: 'color', description: '图标颜色' },
+    badge: { control: 'text', description: '右上角徽标内容' },
     label: { control: 'text', description: '无障碍名称' },
     title: { control: 'text', description: '无障碍标题' },
   },
@@ -67,6 +68,17 @@ export const WithTitle: Story = {
     label: 'Home',
     size: 24,
     title: 'Go to Home',
+  },
+};
+
+export const WithBadge: Story = {
+  args: {
+    to: '/issues',
+    icon: HomeIcon,
+    badge: '12',
+    label: 'Issues (12)',
+    size: 24,
+    title: 'Issues',
   },
 };
 

@@ -400,6 +400,7 @@ const projectsRoot = join(workspaceRoot, 'projects');
 const createWorkspace = (fixture) => {
   const documentId = `page-${fixture.id}`;
   const documentNodeId = `document-${fixture.id}`;
+  const pagesDirectoryNodeId = 'pages';
   return {
     id: `workspace-${fixture.id}`,
     name: fixture.document.metadata?.name ?? fixture.id,
@@ -413,13 +414,20 @@ const createWorkspace = (fixture) => {
         kind: 'dir',
         name: '/',
         parentId: null,
+        children: [pagesDirectoryNodeId],
+      },
+      [pagesDirectoryNodeId]: {
+        id: pagesDirectoryNodeId,
+        kind: 'dir',
+        name: 'pages',
+        parentId: 'root',
         children: [documentNodeId],
       },
       [documentNodeId]: {
         id: documentNodeId,
         kind: 'doc',
         name: `${fixture.id}.pir.json`,
-        parentId: 'root',
+        parentId: pagesDirectoryNodeId,
         docId: documentId,
       },
     },

@@ -1,4 +1,5 @@
 .PdxIconLink {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -9,4 +10,20 @@
   &:hover {
     color: var(--icon-link-hover-color, var(--text-primary));
   }
+}
+
+.PdxIconLinkBadge {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.5rem;
+  min-width: 1rem;
+  padding-inline: 0.25rem;
+  border-radius: 9999px;
+  background: var(--icon-link-badge-background, var(--text-primary));
+  color: var(--icon-link-badge-color, var(--text-inverse));
+  font-size: 0.5625rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1rem;
+  text-align: center;
+  pointer-events: none;
 }

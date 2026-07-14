@@ -541,8 +541,10 @@ describe('editor workspace store hard cut', () => {
     useEditorStore.getState().dispatchWorkspaceCommand(
       createMetadataCommand({
         id: 'command-during-request',
-        forwardOps: [{ op: 'add', path: '/metadata/localOnly', value: true }],
-        reverseOps: [{ op: 'remove', path: '/metadata/localOnly' }],
+        forwardOps: [
+          { op: 'add', path: '/metadata/author', value: 'Local author' },
+        ],
+        reverseOps: [{ op: 'remove', path: '/metadata/author' }],
       })
     );
 
@@ -577,7 +579,7 @@ describe('editor workspace store hard cut', () => {
       {
         description: 'Remote description',
         name: 'One',
-        localOnly: true,
+        author: 'Local author',
       }
     );
     expect(state.documentEditSeqById['page-home']).toBe(2);

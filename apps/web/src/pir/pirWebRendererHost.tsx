@@ -1,10 +1,11 @@
 import type { ElementType, ReactNode } from 'react';
-import type {
-  ComponentAdapter,
-  ComponentRegistry,
-  PIRElementProjectionInput,
-  PIRElementProjectionResult,
-  PIRRendererHost,
+import {
+  defaultComponentRegistry,
+  type ComponentAdapter,
+  type ComponentRegistry,
+  type PIRElementProjectionInput,
+  type PIRElementProjectionResult,
+  type PIRRendererHost,
 } from '@prodivix/pir-react-renderer';
 
 const HTML_ELEMENTS = new Set([
@@ -93,15 +94,17 @@ const projectElement = (
 };
 
 /**
- * Composes the browser PIR host from stable native elements and an optional
- * extension registry. The adapter bridge is independent from PIR wire versions.
+ * Composes the browser PIR host from stable native and Prodivix UI elements,
+ * then overlays an optional extension registry. The adapter bridge is
+ * independent from PIR wire versions.
  */
 export const createPirWebRendererHost = (
   registry?: Pick<ComponentRegistry, 'get'>
 ): PIRRendererHost =>
   Object.freeze({
     resolveElement(type) {
-      const registered = registry?.get(type);
+      const registered =
+        registry?.get(type) ?? defaultComponentRegistry.get(type);
       if (registered) {
         return {
           component: registered.component,

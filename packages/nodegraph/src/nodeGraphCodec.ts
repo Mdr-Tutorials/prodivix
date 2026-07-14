@@ -6,6 +6,7 @@ import type {
   NodeGraphNode,
   NodeGraphPort,
 } from './nodeGraph.types';
+import { nodeGraphCurrentWireFields } from './wire';
 
 type UnsafeRecord = Record<string, unknown>;
 
@@ -89,12 +90,7 @@ const decodeCodeReference = (
     issues.push({ path, message: 'Expected a CodeReference object.' });
     return null;
   }
-  hasOnlyKeys(
-    value,
-    ['artifactId', 'exportName', 'symbolId', 'sourceSpan'],
-    path,
-    issues
-  );
+  hasOnlyKeys(value, nodeGraphCurrentWireFields.codeReference, path, issues);
   const artifactId = readRequiredId(
     value.artifactId,
     `${path}/artifactId`,
@@ -125,7 +121,7 @@ const decodeCodeReference = (
     } else {
       hasOnlyKeys(
         value.sourceSpan,
-        ['artifactId', 'startLine', 'startColumn', 'endLine', 'endColumn'],
+        nodeGraphCurrentWireFields.sourceSpan,
         `${path}/sourceSpan`,
         issues
       );
@@ -178,7 +174,7 @@ const decodeCodeSlotBinding = (
     issues.push({ path, message: 'Expected a CodeSlotBinding object.' });
     return null;
   }
-  hasOnlyKeys(value, ['slotId', 'reference'], path, issues);
+  hasOnlyKeys(value, nodeGraphCurrentWireFields.codeSlotBinding, path, issues);
   const slotId = readRequiredId(value.slotId, `${path}/slotId`, issues);
   const reference = decodeCodeReference(
     value.reference,
@@ -197,12 +193,7 @@ const decodePort = (
     issues.push({ path, message: 'Expected a NodeGraph port object.' });
     return null;
   }
-  hasOnlyKeys(
-    value,
-    ['id', 'direction', 'kind', 'typeRef', 'required', 'multiple'],
-    path,
-    issues
-  );
+  hasOnlyKeys(value, nodeGraphCurrentWireFields.port, path, issues);
   const id = readRequiredId(value.id, `${path}/id`, issues);
   if (value.direction !== 'input' && value.direction !== 'output') {
     issues.push({
@@ -251,7 +242,7 @@ const decodeNode = (
     issues.push({ path, message: 'Expected an object.' });
     return null;
   }
-  hasOnlyKeys(value, ['id', 'type', 'data', 'ports', 'executor'], path, issues);
+  hasOnlyKeys(value, nodeGraphCurrentWireFields.node, path, issues);
   const id = readRequiredId(value.id, `${path}/id`, issues);
   const type = readOptionalString(value.type, `${path}/type`, issues);
   if (!isPlainObject(value.data)) {
@@ -315,12 +306,7 @@ const decodeEdge = (
     issues.push({ path, message: 'Expected an object.' });
     return null;
   }
-  hasOnlyKeys(
-    value,
-    ['id', 'source', 'target', 'sourceHandle', 'targetHandle'],
-    path,
-    issues
-  );
+  hasOnlyKeys(value, nodeGraphCurrentWireFields.edge, path, issues);
   const id = readRequiredId(value.id, `${path}/id`, issues);
   const source = readRequiredId(value.source, `${path}/source`, issues);
   const target = readRequiredId(value.target, `${path}/target`, issues);
@@ -355,7 +341,7 @@ export const decodeNodeGraphDocument = (
     };
   }
   const issues: NodeGraphDecodeIssue[] = [];
-  hasOnlyKeys(value, ['version', 'nodes', 'edges'], '', issues);
+  hasOnlyKeys(value, nodeGraphCurrentWireFields.document, '', issues);
   if (value.version !== 1) {
     issues.push({ path: '/version', message: 'Expected NodeGraph version 1.' });
   }
