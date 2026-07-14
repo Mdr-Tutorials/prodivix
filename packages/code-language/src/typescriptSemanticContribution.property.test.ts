@@ -1,5 +1,4 @@
 import { createCodeSymbolId, type CodeArtifact } from '@prodivix/authoring';
-import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
   createCodeExportLocalSymbolId,
@@ -30,22 +29,14 @@ const canonicalArtifacts = [definitionArtifact, consumerArtifact] as const;
 
 describe('TypeScript semantic contribution properties', () => {
   it('is invariant to CodeArtifact input order', () => {
-    const expected = createTypeScriptSemanticContribution({
-      workspaceId,
-      artifacts: canonicalArtifacts,
-    });
-
-    fc.assert(
-      fc.property(fc.boolean(), (reverse) => {
-        const artifacts = reverse
-          ? [...canonicalArtifacts].reverse()
-          : [...canonicalArtifacts];
-        expect(
-          createTypeScriptSemanticContribution({ workspaceId, artifacts })
-        ).toEqual(expected);
-      }),
-      { numRuns: 8 }
+    const contributions = [
+      canonicalArtifacts,
+      [...canonicalArtifacts].reverse(),
+    ].map((artifacts) =>
+      createTypeScriptSemanticContribution({ workspaceId, artifacts })
     );
+
+    expect(contributions[1]).toEqual(contributions[0]);
   });
 
   it('uses export:<name> local identities for durable exported symbols', () => {
