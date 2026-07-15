@@ -26,7 +26,7 @@ import {
   type SemanticSnapshotIdentity,
   type WorkspaceReferenceFact,
 } from '@prodivix/authoring';
-import { createDataOperationSymbolId } from '@prodivix/data';
+import { createDataOperationSymbolId } from '@prodivix/authoring';
 import type { PIRDocument } from '../pir.types';
 import { createPirSemanticContributionProvider } from './pirSemanticContributionProvider';
 

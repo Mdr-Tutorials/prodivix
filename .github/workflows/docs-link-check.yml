@@ -7,6 +7,9 @@ on:
       - main
     paths:
       - 'apps/docs/**'
+      - 'packages/plugin-contracts/src/diagnostics.ts'
+      - 'specs/diagnostics/**'
+      - 'scripts/generate-diagnostic-docs.mjs'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
@@ -17,6 +20,9 @@ on:
       - main
     paths:
       - 'apps/docs/**'
+      - 'packages/plugin-contracts/src/diagnostics.ts'
+      - 'specs/diagnostics/**'
+      - 'scripts/generate-diagnostic-docs.mjs'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'

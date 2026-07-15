@@ -125,8 +125,29 @@ type CodeArtifactRelocationState =
   | Readonly<{ status: 'idle' }>
   | Readonly<{ status: 'editing'; currentPath: string; nextPath: string }>;
 
+type LatestRequestGate = Readonly<{
+  begin(): number;
+  isCurrent(requestId: number): boolean;
+  invalidate(): void;
+}>;
+
 const EMPTY_WORKSPACE_DOCUMENTS: WorkspaceSnapshot['docsById'] = {};
 const EMPTY_WORKSPACE_TREE: WorkspaceSnapshot['treeById'] = {};
+
+/** Orders asynchronous editor requests without coupling their lifecycle to render state. */
+const createLatestRequestGate = (): LatestRequestGate => {
+  let currentRequestId = 0;
+  return Object.freeze({
+    begin: () => {
+      currentRequestId += 1;
+      return currentRequestId;
+    },
+    isCurrent: (requestId) => currentRequestId === requestId,
+    invalidate: () => {
+      currentRequestId += 1;
+    },
+  });
+};
 
 const resolveLanguageExtensionByName = (name: string) => {
   const lower = name.toLowerCase();
@@ -248,7 +269,7 @@ export function CodeAuthoringWorkspace({
   const [locationQuery, setLocationQuery] =
     useState<CodeLanguageLocationQueryView>(EMPTY_CODE_LANGUAGE_LOCATION_QUERY);
   const locationQueryRequestIdRef = useRef(0);
-  const renameRequestIdRef = useRef(0);
+  const [renameRequestGate] = useState(createLatestRequestGate);
   const requestedArtifactSelectionRef = useRef<string | undefined>(undefined);
   const requestSourceSpanFocusRef = useRef<string | undefined>(undefined);
   const lastActivatedCodeDocumentIdRef = useRef<string | undefined>(undefined);
@@ -455,9 +476,14 @@ export function CodeAuthoringWorkspace({
   }, [codeLanguageSource, selectedFile?.id]);
 
   useEffect(() => {
-    renameRequestIdRef.current += 1;
+    renameRequestGate.invalidate();
     setRenameState({ status: 'idle' });
-  }, [codeLanguageSource, selectedFile?.id, workspace?.workspaceRev]);
+  }, [
+    codeLanguageSource,
+    renameRequestGate,
+    selectedFile?.id,
+    workspace?.workspaceRev,
+  ]);
 
   useEffect(() => {
     setRelocationState({ status: 'idle' });
@@ -557,15 +583,14 @@ export function CodeAuthoringWorkspace({
         offset: view.state.selection.main.head,
       });
       if (!position) return;
-      const requestId = renameRequestIdRef.current + 1;
-      renameRequestIdRef.current = requestId;
+      const requestId = renameRequestGate.begin();
       setSaveError('');
       setRenameState({ status: 'preparing' });
       const result = await codeLanguageSession.session.prepareRename({
         expectedSnapshotIdentity: codeLanguageSession.session.snapshotIdentity,
         position,
       });
-      if (renameRequestIdRef.current !== requestId) return;
+      if (!renameRequestGate.isCurrent(requestId)) return;
       if (result.status !== 'resolved') {
         setRenameState({ status: 'idle' });
         setSaveError(t('resourceManager.code.refactor.renameUnavailable'));
@@ -584,6 +609,7 @@ export function CodeAuthoringWorkspace({
       canRefactorSymbol,
       isSaving,
       isSourceDirty,
+      renameRequestGate,
       t,
       workspace,
       workspaceReadonly,
@@ -1149,8 +1175,7 @@ export function CodeAuthoringWorkspace({
     }
     const nextName = renameState.nextName.trim();
     if (!nextName || nextName === renameState.currentName) return;
-    const requestId = renameRequestIdRef.current + 1;
-    renameRequestIdRef.current = requestId;
+    const requestId = renameRequestGate.begin();
     setSaveError('');
     setMutating(true);
     try {
@@ -1159,7 +1184,7 @@ export function CodeAuthoringWorkspace({
         position: renameState.position,
         newName: nextName,
       });
-      if (renameRequestIdRef.current !== requestId) return;
+      if (!renameRequestGate.isCurrent(requestId)) return;
       if (proposal.status !== 'resolved') {
         setSaveError(t('resourceManager.code.refactor.renameUnavailable'));
         return;
@@ -1678,7 +1703,7 @@ export function CodeAuthoringWorkspace({
                     )
                   }
                   onCancelRename={() => {
-                    renameRequestIdRef.current += 1;
+                    renameRequestGate.invalidate();
                     setRenameState({ status: 'idle' });
                   }}
                   onOpenAffectedOwner={(slotId) => {

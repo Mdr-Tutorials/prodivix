@@ -641,9 +641,6 @@ importers:
       '@prodivix/authoring':
         specifier: workspace:*
         version: link:../authoring
-      '@prodivix/data':
-        specifier: workspace:*
-        version: link:../data
       '@prodivix/diagnostics':
         specifier: workspace:*
         version: link:../diagnostics

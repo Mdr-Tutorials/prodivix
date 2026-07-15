@@ -48,6 +48,11 @@ const runtimeScriptPolicy = headers['/runtime-broker.js'];
 for (const [route, policy] of Object.entries(headers)) {
   assert.equal(policy['Cache-Control'], 'no-store', `${route} cache policy`);
   assert.equal(
+    policy['Cross-Origin-Embedder-Policy'],
+    'credentialless',
+    `${route} cross-origin embedder policy`
+  );
+  assert.equal(
     policy['Cross-Origin-Resource-Policy'],
     'cross-origin',
     `${route} cross-origin resource policy`

@@ -1,5 +1,8 @@
-import type { CodeReference, TriggerBinding } from '@prodivix/authoring';
-import type { DataOperationReference } from '@prodivix/data';
+import type {
+  CodeReference,
+  DataOperationReference,
+  TriggerBinding,
+} from '@prodivix/authoring';
 
 export type PIRJsonValue =
   null | boolean | number | string | readonly PIRJsonValue[] | PIRJsonObject;

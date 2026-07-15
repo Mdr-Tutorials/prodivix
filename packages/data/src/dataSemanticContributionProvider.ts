@@ -1,4 +1,8 @@
 import {
+  createDataOperationSymbolId,
+  createDataSchemaSymbolId,
+  createDataSourceScopeId,
+  createDataSourceSymbolId,
   createSemanticId,
   createWorkspaceDocumentScopeId,
   createWorkspaceDocumentSymbolId,
@@ -33,34 +37,12 @@ export type CreateDataSemanticContributionProviderInput = Readonly<{
   documents: readonly DataSemanticDocumentInput[];
 }>;
 
-export const createDataSourceScopeId = (
-  workspaceId: string,
-  documentId: string
-): string => createSemanticId('data-source-scope', workspaceId, documentId);
-
-export const createDataSourceSymbolId = (
-  workspaceId: string,
-  documentId: string
-): string => createSemanticId('data-source-symbol', workspaceId, documentId);
-
-export const createDataSchemaSymbolId = (
-  workspaceId: string,
-  documentId: string,
-  schemaId: string
-): string =>
-  createSemanticId('data-schema-symbol', workspaceId, documentId, schemaId);
-
-export const createDataOperationSymbolId = (
-  workspaceId: string,
-  documentId: string,
-  operationId: string
-): string =>
-  createSemanticId(
-    'data-operation-symbol',
-    workspaceId,
-    documentId,
-    operationId
-  );
+export {
+  createDataOperationSymbolId,
+  createDataSchemaSymbolId,
+  createDataSourceScopeId,
+  createDataSourceSymbolId,
+} from '@prodivix/authoring';
 
 type MutableContribution = {
   scopes: WorkspaceScopeContribution[];

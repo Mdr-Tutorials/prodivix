@@ -1,4 +1,3 @@
-import type { DataLifecycleSnapshot } from '@prodivix/data';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type {
@@ -8,6 +7,7 @@ import type {
 import {
   PIR_COLLECTION_DATA_LIFECYCLE_ISSUE_CODES,
   resolvePirCollectionDataLifecycle,
+  type PIRDataOperationLifecycleSnapshot,
 } from './pirCollectionDataLifecycle';
 
 const operation = Object.freeze({
@@ -17,29 +17,21 @@ const operation = Object.freeze({
 const binding: PIRDataOperationBinding = Object.freeze({ operation });
 
 const createSnapshot = (
-  status: DataLifecycleSnapshot['status']
-): DataLifecycleSnapshot => {
-  const invocation = {
-    operation,
-    sequence: 1,
-    invocationId: 'invocation-1',
-    attempt: 1,
-    startedAt: 10,
-  } as const;
+  status: PIRDataOperationLifecycleSnapshot['status']
+): PIRDataOperationLifecycleSnapshot => {
   switch (status) {
     case 'idle':
-      return { operation, sequence: 0, status };
+      return { operation, status };
     case 'loading':
-      return { ...invocation, status };
+      return { operation, status };
     case 'success':
-      return { ...invocation, status, completedAt: 20, value: [] };
+      return { operation, status, value: [] };
     case 'empty':
-      return { ...invocation, status, completedAt: 20 };
+      return { operation, status };
     case 'error':
       return {
-        ...invocation,
+        operation,
         status,
-        completedAt: 20,
         error: { code: 'DATA_FAILED', message: 'Failed', retryable: true },
       };
   }
@@ -49,7 +41,7 @@ describe('PIR Collection data lifecycle properties', () => {
   it('maps every Data lifecycle status without inferring empty from values', () => {
     fc.assert(
       fc.property(
-        fc.constantFrom<DataLifecycleSnapshot['status']>(
+        fc.constantFrom<PIRDataOperationLifecycleSnapshot['status']>(
           'idle',
           'loading',
           'success',
@@ -97,7 +89,6 @@ describe('PIR Collection data lifecycle properties', () => {
       },
       snapshot: {
         operation: { ...operation, operationId: 'other-operation' },
-        sequence: 0,
         status: 'idle',
       },
     });

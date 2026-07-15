@@ -1,11 +1,8 @@
-import type {
-  DataJsonValue,
-  DataLifecycleSnapshot,
-  DataOperationError,
-} from '@prodivix/data';
+import type { DataOperationReference } from '@prodivix/authoring';
 import type {
   PIRCollectionDataLifecycleMapping,
   PIRDataOperationBinding,
+  PIRJsonValue,
 } from '../pir.types';
 import type { PIRCollectionResolvedState } from './pirCollectionProjection';
 
@@ -27,23 +24,39 @@ export type PIRCollectionDataLifecycleResolution =
       status: 'ready';
       state: PIRCollectionResolvedState;
       dataId: string;
-      value?: DataJsonValue;
-      errorValue?: DataOperationError;
+      value?: PIRJsonValue;
+      errorValue?: unknown;
     }>
   | Readonly<{
       status: 'blocked';
       issues: readonly PIRCollectionDataLifecycleIssue[];
     }>;
 
+export type PIRDataOperationLifecycleSnapshot =
+  | Readonly<{
+      operation: DataOperationReference;
+      status: 'idle' | 'loading' | 'empty';
+    }>
+  | Readonly<{
+      operation: DataOperationReference;
+      status: 'success';
+      value: PIRJsonValue;
+    }>
+  | Readonly<{
+      operation: DataOperationReference;
+      status: 'error';
+      error: unknown;
+    }>;
+
 export type ResolvePIRCollectionDataLifecycleInput = Readonly<{
   binding: PIRDataOperationBinding;
   mapping: PIRCollectionDataLifecycleMapping;
-  snapshot: DataLifecycleSnapshot;
+  snapshot: PIRDataOperationLifecycleSnapshot;
 }>;
 
 const sameOperation = (
   left: PIRDataOperationBinding['operation'],
-  right: DataLifecycleSnapshot['operation']
+  right: DataOperationReference
 ): boolean =>
   left.documentId === right.documentId &&
   left.operationId === right.operationId;
@@ -51,8 +64,8 @@ const sameOperation = (
 const ready = (
   dataId: string,
   state: PIRCollectionResolvedState,
-  value?: DataJsonValue,
-  errorValue?: DataOperationError
+  value?: PIRJsonValue,
+  errorValue?: unknown
 ): PIRCollectionDataLifecycleResolution =>
   Object.freeze({
     status: 'ready',

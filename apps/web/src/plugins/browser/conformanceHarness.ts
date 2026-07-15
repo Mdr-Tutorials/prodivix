@@ -284,7 +284,9 @@ const runUi: ConformanceApi['runUi'] = ({ sandboxUrl }) => {
   iframe.sandbox.add('allow-scripts');
   iframe.referrerPolicy = 'no-referrer';
   iframe.setAttribute('allow', '');
-  iframe.setAttribute('credentialless', '');
+  if ('credentialless' in iframe) {
+    iframe.setAttribute('credentialless', '');
+  }
   const source = new URL(sandboxUrl);
   source.hash = new URLSearchParams({ nonce }).toString();
   iframe.src = source.href;

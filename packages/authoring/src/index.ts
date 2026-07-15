@@ -7,6 +7,7 @@ export * from './codeRefactorImpact';
 export * from './codeArtifactLifecycle';
 export * from './compile';
 export * from './controlledSource';
+export type { DataOperationReference } from './dataOperationReference';
 export { COD_DIAGNOSTIC_DEFINITIONS } from './diagnostics/codeDiagnosticRegistry';
 export { SEM_DIAGNOSTIC_DEFINITIONS } from './diagnostics/semanticDiagnosticRegistry';
 export * from './language';

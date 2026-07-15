@@ -29,7 +29,6 @@
   },
   "dependencies": {
     "@prodivix/authoring": "workspace:*",
-    "@prodivix/data": "workspace:*",
     "@prodivix/diagnostics": "workspace:*"
   },
   "devDependencies": {

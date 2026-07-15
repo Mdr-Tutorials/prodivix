@@ -121,7 +121,9 @@ const startSandbox = <TMap extends HostContributionPointMap>(
     iframe.referrerPolicy = 'no-referrer';
     iframe.sandbox.add('allow-scripts');
     iframe.setAttribute('allow', '');
-    iframe.setAttribute('credentialless', '');
+    if ('credentialless' in iframe) {
+      iframe.setAttribute('credentialless', '');
+    }
     iframe.src = url.href;
     let settled = false;
 

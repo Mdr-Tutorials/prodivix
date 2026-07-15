@@ -10,6 +10,7 @@ on:
       - 'packages/shared/**'
       - 'packages/themes/**'
       - 'packages/ui/**'
+      - 'packages/plugin-contracts/src/diagnostics.ts'
       - 'specs/diagnostics/**'
       - 'scripts/generate-diagnostic-docs.mjs'
       - 'package.json'

@@ -1,5 +1,6 @@
 import {
   createComponentSymbolId,
+  createDataOperationSymbolId,
   createPirNodeScopeId,
   createPirNodeSymbolId,
   createPirDataSymbolId,
@@ -10,7 +11,6 @@ import {
   createWorkspaceDocumentSymbolId,
   type WorkspaceDependencyContribution,
 } from '@prodivix/authoring';
-import { createDataOperationSymbolId } from '@prodivix/data';
 import type { PIRDocument } from '../pir.types';
 import { createPirInstanceSlotScopes } from '../pirBindingValidator';
 import {

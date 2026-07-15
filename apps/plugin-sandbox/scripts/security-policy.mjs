@@ -35,6 +35,7 @@ const permissionsPolicy = [
 
 const sharedHeaders = Object.freeze({
   'Cache-Control': 'no-store',
+  'Cross-Origin-Embedder-Policy': 'credentialless',
   'Cross-Origin-Resource-Policy': 'cross-origin',
   'Permissions-Policy': permissionsPolicy,
   'Referrer-Policy': 'no-referrer',

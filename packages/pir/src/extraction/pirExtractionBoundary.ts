@@ -387,8 +387,16 @@ export const createPirExtractionBoundaryAnalyzer = (
     occurrence: PIRExtractionOccurrence
   ): void => {
     let targetId: string | undefined;
-    if (value.kind === 'data' && context.subtreeNodeIds.has(value.dataId)) {
-      targetId = value.dataId;
+    if (value.kind === 'data') {
+      const owner = context.document.ui.graph.nodesById[value.dataId];
+      if (
+        !context.document.logic?.dataById?.[value.dataId] &&
+        owner?.kind === 'element' &&
+        owner.data &&
+        context.subtreeNodeIds.has(value.dataId)
+      ) {
+        targetId = value.dataId;
+      }
     } else if (value.kind === 'collection-symbol') {
       const owner = context.collectionSymbolOwners.get(value.symbolId);
       if (owner && context.subtreeNodeIds.has(owner.nodeId)) {

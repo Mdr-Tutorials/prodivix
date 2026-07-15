@@ -159,6 +159,9 @@ test.describe('plugin sandbox production conformance', () => {
     expect(runtime.ok()).toBe(true);
     expect(runtime.headers()['set-cookie']).toBeUndefined();
     expect(runtime.headers()['cache-control']).toBe('no-store');
+    expect(runtime.headers()['cross-origin-embedder-policy']).toBe(
+      'credentialless'
+    );
     expect(runtime.headers()['cross-origin-resource-policy']).toBe(
       'cross-origin'
     );
@@ -171,6 +174,9 @@ test.describe('plugin sandbox production conformance', () => {
     expect(runtime.headers()['permissions-policy']).toContain('geolocation=()');
     expect(ui.headers()['content-security-policy']).toContain(
       "worker-src 'none'"
+    );
+    expect(ui.headers()['cross-origin-embedder-policy']).toBe(
+      'credentialless'
     );
     expect(ui.headers()['referrer-policy']).toBe('no-referrer');
     const runtimeScript = await request.get(

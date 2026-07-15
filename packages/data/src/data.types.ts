@@ -3,6 +3,7 @@ import type {
   RuntimeZone,
   SecretRef,
 } from '@prodivix/runtime-core';
+import type { DataOperationReference as AuthoringDataOperationReference } from '@prodivix/authoring';
 
 export const DATA_SOURCE_WIRE_VERSION = 1 as const;
 export const DATA_DOCUMENT_ISSUE_CODES = Object.freeze({
@@ -83,10 +84,7 @@ export const DATA_OPERATION_KINDS = Object.freeze([
 ] as const);
 export type DataOperationKind = (typeof DATA_OPERATION_KINDS)[number];
 
-export type DataOperationReference = Readonly<{
-  documentId: string;
-  operationId: string;
-}>;
+export type DataOperationReference = AuthoringDataOperationReference;
 
 export type DataCachePolicy = Readonly<{
   strategy:

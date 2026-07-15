@@ -325,7 +325,7 @@ describe('Workspace Component extraction transaction properties', () => {
     );
   });
 
-  it('blocks unsafe route and external incoming references without changing the source', () => {
+  it('rejects unsafe routes and lexically invalid incoming data without changing the source', () => {
     fc.assert(
       fc.property(
         fc.constantFrom<'route' | 'incoming'>('route', 'incoming'),
@@ -351,7 +351,7 @@ describe('Workspace Component extraction transaction properties', () => {
           expect(result.issues.map(({ code }) => code)).toContain(
             unsafeBoundary === 'route'
               ? WORKSPACE_COMPONENT_EXTRACTION_TRANSACTION_ISSUE_CODES.referenceAnalysisBlocked
-              : WORKSPACE_COMPONENT_EXTRACTION_TRANSACTION_ISSUE_CODES.pirAnalysisBlocked
+              : WORKSPACE_COMPONENT_EXTRACTION_TRANSACTION_ISSUE_CODES.sourceInvalid
           );
           expect(workspace).toEqual(before);
           expect(workspace.docsById[`component-${suffix}`]).toBeUndefined();

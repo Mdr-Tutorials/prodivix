@@ -13,6 +13,10 @@ const assertSharedHeaders = (response, route) => {
   assert.equal(response.status, 200, `${route} must return 200`);
   assert.equal(response.headers.get('cache-control'), 'no-store');
   assert.equal(
+    response.headers.get('cross-origin-embedder-policy'),
+    'credentialless'
+  );
+  assert.equal(
     response.headers.get('cross-origin-resource-policy'),
     'cross-origin'
   );
