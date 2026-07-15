@@ -358,7 +358,7 @@ describe('applyWorkspaceCommand', () => {
     );
   });
 
-  it('selects the document patch whitelist from document.type, not domainHint', () => {
+  it('selects the document patch whitelist from document.type', () => {
     const workspace = createWorkspace();
     workspace.docsById['page-home'] = {
       ...workspace.docsById['page-home'],
@@ -373,7 +373,8 @@ describe('applyWorkspaceCommand', () => {
     const result = applyWorkspaceCommand(
       workspace,
       createCommand({
-        domainHint: 'pir',
+        namespace: 'core.nodegraph',
+        domainHint: 'nodegraph',
         forwardOps: [
           {
             op: 'add',
@@ -406,7 +407,7 @@ describe('applyWorkspaceCommand', () => {
     expect(result.ok).toBe(false);
   });
 
-  it('does not let a domainHint bypass the actual document type', () => {
+  it('rejects a domainHint that contradicts the actual document type', () => {
     const result = applyWorkspaceCommand(
       createWorkspace(),
       createCommand({
@@ -425,8 +426,11 @@ describe('applyWorkspaceCommand', () => {
 
     expect(result.ok).toBe(false);
     if (result.ok !== false) return;
-    expect(result.issues.map((issue) => issue.code)).toContain(
-      'WKS_COMMAND_PATCH_PATH_FORBIDDEN'
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        code: 'WKS_COMMAND_INVALID_ENVELOPE',
+        path: '/domainHint',
+      })
     );
   });
 

@@ -21,6 +21,7 @@ export const PRODIVIX_DIAGNOSTIC_DOMAINS = [
   'code',
   'nodegraph',
   'animation',
+  'data',
   'codegen',
   'backend',
   'semantic',

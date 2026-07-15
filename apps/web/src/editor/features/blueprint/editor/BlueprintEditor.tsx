@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { DndContext, DragOverlay } from '@dnd-kit/core';
 import { ChevronRight, SlidersHorizontal } from 'lucide-react';
 import {
@@ -10,6 +10,11 @@ import {
   selectWorkspaceId,
   useEditorStore,
 } from '@/editor/store/useEditorStore';
+import {
+  ExecutionCenter,
+  executionSessionCoordinator,
+  useExecutionSession,
+} from '@/editor/features/execution';
 import { BlueprintAssistantPanel } from './assistant';
 import { BlueprintEditorAddressBar } from './addressBar';
 import { resolveBlueprintEntryDocumentId } from './authoring/blueprintEntryDocument';
@@ -18,6 +23,7 @@ import { BlueprintEditorCanvas } from './canvas';
 import { BlueprintEditorComponentTree } from './componentTree';
 import { useBlueprintEditorController } from './controller';
 import { BlueprintEditorInspector } from './inspector/BlueprintEditorInspector';
+import { resolveProjectPreviewUrl, useBlueprintProjectRunner } from './runner';
 import { BlueprintEditorSaveIndicator } from './saveIndicator';
 import { BlueprintEditorSidebar } from './sidebar';
 import { BlueprintEditorViewportBar } from './viewportBar';
@@ -107,6 +113,34 @@ export function BlueprintEditor({
     controller.entryDocumentId &&
     controller.entry?.status === 'valid'
   );
+  const isRunMode = canvas.canvasMode === 'run';
+  const projectRunner = useBlueprintProjectRunner(
+    controller.workspace,
+    canAuthor && isRunMode
+  );
+  const projectExecutionSession = useExecutionSession(projectRunner.sessionId);
+  const visibleExecutionSessionId = isRunMode
+    ? projectRunner.sessionId
+    : (controller.executionSessionId ??
+      (projectExecutionSession ? projectRunner.sessionId : undefined));
+  const visibleExecutionSession = useExecutionSession(
+    visibleExecutionSessionId ?? 'execution:unavailable'
+  );
+  const showingProjectExecution =
+    visibleExecutionSessionId === projectRunner.sessionId;
+  const projectPreviewUrl = useMemo(
+    () =>
+      projectRunner.state.previewUrl
+        ? resolveProjectPreviewUrl(
+            projectRunner.state.previewUrl,
+            addressBar.currentPath
+          )
+        : undefined,
+    [addressBar.currentPath, projectRunner.state.previewUrl]
+  );
+  const showExecutionCenter = Boolean(
+    controller.workspace && (isRunMode || visibleExecutionSession)
+  );
 
   useEffect(() => {
     if (
@@ -144,6 +178,10 @@ export function BlueprintEditor({
     priority: 20,
   });
   useEditorShortcut('Ctrl+Alt+I', viewportBar.onToggleInteractionMode, {
+    scope: 'blueprint',
+    priority: 20,
+  });
+  useEditorShortcut('Ctrl+Alt+R', viewportBar.onToggleRunMode, {
     scope: 'blueprint',
     priority: 20,
   });
@@ -253,7 +291,12 @@ export function BlueprintEditor({
               entryDocumentId={controller.entryDocumentId}
               rendererHost={controller.rendererHost}
               currentPath={addressBar.currentPath}
-              interactionMode={canvas.interactionMode}
+              canvasMode={canvas.canvasMode}
+              projectRunner={{
+                state: projectRunner.state,
+                frameRevision: projectRunner.frameRevision,
+                onRetry: projectRunner.retry,
+              }}
               viewportWidth={canvas.viewportWidth}
               viewportHeight={canvas.viewportHeight}
               zoom={canvas.zoom}
@@ -325,9 +368,59 @@ export function BlueprintEditor({
           ) : null}
         </DragOverlay>
       </DndContext>
+      {showExecutionCenter ? (
+        <ExecutionCenter
+          sessionId={visibleExecutionSessionId ?? projectRunner.sessionId}
+          status={
+            showingProjectExecution && isRunMode
+              ? projectRunner.state.status
+              : undefined
+          }
+          previewUrl={showingProjectExecution ? projectPreviewUrl : undefined}
+          diagnostics={
+            showingProjectExecution && isRunMode
+              ? projectRunner.state.diagnostics
+              : undefined
+          }
+          onRestart={
+            showingProjectExecution
+              ? () => {
+                  viewportBar.onCanvasModeChange('run');
+                  projectRunner.retry();
+                }
+              : undefined
+          }
+          onStop={
+            showingProjectExecution
+              ? () => void projectRunner.stop()
+              : visibleExecutionSessionId
+                ? () =>
+                    void executionSessionCoordinator.cancel(
+                      visibleExecutionSessionId,
+                      { reason: 'Execution stopped by the user.' }
+                    )
+                : undefined
+          }
+          onReloadPreview={
+            showingProjectExecution ? projectRunner.reloadPreview : undefined
+          }
+          onOpenPreview={
+            showingProjectExecution
+              ? () => {
+                  if (!projectPreviewUrl) return;
+                  window.open(
+                    projectPreviewUrl,
+                    '_blank',
+                    'noopener,noreferrer'
+                  );
+                }
+              : undefined
+          }
+        />
+      ) : null}
       <BlueprintEditorViewportBar
-        interactionMode={viewportBar.interactionMode}
-        onInteractionModeChange={viewportBar.onInteractionModeChange}
+        canvasMode={viewportBar.canvasMode}
+        onCanvasModeChange={viewportBar.onCanvasModeChange}
         viewportWidth={viewportBar.viewportWidth}
         viewportHeight={viewportBar.viewportHeight}
         onViewportWidthChange={viewportBar.onViewportWidthChange}

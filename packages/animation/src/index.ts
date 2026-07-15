@@ -34,9 +34,22 @@ export {
 export {
   evaluateAnimationFrame,
   evaluateAnimationTimelineAtCursor,
+  isSupportedAnimationEasing,
   resolveKeyframedValue,
   resolveTimelineCursorMs,
 } from './animationEvaluation';
+export {
+  ANIMATION_EFFECT_CAPABILITIES,
+  getAnimationTimelineTotalDurationMs,
+  getAnimationTrackEffectCapability,
+} from './animationRuntime';
+export { startAnimationPlayback } from './animationPlayback';
+export {
+  ANIMATION_EXECUTION_PROVIDER_ID,
+  createAnimationExecutionInvocationInput,
+  createAnimationExecutionProvider,
+  readAnimationExecutionJobOutput,
+} from './animationExecutionProvider';
 export {
   ANIMATION_SEMANTIC_PROVIDER_DESCRIPTOR,
   createAnimationSemanticContributionProvider,
@@ -68,6 +81,27 @@ export type {
   SvgFilterDefinition,
   SvgFilterPrimitive,
 } from './animation.types';
+export type {
+  AnimationEffectCapability,
+  AnimationEffectHost,
+  AnimationEffectHostDescriptor,
+  AnimationEffectLease,
+  AnimationEffectLeaseOutcome,
+  AnimationEffectTarget,
+  AnimationFrameScheduler,
+  AnimationPlayback,
+  AnimationPlaybackResult,
+  AnimationRuntimeContributor,
+  AnimationRuntimeFrame,
+  AnimationRuntimePort,
+} from './animationRuntime';
+export type { StartAnimationPlaybackInput } from './animationPlayback';
+export type {
+  AnimationExecutionJobOutput,
+  CreateAnimationExecutionProviderOptions,
+  ResolveAnimationExecutionDocument,
+  ResolveAnimationExecutionRuntime,
+} from './animationExecutionProvider';
 export type {
   AnimationValidationCode,
   AnimationValidationIssue,

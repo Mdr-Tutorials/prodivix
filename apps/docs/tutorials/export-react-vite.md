@@ -45,8 +45,8 @@ pnpm verify:g1:browser
 ## 当前限制
 
 - React/Vite 是当前唯一完成 Golden Gate 的生产 target。
-- Test 与 Deployment 产品表面尚未完成。
-- Data/API runtime、SecretRef 和真实 Runner 尚未交付。
+- Workspace Test 页面已可通过独立 Browser Test provider 运行当前 React/Vite snapshot 并展示 canonical test report；这不等同于 G3 VerificationEvidence。
+- Browser Project Runner 与共享 Runtime Host 已可运行当前 snapshot；Data/API 作者态和 reference-only environment/Secret contract 已建立，但 Data runtime、Secret resolution、Remote Runner 与 Deployment 产品面继续按各自 Gate 建设。
 - 其他框架 target 必须通过自己的 parity 与独立构建 Gate 后才会标记为可用。
 
 架构说明见[Preview 与 Export](/concepts/preview-and-export)和[测试与产品 Gate](/developer/testing-and-gates)。

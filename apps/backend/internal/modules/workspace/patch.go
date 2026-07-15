@@ -25,6 +25,9 @@ func applyWorkspaceDocumentPatch(documentType WorkspaceDocumentType, content jso
 	if documentType == WorkspaceDocumentTypeCode {
 		return applyWorkspacePatchWithValidator(content, ops, validateWorkspaceCodePatchPath)
 	}
+	if documentType == WorkspaceDocumentTypeDataSource {
+		return applyWorkspacePatchWithValidator(content, ops, validateWorkspaceDataSourcePatchPath)
+	}
 	if documentType == WorkspaceDocumentTypePIRGraph {
 		return applyWorkspacePatchWithValidator(content, ops, validateWorkspaceNodeGraphPatchPath)
 	}
@@ -41,6 +44,10 @@ func applyWorkspaceDocumentPatch(documentType WorkspaceDocumentType, content jso
 		return applyWorkspacePatchWithValidator(content, ops, validateGenericWorkspaceDocumentPatchPath)
 	}
 	return applyWorkspacePatch(content, ops)
+}
+
+func validateWorkspaceDataSourcePatchPath(path string) error {
+	return validateWorkspaceDocumentRootPath(path, "source", "schemasById", "operationsById")
 }
 
 func validateWorkspaceAssetPatchPath(path string) error {

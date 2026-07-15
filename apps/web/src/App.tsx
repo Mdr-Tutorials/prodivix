@@ -32,6 +32,9 @@ const ProjectResources = lazy(() =>
 const CodeAuthoringPage = lazy(
   () => import('./editor/features/code/CodeAuthoringPage')
 );
+const ProjectTestingPage = lazy(
+  () => import('./editor/features/testing/ProjectTestingPage')
+);
 const EditorSettingsPage = lazy(() =>
   import('./editor/features/settings/EditorSettingsPage').then((module) => ({
     default: module.EditorSettingsPage,
@@ -110,7 +113,7 @@ export const createRoutes = (t: TFunction) => [
           },
           {
             path: 'test',
-            element: <div>{t('testing', 'testing', { ns: 'routes' })}</div>,
+            element: withEditorSuspense(<ProjectTestingPage />),
           },
           {
             path: 'export',

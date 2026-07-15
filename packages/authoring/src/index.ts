@@ -2,6 +2,7 @@ export { createAuthoringDiagnosticProviderRegistry } from './authoringDiagnostic
 export { createCodeArtifactProviderRegistry } from './codeArtifactProviderRegistry';
 export { createCodeSlotRegistry } from './codeSlotRegistry';
 export { queryCodeSlotSemanticRelations } from './codeSlotSemanticRelations';
+export * from './codeAuthoring';
 export * from './codeRefactorImpact';
 export * from './codeArtifactLifecycle';
 export * from './compile';

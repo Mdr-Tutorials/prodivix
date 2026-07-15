@@ -20,7 +20,7 @@ import type {
   PIRRendererBlockingIssue,
   PIRTriggerDispatchRequest,
 } from '@prodivix/pir-react-renderer';
-import { executeNodeGraphAction } from '@prodivix/runtime-browser';
+import { readNodeGraphExecutionJobOutput } from '@prodivix/nodegraph';
 import {
   composeRouteManifestWithModules,
   flattenRouteManifest,
@@ -40,6 +40,7 @@ import {
   openWorkspaceCodeArtifact,
   openWorkspaceCodeSlotDefinition,
 } from '@/editor/features/code';
+import { startWorkspaceNodeGraphExecution } from '@/editor/features/execution';
 import {
   navigateToWorkspaceSemanticTarget,
   resolveWorkspaceSemanticIndex,
@@ -58,6 +59,7 @@ import {
 import { createPirWebRendererHost } from '@/pir/pirWebRendererHost';
 import { applyPaletteItemInsertion } from '../model/paletteCreation';
 import type { PaletteItemSelection } from '../model/paletteCreation';
+import type { BlueprintCanvasMode } from '../canvas/canvasTypes';
 import type { BlueprintCompositionIssue } from '../model/composition';
 import type { RouteItem } from '../model/types';
 import {
@@ -186,8 +188,13 @@ export const useBlueprintEditorController = (
   const extensions = useWebExtensionRegistrySnapshot();
   const rendererHost = useMemo(
     () =>
-      createPirWebRendererHost(createRendererProjectionRegistry(extensions)),
-    [extensions]
+      createPirWebRendererHost(
+        createRendererProjectionRegistry(extensions),
+        resolvedBlueprintState.canvasMode === 'design'
+          ? 'design'
+          : 'interactive'
+      ),
+    [extensions, resolvedBlueprintState.canvasMode]
   );
   const officialPluginRuntime = useBundledOfficialPluginRuntime(
     entry?.status === 'valid' ? entry.decodedContent : undefined
@@ -204,6 +211,7 @@ export const useBlueprintEditorController = (
     readonly PIRRendererBlockingIssue[]
   >([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [executionSessionId, setExecutionSessionId] = useState<string>();
   const [isLibraryCollapsed, setLibraryCollapsed] = useState(
     () => panelLayout === 'focus'
   );
@@ -227,6 +235,10 @@ export const useBlueprintEditorController = (
   const [collectionPreviewByLocation, setCollectionPreviewByLocation] =
     useState<Readonly<Record<string, PIRCollectionPreviewInput>>>({});
   const [extractionOpen, setExtractionOpen] = useState(false);
+
+  useEffect(() => {
+    setExecutionSessionId(undefined);
+  }, [workspace?.id]);
 
   useEffect(() => {
     if (!blueprintState) {
@@ -608,7 +620,10 @@ export const useBlueprintEditorController = (
   };
 
   const dragDrop = useBlueprintCanonicalDragDrop({
-    workspace: workspace ?? undefined,
+    workspace:
+      resolvedBlueprintState.canvasMode === 'design'
+        ? (workspace ?? undefined)
+        : undefined,
     selectedLocation: selection,
     rootLocation,
     onInsertPaletteItem: (itemId, itemSelection, target, placement) => {
@@ -699,6 +714,7 @@ export const useBlueprintEditorController = (
       workspace,
       artifactId,
       presentation: 'maximized',
+      origin: { surface: 'blueprint-canvas' },
     });
     if (result.status === 'unavailable') {
       setStatusMessage('The referenced CodeArtifact is unavailable.');
@@ -710,6 +726,7 @@ export const useBlueprintEditorController = (
     const result = openWorkspaceCodeSlotDefinition({
       workspace,
       slotId,
+      origin: { surface: 'blueprint-canvas' },
     });
     if (result.status === 'unavailable') {
       setStatusMessage('The CodeSlot definition is unavailable.');
@@ -738,26 +755,41 @@ export const useBlueprintEditorController = (
         );
         return;
       }
-      void executeNodeGraphAction(document.content, {
+      if (!workspace) return;
+      void startWorkspaceNodeGraphExecution({
+        workspace,
         documentId: document.id,
-        nodeId: request.source.nodeId,
-        trigger: 'pir-event',
-        eventKey: request.source.instancePath,
+        source: {
+          ownerId: request.source.nodeId,
+          trigger: 'pir-event',
+          eventKey: request.source.instancePath,
+        },
         params:
           trigger.inputMapping && typeof trigger.inputMapping === 'object'
             ? (trigger.inputMapping as Record<string, unknown>)
             : undefined,
         input: request.payload,
-      }).then((result) => {
-        if (Object.keys(result.statePatch).length > 0) {
-          patchRuntimeState(blueprintKey, result.statePatch);
-        }
-        if (result.status !== 'completed') {
+      })
+        .then(({ job, sessionId }) => {
+          setExecutionSessionId(sessionId);
+          return job.completion;
+        })
+        .then((result) => {
+          const output = readNodeGraphExecutionJobOutput(result);
+          if (output && Object.keys(output.statePatch).length > 0) {
+            patchRuntimeState(blueprintKey, output.statePatch);
+          }
+          if (result.status === 'failed') {
+            setStatusMessage(result.failure.message);
+          } else if (result.status === 'timed-out') {
+            setStatusMessage('NodeGraph execution timed out.');
+          }
+        })
+        .catch((error: unknown) => {
           setStatusMessage(
-            `NodeGraph execution stopped with status ${result.status}.`
+            error instanceof Error ? error.message : String(error)
           );
-        }
-      });
+        });
       return;
     }
     if (trigger.kind === 'play-animation') {
@@ -839,6 +871,7 @@ export const useBlueprintEditorController = (
     readonly,
     rootLocation,
     statusMessage,
+    executionSessionId,
     dismissStatusMessage: () => setStatusMessage(null),
     officialPluginRuntime,
     extraction: {
@@ -932,7 +965,7 @@ export const useBlueprintEditorController = (
       onOpenRoutePath: setPreviewPath,
     },
     canvas: {
-      interactionMode: resolvedBlueprintState.interactionMode,
+      canvasMode: resolvedBlueprintState.canvasMode,
       viewportWidth: resolvedBlueprintState.viewportWidth,
       viewportHeight: resolvedBlueprintState.viewportHeight,
       zoom: resolvedBlueprintState.zoom,
@@ -1001,15 +1034,20 @@ export const useBlueprintEditorController = (
       onStatus: setStatusMessage,
     },
     viewportBar: {
-      interactionMode: resolvedBlueprintState.interactionMode,
-      onInteractionModeChange: (interactionMode: 'design' | 'interactive') =>
-        setBlueprintState(blueprintKey, { interactionMode }),
+      canvasMode: resolvedBlueprintState.canvasMode,
+      onCanvasModeChange: (canvasMode: BlueprintCanvasMode) =>
+        setBlueprintState(blueprintKey, { canvasMode }),
       onToggleInteractionMode: () =>
         setBlueprintState(blueprintKey, {
-          interactionMode:
-            resolvedBlueprintState.interactionMode === 'design'
+          canvasMode:
+            resolvedBlueprintState.canvasMode === 'design'
               ? 'interactive'
               : 'design',
+        }),
+      onToggleRunMode: () =>
+        setBlueprintState(blueprintKey, {
+          canvasMode:
+            resolvedBlueprintState.canvasMode === 'run' ? 'design' : 'run',
         }),
       viewportWidth: resolvedBlueprintState.viewportWidth,
       viewportHeight: resolvedBlueprintState.viewportHeight,

@@ -1,4 +1,75 @@
 {
+  "execution": {
+    "title": "运行",
+    "expand": "展开运行控制台",
+    "collapse": "收起运行控制台",
+    "restart": "重新运行",
+    "stop": "停止运行",
+    "reloadPreview": "重新加载预览",
+    "openPreview": "在新标签页打开预览",
+    "clear": "清空控制台",
+    "empty": "暂无运行输出。",
+    "eventCount": "{{count}} 条事件",
+    "filter": {
+      "all": "全部",
+      "errors": "错误"
+    },
+    "status": {
+      "idle": "空闲",
+      "compiling": "编译中",
+      "blocked": "已阻止",
+      "queued": "排队中",
+      "starting": "启动中",
+      "running": "运行中",
+      "cancelling": "停止中",
+      "succeeded": "已完成",
+      "failed": "失败",
+      "cancelled": "已停止",
+      "timed-out": "已超时"
+    }
+  },
+  "testing": {
+    "title": "Workspace 测试",
+    "subtitle": "将当前 canonical revision 作为 Prodivix 实际导出的同一份独立 React/Vite 工程运行。",
+    "actions": {
+      "run": "运行测试",
+      "rerun": "再次运行",
+      "stop": "停止",
+      "openCode": "打开代码",
+      "openSource": "打开测试源码"
+    },
+    "summary": {
+      "total": "总计",
+      "files": "文件",
+      "cases": "用例",
+      "passed": "通过",
+      "failed": "失败",
+      "failedFiles": "失败文件：{{count}}",
+      "skipped": "跳过",
+      "todo": "待实现"
+    },
+    "running": {
+      "title": "正在运行 Workspace 测试",
+      "description": "正在准备隔离工程、安装依赖并执行项目测试计划。"
+    },
+    "report": {
+      "title": "最近测试报告",
+      "current": "当前 revision",
+      "outdated": "较早 revision"
+    },
+    "empty": {
+      "title": "尚未运行测试",
+      "description": "针对当前精确 revision 运行导出工程检查和 Workspace 测试文件。"
+    },
+    "blocked": {
+      "title": "测试无法启动",
+      "description": "先处理编译诊断，再重新运行同一 revision。"
+    },
+    "failed": {
+      "title": "测试运行失败",
+      "description": "在运行控制台检查当前执行结果，然后重新运行这个 revision。"
+    }
+  },
   "home": {
     "welcomeTitle": "欢迎回来",
     "actions": {
@@ -105,9 +176,14 @@
       "close": "关闭代码编辑器",
       "openWorkspace": "打开代码工作区",
       "discardTitle": "放弃未保存的代码？",
-      "discardMessage": "此代码文件中尚未保存的修改将被放弃。",
+      "discardMessage": "当前代码作者会话中尚未保存的修改将被放弃。",
       "keepEditing": "继续编辑",
       "discard": "放弃修改"
+    },
+    "session": {
+      "staleDraft": "此草稿打开期间规范代码文件已发生变化。请先协调或放弃草稿，再进行保存。",
+      "discardDraft": "使用规范文件",
+      "returnToRequestedArtifact": "返回最初请求的代码文件"
     }
   },
   "bar": {
@@ -1633,8 +1709,8 @@
     },
     "preview": {
       "jumpToStart": "跳到开头",
-      "pause": "暂停",
       "play": "播放",
+      "stop": "停止",
       "zoomOut": "缩小",
       "zoomIn": "放大",
       "resetZoom": "重置缩放",
@@ -1733,6 +1809,8 @@
     "manager": {
       "title": "节点图",
       "namePlaceholder": "节点图名称",
+      "run": "运行",
+      "stop": "停止",
       "new": "新建",
       "clone": "克隆",
       "delete": "删除"

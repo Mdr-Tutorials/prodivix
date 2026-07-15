@@ -8,10 +8,13 @@ type NodeGraphGraphManagerProps = {
   activeGraphName: string;
   graphDocs: readonly WorkspaceNodeGraphListItem[];
   isBusy?: boolean;
+  isExecuting?: boolean;
   onCreateGraph: () => void;
   onDeleteGraph: () => void;
   onDuplicateGraph: () => void;
   onRenameGraph: (value: string) => void;
+  onRunGraph: () => void;
+  onStopGraph: () => void;
   onSwitchGraph: (graphId: string) => void;
   t: TranslateFn;
 };
@@ -21,10 +24,13 @@ export const NodeGraphGraphManager = ({
   activeGraphName,
   graphDocs,
   isBusy = false,
+  isExecuting = false,
   onCreateGraph,
   onDeleteGraph,
   onDuplicateGraph,
   onRenameGraph,
+  onRunGraph,
+  onStopGraph,
   onSwitchGraph,
   t,
 }: NodeGraphGraphManagerProps) => {
@@ -86,6 +92,15 @@ export const NodeGraphGraphManager = ({
         spellCheck={false}
       />
       <div className="nodegraph-graph-manager__actions">
+        <button
+          type="button"
+          disabled={!activeGraphId || isBusy}
+          onClick={isExecuting ? onStopGraph : onRunGraph}
+        >
+          {isExecuting
+            ? t('nodeGraph.manager.stop', { defaultValue: 'Stop' })
+            : t('nodeGraph.manager.run', { defaultValue: 'Run' })}
+        </button>
         <button type="button" disabled={isBusy} onClick={onCreateGraph}>
           {t('nodeGraph.manager.new', { defaultValue: 'New' })}
         </button>

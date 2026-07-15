@@ -15,7 +15,7 @@ export type BlueprintState = {
   viewportHeight: string;
   zoom: number;
   pan: { x: number; y: number };
-  interactionMode: 'design' | 'interactive';
+  canvasMode: 'design' | 'interactive' | 'run';
   routePreviewPath: string;
   selectedId?: string;
   hiddenNodeIds: string[];
@@ -26,7 +26,7 @@ export const DEFAULT_BLUEPRINT_STATE: BlueprintState = {
   viewportHeight: '900',
   zoom: 100,
   pan: { x: 80, y: 60 },
-  interactionMode: 'design',
+  canvasMode: 'design',
   routePreviewPath: '/',
   selectedId: undefined,
   hiddenNodeIds: [],

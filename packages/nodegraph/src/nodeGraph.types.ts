@@ -119,6 +119,7 @@ export type NodeGraphExecutionResult = {
 export type NodeGraphExecutorOptions = {
   maxSteps?: number;
   registry?: NodeGraphNodeExecutorRegistry;
+  onTrace?: (event: NodeGraphTraceEvent) => void;
 };
 
 export type NodeGraphExecutor = (

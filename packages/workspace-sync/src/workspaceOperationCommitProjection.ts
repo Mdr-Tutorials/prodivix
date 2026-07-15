@@ -49,15 +49,24 @@ const projectWorkspacePatchValue = (
   if (segments?.[0] !== 'docsById' || !segments[1]) return operation;
   const documentId = segments[1];
   if (segments.length === 2 && isWorkspaceDocument(operation.value)) {
-    return isPirWorkspaceDocumentType(operation.value.type)
-      ? { ...operation, value: encodeWorkspaceDocument(operation.value) }
-      : operation;
+    return { ...operation, value: encodeWorkspaceDocument(operation.value) };
   }
 
   if (segments[2] !== 'content') return operation;
   const document = resolveDocument(before, after, documentId);
-  if (!document || !isPirWorkspaceDocumentType(document.type)) {
+  if (!document) {
     return operation;
+  }
+  if (!isPirWorkspaceDocumentType(document.type)) {
+    return segments.length === 3
+      ? {
+          ...operation,
+          value: encodeWorkspaceDocument({
+            ...document,
+            content: operation.value,
+          }).content,
+        }
+      : operation;
   }
   const pirPath =
     segments.length === 3
@@ -86,7 +95,7 @@ const projectCommand = (
   ),
 });
 
-/** Projects a commit DTO; callers must retain the separate domain operation. */
+/** Projects canonical Workspace values into persistence wire values for one commit DTO. */
 export const projectWorkspaceOperationToCommitWire = (
   before: WorkspaceSnapshot,
   after: WorkspaceSnapshot,

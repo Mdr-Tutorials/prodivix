@@ -54,7 +54,8 @@ const createStableIdentityProps = (
 
 const projectElement = (
   input: PIRElementProjectionInput,
-  adapter?: ComponentAdapter
+  adapter: ComponentAdapter | undefined,
+  interactionMode: 'design' | 'interactive'
 ): PIRElementProjectionResult => {
   const adapterResult = adapter?.mapProps?.({
     node: input.node,
@@ -63,7 +64,7 @@ const projectElement = (
     resolvedText: input.resolvedText as ReactNode,
     isSelected: input.selected,
     hasSelectedDescendant: false,
-    interactionMode: 'interactive',
+    interactionMode,
   });
   const identityProps = createStableIdentityProps(input);
   const projectedProps = {
@@ -99,7 +100,8 @@ const projectElement = (
  * independent from PIR wire versions.
  */
 export const createPirWebRendererHost = (
-  registry?: Pick<ComponentRegistry, 'get'>
+  registry?: Pick<ComponentRegistry, 'get'>,
+  interactionMode: 'design' | 'interactive' = 'interactive'
 ): PIRRendererHost =>
   Object.freeze({
     resolveElement(type) {
@@ -110,7 +112,8 @@ export const createPirWebRendererHost = (
           component: registered.component,
           supportsChildren: registered.adapter.supportsChildren,
           isVoid: registered.adapter.isVoid,
-          project: (input) => projectElement(input, registered.adapter),
+          project: (input) =>
+            projectElement(input, registered.adapter, interactionMode),
         };
       }
 
@@ -123,7 +126,7 @@ export const createPirWebRendererHost = (
         component,
         supportsChildren: !VOID_ELEMENTS.has(nativeType),
         isVoid: VOID_ELEMENTS.has(nativeType),
-        project: projectElement,
+        project: (input) => projectElement(input, undefined, interactionMode),
       };
     },
   });

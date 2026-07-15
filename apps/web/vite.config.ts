@@ -5,6 +5,11 @@ import { fileURLToPath } from 'node:url';
 import { createWebResolveAliases } from './config/resolveAliases.ts';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
+const crossOriginIsolationHeaders = {
+  'Cross-Origin-Embedder-Policy': 'credentialless',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+};
+
 export default defineConfig({
   plugins: [
     react(),
@@ -51,5 +56,9 @@ export default defineConfig({
   // },
   server: {
     port: 5173,
+    headers: crossOriginIsolationHeaders,
+  },
+  preview: {
+    headers: crossOriginIsolationHeaders,
   },
 });

@@ -63,7 +63,6 @@ describe('workspace PIR document properties', () => {
           issuedAt: '2026-07-13T00:00:00.000Z',
           namespace: 'core.pir',
           type: 'metadata.update',
-          domainHint: 'pir',
         });
         expect(command).not.toBeNull();
         if (!command) return;

@@ -22,7 +22,7 @@ import {
   normalizeWorkspaceOperationWire,
   type WorkspaceOperationCommitPlanResult,
 } from './workspaceOperationCommitWire';
-import { projectWorkspaceOperationToCommitWire } from './workspaceOperationCommitPirWire';
+import { projectWorkspaceOperationToCommitWire } from './workspaceOperationCommitProjection';
 
 export type {
   WorkspaceOperationCommitDocumentExpectation,

@@ -31,6 +31,16 @@
     "placeholderTitle": "Drop a component",
     "placeholderDescription": "Drag from the library to start building."
   },
+  "runner": {
+    "previewTitle": "Running project preview",
+    "preparingTitle": "Preparing project runner",
+    "preparingDescription": "Compiling the Workspace and starting an isolated browser runtime.",
+    "failedTitle": "Project runner unavailable",
+    "stoppedTitle": "Project runner stopped",
+    "start": "Start",
+    "retry": "Retry",
+    "updating": "Updating project preview…"
+  },
   "assistant": {
     "title": "AI Assistant",
     "expand": "Expand AI assistant",
@@ -585,7 +595,9 @@
       "design": "Design",
       "designTitle": "Design mode (Ctrl+Alt+I)",
       "interactive": "Interact",
-      "interactiveTitle": "Interactive mode (Ctrl+Alt+I)"
+      "interactiveTitle": "Interactive mode (Ctrl+Alt+I)",
+      "run": "Run",
+      "runTitle": "Run project (Ctrl+Alt+R)"
     },
     "routeDebug": {
       "label": "Debug",

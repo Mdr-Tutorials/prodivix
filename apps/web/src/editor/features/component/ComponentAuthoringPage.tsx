@@ -45,6 +45,10 @@ const ownerLabel = (ownerRef: DiagnosticTargetRef): string => {
       return `Animation · ${ownerRef.documentId}/${ownerRef.timelineId}`;
     case 'animation-track':
       return `Animation · ${ownerRef.documentId}/${ownerRef.trackId}`;
+    case 'data-source':
+      return `Data source · ${ownerRef.documentId}`;
+    case 'data-operation':
+      return `Data operation · ${ownerRef.documentId}/${ownerRef.operationId}`;
     case 'operation':
       return `Operation · ${ownerRef.operation}`;
     case 'theme-token':

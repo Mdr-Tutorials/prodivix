@@ -70,6 +70,59 @@ export const useAnimationEditorState = ({
   const suppressNextPersistenceRef = useRef(false);
   const persistenceChainRef = useRef(Promise.resolve());
 
+  const scheduleAnimationPersistence = useCallback(
+    (
+      nextAnimation: AnimationDefinition,
+      nextSignature: string
+    ): Promise<boolean> => {
+      const execution = persistenceChainRef.current.then(async () => {
+        const state = useEditorStore.getState();
+        const currentWorkspace = state.workspace;
+        if (!currentWorkspace) return false;
+        const document = selectWorkspaceAnimationDocument(
+          currentWorkspace,
+          animationDocumentId
+        );
+        if (document?.status !== 'valid') return false;
+        const existingSignature = serializeAnimationDefinition(
+          document.decodedContent
+        );
+        if (existingSignature === nextSignature) return true;
+        const command = createWorkspaceAnimationDocumentUpdateCommand({
+          workspace: currentWorkspace,
+          documentId: animationDocumentId,
+          after: nextAnimation,
+          commandId: createWorkspaceClientOperationId('animation'),
+          mergeKey: 'animation-definition',
+          label: 'Update animation',
+        });
+        if (!command) return false;
+        const outcome = await dispatchWorkspaceAuthoringOperation({
+          workspace: currentWorkspace,
+          readonly: state.workspaceReadonly,
+          operation: { kind: 'command', command },
+        });
+        if (outcome.status === 'rejected') {
+          console.warn(
+            '[animation] workspace operation rejected',
+            outcome.message
+          );
+          return false;
+        }
+        return true;
+      });
+      persistenceChainRef.current = execution.then(
+        () => undefined,
+        () => undefined
+      );
+      return execution.catch((error: unknown) => {
+        console.warn('[animation] workspace operation failed', error);
+        return false;
+      });
+    },
+    [animationDocumentId]
+  );
+
   useEffect(() => {
     currentSignatureRef.current = currentSignature;
   }, [currentSignature]);
@@ -99,45 +152,29 @@ export const useAnimationEditorState = ({
     }
     if (currentSignature === committedSignatureRef.current) return;
     committedSignatureRef.current = currentSignature;
-    persistenceChainRef.current = persistenceChainRef.current
-      .then(async () => {
-        const state = useEditorStore.getState();
-        const workspace = state.workspace;
-        if (!workspace) return;
-        const document = selectWorkspaceAnimationDocument(
-          workspace,
-          animationDocumentId
-        );
-        if (document?.status !== 'valid') return;
-        const existingSignature = serializeAnimationDefinition(
-          document.decodedContent
-        );
-        if (existingSignature === currentSignature) return;
-        const command = createWorkspaceAnimationDocumentUpdateCommand({
-          workspace,
-          documentId: animationDocumentId,
-          after: animation,
-          commandId: createWorkspaceClientOperationId('animation'),
-          mergeKey: 'animation-definition',
-          label: 'Update animation',
-        });
-        if (!command) return;
-        const outcome = await dispatchWorkspaceAuthoringOperation({
-          workspace,
-          readonly: state.workspaceReadonly,
-          operation: { kind: 'command', command },
-        });
-        if (outcome.status === 'rejected') {
-          console.warn(
-            '[animation] workspace operation rejected',
-            outcome.message
-          );
-        }
-      })
-      .catch((error: unknown) => {
-        console.warn('[animation] workspace operation failed', error);
-      });
-  }, [animation, animationDocumentId, currentSignature, workspaceReadonly]);
+    void scheduleAnimationPersistence(animation, currentSignature);
+  }, [
+    animation,
+    currentSignature,
+    scheduleAnimationPersistence,
+    workspaceReadonly,
+  ]);
+
+  const flushPendingPersistence = useCallback(async (): Promise<boolean> => {
+    const signature = serializeAnimationDefinition(animation);
+    const persisted = await scheduleAnimationPersistence(animation, signature);
+    await persistenceChainRef.current;
+    if (!persisted) return false;
+    const currentWorkspace = useEditorStore.getState().workspace;
+    const current = selectWorkspaceAnimationDocument(
+      currentWorkspace,
+      animationDocumentId
+    );
+    return (
+      current?.status === 'valid' &&
+      serializeAnimationDefinition(current.decodedContent) === signature
+    );
+  }, [animation, animationDocumentId, scheduleAnimationPersistence]);
 
   const activeTimelineId = resolveActiveTimelineId(animation);
   const activeTimeline = useMemo(
@@ -1203,5 +1240,6 @@ export const useAnimationEditorState = ({
     updateSvgPrimitiveType,
     activeTimelineDisplayName,
     canRemoveSvgFilter,
+    flushPendingPersistence,
   };
 };

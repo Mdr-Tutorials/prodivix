@@ -1,21 +1,12 @@
 import type { CodeArtifactLanguage } from '@prodivix/authoring';
 import type { WorkspaceRouteManifest } from '@prodivix/router';
+import type { WorkspaceDocumentType } from './workspaceContractRegistry';
+
+export type { WorkspaceDocumentType } from './workspaceContractRegistry';
 
 export type WorkspaceId = string;
 export type WorkspaceDocumentId = string;
 export type WorkspaceVfsNodeId = string;
-
-export type WorkspaceDocumentType =
-  | 'pir-page'
-  | 'pir-layout'
-  | 'pir-component'
-  | 'pir-graph'
-  | 'pir-animation'
-  | 'design-tokens'
-  | 'design-token-resolver'
-  | 'code'
-  | 'asset'
-  | 'project-config';
 
 export type WorkspaceDocument = {
   id: WorkspaceDocumentId;

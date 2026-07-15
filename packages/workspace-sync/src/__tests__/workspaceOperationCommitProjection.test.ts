@@ -4,7 +4,7 @@ import type {
   WorkspaceDocument,
   WorkspaceOperation,
 } from '@prodivix/workspace';
-import { projectWorkspaceOperationToCommitWire } from '../workspaceOperationCommitPirWire';
+import { projectWorkspaceOperationToCommitWire } from '../workspaceOperationCommitProjection';
 import { createWorkspaceOutboxEntry } from '../workspaceOutbox';
 import { createPirContent, createWorkspace } from './testWorkspace';
 
@@ -38,7 +38,7 @@ const graphCommand = (): WorkspaceCommandEnvelope => {
   };
 };
 
-describe('PIR Atomic Commit wire projection', () => {
+describe('Workspace Atomic Commit wire projection', () => {
   it('keeps outbox operations domain-canonical and exact requests wire-canonical', () => {
     const workspace = createWorkspace();
     const operation: WorkspaceOperation = {
@@ -115,6 +115,70 @@ describe('PIR Atomic Commit wire projection', () => {
 
     expect(document.content).not.toHaveProperty('version');
     expect(projectedDocument.content).toHaveProperty('version');
+  });
+
+  it('projects whole Data documents through their strict wire codec', () => {
+    const before = createWorkspace();
+    const document: WorkspaceDocument = {
+      id: 'catalog',
+      type: 'data-source',
+      path: '/data/catalog.data.json',
+      contentRev: 1,
+      metaRev: 1,
+      content: {
+        source: {
+          id: 'catalog',
+          adapterId: 'rest',
+          runtimeZone: 'server',
+          bindingsById: {},
+          configurationByKey: {},
+        },
+        schemasById: {
+          products: { id: 'products', schema: true },
+        },
+        operationsById: {
+          'list-products': {
+            id: 'list-products',
+            kind: 'query',
+            outputSchemaId: 'products',
+            configurationByKey: {},
+            policies: {},
+          },
+        },
+      },
+    };
+    const after = {
+      ...before,
+      docsById: { ...before.docsById, [document.id]: document },
+    };
+    const operation: WorkspaceOperation = {
+      kind: 'command',
+      command: {
+        id: 'data-create',
+        namespace: 'core.workspace',
+        type: 'document.create',
+        version: '1.0',
+        issuedAt,
+        target: { workspaceId: before.id },
+        domainHint: 'workspace',
+        forwardOps: [
+          { op: 'add', path: `/docsById/${document.id}`, value: document },
+        ],
+        reverseOps: [{ op: 'remove', path: `/docsById/${document.id}` }],
+      },
+    };
+
+    const projected = projectWorkspaceOperationToCommitWire(
+      before,
+      after,
+      operation
+    );
+    if (projected.kind !== 'command') return;
+    const projectedDocument = projected.command.forwardOps[0]
+      ?.value as WorkspaceDocument;
+
+    expect(document.content).not.toHaveProperty('wireVersion');
+    expect(projectedDocument.content).toMatchObject({ wireVersion: 1 });
   });
 
   it('projects workspace-level PIR content replacements through the same codec', () => {

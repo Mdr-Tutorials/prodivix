@@ -10,7 +10,6 @@
     "noEmit": false,
     "paths": {
       "@prodivix/animation": ["../animation/src"],
-      "@prodivix/nodegraph": ["../nodegraph/src"],
       "@prodivix/runtime-core": ["../runtime-core/src"]
     }
   },
@@ -27,7 +26,7 @@
       "path": "../animation"
     },
     {
-      "path": "../nodegraph"
+      "path": "../runtime-core"
     }
   ]
 }

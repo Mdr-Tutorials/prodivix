@@ -108,6 +108,7 @@ func TestMapStoreErrorMapsCommitClientFailuresTo422(t *testing.T) {
 		commitValidation("/operation", "reverse does not restore state"),
 		fmt.Errorf("apply command: %w", commitValidation("/operation", "capabilities are invalid")),
 		ErrWorkspaceCommitIdentityMismatch,
+		ErrDataSourceValidationFailed,
 	}
 	for _, err := range tests {
 		failure := MapStoreError(err)

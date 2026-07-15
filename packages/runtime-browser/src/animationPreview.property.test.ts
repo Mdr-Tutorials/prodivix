@@ -1,122 +1,64 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { buildAnimationPreviewSnapshotFromTimelines } from './index';
-import type { AnimationTimeline } from '@prodivix/animation';
-
-const createOpacityTimeline = (
-  id: string,
-  targetNodeId: string,
-  durationMs: number,
-  from: number,
-  to: number
-): AnimationTimeline => ({
-  id,
-  name: id,
-  durationMs,
-  bindings: [
-    {
-      id: `${id}-binding`,
-      targetNodeId,
-      tracks: [
-        {
-          id: `${id}-track`,
-          kind: 'style',
-          property: 'opacity',
-          keyframes: [
-            { atMs: 0, value: from },
-            { atMs: durationMs, value: to },
-          ],
-        },
-      ],
-    },
-  ],
-});
+import { projectAnimationFrameToBrowserPreview } from './index';
+import type { AnimationFrame } from '@prodivix/animation';
 
 describe('browser animation projection properties', () => {
-  it('projects the last timeline override at every cursor', () => {
+  it('projects evaluated node styles without owning timeline semantics', () => {
     fc.assert(
-      fc.property(
-        fc.integer({ min: 1, max: 10_000 }),
-        fc.integer({ min: 0, max: 10_000 }),
-        fc.integer({ min: -100, max: 100 }),
-        fc.integer({ min: -100, max: 100 }),
-        (durationMs, cursorSeed, from, to) => {
-          const cursorMs = cursorSeed % durationMs;
-          const snapshot = buildAnimationPreviewSnapshotFromTimelines({
-            targetDocumentId: 'page-home',
-            timelines: [
-              createOpacityTimeline('first', 'node', durationMs, 0, 0),
-              createOpacityTimeline('last', 'node', durationMs, from, to),
-            ],
-            globalMs: cursorMs,
-            svgFilters: [],
-          });
-          const expected = from + ((to - from) * cursorMs) / durationMs;
-          expect(snapshot.cssText).toContain(
-            'data-pir-document-id="page-home"][data-pir-node-id="node"'
-          );
-          const opacity = snapshot.cssText.match(/opacity:([^;]+);/)?.[1];
-          expect(Number(opacity)).toBeCloseTo(expected, 10);
-        }
-      )
+      fc.property(fc.integer({ min: -100, max: 100 }), (opacity) => {
+        const frame: AnimationFrame = {
+          stylesByNodeId: new Map([['node', { opacity }]]),
+          svgFilters: [],
+        };
+        const snapshot = projectAnimationFrameToBrowserPreview(
+          frame,
+          'page-home'
+        );
+
+        expect(snapshot.cssText).toContain(
+          'data-pir-document-id="page-home"][data-pir-node-id="node"'
+        );
+        expect(snapshot.cssText).toContain(`opacity:${opacity};`);
+      })
     );
   });
 
-  it('projects SVG attribute tracks without mutating source filters', () => {
+  it('clones SVG filter projection without mutating the evaluated frame', () => {
     fc.assert(
-      fc.property(
-        fc.integer({ min: 1, max: 10_000 }),
-        fc.integer({ min: 0, max: 10_000 }),
-        (durationMs, cursorSeed) => {
-          const cursorMs = cursorSeed % durationMs;
-          const timeline: AnimationTimeline = {
-            id: 'svg',
-            name: 'SVG',
-            durationMs,
-            bindings: [
+      fc.property(fc.integer({ min: -100, max: 100 }), (stdDeviation) => {
+        const svgFilters = [
+          {
+            id: 'filter',
+            primitives: [
               {
-                id: 'binding',
-                targetNodeId: 'node',
-                tracks: [
-                  {
-                    id: 'track',
-                    kind: 'svg-filter-attr',
-                    filterId: 'filter',
-                    primitiveId: 'primitive',
-                    attr: 'stdDeviation',
-                    keyframes: [
-                      { atMs: 0, value: 0 },
-                      { atMs: durationMs, value: 10 },
-                    ],
-                  },
-                ],
+                id: 'primitive',
+                type: 'feGaussianBlur' as const,
+                attrs: { stdDeviation },
               },
             ],
-          };
-          const svgFilters = [
-            {
-              id: 'filter',
-              primitives: [
-                {
-                  id: 'primitive',
-                  type: 'feGaussianBlur' as const,
-                  attrs: { stdDeviation: 0 },
-                },
-              ],
-            },
-          ];
-          const snapshot = buildAnimationPreviewSnapshotFromTimelines({
-            targetDocumentId: 'page-home',
-            timelines: [timeline],
-            globalMs: cursorMs,
-            svgFilters,
-          });
-          expect(
-            snapshot.svgFilters[0].primitives[0].attrs?.stdDeviation
-          ).toBeCloseTo((10 * cursorMs) / durationMs, 10);
-          expect(svgFilters[0].primitives[0].attrs.stdDeviation).toBe(0);
-        }
-      )
+          },
+        ];
+        const frame: AnimationFrame = {
+          stylesByNodeId: new Map(),
+          svgFilters,
+        };
+        const snapshot = projectAnimationFrameToBrowserPreview(
+          frame,
+          'page-home'
+        );
+
+        expect(snapshot.svgFilters).not.toBe(svgFilters);
+        expect(snapshot.svgFilters[0].primitives).not.toBe(
+          svgFilters[0].primitives
+        );
+        expect(snapshot.svgFilters[0].primitives[0].attrs?.stdDeviation).toBe(
+          stdDeviation
+        );
+        expect(svgFilters[0].primitives[0].attrs.stdDeviation).toBe(
+          stdDeviation
+        );
+      })
     );
   });
 });

@@ -99,7 +99,7 @@ func MapStoreError(err error) *RequestFailure {
 	if errors.Is(err, ErrPIRValidationFailed) {
 		return NewRequestFailure(http.StatusUnprocessableEntity, ErrorPIRValidationFailed, err.Error(), nil)
 	}
-	if errors.Is(err, ErrNodeGraphValidationFailed) || errors.Is(err, ErrAnimationValidationFailed) {
+	if errors.Is(err, ErrNodeGraphValidationFailed) || errors.Is(err, ErrAnimationValidationFailed) || errors.Is(err, ErrDataSourceValidationFailed) {
 		return NewRequestFailure(http.StatusUnprocessableEntity, ErrorInvalidPayload, err.Error(), nil)
 	}
 	if IsWorkspaceEnvelopeError(err) {
@@ -288,6 +288,7 @@ func DefaultCapabilities() map[string]bool {
 		"core.animation.definition.update@1.0":            true,
 		"core.design-tokens.document.update@1.0":          true,
 		"core.design-token-resolvers.document.update@1.0": true,
+		"core.data.document.update@1.0":                   true,
 		"core.resource.project-config.value.update@1.0":   true,
 		"core.workspace.document.create@1.0":              true,
 		"core.workspace.document.rename@1.0":              true,

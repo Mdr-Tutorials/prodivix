@@ -1,4 +1,7 @@
-import { isWorkspaceCodeDocumentContent } from '@prodivix/workspace';
+import {
+  decodeWorkspaceDataSourceDocument,
+  isWorkspaceCodeDocumentContent,
+} from '@prodivix/workspace';
 import { getCodeAuthoringSelectionStorageKey } from '@/editor/features/code/codeAuthoringModel';
 import { useEditorStore } from '@/editor/store/useEditorStore';
 import { resolveWorkspaceSemanticNavigationLocation } from './workspaceSemanticNavigationModel';
@@ -224,6 +227,28 @@ export const navigateToWorkspaceSemanticTarget = (
         location: resolution.location,
       });
       return finish(`${basePath}/animation`);
+    }
+    case 'data-source':
+    case 'data-operation': {
+      const document = workspace?.docsById[targetRef.documentId];
+      if (!workspace || !document || document.type !== 'data-source') {
+        return unavailable('target-unavailable');
+      }
+      const dataSource = decodeWorkspaceDataSourceDocument(document);
+      if (
+        dataSource.status !== 'valid' ||
+        (targetRef.kind === 'data-operation' &&
+          !dataSource.decodedContent.operationsById[targetRef.operationId])
+      ) {
+        return unavailable('target-unavailable');
+      }
+      editor.setActiveDocumentId(document.id);
+      navigationStore.requestSurfaceNavigation({
+        projectId: input.projectId,
+        workspaceId: workspace.id,
+        location: resolution.location,
+      });
+      return finish(`${basePath}/resources`);
     }
     case 'code-artifact':
       return openCodeArtifact(targetRef.artifactId);

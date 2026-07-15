@@ -1,4 +1,7 @@
-import type { WorkspaceDocumentType } from '@prodivix/workspace';
+import {
+  isWorkspaceDocumentType,
+  type WorkspaceDocumentType,
+} from '@prodivix/workspace';
 import { isRecord } from './jsonValue';
 
 export type WorkspaceRevisionConflictCode =
@@ -56,19 +59,6 @@ export type WorkspaceRevisionConflictDecodeIssue = {
 export type WorkspaceRevisionConflictDecodeResult =
   | { ok: true; conflict: WorkspaceRevisionConflictResponse }
   | { ok: false; issues: WorkspaceRevisionConflictDecodeIssue[] };
-
-const DOCUMENT_TYPES: ReadonlySet<WorkspaceDocumentType> = new Set([
-  'pir-page',
-  'pir-layout',
-  'pir-component',
-  'pir-graph',
-  'pir-animation',
-  'design-tokens',
-  'design-token-resolver',
-  'code',
-  'asset',
-  'project-config',
-]);
 
 const CONFLICT_CODES: ReadonlySet<string> = new Set([
   'WKS-4001',
@@ -175,7 +165,7 @@ const parseServerDocument = (
     ]) ||
     !isNonEmptyString(value.id) ||
     !isNonEmptyString(value.type) ||
-    !DOCUMENT_TYPES.has(value.type as WorkspaceDocumentType) ||
+    !isWorkspaceDocumentType(value.type) ||
     !isNonEmptyString(value.path) ||
     !isPositiveInteger(value.contentRev) ||
     !isPositiveInteger(value.metaRev) ||

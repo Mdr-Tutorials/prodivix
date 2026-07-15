@@ -1,5 +1,7 @@
 import {
+  isWorkspaceCommandDomain,
   resolveWorkspaceCommandDomain,
+  resolveWorkspaceCommandNamespaceDomain,
   type WorkspaceCommandDomain,
   type WorkspaceCommandEnvelope,
   type WorkspaceOperation,
@@ -80,24 +82,13 @@ export const parsePointer = (path: string): string[] | null => {
   return segments;
 };
 
-const inferNamespaceDomain = (
-  namespace: string
-): WorkspaceCommandDomain | undefined => {
-  if (namespace.startsWith('core.nodegraph')) return 'nodegraph';
-  if (namespace.startsWith('core.animation')) return 'animation';
-  if (namespace.startsWith('core.code')) return 'code';
-  if (namespace.startsWith('core.resource')) return 'resource';
-  if (namespace.startsWith('core.route')) return 'route';
-  if (namespace.startsWith('core.workspace')) return 'workspace';
-  if (namespace.startsWith('core.pir')) return 'pir';
-  return undefined;
-};
-
 export const validateCommandTargetAndDomain = (
   command: WorkspaceCommandEnvelope,
   commandIndex: number
 ): WorkspaceOperationCommitPlanIssue | null => {
-  const inferredDomain = inferNamespaceDomain(command.namespace);
+  const inferredDomain = resolveWorkspaceCommandNamespaceDomain(
+    command.namespace
+  );
   const resolvedDomain = resolveWorkspaceCommandDomain(command);
   if (
     command.domainHint &&
@@ -245,16 +236,6 @@ const ATOMIC_PATCH_OPERATIONS = new Set<WorkspacePatchOperation['op']>([
   'replace',
   'test',
 ]);
-const COMMAND_DOMAINS = new Set<WorkspaceCommandDomain>([
-  'pir',
-  'workspace',
-  'route',
-  'nodegraph',
-  'animation',
-  'code',
-  'resource',
-]);
-
 const wireFailure = (
   path: string,
   message: string,
@@ -735,7 +716,7 @@ const decodeCommand = (
   if (!domainHint.ok) return domainHint;
   if (
     domainHint.value !== undefined &&
-    !COMMAND_DOMAINS.has(domainHint.value as WorkspaceCommandDomain)
+    !isWorkspaceCommandDomain(domainHint.value)
   ) {
     return wireFailure(
       `${path}/domainHint`,

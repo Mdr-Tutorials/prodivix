@@ -43,7 +43,7 @@ flowchart TD
 
 已经可用的核心链路包括：PIR-current、跨领域语义索引、组件契约与 Collection、视觉/代码受控双向编辑、统一 Issues、可逆 History、Durable Outbox、Atomic Commit，以及 React/Vite 独立导出验证。
 
-ExecutionProvider、浏览器与远程 Runner、Data/API IR、SecretRef、完整项目开发服务器体验、Test、Deployment、多框架生产 target、团队协作和生产 SLA 尚未交付。
+ExecutionProvider/ExecutionJob、Execution Session coordinator、共享 Browser Runtime Host 与独立 Preview/Test provider 已形成可用纵切。蓝图可以运行独立 React/Vite 工程；Test 页面可以执行同一 revision 的 test plan，并通过共享 Execution Center 观察和控制。DataSourceDocument/DataOperationReference、typed Workspace/Semantic 与 reference-only environment/Secret contract 已建立；PIR binding、Data runtime/协议 adapter、Secret resolution、Remote provider、Terminal/Network、Deployment、多框架生产 target、团队协作和生产 SLA 继续按各自产品 Gate 建设。
 
 ## 推荐阅读顺序
 

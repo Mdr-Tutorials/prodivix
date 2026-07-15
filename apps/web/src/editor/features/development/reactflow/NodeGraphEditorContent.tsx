@@ -21,6 +21,13 @@ import {
   type WorkspaceVfsIntentRequest,
 } from '@prodivix/workspace';
 import { openWorkspaceCodeSlotDefinition } from '@/editor/features/code';
+import {
+  ExecutionCenter,
+  getWorkspaceNodeGraphExecutionSessionId,
+  startWorkspaceNodeGraphExecution,
+  stopWorkspaceNodeGraphExecution,
+  useExecutionSession,
+} from '@/editor/features/execution';
 import { useWorkspaceSemanticNavigationStore } from '@/editor/navigation';
 import { useWorkspaceHistoryShortcuts } from '@/editor/shortcuts';
 import {
@@ -69,6 +76,13 @@ const EMPTY_NODEGRAPH_DOCUMENT: NodeGraphDocument = {
 const serializeDocument = (content: NodeGraphDocument): string =>
   JSON.stringify(content);
 
+const ACTIVE_EXECUTION_STATUSES = new Set([
+  'queued',
+  'starting',
+  'running',
+  'cancelling',
+]);
+
 type WorkspaceCommandFactory = (
   workspace: WorkspaceSnapshot
 ) => WorkspaceCommandEnvelope | null;
@@ -101,6 +115,16 @@ export const NodeGraphEditorContent = () => {
   const activeContentSignature = useMemo(
     () => serializeDocument(activeContent),
     [activeContent]
+  );
+  const executionSessionId =
+    workspace && activeGraphId
+      ? getWorkspaceNodeGraphExecutionSessionId(workspace.id, activeGraphId)
+      : undefined;
+  const executionSession = useExecutionSession(
+    executionSessionId ?? 'nodegraph:unavailable'
+  );
+  const isExecuting = Boolean(
+    executionSession && ACTIVE_EXECUTION_STATUSES.has(executionSession.status)
   );
   const codeArtifacts = useMemo(
     () =>
@@ -300,6 +324,41 @@ export const NodeGraphEditorContent = () => {
     t,
   });
 
+  const runActiveGraph = useCallback(async () => {
+    if (!activeGraphId) return;
+    const canvasDocument = toCanonicalNodeGraphDocument(nodes, edges);
+    await persistCanvas(nodes, edges);
+    await persistenceChainRef.current;
+    const currentWorkspace = useEditorStore.getState().workspace;
+    const currentRead = currentWorkspace
+      ? listWorkspaceNodeGraphs(currentWorkspace).find(
+          (document) => document.id === activeGraphId
+        )?.read
+      : undefined;
+    if (
+      !currentWorkspace ||
+      currentRead?.status !== 'valid' ||
+      serializeDocument(currentRead.decodedContent) !==
+        serializeDocument(canvasDocument)
+    ) {
+      setHint('Save the current NodeGraph revision before running it.');
+      return;
+    }
+    try {
+      await startWorkspaceNodeGraphExecution({
+        workspace: currentWorkspace,
+        documentId: activeGraphId,
+      });
+    } catch (error) {
+      setHint(error instanceof Error ? error.message : String(error));
+    }
+  }, [activeGraphId, edges, nodes, persistCanvas]);
+
+  const stopActiveGraph = useCallback(() => {
+    if (!workspaceId || !activeGraphId) return;
+    void stopWorkspaceNodeGraphExecution(workspaceId, activeGraphId);
+  }, [activeGraphId, workspaceId]);
+
   useEffect(() => {
     const location = semanticNavigationRequest?.location;
     const targetRef =
@@ -393,6 +452,7 @@ export const NodeGraphEditorContent = () => {
       const result = openWorkspaceCodeSlotDefinition({
         workspace,
         slotId,
+        origin: { surface: 'nodegraph' },
       });
       if (result.status === 'unavailable') {
         setHint('The CodeSlot definition is unavailable.');
@@ -588,45 +648,57 @@ export const NodeGraphEditorContent = () => {
 
   return (
     <div
-      className="nodegraph-native-root"
+      className="nodegraph-native-root flex min-h-0 flex-col"
       data-theme={colorMode}
       onClick={closeMenu}
     >
-      <NodeGraphGraphManager
-        activeGraphId={activeGraphId}
-        activeGraphName={activeGraph?.name ?? ''}
-        graphDocs={graphDocs}
-        isBusy={managerBusy}
-        onCreateGraph={createGraph}
-        onDeleteGraph={deleteGraph}
-        onDuplicateGraph={duplicateGraph}
-        onRenameGraph={renameActiveGraph}
-        onSwitchGraph={switchGraph}
-        t={t}
-      />
-      <NodeGraphCanvas
-        colorMode={colorMode}
-        edges={edges}
-        flowNodes={flowNodes}
-        invalidConnectEndHint={hintText.invalidConnectEnd}
-        isValidConnection={isValidConnection}
-        onConnect={onConnect}
-        onEdgesChange={onEdgesChange}
-        onNodeDragStop={onNodeDragStop}
-        onNodesChange={onNodesChange}
-        setHint={setHint}
-        setMenu={setMenu}
-        t={t}
-      />
-      {shellHint ? (
-        <div className="nodegraph-native-hint">{shellHint}</div>
+      <div className="relative min-h-0 flex-1">
+        <NodeGraphGraphManager
+          activeGraphId={activeGraphId}
+          activeGraphName={activeGraph?.name ?? ''}
+          graphDocs={graphDocs}
+          isBusy={managerBusy}
+          isExecuting={isExecuting}
+          onCreateGraph={createGraph}
+          onDeleteGraph={deleteGraph}
+          onDuplicateGraph={duplicateGraph}
+          onRenameGraph={renameActiveGraph}
+          onRunGraph={() => void runActiveGraph()}
+          onStopGraph={stopActiveGraph}
+          onSwitchGraph={switchGraph}
+          t={t}
+        />
+        <NodeGraphCanvas
+          colorMode={colorMode}
+          edges={edges}
+          flowNodes={flowNodes}
+          invalidConnectEndHint={hintText.invalidConnectEnd}
+          isValidConnection={isValidConnection}
+          onConnect={onConnect}
+          onEdgesChange={onEdgesChange}
+          onNodeDragStop={onNodeDragStop}
+          onNodesChange={onNodesChange}
+          setHint={setHint}
+          setMenu={setMenu}
+          t={t}
+        />
+        {shellHint ? (
+          <div className="nodegraph-native-hint">{shellHint}</div>
+        ) : null}
+        <NodeGraphContextMenu
+          menu={menu}
+          menuColumns={menuColumns}
+          menuLayout={menuLayout}
+          onMenuItemEnter={onMenuItemEnter}
+        />
+      </div>
+      {executionSessionId && executionSession ? (
+        <ExecutionCenter
+          sessionId={executionSessionId}
+          onRestart={() => void runActiveGraph()}
+          onStop={stopActiveGraph}
+        />
       ) : null}
-      <NodeGraphContextMenu
-        menu={menu}
-        menuColumns={menuColumns}
-        menuLayout={menuLayout}
-        onMenuItemEnter={onMenuItemEnter}
-      />
     </div>
   );
 };

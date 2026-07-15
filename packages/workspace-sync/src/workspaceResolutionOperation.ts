@@ -3,6 +3,8 @@ import {
   applyWorkspaceTransaction,
   createWorkspaceCommandOperation,
   createWorkspaceTransactionOperation,
+  getWorkspaceDocumentDomain,
+  getWorkspaceDocumentPolicy,
   type WorkspaceCommandDomain,
   type WorkspaceCommandEnvelope,
   type WorkspaceDocument,
@@ -221,51 +223,42 @@ const createWorkspaceDraft = (
   };
 };
 
-const documentDomain = (
-  document: WorkspaceDocument
-): WorkspaceCommandDomain | null => {
-  if (
-    document.type === 'pir-page' ||
-    document.type === 'pir-layout' ||
-    document.type === 'pir-component'
-  ) {
-    return 'pir';
-  }
-  if (document.type === 'pir-graph') return 'nodegraph';
-  if (document.type === 'pir-animation') return 'animation';
-  if (
-    document.type === 'design-tokens' ||
-    document.type === 'design-token-resolver'
-  ) {
-    return 'token';
-  }
-  if (document.type === 'code') return 'code';
-  if (document.type === 'asset' || document.type === 'project-config') {
-    return 'resource';
-  }
-  return null;
-};
+const collectTopLevelContentPaths = (
+  remoteContent: unknown,
+  resolvedContent: unknown,
+  prefixes?: readonly string[]
+): string[] =>
+  [
+    ...new Set([
+      ...Object.keys(isRecord(remoteContent) ? remoteContent : {}),
+      ...Object.keys(isRecord(resolvedContent) ? resolvedContent : {}),
+    ]),
+  ]
+    .map((key) => appendJsonPointer('', key))
+    .filter(
+      (path) => !prefixes || prefixes.some((prefix) => path.startsWith(prefix))
+    )
+    .sort();
 
-const allowedContentPaths = (document: WorkspaceDocument): string[] | null => {
-  if (
-    document.type === 'pir-page' ||
-    document.type === 'pir-layout' ||
-    document.type === 'pir-component'
-  ) {
-    return ['/componentContract', '/ui/graph', '/logic', '/metadata'];
+const resolveDocumentContentPaths = (
+  document: WorkspaceDocument,
+  remoteContent: unknown,
+  resolvedContent: unknown
+): readonly string[] => {
+  const policy = getWorkspaceDocumentPolicy(document.type).patch;
+  if (policy.kind === 'top-level') {
+    return collectTopLevelContentPaths(remoteContent, resolvedContent);
   }
-  if (document.type === 'pir-graph') {
-    return ['/nodes', '/edges'];
-  }
-  if (document.type === 'pir-animation') {
-    return ['/target', '/timelines', '/svgFilters', '/x-animationEditor'];
-  }
-  if (document.type === 'code') return ['/language', '/source', '/metadata'];
-  if (document.type === 'project-config') return ['/value', '/metadata'];
-  if (document.type === 'asset') {
-    return ['/mime', '/category', '/size', '/dataUrl', '/text', '/metadata'];
-  }
-  return null;
+  return [
+    ...new Set([
+      ...policy.roots,
+      ...collectTopLevelContentPaths(
+        remoteContent,
+        resolvedContent,
+        policy.extensionRootPrefixes
+      ),
+    ]),
+  ].sort();
 };
 
 const contentStateAtPath = (
@@ -307,27 +300,13 @@ const createDocumentDraft = (
   ) {
     return { ok: true, draft: null };
   }
-  const domainHint = documentDomain(resolvedDocument);
-  const dynamicTokenPaths =
-    resolvedDocument.type === 'design-tokens' ||
-    resolvedDocument.type === 'design-token-resolver'
-      ? [
-          ...new Set([
-            ...Object.keys(
-              isRecord(remoteDocument.content) ? remoteDocument.content : {}
-            ),
-            ...Object.keys(
-              isRecord(resolvedDocument.content) ? resolvedDocument.content : {}
-            ),
-          ]),
-        ]
-          .sort()
-          .map((key) => appendJsonPointer('', key))
-      : null;
-  const paths = dynamicTokenPaths ?? allowedContentPaths(resolvedDocument);
+  const domainHint = getWorkspaceDocumentDomain(resolvedDocument.type);
+  const paths = resolveDocumentContentPaths(
+    resolvedDocument,
+    remoteDocument.content,
+    resolvedDocument.content
+  );
   if (
-    !domainHint ||
-    !paths ||
     !isRecord(remoteDocument.content) ||
     !isRecord(resolvedDocument.content)
   ) {

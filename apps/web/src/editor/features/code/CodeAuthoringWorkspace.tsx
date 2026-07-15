@@ -16,11 +16,12 @@ import {
   analyzeCodeLanguageRenameImpact,
   decodeControlledSourceManifest,
   decodeShaderCompileProfile,
+  hasCodeAuthoringCapability,
   queryCodeArtifactRefactorImpact,
   writeShaderCompileProfile,
+  type CodeAuthoringRequest,
   type ShaderCompileProfile,
 } from '@prodivix/authoring';
-import { createControlledCodeEditPlan } from '@prodivix/prodivix-compiler';
 import type { DiagnosticTargetRef } from '@prodivix/diagnostics';
 import { CodeFileTree } from './CodeFileTree';
 import {
@@ -64,7 +65,6 @@ import {
 import { useWorkspaceShaderCompile } from '@/editor/codeCompile';
 import {
   getCodeAuthoringSelectionStorageKey,
-  reconcileCodeResourceEditorDraft,
   resolveDefaultCodeKindByParentPath,
   resolveTemplateByCodeKind,
   type CodeFileKind,
@@ -78,7 +78,6 @@ import {
   createWorkspaceOrphanCodeArtifactToModuleCommand,
   createWorkspaceDirectoryIntentRequest,
   createWorkspaceCodeDocumentIntentRequest,
-  createWorkspaceCodeSourceUpdateCommand,
   deleteWorkspaceDirectoryIntentRequest,
   deleteWorkspaceCodeDocumentIntentRequest,
   projectWorkspaceCodeArtifactLifecycles,
@@ -94,13 +93,10 @@ import {
   flattenCodeResourceFiles,
   normalizeCodeResourcePath,
 } from './workspaceCodeArtifacts';
-
-export type CodeAuthoringPresentation =
-  'page' | 'embedded' | 'compact' | 'maximized';
+import { useCodeAuthoringSession } from './useCodeAuthoringSession';
 
 type CodeAuthoringWorkspaceProps = {
-  presentation?: CodeAuthoringPresentation;
-  requestedDocumentId?: string;
+  request: CodeAuthoringRequest;
   requestedCreateFolder?: 'scripts' | 'styles' | 'shaders' | null;
   onCreateRequestConsumed?: () => void;
   onDirtyChange?: (dirty: boolean) => void;
@@ -205,12 +201,13 @@ const describeCodeSlotOwner = (owner: DiagnosticTargetRef): string => {
 };
 
 export function CodeAuthoringWorkspace({
-  presentation = 'page',
-  requestedDocumentId,
+  request,
   requestedCreateFolder,
   onCreateRequestConsumed,
   onDirtyChange,
 }: CodeAuthoringWorkspaceProps) {
+  const presentation = request.presentation;
+  const requestedDocumentId = request.artifactId;
   const { t } = useTranslation('editor');
   const navigate = useNavigate();
   const { projectId } = useParams();
@@ -241,10 +238,8 @@ export function CodeAuthoringWorkspace({
     [treeById, treeRootId, workspaceDocumentsById]
   );
   const [selectedNodeId, setSelectedNodeId] = useState<string>('code-root');
-  const [editorValue, setEditorValue] = useState('');
   const [codeEditorView, setCodeEditorView] = useState<EditorView | null>(null);
-  const [isSaving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState('');
+  const [isMutating, setMutating] = useState(false);
   const [renameState, setRenameState] = useState<CodeLanguageRenameState>({
     status: 'idle',
   });
@@ -254,9 +249,8 @@ export function CodeAuthoringWorkspace({
     useState<CodeLanguageLocationQueryView>(EMPTY_CODE_LANGUAGE_LOCATION_QUERY);
   const locationQueryRequestIdRef = useRef(0);
   const renameRequestIdRef = useRef(0);
-  const editorBaselineRef = useRef<
-    { documentId: string; source: string } | undefined
-  >(undefined);
+  const requestedArtifactSelectionRef = useRef<string | undefined>(undefined);
+  const requestSourceSpanFocusRef = useRef<string | undefined>(undefined);
   const lastActivatedCodeDocumentIdRef = useRef<string | undefined>(undefined);
   const semanticNavigationRequest = useWorkspaceSemanticNavigationStore(
     (state) => state.navigationRequest
@@ -271,6 +265,51 @@ export function CodeAuthoringWorkspace({
   );
   const allFiles = useMemo(() => flattenCodeResourceFiles(tree), [tree]);
   const selectedFile = selectedNode.type === 'file' ? selectedNode : undefined;
+  const canEditSource = hasCodeAuthoringCapability(request, 'edit-source');
+  const canSaveSource = hasCodeAuthoringCapability(request, 'save-source');
+  const canNavigateSemantics = hasCodeAuthoringCapability(
+    request,
+    'semantic-navigation'
+  );
+  const canRefactorSymbol = hasCodeAuthoringCapability(
+    request,
+    'refactor-symbol'
+  );
+  const canRelocateArtifact = hasCodeAuthoringCapability(
+    request,
+    'relocate-artifact'
+  );
+  const canConfigureCompile = hasCodeAuthoringCapability(
+    request,
+    'configure-compile'
+  );
+  const canManageArtifacts = hasCodeAuthoringCapability(
+    request,
+    'manage-artifacts'
+  );
+  const canInspectBindings = hasCodeAuthoringCapability(
+    request,
+    'inspect-bindings'
+  );
+  const authoringSession = useCodeAuthoringSession({
+    request,
+    workspace: workspace ?? null,
+    artifactId: selectedFile?.id,
+    readonly: workspaceReadonly,
+  });
+  const editorValue = authoringSession.source;
+  const setEditorValue = authoringSession.setSource;
+  const isSourceDirty = authoringSession.activeDirty;
+  const isDirty = authoringSession.dirty;
+  const isSaving = authoringSession.isSaving || isMutating;
+  const saveError = authoringSession.error;
+  const setSaveError = useCallback(
+    (message: string) => {
+      if (message) authoringSession.reportError(message);
+      else authoringSession.clearError();
+    },
+    [authoringSession.clearError, authoringSession.reportError]
+  );
   const selectedCodeDocument = selectedFile
     ? workspaceDocumentsById[selectedFile.id]
     : undefined;
@@ -309,7 +348,7 @@ export function CodeAuthoringWorkspace({
   });
   const shaderCompile = useWorkspaceShaderCompile({
     workspace: workspace ?? null,
-    artifactId: selectedFile?.id,
+    artifactId: canConfigureCompile ? selectedFile?.id : undefined,
   });
   const codeAuthoringEnvironment = useMemo(
     () =>
@@ -381,10 +420,6 @@ export function CodeAuthoringWorkspace({
       })
       .sort((left, right) => left.libraryId.localeCompare(right.libraryId));
   }, [codeAuthoringEnvironment]);
-  const isSourceDirty = Boolean(
-    selectedFile && editorValue !== (selectedFile.textContent ?? '')
-  );
-  const isDirty = isSourceDirty;
   const isCompact = presentation === 'compact';
   const isOverlay = presentation === 'compact' || presentation === 'maximized';
   const controlledSourceManifest = useMemo(() => {
@@ -430,6 +465,7 @@ export function CodeAuthoringWorkspace({
 
   const openCodeLanguageLocation = useCallback(
     (location: CodeLanguageLocation, view?: EditorView | null) => {
+      if (!canNavigateSemantics) return;
       if (
         view &&
         selectedFile?.id === location.sourceSpan.artifactId &&
@@ -449,6 +485,24 @@ export function CodeAuthoringWorkspace({
         }
       }
       if (!projectId) return;
+      const targetFile = findCodeResourceNodeById(
+        tree,
+        location.sourceSpan.artifactId
+      );
+      if (workspace && targetFile?.type === 'file') {
+        useWorkspaceSemanticNavigationStore
+          .getState()
+          .requestSurfaceNavigation({
+            projectId,
+            workspaceId: workspace.id,
+            location: { kind: 'source-span', sourceSpan: location.sourceSpan },
+          });
+        setSelectedNodeId(targetFile.id);
+        if (!isOverlay && workspace.activeDocumentId !== targetFile.id) {
+          setActiveDocumentId(targetFile.id);
+        }
+        return;
+      }
       navigateToWorkspaceSemanticTarget({
         projectId,
         navigate,
@@ -456,7 +510,17 @@ export function CodeAuthoringWorkspace({
         resolveSemanticIndex: resolveWorkspaceSemanticIndex,
       });
     },
-    [codeLanguageSource, navigate, projectId, selectedFile?.id]
+    [
+      canNavigateSemantics,
+      codeLanguageSource,
+      navigate,
+      projectId,
+      selectedFile?.id,
+      isOverlay,
+      setActiveDocumentId,
+      tree,
+      workspace,
+    ]
   );
 
   const handleDefinitionResult = useCallback(
@@ -471,6 +535,7 @@ export function CodeAuthoringWorkspace({
   const beginCodeLanguageRename = useCallback(
     async (view: EditorView | null = codeEditorView) => {
       if (
+        !canRefactorSymbol ||
         !view ||
         !workspace ||
         workspaceReadonly ||
@@ -516,6 +581,7 @@ export function CodeAuthoringWorkspace({
     [
       codeEditorView,
       codeLanguageSession,
+      canRefactorSymbol,
       isSaving,
       isSourceDirty,
       t,
@@ -553,7 +619,13 @@ export function CodeAuthoringWorkspace({
 
   const runCodeLanguageLocationQuery = useCallback(
     async (kind: CodeLanguageLocationQueryKind) => {
-      if (codeLanguageSession.status !== 'ready' || !codeEditorView) return;
+      if (
+        !canNavigateSemantics ||
+        codeLanguageSession.status !== 'ready' ||
+        !codeEditorView
+      ) {
+        return;
+      }
       if (codeEditorView.state.doc.toString() !== codeLanguageSession.source) {
         setLocationQuery({
           status: 'unavailable',
@@ -596,7 +668,12 @@ export function CodeAuthoringWorkspace({
         openCodeLanguageLocation(projected.locations[0], codeEditorView);
       }
     },
-    [codeEditorView, codeLanguageSession, openCodeLanguageLocation]
+    [
+      canNavigateSemantics,
+      codeEditorView,
+      codeLanguageSession,
+      openCodeLanguageLocation,
+    ]
   );
 
   const codeLanguageStatusText = useMemo(() => {
@@ -647,40 +724,51 @@ export function CodeAuthoringWorkspace({
   }, [locationQuery, t]);
 
   const canCreateCodeDocument =
+    canManageArtifacts &&
     Boolean(workspaceId && typeof workspaceRev === 'number') &&
     !workspaceReadonly &&
     (!workspaceCapabilitiesLoaded ||
       workspaceCapabilities['core.workspace.code-document.create@1.0'] ===
         true);
   const canCreateDirectory =
+    canManageArtifacts &&
     Boolean(workspaceId && typeof workspaceRev === 'number') &&
     !workspaceReadonly &&
     (!workspaceCapabilitiesLoaded ||
       workspaceCapabilities['core.workspace.directory.create@1.0'] === true);
   const canRenameDirectory =
+    canManageArtifacts &&
     Boolean(workspaceId && typeof workspaceRev === 'number') &&
     !workspaceReadonly &&
     (!workspaceCapabilitiesLoaded ||
       workspaceCapabilities['core.workspace.directory.rename@1.0'] === true);
   const canDeleteDirectory =
+    canManageArtifacts &&
     Boolean(workspaceId && typeof workspaceRev === 'number') &&
     !workspaceReadonly &&
     (!workspaceCapabilitiesLoaded ||
       workspaceCapabilities['core.workspace.directory.delete@1.0'] === true);
   const canRenameCodeDocument =
+    canManageArtifacts &&
     Boolean(workspaceId && typeof workspaceRev === 'number') &&
     !workspaceReadonly &&
     (!workspaceCapabilitiesLoaded ||
       workspaceCapabilities['core.workspace.code-document.rename@1.0'] ===
         true);
   const canDeleteCodeDocument =
+    canManageArtifacts &&
     Boolean(workspaceId && typeof workspaceRev === 'number') &&
     !workspaceReadonly &&
     (!workspaceCapabilitiesLoaded ||
       workspaceCapabilities['core.workspace.code-document.delete@1.0'] ===
         true);
   const canPatchSelectedFile = Boolean(
-    workspace && workspaceId && selectedFile && !workspaceReadonly
+    canEditSource &&
+    canSaveSource &&
+    workspace &&
+    workspaceId &&
+    selectedFile &&
+    !workspaceReadonly
   );
 
   const executeVfsIntent = async (
@@ -698,12 +786,57 @@ export function CodeAuthoringWorkspace({
 
   useEffect(() => {
     if (!requestedDocumentId) return;
+    const selectionKey = `${request.requestId}:${requestedDocumentId}`;
+    if (requestedArtifactSelectionRef.current === selectionKey) return;
     const requestedFile = findCodeResourceNodeById(tree, requestedDocumentId);
     if (requestedFile?.type !== 'file') return;
+    requestedArtifactSelectionRef.current = selectionKey;
     if (selectedNodeId !== requestedFile.id) {
       setSelectedNodeId(requestedFile.id);
     }
-  }, [requestedDocumentId, selectedNodeId, tree]);
+  }, [request.requestId, requestedDocumentId, selectedNodeId, tree]);
+
+  useEffect(() => {
+    requestSourceSpanFocusRef.current = undefined;
+  }, [request.requestId]);
+
+  useEffect(() => {
+    const sourceSpan = request.sourceSpan;
+    if (!sourceSpan) return;
+    const focusKey = `${request.requestId}:${sourceSpan.artifactId}:${sourceSpan.startLine}:${sourceSpan.startColumn}:${sourceSpan.endLine}:${sourceSpan.endColumn}`;
+    if (requestSourceSpanFocusRef.current === focusKey) return;
+    const targetFile = findCodeResourceNodeById(tree, sourceSpan.artifactId);
+    if (targetFile?.type !== 'file') return;
+    if (selectedNodeId !== targetFile.id) {
+      setSelectedNodeId(targetFile.id);
+      if (!isOverlay && workspace?.activeDocumentId !== targetFile.id) {
+        setActiveDocumentId(targetFile.id);
+      }
+      return;
+    }
+    if (!codeEditorView || selectedFile?.id !== targetFile.id) return;
+    const viewSource = codeEditorView.state.doc.toString();
+    if (viewSource !== editorValue) return;
+    const range = resolveSourceSpanOffsets(viewSource, sourceSpan);
+    if (!range) return;
+    codeEditorView.dispatch({
+      selection: { anchor: range.from, head: range.to },
+      scrollIntoView: true,
+    });
+    codeEditorView.focus();
+    requestSourceSpanFocusRef.current = focusKey;
+  }, [
+    codeEditorView,
+    editorValue,
+    isOverlay,
+    request.requestId,
+    request.sourceSpan,
+    selectedFile?.id,
+    selectedNodeId,
+    setActiveDocumentId,
+    tree,
+    workspace?.activeDocumentId,
+  ]);
 
   useEffect(() => {
     if (isOverlay || typeof window === 'undefined') return;
@@ -731,24 +864,6 @@ export function CodeAuthoringWorkspace({
       selectedNodeId
     );
   }, [isOverlay, projectId, selectedNodeId, tree]);
-
-  useEffect(() => {
-    if (!selectedFile) {
-      setEditorValue('');
-      editorBaselineRef.current = undefined;
-      return;
-    }
-    const reconciled = reconcileCodeResourceEditorDraft({
-      baseline: editorBaselineRef.current,
-      editorValue,
-      documentId: selectedFile.id,
-      source: selectedFile.textContent ?? '',
-    });
-    editorBaselineRef.current = reconciled.baseline;
-    if (reconciled.editorValue !== editorValue) {
-      setEditorValue(reconciled.editorValue);
-    }
-  }, [editorValue, selectedFile]);
 
   useEffect(() => {
     if (requestedDocumentId) return;
@@ -791,7 +906,7 @@ export function CodeAuthoringWorkspace({
     if (targetFile?.type !== 'file') return;
     if (selectedNodeId !== targetFile.id) {
       setSelectedNodeId(targetFile.id);
-      if (workspace?.activeDocumentId !== targetFile.id) {
+      if (!isOverlay && workspace?.activeDocumentId !== targetFile.id) {
         setActiveDocumentId(targetFile.id);
       }
       return;
@@ -820,6 +935,7 @@ export function CodeAuthoringWorkspace({
     codeEditorView,
     consumeSemanticNavigation,
     editorValue,
+    isOverlay,
     projectId,
     selectedNodeId,
     selectedFile?.id,
@@ -968,7 +1084,7 @@ export function CodeAuthoringWorkspace({
     }
     if (result.status === 'unchanged') return true;
     setSaveError('');
-    setSaving(true);
+    setMutating(true);
     try {
       const outcome = await dispatchWorkspaceAuthoringOperation({
         workspace,
@@ -981,7 +1097,7 @@ export function CodeAuthoringWorkspace({
       }
       return true;
     } finally {
-      setSaving(false);
+      setMutating(false);
     }
   };
 
@@ -1036,7 +1152,7 @@ export function CodeAuthoringWorkspace({
     const requestId = renameRequestIdRef.current + 1;
     renameRequestIdRef.current = requestId;
     setSaveError('');
-    setSaving(true);
+    setMutating(true);
     try {
       const proposal = await codeLanguageSession.session.getRenameEdits({
         expectedSnapshotIdentity: codeLanguageSession.session.snapshotIdentity,
@@ -1082,7 +1198,7 @@ export function CodeAuthoringWorkspace({
         editCount: impact.editCount,
       });
     } finally {
-      setSaving(false);
+      setMutating(false);
     }
   };
 
@@ -1097,7 +1213,7 @@ export function CodeAuthoringWorkspace({
       return;
     }
     setSaveError('');
-    setSaving(true);
+    setMutating(true);
     try {
       const outcome = await dispatchWorkspaceAuthoringOperation({
         workspace,
@@ -1115,15 +1231,11 @@ export function CodeAuthoringWorkspace({
         ? renameState.plan.nextSources[selectedFile.id]
         : undefined;
       if (selectedFile && nextSelectedSource !== undefined) {
-        editorBaselineRef.current = {
-          documentId: selectedFile.id,
-          source: nextSelectedSource,
-        };
         setEditorValue(nextSelectedSource);
       }
       setRenameState({ status: 'idle' });
     } finally {
-      setSaving(false);
+      setMutating(false);
     }
   };
 
@@ -1228,7 +1340,7 @@ export function CodeAuthoringWorkspace({
       return;
     }
     if (plan.status === 'unchanged') return;
-    setSaving(true);
+    setMutating(true);
     try {
       const outcome = await dispatchWorkspaceAuthoringOperation({
         workspace,
@@ -1237,7 +1349,7 @@ export function CodeAuthoringWorkspace({
       });
       if (outcome.status === 'rejected') setSaveError(outcome.message);
     } finally {
-      setSaving(false);
+      setMutating(false);
     }
   };
 
@@ -1254,7 +1366,7 @@ export function CodeAuthoringWorkspace({
       return;
     }
     if (plan.status === 'unchanged') return;
-    setSaving(true);
+    setMutating(true);
     try {
       const outcome = await dispatchWorkspaceAuthoringOperation({
         workspace,
@@ -1263,93 +1375,7 @@ export function CodeAuthoringWorkspace({
       });
       if (outcome.status === 'rejected') setSaveError(outcome.message);
     } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSave = async () => {
-    if (isSaving) return;
-    if (!selectedFile) return;
-    if (!workspace || !workspaceId) return;
-    const document = workspaceDocumentsById[selectedFile.id];
-    if (
-      !document ||
-      document.type !== 'code' ||
-      !isWorkspaceCodeDocumentContent(document.content)
-    ) {
-      return;
-    }
-    const previousSource = document.content.source;
-    if (previousSource === editorValue) return;
-    const controlledManifest = decodeControlledSourceManifest(
-      document.content.metadata
-    );
-    if (controlledManifest.status !== 'absent') {
-      if (controlledManifest.status === 'invalid') {
-        setSaveError(
-          controlledManifest.issues[0]?.message ||
-            'The controlled source manifest is invalid.'
-        );
-        return;
-      }
-      const plan = createControlledCodeEditPlan({
-        workspace,
-        baseRevision: workspace.workspaceRev,
-        codeDocumentId: document.id,
-        source: editorValue,
-        operationId: createIntentId(),
-        issuedAt: new Date().toISOString(),
-      });
-      if (plan.status === 'rejected') {
-        setSaveError(
-          plan.issues[0]?.message ||
-            'The controlled visual/code update was rejected.'
-        );
-        return;
-      }
-      if (plan.status === 'unchanged') return;
-      setSaveError('');
-      setSaving(true);
-      try {
-        const outcome = await dispatchWorkspaceAuthoringOperation({
-          workspace,
-          readonly: workspaceReadonly,
-          operation: plan.operation,
-        });
-        if (outcome.status === 'rejected') setSaveError(outcome.message);
-      } finally {
-        setSaving(false);
-      }
-      return;
-    }
-    const command = createWorkspaceCodeSourceUpdateCommand({
-      workspaceId,
-      document,
-      source: editorValue,
-      commandId: createIntentId(),
-      issuedAt: new Date().toISOString(),
-    });
-    if (!command) return;
-    setSaveError('');
-    setSaving(true);
-    try {
-      const outcome = await dispatchWorkspaceAuthoringOperation({
-        workspace,
-        readonly: workspaceReadonly,
-        operation: { kind: 'command', command },
-      });
-      if (outcome.status === 'rejected') setSaveError(outcome.message);
-    } catch (error) {
-      console.warn('[resources] code document save failed', error);
-      setSaveError(
-        error instanceof Error && error.message
-          ? error.message
-          : t('resourceManager.code.saveFailed', {
-              defaultValue: 'Could not save the code document.',
-            })
-      );
-    } finally {
-      setSaving(false);
+      setMutating(false);
     }
   };
 
@@ -1385,7 +1411,7 @@ export function CodeAuthoringWorkspace({
     });
     if (!command) return;
     setSaveError('');
-    setSaving(true);
+    setMutating(true);
     try {
       const outcome = await dispatchWorkspaceAuthoringOperation({
         workspace,
@@ -1394,14 +1420,15 @@ export function CodeAuthoringWorkspace({
       });
       if (outcome.status === 'rejected') setSaveError(outcome.message);
     } finally {
-      setSaving(false);
+      setMutating(false);
     }
   };
 
   useEditorShortcut(
     'Mod+S',
     () => {
-      handleSave();
+      if (isMutating) return;
+      void authoringSession.save();
     },
     {
       allowInEditable: true,
@@ -1438,6 +1465,7 @@ export function CodeAuthoringWorkspace({
         }
       : relocationState;
   const canStartCodeLanguageRename = Boolean(
+    canRefactorSymbol &&
     codeLanguageSession.status === 'ready' &&
     codeEditorView &&
     workspace &&
@@ -1449,6 +1477,7 @@ export function CodeAuthoringWorkspace({
     relocationState.status === 'idle'
   );
   const canStartCodeArtifactRelocation = Boolean(
+    canRelocateArtifact &&
     canRenameCodeDocument &&
     selectedCodeDocument?.type === 'code' &&
     !isSourceDirty &&
@@ -1457,7 +1486,7 @@ export function CodeAuthoringWorkspace({
   );
 
   const shellClassName =
-    presentation === 'page'
+    presentation === 'workspace'
       ? 'mx-auto grid w-full max-w-7xl gap-4 px-6 py-6'
       : presentation === 'embedded'
         ? 'grid gap-4'
@@ -1473,7 +1502,7 @@ export function CodeAuthoringWorkspace({
 
   return (
     <section className={shellClassName}>
-      {presentation === 'page' ? (
+      {presentation === 'workspace' ? (
         <article className="rounded-2xl border border-black/8 bg-(--bg-canvas) p-5">
           <h2 className="text-base font-medium text-(--text-primary)">
             {t('resourceManager.code.header.title')}
@@ -1485,13 +1514,16 @@ export function CodeAuthoringWorkspace({
       ) : null}
 
       <div className={workspaceGridClassName}>
-        {!isCompact ? (
+        {canManageArtifacts ? (
           <CodeFileTree
             tree={tree}
             selectedId={selectedNodeId}
             onSelect={(nodeId) => {
               setSelectedNodeId(nodeId);
-              if (findCodeResourceNodeById(tree, nodeId)?.type === 'file') {
+              if (
+                !isOverlay &&
+                findCodeResourceNodeById(tree, nodeId)?.type === 'file'
+              ) {
                 setActiveDocumentId(nodeId);
               }
             }}
@@ -1526,6 +1558,21 @@ export function CodeAuthoringWorkspace({
               <p className="text-xs text-(--text-secondary)">
                 {selectedNode.path}
               </p>
+              {isCompact &&
+              request.artifactId &&
+              selectedFile?.id !== request.artifactId ? (
+                <button
+                  type="button"
+                  className="mt-1 text-[10px] font-medium text-(--text-primary) underline underline-offset-2"
+                  onClick={() => {
+                    if (request.artifactId) {
+                      setSelectedNodeId(request.artifactId);
+                    }
+                  }}
+                >
+                  {t('codeAuthoring.session.returnToRequestedArtifact')}
+                </button>
+              ) : null}
               {controlledSourceManifest.status === 'valid' ? (
                 <p className="mt-1 text-[10px] text-(--text-muted)">
                   Controlled visual/code ·{' '}
@@ -1557,7 +1604,10 @@ export function CodeAuthoringWorkspace({
                     onClick={() =>
                       void runCodeLanguageLocationQuery('definition')
                     }
-                    disabled={codeLanguageSession.status !== 'ready'}
+                    disabled={
+                      !canNavigateSemantics ||
+                      codeLanguageSession.status !== 'ready'
+                    }
                     title={t(
                       'resourceManager.code.language.actions.definitionShortcut'
                     )}
@@ -1570,15 +1620,23 @@ export function CodeAuthoringWorkspace({
                     onClick={() =>
                       void runCodeLanguageLocationQuery('references')
                     }
-                    disabled={codeLanguageSession.status !== 'ready'}
+                    disabled={
+                      !canNavigateSemantics ||
+                      codeLanguageSession.status !== 'ready'
+                    }
                   >
                     {t('resourceManager.code.language.actions.findReferences')}
                   </button>
                   <button
                     type="button"
                     className="inline-flex items-center gap-1 rounded-lg border border-black/12 bg-black px-2.5 py-1.5 text-xs text-white hover:bg-black/90 disabled:cursor-not-allowed disabled:opacity-50"
-                    onClick={handleSave}
-                    disabled={!isDirty || !canPatchSelectedFile || isSaving}
+                    onClick={() => void authoringSession.save()}
+                    disabled={
+                      !isSourceDirty ||
+                      !canPatchSelectedFile ||
+                      isSaving ||
+                      authoringSession.stale
+                    }
                   >
                     <Save size={12} />
                     {t('resourceManager.code.actions.save')}
@@ -1590,7 +1648,7 @@ export function CodeAuthoringWorkspace({
                   {codeLanguageStatusText}
                 </p>
               ) : null}
-              {!isCompact ? (
+              {canRefactorSymbol || canRelocateArtifact ? (
                 <CodeArtifactRefactorPanel
                   rename={renameRefactorView}
                   relocation={relocationRefactorView}
@@ -1648,7 +1706,7 @@ export function CodeAuthoringWorkspace({
                   }
                 />
               ) : null}
-              {isShaderFile && !isCompact ? (
+              {isShaderFile && canConfigureCompile ? (
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-2">
                   <div>
                     <p className="m-0 text-xs font-medium text-(--text-primary)">
@@ -1756,7 +1814,23 @@ export function CodeAuthoringWorkspace({
                   {saveError}
                 </p>
               ) : null}
-              {!isCompact && selectedArtifactLifecycle?.status === 'orphan' ? (
+              {authoringSession.stale ? (
+                <div
+                  role="alert"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                >
+                  <span>{t('codeAuthoring.session.staleDraft')}</span>
+                  <button
+                    type="button"
+                    className="rounded-md border border-amber-400 bg-white px-2 py-1 text-[10px] hover:bg-amber-100"
+                    onClick={authoringSession.discard}
+                  >
+                    {t('codeAuthoring.session.discardDraft')}
+                  </button>
+                </div>
+              ) : null}
+              {canInspectBindings &&
+              selectedArtifactLifecycle?.status === 'orphan' ? (
                 <div className="grid gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
                   <div>
                     <p className="font-medium">
@@ -1799,7 +1873,7 @@ export function CodeAuthoringWorkspace({
                   </div>
                 </div>
               ) : null}
-              {!isCompact && codeSlotUsages.length ? (
+              {canInspectBindings && codeSlotUsages.length ? (
                 <div className="grid gap-2 rounded-lg border border-black/10 bg-black/[0.02] p-3">
                   <div className="flex items-center justify-between gap-2">
                     <p className="m-0 text-xs font-medium text-(--text-primary)">
@@ -1841,6 +1915,7 @@ export function CodeAuthoringWorkspace({
               <CodeMirror
                 data-editor-native-history="true"
                 value={editorValue}
+                editable={canEditSource && !workspaceReadonly}
                 onCreateEditor={setCodeEditorView}
                 onChange={(value) => {
                   setEditorValue(value);

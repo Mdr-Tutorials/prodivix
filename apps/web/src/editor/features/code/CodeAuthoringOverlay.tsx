@@ -4,6 +4,7 @@ import { Maximize2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { PdxModal } from '@prodivix/ui';
 import { EditorConfirmModal } from '@/editor/components/EditorConfirmModal';
+import { useWorkspaceSemanticNavigationStore } from '@/editor/navigation';
 import { useEditorStore } from '@/editor/store/useEditorStore';
 import { CodeAuthoringWorkspace } from './CodeAuthoringWorkspace';
 import { getCodeAuthoringSelectionStorageKey } from './codeAuthoringModel';
@@ -31,11 +32,11 @@ export function CodeAuthoringOverlay() {
   useEffect(() => {
     setDirty(false);
     setPendingAction(null);
-  }, [request?.id]);
+  }, [request?.requestId]);
 
   useEffect(() => {
     if (request && workspace?.id !== request.workspaceId) {
-      close(request.id);
+      close(request.requestId);
     }
   }, [close, request, workspace?.id]);
 
@@ -50,11 +51,20 @@ export function CodeAuthoringOverlay() {
           request.artifactId
         );
       }
-      close(request.id);
+      if (request.sourceSpan) {
+        useWorkspaceSemanticNavigationStore
+          .getState()
+          .requestSurfaceNavigation({
+            projectId,
+            workspaceId: request.workspaceId,
+            location: { kind: 'source-span', sourceSpan: request.sourceSpan },
+          });
+      }
+      close(request.requestId);
       navigate(`/editor/project/${projectId}/code`);
       return;
     }
-    close(request.id);
+    close(request.requestId);
   };
 
   const requestAction = (action: Exclude<PendingAction, null>) => {
@@ -112,9 +122,8 @@ export function CodeAuthoringOverlay() {
         }
       >
         <CodeAuthoringWorkspace
-          key={request.id}
-          presentation={request.presentation}
-          requestedDocumentId={request.artifactId}
+          key={request.requestId}
+          request={request}
           onDirtyChange={setDirty}
         />
       </PdxModal>

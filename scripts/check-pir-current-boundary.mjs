@@ -18,7 +18,7 @@ const pirWireEntry = join(repoRoot, 'packages/pir/src/wire.ts');
 const generatedWirePath = join(pirCodecRoot, 'pirWire.generated.ts');
 const workspaceCommitWireProjector = join(
   repoRoot,
-  'packages/workspace-sync/src/workspaceOperationCommitPirWire.ts'
+  'packages/workspace-sync/src/workspaceOperationCommitProjection.ts'
 );
 const legacyGeneratedWirePath = join(
   repoRoot,

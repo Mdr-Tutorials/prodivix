@@ -1,16 +1,22 @@
 import { useTranslation } from 'react-i18next';
 import { PdxInput, PdxPopover, PdxSlider } from '@prodivix/ui';
-import { ChevronDown, MousePointer2, Play, RotateCcw } from 'lucide-react';
+import {
+  ChevronDown,
+  MousePointer2,
+  Play,
+  Rocket,
+  RotateCcw,
+} from 'lucide-react';
 import {
   VIEWPORT_DEVICE_PRESETS,
   VIEWPORT_QUICK_PRESETS,
   VIEWPORT_ZOOM_RANGE,
 } from '@/editor/features/blueprint/editor/model/viewport';
-import type { BlueprintCanvasInteractionMode } from '../canvas';
+import type { BlueprintCanvasMode } from '../canvas';
 
 type BlueprintEditorViewportBarProps = {
-  interactionMode: BlueprintCanvasInteractionMode;
-  onInteractionModeChange: (mode: BlueprintCanvasInteractionMode) => void;
+  canvasMode: BlueprintCanvasMode;
+  onCanvasModeChange: (mode: BlueprintCanvasMode) => void;
   viewportWidth: string;
   viewportHeight: string;
   onViewportWidthChange: (value: string) => void;
@@ -30,8 +36,8 @@ const DEVICE_KIND_ICON_STYLES: Record<string, string> = {
 };
 
 export function BlueprintEditorViewportBar({
-  interactionMode,
-  onInteractionModeChange,
+  canvasMode,
+  onCanvasModeChange,
   viewportWidth,
   viewportHeight,
   onViewportWidthChange,
@@ -42,8 +48,8 @@ export function BlueprintEditorViewportBar({
   onResetView,
 }: BlueprintEditorViewportBarProps) {
   const { t } = useTranslation('blueprint');
-  const interactionModes: Array<{
-    value: BlueprintCanvasInteractionMode;
+  const canvasModes: Array<{
+    value: BlueprintCanvasMode;
     label: string;
     title: string;
     icon: typeof MousePointer2;
@@ -64,14 +70,22 @@ export function BlueprintEditorViewportBar({
       }),
       icon: Play,
     },
+    {
+      value: 'run',
+      label: t('viewport.modes.run'),
+      title: t('viewport.modes.runTitle', {
+        defaultValue: 'Run project (Ctrl+Alt+R)',
+      }),
+      icon: Rocket,
+    },
   ];
 
   return (
     <section className="flex min-h-[30px] flex-nowrap items-center gap-2.5 bg-(--bg-canvas) px-[14px] py-1 text-[11px] text-(--text-muted)">
       <div className="inline-flex h-6 flex-none items-center overflow-hidden rounded-full border border-(--border-default) bg-(--bg-muted)">
-        {interactionModes.map((mode) => {
+        {canvasModes.map((mode) => {
           const Icon = mode.icon;
-          const isActive = interactionMode === mode.value;
+          const isActive = canvasMode === mode.value;
           return (
             <button
               key={mode.value}
@@ -84,7 +98,7 @@ export function BlueprintEditorViewportBar({
               title={mode.title}
               aria-label={mode.title}
               aria-pressed={isActive}
-              onClick={() => onInteractionModeChange(mode.value)}
+              onClick={() => onCanvasModeChange(mode.value)}
             >
               <Icon size={12} />
             </button>

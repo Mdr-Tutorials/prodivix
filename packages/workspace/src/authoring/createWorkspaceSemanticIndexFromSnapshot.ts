@@ -6,6 +6,7 @@ import {
   type WorkspaceSemanticIndex,
 } from '@prodivix/authoring';
 import { createAnimationSemanticContributionProvider } from '@prodivix/animation';
+import { createDataSemanticContributionProvider } from '@prodivix/data';
 import { createNodeGraphSemanticContributionProvider } from '@prodivix/nodegraph';
 import { createPirSemanticContributionProvider } from '@prodivix/pir';
 import { createRouteSemanticContributionProvider } from '@prodivix/router';
@@ -37,6 +38,10 @@ import {
   decodeWorkspaceDesignTokenDocument,
   type WorkspaceDesignTokenReadResult,
 } from '../workspaceDesignTokenDocument';
+import {
+  decodeWorkspaceDataSourceDocument,
+  type WorkspaceDataSourceReadResult,
+} from '../workspaceDataSourceDocument';
 import {
   collectWorkspaceDesignTokenResolverDocumentReferences,
   decodeWorkspaceDesignTokenResolverDocument,
@@ -106,6 +111,10 @@ type ValidWorkspaceDesignTokenRead = Extract<
 >;
 type ValidWorkspaceDesignTokenResolverRead = Extract<
   WorkspaceDesignTokenResolverReadResult,
+  Readonly<{ status: 'valid' }>
+>;
+type ValidWorkspaceDataSourceRead = Extract<
+  WorkspaceDataSourceReadResult,
   Readonly<{ status: 'valid' }>
 >;
 type ValidWorkspaceAssetDocument = Readonly<{
@@ -422,6 +431,47 @@ const collectAssetDocuments = (
       });
 };
 
+const collectDataSourceDocuments = (
+  snapshot: WorkspaceSnapshot
+):
+  | Readonly<{
+      status: 'ready';
+      reads: readonly ValidWorkspaceDataSourceRead[];
+    }>
+  | Readonly<{
+      status: 'blocked';
+      issues: readonly WorkspaceSemanticIndexIssue[];
+    }> => {
+  const reads: ValidWorkspaceDataSourceRead[] = [];
+  const issues: WorkspaceSemanticIndexIssue[] = [];
+  for (const document of Object.values(snapshot.docsById)
+    .filter((candidate) => candidate.type === 'data-source')
+    .sort(
+      (left, right) =>
+        compareText(left.id, right.id) || compareText(left.path, right.path)
+    )) {
+    const read = decodeWorkspaceDataSourceDocument(document);
+    if (read.status === 'valid') {
+      reads.push(read);
+      continue;
+    }
+    if (read.status === 'invalid') {
+      issues.push(
+        ...read.issues.map((issue): WorkspaceSemanticIndexIssue => ({
+          code: WORKSPACE_SEMANTIC_INDEX_ISSUE_CODES.documentInvalid,
+          path: qualifyDocumentPath(document.id, issue.path),
+          message: issue.message,
+          causeCode: issue.code,
+          documentId: document.id,
+        }))
+      );
+    }
+  }
+  return issues.length > 0
+    ? Object.freeze({ status: 'blocked', issues: Object.freeze(issues) })
+    : Object.freeze({ status: 'ready', reads: Object.freeze(reads) });
+};
+
 const mapComponentGraphIssue = (
   issue: WorkspaceComponentGraphIssue
 ): WorkspaceSemanticIndexIssue => ({
@@ -462,7 +512,7 @@ const mapProviderSetupFailure = (
   message:
     error instanceof Error
       ? error.message
-      : 'Workspace PIR semantic provider setup failed.',
+      : 'Workspace semantic provider setup failed.',
   causeCode: 'provider-setup-failed',
 });
 
@@ -489,6 +539,8 @@ export const createWorkspaceSemanticIndexFromSnapshot = (
   }
   const assets = collectAssetDocuments(snapshot);
   if (assets.status === 'blocked') return blocked(assets.issues);
+  const dataSources = collectDataSourceDocuments(snapshot);
+  if (dataSources.status === 'blocked') return blocked(dataSources.issues);
   const externalAdapters = readWorkspaceExternalAdapterConfig(snapshot);
   if (externalAdapters.status === 'invalid') {
     return blocked(
@@ -519,6 +571,15 @@ export const createWorkspaceSemanticIndexFromSnapshot = (
           ...(document.name ? { displayName: document.name } : {}),
           revision: workspaceRevisions.documentRevs[document.id]!,
           content: document.content,
+        })),
+      }),
+      createDataSemanticContributionProvider({
+        workspaceId: snapshot.id,
+        documents: dataSources.reads.map((read) => ({
+          documentId: read.document.id,
+          ...(read.document.name ? { displayName: read.document.name } : {}),
+          revision: workspaceRevisions.documentRevs[read.document.id]!,
+          content: read.decodedContent,
         })),
       }),
       createRouteSemanticContributionProvider({

@@ -10,6 +10,7 @@ export type ProdivixDiagnosticDomain =
   | 'code'
   | 'nodegraph'
   | 'animation'
+  | 'data'
   | 'codegen'
   | 'backend'
   | 'semantic'
@@ -49,6 +50,12 @@ export type DiagnosticTargetRef =
       timelineId: string;
       bindingId: string;
       trackId: string;
+    }
+  | { kind: 'data-source'; documentId: string }
+  | {
+      kind: 'data-operation';
+      documentId: string;
+      operationId: string;
     }
   | { kind: 'code-artifact'; artifactId: string }
   | { kind: 'operation'; operation: string }

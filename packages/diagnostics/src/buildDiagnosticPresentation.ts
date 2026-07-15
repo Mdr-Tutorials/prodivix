@@ -115,6 +115,10 @@ const labelForTargetRef = (targetRef: DiagnosticTargetRef): string => {
       return `Animation timeline ${targetRef.timelineId}`;
     case 'animation-track':
       return `Animation track ${targetRef.trackId}`;
+    case 'data-source':
+      return `Data source ${targetRef.documentId}`;
+    case 'data-operation':
+      return `Data operation ${targetRef.operationId}`;
     case 'code-artifact':
       return `Code artifact ${targetRef.artifactId}`;
     case 'operation':

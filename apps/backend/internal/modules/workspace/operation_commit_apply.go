@@ -128,15 +128,15 @@ func (state *workspaceCommitState) applyDocumentCommand(command WorkspaceCommand
 	if domain == "" {
 		domain = commitNamespaceDomain(command.Namespace)
 	}
-	isResourceDocument := document.Type == WorkspaceDocumentTypeAsset || document.Type == WorkspaceDocumentTypeProjectConfig
-	if (domain == "resource") != isResourceDocument {
-		return errors.New("resource commands may target only asset or project-config documents")
+	expectedDomain := workspaceDocumentCommandDomain(document.Type)
+	if domain != expectedDomain {
+		return fmt.Errorf("command domain %s cannot target a %s document; expected %s", domain, document.Type, expectedDomain)
 	}
 	patched, err := applyWorkspaceDocumentPatch(document.Type, document.Content, command.ForwardOps)
 	if err != nil {
 		return err
 	}
-	if err := validateWorkspaceDocumentContent(document.Type, patched); err != nil {
+	if err := validateWorkspaceDocumentContent(document.Type, patched, documentID); err != nil {
 		return err
 	}
 	reversed, err := applyWorkspaceDocumentPatch(document.Type, patched, command.ReverseOps)
@@ -149,6 +149,27 @@ func (state *workspaceCommitState) applyDocumentCommand(command WorkspaceCommand
 	document.Content = patched
 	state.Documents[documentID] = document
 	return nil
+}
+
+func workspaceDocumentCommandDomain(documentType WorkspaceDocumentType) string {
+	switch documentType {
+	case WorkspaceDocumentTypePIRPage, WorkspaceDocumentTypePIRLayout, WorkspaceDocumentTypePIRComponent:
+		return "pir"
+	case WorkspaceDocumentTypePIRGraph:
+		return "nodegraph"
+	case WorkspaceDocumentTypePIRAnimation:
+		return "animation"
+	case WorkspaceDocumentTypeDesignTokens, WorkspaceDocumentTypeTokenResolver:
+		return "token"
+	case WorkspaceDocumentTypeCode:
+		return "code"
+	case WorkspaceDocumentTypeDataSource:
+		return "data"
+	case WorkspaceDocumentTypeAsset, WorkspaceDocumentTypeProjectConfig:
+		return "resource"
+	default:
+		return ""
+	}
 }
 
 func validateCommitRoutePatchPath(path string) error {
@@ -453,7 +474,7 @@ func (state *workspaceCommitState) validate() error {
 		if document.ContentRev <= 0 || document.MetaRev <= 0 || document.ContentRev > maxJSONSafeInteger || document.MetaRev > maxJSONSafeInteger {
 			return fmt.Errorf("%w: document revisions must be positive JSON safe integers", ErrWorkspaceVFSInvalid)
 		}
-		if err := validateWorkspaceDocumentContent(document.Type, document.Content); err != nil {
+		if err := validateWorkspaceDocumentContent(document.Type, document.Content, document.ID); err != nil {
 			return err
 		}
 		if document.Capabilities != nil && len(document.Capabilities) == 0 {

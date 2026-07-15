@@ -78,7 +78,28 @@ describe('diagnostics contract', () => {
     expect(isDiagnostic(diagnostic)).toBe(true);
     expect(isDiagnosticDomain('plugin')).toBe(true);
     expect(isDiagnosticDomain('semantic')).toBe(true);
+    expect(isDiagnosticDomain('data')).toBe(true);
     expect(isDiagnosticDomain('elib')).toBe(false);
     expect(isDiagnosticDomain('unknown')).toBe(false);
+  });
+
+  it('accepts stable Data source and operation locations', () => {
+    expect(
+      createDiagnostic({
+        code: 'DAT-1001',
+        domain: 'data',
+        severity: 'error',
+        message: 'Data operation is invalid.',
+        targetRef: {
+          kind: 'data-operation',
+          documentId: 'data-catalog',
+          operationId: 'list-products',
+        },
+      }).targetRef
+    ).toEqual({
+      kind: 'data-operation',
+      documentId: 'data-catalog',
+      operationId: 'list-products',
+    });
   });
 });

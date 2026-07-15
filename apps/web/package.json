@@ -54,6 +54,7 @@
     "@prodivix/prodivix-compiler": "workspace:*",
     "@prodivix/router": "workspace:*",
     "@prodivix/runtime-browser": "workspace:*",
+    "@prodivix/runtime-core": "workspace:*",
     "@prodivix/shared": "workspace:*",
     "@prodivix/themes": "workspace:*",
     "@prodivix/tokens": "workspace:*",

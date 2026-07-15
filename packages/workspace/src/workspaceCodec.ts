@@ -25,31 +25,27 @@ import {
   decodeDtcgDesignTokenDocument,
   decodeDtcgDesignTokenResolverDocument,
 } from '@prodivix/tokens';
+import {
+  decodeDataSourceDocument,
+  encodeDataSourceDocument,
+  isDataSourceDocument,
+  type DataSourceDocument,
+} from '@prodivix/data';
 import { tryNormalizeWorkspacePirContent } from './workspacePirContent';
 import {
   isCanonicalWorkspaceDocumentUpdatedAt,
   isValidWorkspaceDocumentName,
 } from './workspaceDocumentValidation';
 import {
+  isPirWorkspaceDocumentType as isRegisteredPirWorkspaceDocumentType,
+  isWorkspaceDocumentType,
+} from './workspaceContractRegistry';
+import {
   isWorkspacePirDocument as isCanonicalWorkspacePirDocument,
-  isWorkspacePirDocumentType,
   type WorkspacePirDocument,
 } from './component/workspacePirDocument';
 
 export { WorkspaceCodecError } from './workspaceCodecError';
-
-const WORKSPACE_DOCUMENT_TYPES = new Set<WorkspaceDocumentType>([
-  'pir-page',
-  'pir-layout',
-  'pir-component',
-  'pir-graph',
-  'pir-animation',
-  'design-tokens',
-  'design-token-resolver',
-  'code',
-  'asset',
-  'project-config',
-]);
 
 const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -184,7 +180,7 @@ const parseCanonicalIdArray = (value: unknown, path: string): string[] => {
 
 export const isPirWorkspaceDocumentType = (
   type: WorkspaceDocumentType
-): boolean => isWorkspacePirDocumentType(type);
+): boolean => isRegisteredPirWorkspaceDocumentType(type);
 
 export const isWorkspacePirDocument = (
   document: WorkspaceDocument | undefined
@@ -204,7 +200,7 @@ const parseWorkspaceDocument = (
     'Unknown workspace document field.'
   );
   const type = requireString(source.type, `${path}/type`);
-  if (!WORKSPACE_DOCUMENT_TYPES.has(type as WorkspaceDocumentType)) {
+  if (!isWorkspaceDocumentType(type)) {
     throw new WorkspaceCodecError(
       `${path}/type`,
       `Unsupported workspace document type: ${type}.`
@@ -285,6 +281,22 @@ const parseWorkspaceDocument = (
       throw new WorkspaceCodecError(
         `${path}/content`,
         decoded.issues.map((issue) => issue.message).join('; ')
+      );
+    }
+  } else if (type === 'data-source') {
+    if (pirContentBoundary === 'wire') {
+      const decoded = decodeDataSourceDocument(content, { documentId: id });
+      if (!decoded.ok) {
+        throw new WorkspaceCodecError(
+          `${path}/content`,
+          decoded.issues.map((issue) => issue.message).join('; ')
+        );
+      }
+      content = decoded.value;
+    } else if (!isDataSourceDocument(content, { documentId: id })) {
+      throw new WorkspaceCodecError(
+        `${path}/content`,
+        `Workspace Data source document ${id} must use the canonical current model.`
       );
     }
   } else if (type === 'code' && !isWorkspaceCodeDocumentContent(content)) {
@@ -485,7 +497,11 @@ export const encodeWorkspaceDocument = (
   ...document,
   content: isPirWorkspaceDocumentType(document.type)
     ? JSON.parse(encodePirDocument(document.content as PIRDocument))
-    : document.content,
+    : document.type === 'data-source'
+      ? encodeDataSourceDocument(document.content as DataSourceDocument, {
+          documentId: document.id,
+        })
+      : document.content,
 });
 
 /** Decodes the backend wire contract into the only canonical Workspace model. */

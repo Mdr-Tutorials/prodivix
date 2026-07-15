@@ -4,6 +4,12 @@ export {
   createNodeGraphExecutor,
 } from './nodeGraphExecutor';
 export {
+  NODEGRAPH_EXECUTION_PROVIDER_ID,
+  createNodeGraphExecutionInvocationInput,
+  createNodeGraphExecutionProvider,
+  readNodeGraphExecutionJobOutput,
+} from './nodeGraphExecutionProvider';
+export {
   createNodeGraphSemanticContributionProvider,
   NODEGRAPH_SEMANTIC_PROVIDER_DESCRIPTOR,
 } from './authoring/nodeGraphSemanticContributionProvider';
@@ -34,6 +40,12 @@ export type {
   NodeGraphTraceEvent,
   NodeGraphTraceKind,
 } from './nodeGraph.types';
+export type {
+  CreateNodeGraphExecutionInvocationInput,
+  CreateNodeGraphExecutionProviderOptions,
+  NodeGraphExecutionJobOutput,
+  ResolveNodeGraphExecutionDocument,
+} from './nodeGraphExecutionProvider';
 export type {
   CreateNodeGraphSemanticContributionProviderInput,
   NodeGraphSemanticDocumentInput,

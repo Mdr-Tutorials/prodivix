@@ -1,6 +1,6 @@
 const SEMANTIC_ID_PREFIX = 'prodivix.semantic.v1';
 
-export const CURRENT_SEMANTIC_SCHEMA_VERSION = 'prodivix-semantic-v2';
+export const CURRENT_SEMANTIC_SCHEMA_VERSION = 'prodivix-semantic-v3';
 
 const encodeSemanticIdPart = (value: string): string =>
   `${value.length}:${value}`;

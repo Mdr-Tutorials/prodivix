@@ -263,6 +263,7 @@ const (
 	WorkspaceDocumentTypeDesignTokens  WorkspaceDocumentType = "design-tokens"
 	WorkspaceDocumentTypeTokenResolver WorkspaceDocumentType = "design-token-resolver"
 	WorkspaceDocumentTypeCode          WorkspaceDocumentType = "code"
+	WorkspaceDocumentTypeDataSource    WorkspaceDocumentType = "data-source"
 	WorkspaceDocumentTypeAsset         WorkspaceDocumentType = "asset"
 	WorkspaceDocumentTypeProjectConfig WorkspaceDocumentType = "project-config"
 )

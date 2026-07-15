@@ -1,22 +1,29 @@
 import { create } from 'zustand';
-import type { CodeSlotKind } from '@prodivix/authoring';
+import {
+  createCodeAuthoringRequest,
+  type CodeAuthoringRequest,
+  type CodeAuthoringRequestInput,
+  type CodeSlotKind,
+} from '@prodivix/authoring';
 
 export type CodeAuthoringOverlayPresentation = 'compact' | 'maximized';
 
-export type CodeAuthoringOverlayRequestInput = Readonly<{
-  workspaceId: string;
-  artifactId: string;
-  presentation: CodeAuthoringOverlayPresentation;
-  slotId?: string;
-}>;
+export type CodeAuthoringOverlayRequestInput = Omit<
+  CodeAuthoringRequestInput,
+  'artifactId' | 'requestId' | 'presentation'
+> &
+  Readonly<{
+    artifactId: string;
+    presentation: CodeAuthoringOverlayPresentation;
+  }>;
 
-export type CodeAuthoringOverlayRequest = CodeAuthoringOverlayRequestInput &
-  Readonly<{ id: number }>;
+export type CodeAuthoringOverlayRequest = CodeAuthoringRequest &
+  Readonly<{ presentation: CodeAuthoringOverlayPresentation }>;
 
 type CodeAuthoringOverlayStore = {
   request: CodeAuthoringOverlayRequest | null;
   open: (request: CodeAuthoringOverlayRequestInput) => void;
-  close: (requestId?: number) => void;
+  close: (requestId?: string) => void;
 };
 
 let nextRequestId = 0;
@@ -39,11 +46,19 @@ export const useCodeAuthoringOverlayStore = create<CodeAuthoringOverlayStore>()(
     request: null,
     open: (request) => {
       nextRequestId += 1;
-      set({ request: { ...request, id: nextRequestId } });
+      set({
+        request: createCodeAuthoringRequest({
+          ...request,
+          requestId: `code-authoring-overlay:${nextRequestId}`,
+        }) as CodeAuthoringOverlayRequest,
+      });
     },
     close: (requestId) =>
       set((state) => {
-        if (!state.request || (requestId && state.request.id !== requestId)) {
+        if (
+          !state.request ||
+          (requestId && state.request.requestId !== requestId)
+        ) {
           return state;
         }
         return { request: null };
@@ -55,5 +70,5 @@ export const openCodeAuthoringOverlay = (
   request: CodeAuthoringOverlayRequestInput
 ) => useCodeAuthoringOverlayStore.getState().open(request);
 
-export const closeCodeAuthoringOverlay = (requestId?: number) =>
+export const closeCodeAuthoringOverlay = (requestId?: string) =>
   useCodeAuthoringOverlayStore.getState().close(requestId);

@@ -67,6 +67,31 @@ export const createDefaultNodeGraphNodeExecutorRegistry =
     registry.register('start', ({ node, input }) => ({
       output: node.data.value ?? input,
     }));
+    registry.register('process', ({ input }) => ({ output: input }));
+    registry.register('switch', ({ node, input }) => {
+      const selector = node.data.value ?? input;
+      const cases = Array.isArray(node.data.cases)
+        ? node.data.cases.filter(
+            (candidate): candidate is { id: string; label?: string } =>
+              Boolean(
+                candidate &&
+                typeof candidate === 'object' &&
+                'id' in candidate &&
+                typeof candidate.id === 'string' &&
+                candidate.id.trim()
+              )
+          )
+        : [];
+      const selectedCase = cases.find(
+        (candidate) => candidate.id === selector || candidate.label === selector
+      );
+      return {
+        output: input,
+        nextHandle: selectedCase
+          ? `out.control.case-${selectedCase.id}`
+          : 'out.control.default',
+      };
+    });
     registry.register('log', ({ node, input }) => {
       const output = node.data.description ?? node.data.value ?? input;
       return {
@@ -100,7 +125,13 @@ export const createNodeGraphExecutor = (
       detail: Record<string, unknown>
     ) => {
       sequence += 1;
-      trace.push({ sequence, kind, detail });
+      const event = { sequence, kind, detail };
+      trace.push(event);
+      try {
+        options.onTrace?.(event);
+      } catch {
+        // Execution observation cannot alter deterministic graph semantics.
+      }
     };
     const finish = (
       status: NodeGraphExecutionResult['status'],

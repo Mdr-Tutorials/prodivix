@@ -62,6 +62,17 @@ func TestStandaloneDomainDocumentValidation(t *testing.T) {
 			content:      `{"version":"2025.10","modifiers":{"theme":{"contexts":{}}},"resolutionOrder":[]}`,
 			wantError:    ErrDesignTokenResolverValidationFailed,
 		},
+		{
+			name:         "data source wire current",
+			documentType: WorkspaceDocumentTypeDataSource,
+			content:      `{"wireVersion":1,"source":{"id":"catalog","adapterId":"rest","runtimeZone":"server","bindingsById":{"catalog-api-key":{"kind":"secret-ref","reference":{"bindingId":"catalog-api-key"}}},"configurationByKey":{"baseUrl":{"kind":"literal","value":"https://example.test"},"authorization":{"kind":"secret-ref","reference":{"bindingId":"catalog-api-key"}}}},"schemasById":{"product-list":{"id":"product-list","schema":{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"array"}}},"operationsById":{"list-products":{"id":"list-products","kind":"query","outputSchemaId":"product-list","configurationByKey":{},"policies":{}}}}`,
+		},
+		{
+			name:         "data source rejects value-bearing secret refs",
+			documentType: WorkspaceDocumentTypeDataSource,
+			content:      `{"wireVersion":1,"source":{"id":"catalog","adapterId":"rest","runtimeZone":"server","bindingsById":{"api-key":{"kind":"secret-ref","reference":{"bindingId":"api-key"},"value":"plaintext"}},"configurationByKey":{}},"schemasById":{"product-list":{"id":"product-list","schema":true}},"operationsById":{"list-products":{"id":"list-products","kind":"query","outputSchemaId":"product-list","configurationByKey":{},"policies":{}}}}`,
+			wantError:    ErrDataSourceValidationFailed,
+		},
 	}
 
 	for _, test := range tests {
@@ -96,6 +107,16 @@ func TestStandaloneDomainPatchPathsUseCurrentCollections(t *testing.T) {
 	for _, path := range []string{"/timelinesById/timeline", "/tracksById/track", "/metadata"} {
 		if !errors.Is(validateWorkspaceAnimationPatchPath(path), ErrWorkspacePatchPathForbidden) {
 			t.Fatalf("expected legacy Animation path %s to be rejected", path)
+		}
+	}
+	for _, path := range []string{"/source/adapterId", "/schemasById/product", "/operationsById/list-products/policies"} {
+		if err := validateWorkspaceDataSourcePatchPath(path); err != nil {
+			t.Fatalf("expected Data source path %s to be allowed: %v", path, err)
+		}
+	}
+	for _, path := range []string{"/wireVersion", "/secrets", "/metadata"} {
+		if !errors.Is(validateWorkspaceDataSourcePatchPath(path), ErrWorkspacePatchPathForbidden) {
+			t.Fatalf("expected Data source path %s to be rejected", path)
 		}
 	}
 }

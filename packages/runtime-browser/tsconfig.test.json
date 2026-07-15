@@ -7,7 +7,7 @@
     "tsBuildInfoFile": "./node_modules/.cache/tsconfig.test.tsbuildinfo",
     "paths": {
       "@prodivix/animation": ["../animation/dist/index.d.ts"],
-      "@prodivix/nodegraph": ["../nodegraph/dist/index.d.ts"]
+      "@prodivix/runtime-core": ["../runtime-core/dist/index.d.ts"]
     }
   },
   "include": ["src/**/*"],
@@ -17,7 +17,7 @@
       "path": "../animation"
     },
     {
-      "path": "../nodegraph"
+      "path": "../runtime-core"
     }
   ]
 }

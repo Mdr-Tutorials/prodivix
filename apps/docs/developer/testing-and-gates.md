@@ -43,6 +43,18 @@ pnpm verify:g1:browser
 
 WebGPU 不可用必须记录为环境能力结果，不得伪造成功。视觉回归、accessibility、performance 与后续正式 `VerificationEvidence` 是独立 Gate。
 
+## Workspace Test 运行
+
+编辑器中的 Test 页面运行当前 Canonical Workspace revision 导出的独立 React/Vite 工程。存在 blocking export diagnostic 时运行会被阻断；准备成功后，Browser Test ExecutionProvider 在 `test` runtime zone 启动 snapshot 声明的 Vitest plan。
+
+Preview 与 Test 是两个独立 Provider：它们拥有不同 descriptor、ExecutionJob、Session、取消和结果，只共享 `BrowserProjectRuntimeHost` 的 filesystem、依赖安装与 browser Node runtime。这样既能复用昂贵的安装资源，也不会把预览 server 和测试进程混成同一个生命周期。
+
+Vitest JSON 在 Browser adapter 边界转换为 `@prodivix/runtime-core` 的 `ExecutionTestReport`。Test 页面展示 file/case status、duration 与 failure message，并通过共享 Execution Center 提供日志、停止和重跑；未来 Remote provider 与其他测试工具继续输出同一 transport-neutral report contract。
+
+`TST-5001` 表示已经取得报告后的用例/测试失败；`TST-5002` 表示宿主准备、命令执行或报告转换失败。两者都属于 G2 Workspace Test execution diagnostic，不是 VerificationEvidence code。
+
+这个 G2 纵切是 Workspace 导出工程测试宿主，不等同于 G3 的 `BehaviorScenario`、`VerificationPlan` 或 `VerificationEvidence`。运行报告与 Session event 是可丢弃运行态，不写入 Canonical Workspace 或 Outbox。
+
 ## Closure evidence
 
 通过一个 Gate 需要可重复证据，而不是“测试大概都绿了”。当前证据保存在：

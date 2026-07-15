@@ -32,6 +32,9 @@
       "path": "./packages/runtime-core"
     },
     {
+      "path": "./packages/data"
+    },
+    {
       "path": "./packages/nodegraph"
     },
     {

@@ -24,7 +24,8 @@
     "typecheck": "tsc -b tsconfig.test.json --pretty false"
   },
   "dependencies": {
-    "@prodivix/authoring": "workspace:*"
+    "@prodivix/authoring": "workspace:*",
+    "@prodivix/runtime-core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.1.0",

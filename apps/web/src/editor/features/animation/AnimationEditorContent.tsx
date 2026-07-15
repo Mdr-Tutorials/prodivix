@@ -3,14 +3,23 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from 'react';
 import type {
   AnimationDefinition,
   AnimationTimeline,
 } from '@prodivix/animation';
+import { createBrowserAnimationEffectStore } from '@prodivix/runtime-browser';
 import { createWorkspaceCodeArtifactProvider } from '@prodivix/workspace';
 import { openWorkspaceCodeSlotDefinition } from '@/editor/features/code';
+import {
+  ExecutionCenter,
+  getWorkspaceAnimationExecutionSessionId,
+  startWorkspaceAnimationExecution,
+  stopWorkspaceAnimationExecution,
+  useExecutionSession,
+} from '@/editor/features/execution';
 import { useWorkspaceSemanticNavigationStore } from '@/editor/navigation';
 import { useWorkspaceHistoryShortcuts } from '@/editor/shortcuts';
 import {
@@ -24,6 +33,13 @@ import { AnimationEditorTimelinePanel } from './panels/AnimationEditorTimelinePa
 import type { AnimationEditorTrackRef } from './panels/AnimationEditorTimelinePanel';
 import { AnimationEditorTopBar } from './panels/AnimationEditorTopBar';
 import { useAnimationEditorState } from './useAnimationEditorState';
+
+const ACTIVE_EXECUTION_STATUSES = new Set([
+  'queued',
+  'starting',
+  'running',
+  'cancelling',
+]);
 
 type AnimationEditorContentProps = Readonly<{
   animationDocumentId: string;
@@ -47,6 +63,7 @@ export const AnimationEditorContent = ({
     activeTimelineId,
     activeTimeline,
     cursorMs,
+    nodeTargetOptions,
     svgFilters,
     zoom,
     addTimeline,
@@ -84,6 +101,7 @@ export const AnimationEditorContent = ({
     deleteSvgPrimitive,
     updateSvgPrimitiveType,
     canRemoveSvgFilter,
+    flushPendingPersistence,
   } = useAnimationEditorState({
     animationDocumentId,
     persistedAnimation,
@@ -103,6 +121,7 @@ export const AnimationEditorContent = ({
       openWorkspaceCodeSlotDefinition({
         workspace,
         slotId,
+        origin: { surface: 'animation-timeline' },
       });
     },
     [workspace]
@@ -117,11 +136,65 @@ export const AnimationEditorContent = ({
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>();
   const [selection, setSelection] = useState<AnimationEditorSelection>({});
+  const [executionDiagnostic, setExecutionDiagnostic] = useState<
+    string | undefined
+  >();
+  const targetNodeIdsSignature = useMemo(
+    () =>
+      nodeTargetOptions
+        .map((option) => option.id)
+        .sort()
+        .join('\u0000'),
+    [nodeTargetOptions]
+  );
+  const effectStore = useMemo(
+    () =>
+      createBrowserAnimationEffectStore({
+        targetDocumentId: animation.target.documentId,
+        targetNodeIds: targetNodeIdsSignature
+          ? targetNodeIdsSignature.split('\u0000')
+          : [],
+      }),
+    [
+      animation.target.documentId,
+      animationDocumentId,
+      targetNodeIdsSignature,
+      workspaceId,
+    ]
+  );
+  const effectSnapshot = useSyncExternalStore(
+    effectStore.subscribe,
+    effectStore.getSnapshot,
+    effectStore.getSnapshot
+  );
+  const executionSessionId = workspaceId
+    ? getWorkspaceAnimationExecutionSessionId(workspaceId, animationDocumentId)
+    : undefined;
+  const executionSession = useExecutionSession(
+    executionSessionId ?? 'animation:unavailable'
+  );
+  const isExecuting = Boolean(
+    executionSession && ACTIVE_EXECUTION_STATUSES.has(executionSession.status)
+  );
   const semanticNavigationRequest = useWorkspaceSemanticNavigationStore(
     (state) => state.navigationRequest
   );
   const consumeSemanticNavigation = useWorkspaceSemanticNavigationStore(
     (state) => state.consumeNavigation
+  );
+
+  useEffect(
+    () => () => {
+      effectStore.dispose();
+      if (workspaceId) {
+        void stopWorkspaceAnimationExecution(
+          workspaceId,
+          animationDocumentId,
+          'Animation effect surface was replaced.'
+        );
+      }
+    },
+    [animationDocumentId, effectStore, workspaceId]
   );
 
   useEffect(() => {
@@ -247,8 +320,65 @@ export const AnimationEditorContent = ({
     return firstBindingId || undefined;
   }, [activeTimeline, selection.bindingId]);
 
+  const stopPlayback = useCallback(() => {
+    if (!workspaceId) return;
+    void stopWorkspaceAnimationExecution(workspaceId, animationDocumentId);
+  }, [animationDocumentId, workspaceId]);
+
+  const runActiveTimeline = useCallback(async () => {
+    if (!activeTimeline) return;
+    setExecutionDiagnostic(undefined);
+    if (!(await flushPendingPersistence())) {
+      setExecutionDiagnostic(
+        'Save the current Animation revision before running it.'
+      );
+      return;
+    }
+    const currentWorkspace = useEditorStore.getState().workspace;
+    if (!currentWorkspace) {
+      setExecutionDiagnostic('The current Workspace is unavailable.');
+      return;
+    }
+    effectStore.reset();
+    try {
+      await startWorkspaceAnimationExecution({
+        workspace: currentWorkspace,
+        documentId: animationDocumentId,
+        timelineId: activeTimeline.id,
+        runtime: effectStore.createRuntimePort(),
+      });
+    } catch (error) {
+      setExecutionDiagnostic(
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  }, [
+    activeTimeline,
+    animationDocumentId,
+    effectStore,
+    flushPendingPersistence,
+  ]);
+
+  const changeCursor = useCallback(
+    (nextMs: number) => {
+      if (isExecuting) stopPlayback();
+      effectStore.reset();
+      setCursorMs(nextMs);
+    },
+    [effectStore, isExecuting, setCursorMs, stopPlayback]
+  );
+  const runtimePreview =
+    effectSnapshot.status === 'idle' || effectSnapshot.status === 'disposed'
+      ? undefined
+      : effectSnapshot.preview;
+  const displayedCursorMs =
+    runtimePreview && effectSnapshot.cursorMs !== null
+      ? effectSnapshot.cursorMs
+      : cursorMs;
+  const visibleDiagnostic = diagnostic ?? executionDiagnostic;
+
   return (
-    <div className="relative flex h-full min-h-screen flex-col overflow-hidden text-(--text-primary) [--anim-inspector-width:400px] [--anim-timeline-height:300px] max-[1100px]:[--anim-inspector-width:100%]">
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden text-(--text-primary) [--anim-inspector-width:400px] [--anim-timeline-height:300px] max-[1100px]:[--anim-inspector-width:100%]">
       <AnimationEditorTopBar
         timelines={animation.timelines}
         activeTimelineId={activeTimelineId}
@@ -270,21 +400,25 @@ export const AnimationEditorContent = ({
               entryDocumentId={animation.target.documentId}
               previewNodeId={previewNodeId}
               timeline={activeTimeline}
-              cursorMs={cursorMs}
-              onCursorChange={setCursorMs}
+              cursorMs={displayedCursorMs}
+              onCursorChange={changeCursor}
               svgFilters={svgFilters}
               zoom={zoom}
               onZoomChange={setZoom}
               selectedNodeId={selectedNodeId}
               onSelectNodeId={setSelectedNodeId}
+              executionRunning={isExecuting}
+              runtimePreview={runtimePreview}
+              onPlay={() => void runActiveTimeline()}
+              onStop={stopPlayback}
             />
           </div>
 
           <AnimationEditorTimelinePanel
             timelines={animation.timelines}
             activeTimelineId={activeTimelineId}
-            cursorMs={cursorMs}
-            onCursorChange={setCursorMs}
+            cursorMs={displayedCursorMs}
+            onCursorChange={changeCursor}
             selectedTrack={selectedTrackRef}
             onSelectTimeline={(timelineId) => {
               selectTimeline(timelineId);
@@ -301,7 +435,7 @@ export const AnimationEditorContent = ({
 
         <AnimationEditorInspectorPanel
           timeline={activeTimelineForInspector}
-          cursorMs={cursorMs}
+          cursorMs={displayedCursorMs}
           svgFilters={svgFilters}
           canRemoveSvgFilter={canRemoveSvgFilter}
           selection={selection}
@@ -347,17 +481,24 @@ export const AnimationEditorContent = ({
           onDeleteSvgPrimitive={deleteSvgPrimitive}
           onUpdateSvgPrimitiveType={updateSvgPrimitiveType}
         />
-        {diagnostic ? (
+        {visibleDiagnostic ? (
           <div className="pointer-events-none absolute inset-x-3 top-3 z-20 flex justify-center">
             <div
               role="status"
               className="max-w-2xl rounded-xl border border-black/10 bg-[rgb(var(--bg-canvas-rgb)_/_0.94)] px-4 py-2 text-xs text-(--text-secondary) shadow-(--shadow-md) backdrop-blur"
             >
-              {diagnostic}
+              {visibleDiagnostic}
             </div>
           </div>
         ) : null}
       </fieldset>
+      {executionSessionId && executionSession ? (
+        <ExecutionCenter
+          sessionId={executionSessionId}
+          onRestart={() => void runActiveTimeline()}
+          onStop={stopPlayback}
+        />
+      ) : null}
     </div>
   );
 };

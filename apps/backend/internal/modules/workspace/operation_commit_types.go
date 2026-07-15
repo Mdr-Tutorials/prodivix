@@ -379,7 +379,7 @@ func validateRawCommitCommand(command WorkspaceCommandEnvelope) error {
 	}
 	if command.DomainHint != "" {
 		switch command.DomainHint {
-		case "pir", "workspace", "route", "nodegraph", "animation", "token", "code", "resource":
+		case "pir", "workspace", "route", "nodegraph", "animation", "token", "code", "data", "resource":
 		default:
 			return commitValidation("/operation/command/domainHint", "domainHint must use a canonical registered domain")
 		}
@@ -445,8 +445,8 @@ func validateCommitCommand(command WorkspaceCommandEnvelope, workspaceID string)
 		if documentDomain == "" {
 			documentDomain = namespaceDomain
 		}
-		if documentDomain != "pir" && documentDomain != "nodegraph" && documentDomain != "animation" && documentDomain != "token" && documentDomain != "code" && documentDomain != "resource" {
-			return commitValidation("/operation/command/domainHint", "document-targeted commands require pir, nodegraph, animation, token, code, or resource domain")
+		if documentDomain != "pir" && documentDomain != "nodegraph" && documentDomain != "animation" && documentDomain != "token" && documentDomain != "code" && documentDomain != "data" && documentDomain != "resource" {
+			return commitValidation("/operation/command/domainHint", "document-targeted commands require pir, nodegraph, animation, token, code, data, or resource domain")
 		}
 	}
 	return nil
@@ -455,25 +455,31 @@ func validateCommitCommand(command WorkspaceCommandEnvelope, workspaceID string)
 func commitNamespaceDomain(namespace string) string {
 	namespace = strings.TrimSpace(namespace)
 	switch {
-	case strings.HasPrefix(namespace, "core.pir"):
+	case matchesCommitNamespace(namespace, "core.pir"):
 		return "pir"
-	case strings.HasPrefix(namespace, "core.nodegraph"):
+	case matchesCommitNamespace(namespace, "core.nodegraph"):
 		return "nodegraph"
-	case strings.HasPrefix(namespace, "core.animation"):
+	case matchesCommitNamespace(namespace, "core.animation"):
 		return "animation"
-	case strings.HasPrefix(namespace, "core.design-token"):
+	case matchesCommitNamespace(namespace, "core.design-tokens"), matchesCommitNamespace(namespace, "core.design-token-resolvers"):
 		return "token"
-	case strings.HasPrefix(namespace, "core.code"):
+	case matchesCommitNamespace(namespace, "core.code"):
 		return "code"
-	case strings.HasPrefix(namespace, "core.resource"):
+	case matchesCommitNamespace(namespace, "core.data"):
+		return "data"
+	case matchesCommitNamespace(namespace, "core.resource"):
 		return "resource"
-	case strings.HasPrefix(namespace, "core.route"):
+	case matchesCommitNamespace(namespace, "core.route"):
 		return "route"
-	case strings.HasPrefix(namespace, "core.workspace"):
+	case matchesCommitNamespace(namespace, "core.workspace"), matchesCommitNamespace(namespace, "core.workspace-sync"):
 		return "workspace"
 	default:
 		return ""
 	}
+}
+
+func matchesCommitNamespace(namespace string, root string) bool {
+	return namespace == root || strings.HasPrefix(namespace, root+".")
 }
 
 func canonicalizeCommitCommandPatchValues(command *WorkspaceCommandEnvelope) error {

@@ -937,6 +937,7 @@ export const useBlueprintEditorInspectorController = ({
         workspace: source,
         artifactId,
         presentation: 'maximized',
+        origin: { surface: 'inspector' },
       });
       if (result.status === 'unavailable') {
         report('The selected code artifact is no longer available.');

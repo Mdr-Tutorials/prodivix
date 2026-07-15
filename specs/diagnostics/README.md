@@ -4,7 +4,7 @@
 
 - Draft
 - 日期：2026-05-03
-- 适用范围：PIR、Workspace、Plugin、Route、Editor、UX、Code、Semantic、NodeGraph、Animation、External Library、Codegen、Backend、AI
+- 适用范围：PIR、Workspace、Plugin、Route、Editor、UX、Code、Semantic、NodeGraph、Animation、Data、Workspace Test、Codegen、Backend、AI
 - 后端错误响应：`specs/decisions/24.backend-diagnostic-envelope.md`
 
 ## 1. 目的
@@ -23,7 +23,7 @@ Prodivix Diagnostics 用于统一：
 
 应该进入 Diagnostics 的问题：
 
-1. 核心模型错误：PIR graph、Workspace VFS、Route manifest、NodeGraph、Animation。
+1. 核心模型错误：PIR graph、Workspace VFS、Route manifest、NodeGraph、Animation、DataSourceDocument。
 2. 跨模块链路错误：保存、同步、导出、代码生成、部署、外部库运行时、AI Provider。
 3. 可恢复但需要定位的问题：引用断裂、缺失节点、重复注册、Capability 不匹配、同步冲突。
 4. 需要写文档、打日志、做测试断言或上报 telemetry 的稳定语义。
@@ -52,6 +52,7 @@ type ProdivixDiagnostic = {
     | 'semantic'
     | 'nodegraph'
     | 'animation'
+    | 'data'
     | 'codegen'
     | 'backend'
     | 'ai';
@@ -89,21 +90,23 @@ type ProdivixDiagnostic = {
 
 ## 5. 编码域
 
-| 前缀       | 领域        | 说明                                           | 码表                                              |
-| ---------- | ----------- | ---------------------------------------------- | ------------------------------------------------- |
-| `PIR-xxxx` | PIR         | Schema、graph、ValueRef、materialize、校验     | `specs/diagnostics/pir-diagnostic-codes.md`       |
-| `WKS-xxxx` | Workspace   | VFS、文档保存、revision、同步冲突、capability  | `specs/diagnostics/workspace-diagnostic-codes.md` |
-| `PLG-xxxx` | Plugin      | Manifest、contract、权限、注册事务、runtime    | `specs/diagnostics/plugin-diagnostic-codes.md`    |
-| `RTE-xxxx` | Route       | Route manifest、Outlet、导航运行时             | `specs/diagnostics/route-diagnostic-codes.md`     |
-| `EDT-xxxx` | Editor      | 编辑器交互、选择、拖拽、Inspector、画布状态    | `specs/diagnostics/editor-diagnostic-codes.md`    |
-| `UX-xxxx`  | UX          | 可访问性、交互、响应式布局、内容和视觉反馈     | `specs/diagnostics/ux-diagnostic-codes.md`        |
-| `COD-xxxx` | Code        | 用户代码片段、符号解析、类型、宿主绑定、运行时 | `specs/diagnostics/code-diagnostic-codes.md`      |
-| `SEM-xxxx` | Semantic    | 跨领域引用解析、作用域、类型约束与快照身份     | `specs/diagnostics/semantic-diagnostic-codes.md`  |
-| `NGR-xxxx` | NodeGraph   | 节点图端口、连线、执行、调试                   | `specs/diagnostics/nodegraph-diagnostic-codes.md` |
-| `ANI-xxxx` | Animation   | Timeline、binding、track、target node          | `specs/diagnostics/animation-diagnostic-codes.md` |
-| `GEN-xxxx` | Codegen     | IR 构建、依赖解析、代码发射、导出              | `specs/diagnostics/codegen-diagnostic-codes.md`   |
-| `API-xxxx` | Backend/API | HTTP、鉴权、权限、后端校验、持久化             | `specs/diagnostics/api-diagnostic-codes.md`       |
-| `AI-xxxx`  | AI          | Provider、模型发现、Prompt、结构化响应解析     | `specs/diagnostics/ai-diagnostic-codes.md`        |
+| 前缀       | 领域                                 | 说明                                             | 码表                                              |
+| ---------- | ------------------------------------ | ------------------------------------------------ | ------------------------------------------------- |
+| `PIR-xxxx` | PIR                                  | Schema、graph、ValueRef、materialize、校验       | `specs/diagnostics/pir-diagnostic-codes.md`       |
+| `WKS-xxxx` | Workspace                            | VFS、文档保存、revision、同步冲突、capability    | `specs/diagnostics/workspace-diagnostic-codes.md` |
+| `PLG-xxxx` | Plugin                               | Manifest、contract、权限、注册事务、runtime      | `specs/diagnostics/plugin-diagnostic-codes.md`    |
+| `RTE-xxxx` | Route                                | Route manifest、Outlet、导航运行时               | `specs/diagnostics/route-diagnostic-codes.md`     |
+| `EDT-xxxx` | Editor                               | 编辑器交互、选择、拖拽、Inspector、画布状态      | `specs/diagnostics/editor-diagnostic-codes.md`    |
+| `UX-xxxx`  | UX                                   | 可访问性、交互、响应式布局、内容和视觉反馈       | `specs/diagnostics/ux-diagnostic-codes.md`        |
+| `COD-xxxx` | Code                                 | 用户代码片段、符号解析、类型、宿主绑定、运行时   | `specs/diagnostics/code-diagnostic-codes.md`      |
+| `SEM-xxxx` | Semantic                             | 跨领域引用解析、作用域、类型约束与快照身份       | `specs/diagnostics/semantic-diagnostic-codes.md`  |
+| `NGR-xxxx` | NodeGraph                            | 节点图端口、连线、执行、调试                     | `specs/diagnostics/nodegraph-diagnostic-codes.md` |
+| `ANI-xxxx` | Animation                            | Timeline、binding、track、target node            | `specs/diagnostics/animation-diagnostic-codes.md` |
+| `DAT-xxxx` | Data                                 | Data source、schema、operation、binding、runtime | `specs/diagnostics/data-diagnostic-codes.md`      |
+| `TST-xxxx` | Workspace Test (`domain: workspace`) | 导出工程测试执行与报告转换                       | `specs/diagnostics/test-diagnostic-codes.md`      |
+| `GEN-xxxx` | Codegen                              | IR 构建、依赖解析、代码发射、导出                | `specs/diagnostics/codegen-diagnostic-codes.md`   |
+| `API-xxxx` | Backend/API                          | HTTP、鉴权、权限、后端校验、持久化               | `specs/diagnostics/api-diagnostic-codes.md`       |
+| `AI-xxxx`  | AI                                   | Provider、模型发现、Prompt、结构化响应解析       | `specs/diagnostics/ai-diagnostic-codes.md`        |
 
 ## 6. 码位规则
 

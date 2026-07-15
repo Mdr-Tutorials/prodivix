@@ -14,6 +14,7 @@
   - `specs/decisions/28.code-authoring-environment.md`
   - `specs/decisions/38.blueprint-component-instance-and-collection.md`
   - `specs/decisions/31.production-export-planner.md`
+  - `specs/decisions/45.data-operation-and-environment-reference-foundation.md`
   - `specs/roadmap/g0-closure-evidence.md`
 
 ## 文档目的
@@ -95,8 +96,8 @@ flowchart LR
 | ------------ | ----------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | G0           | Passed            | Implemented                               | Canonical Workspace、History、Atomic Commit、Revision Conflict、唯一生产写入链路、双 Durable Outbox、正式 local replica、revision-aware Issues 与 Golden Conformance 已落地；`pnpm run verify:g0` 的 8 个阶段与六项退出 Gate 已完整通过，证据见 `g0-closure-evidence.md`                                                            |
 | G1           | Passed            | Implemented / PIR-current / Semantic Code | Workspace Semantic Index、无版本 PIR-current、Component/Collection、Renderer-Compiler parity、原子 extraction、TS/JS/CSS/SCSS/GLSL/WGSL、独立 Shader Compile、跨编辑器 CodeSlot、controlled round-trip、Token/Resolver/Asset provider、完整 S5 产品表面、唯一 durable 生产写入链，以及独立 React/Vite build/browser Gate 已形成闭环 |
-| G2           | In Progress       | Foundation                                | 进入 ExecutionProvider、Data/API IR、SecretRef、runtime zones、项目级浏览器运行环境与第二 framework target 的建设阶段                                                                                                                                                                                                               |
-| G3           | Blocked           | Early                                     | NodeGraph 已形成无 DOM 领域包与执行内核；Animation 已形成 contract、normalizer、基础 evaluator 和 Browser preview projection；G3 统一完成 command、lifecycle、composition、conflict 与完整行为验证                                                                                                                                  |
+| G2           | In Progress       | Execution + Data Authoring Foundation     | ExecutionProvider/Job、共享 Browser Runtime Host、Preview/Test 与 NodeGraph/Animation provider 已建立；DataSourceDocument/DataOperationReference、typed Workspace/Semantic 与引用式 environment/Secret contract 已落地；Data runtime、协议 adapter、Secret resolution、Remote Runner、Terminal/Network 与第二 target 继续建设       |
+| G3           | Blocked           | Early                                     | NodeGraph 已形成无 DOM 执行内核；Animation 已形成完整单 timeline lifecycle、Runtime Port 与 Browser effect projection；G3 统一完成 composition、route/reduced-motion/CodeSlot 行为、conflict 与 VerificationEvidence                                                                                                                |
 | G4           | Blocked           | Foundation Only                           | AI gateway、streaming、tool 和 trace 有基础；真实 Workspace 写入仍未达到产品 Gate                                                                                                                                                                                                                                                   |
 | G5           | Blocked           | Not Started Systematically                | 单设备 local replica 已形成基础；multi-device sync、presence、Review、Production Feedback 与完整 Local-first 团队闭环尚未形成                                                                                                                                                                                                       |
 | G6           | Blocked           | Infrastructure Preview                    | Plugin Host 和三类官方插件较成熟，但 SDK、conformance、签名、Marketplace 和多 Target Gate 尚未完成                                                                                                                                                                                                                                  |
@@ -238,6 +239,24 @@ S6 Golden G1 已完成。旅程覆盖原子抽取、3 个 instances、props/even
 7. `SecretRef`、环境绑定、权限和 mock/live adapter；Secret 不进入 PIR 和客户端产物。
 8. 二进制 Asset 管线：hash、去重、元数据、转换和交付策略。
 9. Auth、session、permission 和 server function 的稳定 runtime contract。
+
+### 当前基础
+
+- `@prodivix/runtime-core` 已完成 revision-bound `ExecutionRequest`、静态 provider descriptor/capability matching、instance-owned registry、canonical `ExecutionJob` 状态机，以及 transport-neutral `ExecutionTestReport` / `test.report` contract。
+- Job 已统一 state、log、diagnostic、artifact、trace、SourceTrace、cursor replay、cancel、timeout 与 terminal result，并由属性测试和 provider conformance test 验证。
+- instance-owned `ExecutionSessionCoordinator` 以稳定 session identity 组合 revision-bound Jobs，提供有界事件保留、订阅、清理与取消入口；它不持久化 Workspace，也不拥有 provider process。
+- `@prodivix/runtime-browser` 以 composition-root-owned `BrowserProjectRuntimeHost` 统一管理惰性 browser Node runtime、filesystem snapshot、dependency fingerprint/install、owner-scoped process 与 dispose。Preview 与 Test 各自使用独立 provider descriptor、Job、Session 和 owner，只共享 Host 资源与匹配的依赖安装结果。
+- Browser Preview provider 从 Compiler 生成的 revision-bound React/Vite bundle 构造隔离工程 snapshot，完成 Vite server、source-only HMR、console forwarding 与 preview artifact。
+- Browser Test provider 运行同一 exact Workspace revision 导出的独立工程 test plan，把 Vitest 私有 JSON 在 adapter 边界转换为 canonical `ExecutionTestReport`，并通过 `test.report` trace、report artifact 与 Test 页面呈现 file/case status、duration 和 failure message。
+- 蓝图画布已形成 Design / Interactive / Run 三模式；Run 通过 sandboxed iframe 原位显示真实项目 server，共享 Execution Center 提供日志过滤、停止、重启、刷新和独立预览，并在模式切换后保留当前会话事件。
+- `@prodivix/nodegraph` 已提供 same-context ExecutionProvider，将确定性 trace 实时映射为 Job trace/log/diagnostic 与 node-qualified SourceTrace；NodeGraph 编辑器 Run/Stop、Blueprint trigger、跨 revision session、取消、timeout 和 state patch result 已接入共享 Execution Center。旧 `runtime-browser` action 直调协议已删除。
+- `@prodivix/animation` 已提供无 DOM scheduler/effect lease port 与 same-context ExecutionProvider，正式执行 delay、iterations、direction、fillMode、timeline/keyframe easing、取消、timeout、diagnostic 和 SourceTrace。`@prodivix/runtime-browser` 提供 one-shot RAF、target capability 与 generation-fenced effect store；Animation 编辑器 Play/Stop/Restart 已硬切到 revision-bound Session 与共享 Execution Center，旧私有 RAF lifecycle 和 browser preview helper 已删除。
+- Workspace Test 纵切是 G2 的导出工程测试宿主；其报告与 Session event 不持久化为 Workspace 作者态，也不提前宣称 G3 `BehaviorScenario`、`VerificationPlan` 或 `VerificationEvidence` 已完成。
+- `@prodivix/data` 已建立无版本号 current DataSourceDocument、DataOperationReference、JSON Schema 2020-12 shape、query/mutation、pagination/cache/retry/optimistic policy、lifecycle contract、strict normalization 与 `wireVersion: 1` codec。Policy 与 lifecycle 在此处是稳定 contract，不表示执行器已经完成。
+- Canonical Workspace 已注册一等 `data-source` typed document；TypeScript Workspace codec/validator 复用 Data strict codec，后端验证对应 wire envelope 与基础 shape，默认 Workspace Semantic Index composition 接入 revision-bound Data source/schema/operation contribution。Data 作者态继续进入 Command/Transaction、Outbox 与 Atomic Commit，不建立私有镜像。
+- `@prodivix/runtime-core` 已提供 reference-only ExecutionEnvironmentSnapshotRef、EnvironmentBindingReference 与 SecretRef，并允许 ExecutionRequest 绑定 immutable environment snapshot identity。Environment value map 不进入 request；Secret material 不进入 Workspace、request、log、artifact 或客户端产物。
+- PIR 现有 `dataId` 继续表示 PIR 文档内局部数据作用域，不是全局 operation identity。PIR/Collection DataOperationReference binding、Data runtime/adapter registry、Secret resolver/runtime-zone permission、OpenAPI/GraphQL/AsyncAPI adapter，以及 Preview/Export CRUD parity 尚未完成。
+- Remote Isolated provider、Terminal/Network 与多 framework runner 继续作为 G2 后续交付。
 
 ### 退出 Gate
 

@@ -22,19 +22,19 @@
 
 ```ts
 type AnimationDiagnosticStage =
-  'timeline' | 'binding' | 'track' | 'keyframe' | 'preview';
+  'timeline' | 'binding' | 'track' | 'keyframe' | 'preview' | 'runtime';
 ```
 
 ## 3. 编码分段
 
-| 段位       | 阶段       | 说明                          |
-| ---------- | ---------- | ----------------------------- |
-| `ANI-10xx` | `timeline` | 时间线形状、时长、迭代策略    |
-| `ANI-20xx` | `binding`  | target node、binding 唯一性   |
-| `ANI-30xx` | `track`    | track 类型、属性、filter 定义 |
-| `ANI-40xx` | `keyframe` | keyframe 排序、值类型、单位   |
-| `ANI-50xx` | `preview`  | 动画预览、采样、播放状态      |
-| `ANI-90xx` | `preview`  | 动画未知异常                  |
+| 段位       | 阶段                  | 说明                                |
+| ---------- | --------------------- | ----------------------------------- |
+| `ANI-10xx` | `timeline`            | 时间线形状、时长、迭代策略          |
+| `ANI-20xx` | `binding`             | target node、binding 唯一性         |
+| `ANI-30xx` | `track`               | track 类型、属性、filter 定义       |
+| `ANI-40xx` | `keyframe`            | keyframe 排序、值类型、单位         |
+| `ANI-50xx` | `preview` / `runtime` | 动画预览、采样、播放与 Runtime Port |
+| `ANI-90xx` | `preview` / `runtime` | 动画未知异常                        |
 
 ## 4. 已占用码位
 
@@ -100,6 +100,51 @@ type AnimationDiagnosticStage =
 - Trigger: 预览器无法在指定时间采样动画状态
 - User action: 检查绑定目标、track 值和 filter 定义
 - Developer notes: 预览失败不应破坏 PIR 保存态
+
+### `ANI-5002` 执行目标时间线不存在
+
+- Severity: `error`
+- Stage: `runtime`
+- Retryable: false
+- Trigger: revision-bound Animation Job 指向的 timeline 不存在
+- User action: 重新选择时间线并基于最新 Workspace revision 运行
+- Developer notes: Job 不得回退到其他 active timeline
+
+### `ANI-5101` CodeSlot 执行能力不可用
+
+- Severity: `error`
+- Stage: `runtime`
+- Retryable: false
+- Trigger: timeline 绑定 custom easing、script 或 shader，但当前 provider 没有对应 execution capability
+- User action: 选择具备该能力的 runtime，或移除绑定
+- Developer notes: provider 必须 fail closed，不得忽略 CodeSlot 后返回 succeeded
+
+### `ANI-5102` Easing 不受当前 Runtime 支持
+
+- Severity: `error`
+- Stage: `runtime`
+- Retryable: false
+- Trigger: timeline 或 keyframe easing 无法由当前 deterministic evaluator 执行
+- User action: 使用受支持的 easing 或接入 custom easing CodeSlot runtime
+- Developer notes: 不得静默按 linear 执行正式 Job
+
+### `ANI-5201` Effect capability 不受支持
+
+- Severity: `error`
+- Stage: `runtime`
+- Retryable: false
+- Trigger: effect host 未声明 track 所需的 style、css-filter 或 svg-filter capability
+- User action: 切换 effect host 或调整 track
+- Developer notes: 在 acquire lease 前完成 preflight
+
+### `ANI-5202` Effect target 不可用
+
+- Severity: `error`
+- Stage: `runtime`
+- Retryable: false
+- Trigger: effect host 无法解析 document-qualified PIR target node
+- User action: 修复动画 binding 或恢复目标节点
+- Developer notes: diagnostic 使用 animation-track target，并由 Semantic Index 提供跨文档影响
 
 ### `ANI-9001` Animation 未知异常
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
+import { createCodeAuthoringRequest } from '@prodivix/authoring';
 import { CodeAuthoringWorkspace } from '@/editor/features/code/CodeAuthoringWorkspace';
 import { ExternalLibraryManager } from './ExternalLibraryManager';
 import { I18nResourcePage } from './I18nResourcePage';
@@ -58,6 +59,16 @@ export function ProjectResources() {
   const [pendingCodeFolder, setPendingCodeFolder] = useState<
     'scripts' | 'styles' | 'shaders' | null
   >(null);
+  const codeAuthoringRequest = useMemo(
+    () =>
+      createCodeAuthoringRequest({
+        requestId: `resource-code:${workspace?.id ?? projectId ?? 'workspace'}`,
+        workspaceId: workspace?.id ?? projectId ?? 'workspace',
+        presentation: 'embedded',
+        origin: { surface: 'resources' },
+      }),
+    [projectId, workspace?.id]
+  );
   useEffect(() => {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(
@@ -151,7 +162,7 @@ export function ProjectResources() {
 
       {activeSection === 'code' ? (
         <CodeAuthoringWorkspace
-          presentation="embedded"
+          request={codeAuthoringRequest}
           requestedCreateFolder={pendingCodeFolder}
           onCreateRequestConsumed={() => setPendingCodeFolder(null)}
         />

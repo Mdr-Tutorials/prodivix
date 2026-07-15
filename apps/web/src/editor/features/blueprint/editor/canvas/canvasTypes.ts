@@ -9,15 +9,17 @@ import type {
   PIRTriggerDispatchRequest,
 } from '@prodivix/pir-react-renderer';
 import type { WorkspaceSnapshot } from '@prodivix/workspace';
+import type { BlueprintProjectRunnerSurfaceController } from '../runner';
 
-export type BlueprintCanvasInteractionMode = 'design' | 'interactive';
+export type BlueprintCanvasMode = 'design' | 'interactive' | 'run';
 
 export type BlueprintEditorCanvasProps = {
   workspace: WorkspaceSnapshot;
   entryDocumentId: string;
   rendererHost: PIRRendererHost;
   currentPath: string;
-  interactionMode: BlueprintCanvasInteractionMode;
+  canvasMode: BlueprintCanvasMode;
+  projectRunner: BlueprintProjectRunnerSurfaceController;
   viewportWidth: string;
   viewportHeight: string;
   zoom: number;

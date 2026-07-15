@@ -25,7 +25,8 @@
   },
   "dependencies": {
     "@prodivix/animation": "workspace:*",
-    "@prodivix/nodegraph": "workspace:*"
+    "@prodivix/runtime-core": "workspace:*",
+    "@webcontainer/api": "^1.6.4"
   },
   "devDependencies": {
     "@types/node": "^26.1.0",

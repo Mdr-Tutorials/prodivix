@@ -20,6 +20,16 @@ import { isCanonicalWorkspaceAnimationDocumentContent } from './workspaceAnimati
 import { isCanonicalWorkspaceNodeGraphDocumentContent } from './workspaceNodeGraphDocument';
 import { isCanonicalWorkspaceDesignTokenDocumentContent } from './workspaceDesignTokenDocument';
 import { isCanonicalWorkspaceDesignTokenResolverDocumentContent } from './workspaceDesignTokenResolverDocument';
+import { isCanonicalWorkspaceDataSourceDocumentContent } from './workspaceDataSourceDocument';
+import {
+  getWorkspaceDocumentDomain,
+  isPirWorkspaceDocumentType,
+  isWorkspaceDocumentCommandDomain,
+  isWorkspaceDocumentPatchPathAllowed,
+  resolveWorkspaceCommandNamespaceDomain,
+  type WorkspaceCommandDomain,
+  type WorkspaceDocumentCommandDomain,
+} from './workspaceContractRegistry';
 import {
   collectRouteManifestDocumentRefs,
   type WorkspaceRouteNode,
@@ -48,20 +58,10 @@ export type WorkspaceCommandEnvelope = {
   };
   mergeKey?: string;
   label?: string;
-  domainHint?:
-    | 'pir'
-    | 'workspace'
-    | 'route'
-    | 'nodegraph'
-    | 'animation'
-    | 'token'
-    | 'code'
-    | 'resource';
+  domainHint?: WorkspaceCommandDomain;
 };
 
-export type WorkspaceCommandDomain = NonNullable<
-  WorkspaceCommandEnvelope['domainHint']
->;
+export type { WorkspaceCommandDomain } from './workspaceContractRegistry';
 
 export type WorkspaceCommandIssueCode =
   | 'WKS_COMMAND_INVALID_ENVELOPE'
@@ -416,22 +416,7 @@ export type WorkspaceDirectoryDeleteIntentRequest = {
 };
 
 type PatchTarget = 'document' | 'workspace';
-type DocumentPatchDomain = Exclude<
-  WorkspaceCommandDomain,
-  'workspace' | 'route'
->;
-const DOCUMENT_PATCH_DOMAINS: readonly DocumentPatchDomain[] = [
-  'pir',
-  'nodegraph',
-  'animation',
-  'token',
-  'code',
-  'resource',
-];
-const isDocumentPatchDomain = (
-  domain: WorkspaceCommandDomain
-): domain is DocumentPatchDomain =>
-  DOCUMENT_PATCH_DOMAINS.includes(domain as DocumentPatchDomain);
+type DocumentPatchDomain = WorkspaceDocumentCommandDomain;
 type PatchApplyResult =
   { ok: true; value: unknown } | { ok: false; path: string };
 
@@ -683,111 +668,26 @@ export const resolveWorkspaceCommandDomain = (
   command: WorkspaceCommandEnvelope
 ): WorkspaceCommandDomain => {
   if (command.domainHint) return command.domainHint;
-  if (command.namespace.startsWith('core.nodegraph')) return 'nodegraph';
-  if (command.namespace.startsWith('core.animation')) return 'animation';
-  if (command.namespace.startsWith('core.code')) return 'code';
-  if (command.namespace.startsWith('core.resource')) return 'resource';
+  const namespaceDomain = resolveWorkspaceCommandNamespaceDomain(
+    command.namespace
+  );
   if (
-    command.namespace.startsWith('core.route') ||
-    command.target.routeNodeId
+    namespaceDomain &&
+    namespaceDomain !== 'workspace' &&
+    namespaceDomain !== 'pir'
   ) {
+    return namespaceDomain;
+  }
+  if (command.target.routeNodeId) {
     return 'route';
   }
-  if (command.namespace.startsWith('core.workspace')) return 'workspace';
-  return 'pir';
+  return namespaceDomain ?? 'pir';
 };
-
-const isAllowedPirDocumentPath = (path: string): boolean =>
-  path === '/ui/graph' ||
-  path.startsWith('/ui/graph/') ||
-  path === '/componentContract' ||
-  path.startsWith('/componentContract/') ||
-  path === '/logic' ||
-  path.startsWith('/logic/') ||
-  path === '/metadata' ||
-  path.startsWith('/metadata/') ||
-  path.startsWith('/x-');
-
-const isAllowedNodeGraphDocumentPath = (path: string): boolean =>
-  path === '/nodes' ||
-  path.startsWith('/nodes/') ||
-  path === '/edges' ||
-  path.startsWith('/edges/');
-
-const isAllowedAnimationDocumentPath = (path: string): boolean =>
-  path === '/target' ||
-  path.startsWith('/target/') ||
-  path === '/timelines' ||
-  path.startsWith('/timelines/') ||
-  path === '/svgFilters' ||
-  path.startsWith('/svgFilters/') ||
-  path === '/x-animationEditor' ||
-  path.startsWith('/x-animationEditor/');
-
-const isAllowedCodeDocumentPath = (path: string): boolean =>
-  path === '/language' ||
-  path === '/source' ||
-  path === '/metadata' ||
-  path.startsWith('/metadata/') ||
-  path.startsWith('/x-');
-
-const isAllowedDesignTokenDocumentPath = (path: string): boolean =>
-  path.startsWith('/') && path !== '/';
-
-const isAllowedResourceDocumentPath = (
-  path: string,
-  documentType: WorkspaceDocumentType
-): boolean => {
-  const roots =
-    documentType === 'asset'
-      ? ['mime', 'category', 'size', 'dataUrl', 'text', 'metadata']
-      : documentType === 'project-config'
-        ? ['value', 'metadata']
-        : [];
-  return roots.some(
-    (root) => path === `/${root}` || path.startsWith(`/${root}/`)
-  );
-};
-
-const PIR_DOCUMENT_TYPES: ReadonlySet<WorkspaceDocumentType> = new Set([
-  'pir-page',
-  'pir-layout',
-  'pir-component',
-]);
-
-const isPirWorkspaceDocumentType = (
-  documentType: WorkspaceDocumentType
-): boolean => PIR_DOCUMENT_TYPES.has(documentType);
 
 const isAllowedDocumentPath = (
   path: string,
   documentType: WorkspaceDocumentType
-): boolean => {
-  if (path === '/' || path === '/ui/root' || path.startsWith('/ui/root/')) {
-    return false;
-  }
-
-  if (isPirWorkspaceDocumentType(documentType)) {
-    return isAllowedPirDocumentPath(path);
-  }
-  if (documentType === 'pir-graph') {
-    return isAllowedNodeGraphDocumentPath(path);
-  }
-  if (documentType === 'pir-animation') {
-    return isAllowedAnimationDocumentPath(path);
-  }
-  if (
-    documentType === 'design-tokens' ||
-    documentType === 'design-token-resolver'
-  ) {
-    return isAllowedDesignTokenDocumentPath(path);
-  }
-  if (documentType === 'code') return isAllowedCodeDocumentPath(path);
-  if (documentType === 'asset' || documentType === 'project-config') {
-    return isAllowedResourceDocumentPath(path, documentType);
-  }
-  return false;
-};
+): boolean => isWorkspaceDocumentPatchPathAllowed(documentType, path);
 
 const isAllowedWorkspacePath = (path: string): boolean =>
   path === '/treeRootId' ||
@@ -932,7 +832,7 @@ const validateEnvelope = (
 
   if (
     command.target?.documentId &&
-    !isDocumentPatchDomain(resolveWorkspaceCommandDomain(command))
+    !isWorkspaceDocumentCommandDomain(resolveWorkspaceCommandDomain(command))
   ) {
     issues.push({
       code: 'WKS_COMMAND_INVALID_ENVELOPE',
@@ -1396,17 +1296,15 @@ const applyWorkspaceDocumentCommandInternal = <TContent>(
       ],
     };
   }
-  const isResourceDocument =
-    target.documentType === 'asset' || target.documentType === 'project-config';
-  if ((target.domain === 'resource') !== isResourceDocument) {
+  const expectedDomain = getWorkspaceDocumentDomain(target.documentType);
+  if (target.domain !== expectedDomain) {
     return {
       ok: false,
       issues: [
         {
           code: 'WKS_COMMAND_INVALID_ENVELOPE',
           path: '/domainHint',
-          message:
-            'Resource commands may target only asset or project-config documents.',
+          message: `Command domain ${target.domain} cannot target a ${target.documentType} document; expected ${expectedDomain}.`,
           documentId: target.documentId,
         },
       ],
@@ -1514,6 +1412,26 @@ const applyWorkspaceDocumentCommandInternal = <TContent>(
           path: '/target/documentId',
           message:
             'Code workspace documents must remain a language/source wrapper.',
+          documentId: target.documentId,
+        },
+      ],
+    };
+  }
+  if (
+    target.documentType === 'data-source' &&
+    !isCanonicalWorkspaceDataSourceDocumentContent(
+      patchedContent.value,
+      target.documentId
+    )
+  ) {
+    return {
+      ok: false,
+      issues: [
+        {
+          code: 'WKS_COMMAND_VALIDATION_FAILED',
+          path: '/target/documentId',
+          message:
+            'Data source Workspace documents must remain canonical Data current-model documents.',
           documentId: target.documentId,
         },
       ],
@@ -1684,13 +1602,7 @@ const applyWorkspaceCommandInternal = (
     }
 
     const documentDomain: DocumentPatchDomain =
-      commandDomain === 'nodegraph' ||
-      commandDomain === 'animation' ||
-      commandDomain === 'token' ||
-      commandDomain === 'code' ||
-      commandDomain === 'resource'
-        ? commandDomain
-        : 'pir';
+      isWorkspaceDocumentCommandDomain(commandDomain) ? commandDomain : 'pir';
     const documentResult = applyWorkspaceDocumentCommandInternal(
       document.content,
       command,

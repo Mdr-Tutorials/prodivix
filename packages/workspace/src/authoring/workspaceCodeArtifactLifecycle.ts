@@ -4,6 +4,7 @@ import {
   type CodeArtifact,
   type CodeArtifactLifecycle,
 } from '@prodivix/authoring';
+import type { ProdivixDiagnostic } from '@prodivix/diagnostics';
 import {
   createWorkspaceCodeContentUpdateCommand,
   type WorkspaceCommandEnvelope,
@@ -62,7 +63,7 @@ export const projectWorkspaceCodeArtifactLifecycles = (
 
 export const collectWorkspaceCodeArtifactLifecycleDiagnostics = (
   workspace: WorkspaceSnapshot
-) => {
+): readonly ProdivixDiagnostic[] => {
   const composition = createWorkspaceCodeSlotRegistryFromSnapshot(workspace);
   if (composition.status === 'blocked') return Object.freeze([]);
   const artifactProvider = createWorkspaceCodeArtifactProvider(workspace);

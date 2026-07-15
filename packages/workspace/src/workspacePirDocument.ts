@@ -1,6 +1,5 @@
 import type { PIRDocument } from '@prodivix/pir';
 import type {
-  WorkspaceCommandDomain,
   WorkspaceCommandEnvelope,
   WorkspacePatchOperation,
 } from './workspaceCommand';
@@ -11,10 +10,6 @@ export type CreateWorkspacePirDocumentUpdateCommandInput = {
   before: PIRDocument;
   commandId: string;
   documentId?: string;
-  domainHint?: Extract<
-    WorkspaceCommandDomain,
-    'pir' | 'nodegraph' | 'animation' | 'code'
-  >;
   issuedAt?: string;
   label?: string;
   mergeKey?: string;
@@ -45,7 +40,7 @@ const appendOptionalDocumentPatch = (
   reverseOps.unshift({ op: 'replace', path, value: before });
 };
 
-/** Builds the shared reversible command for PIR-owned authoring domains. */
+/** Builds a reversible command that updates one canonical PIR document. */
 export const createWorkspacePirDocumentUpdateCommand = (
   input: CreateWorkspacePirDocumentUpdateCommandInput
 ): WorkspaceCommandEnvelope | null => {
@@ -83,13 +78,6 @@ export const createWorkspacePirDocumentUpdateCommand = (
   );
   if (!forwardOps.length) return null;
   const namespace = input.namespace ?? 'core.pir';
-  const domainHint =
-    input.domainHint ??
-    (namespace.startsWith('core.nodegraph')
-      ? 'nodegraph'
-      : namespace.startsWith('core.code')
-        ? 'code'
-        : 'pir');
   return {
     id: input.commandId,
     namespace,
@@ -99,7 +87,7 @@ export const createWorkspacePirDocumentUpdateCommand = (
     forwardOps,
     reverseOps,
     target: { workspaceId: input.workspace.id, documentId },
-    domainHint,
+    domainHint: 'pir',
     ...(input.mergeKey ? { mergeKey: input.mergeKey } : {}),
     ...(input.label ? { label: input.label } : {}),
   };

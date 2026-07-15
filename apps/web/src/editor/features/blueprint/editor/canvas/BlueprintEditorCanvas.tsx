@@ -18,6 +18,7 @@ import {
 import { createWorkspacePirProjectionPlan } from '@prodivix/workspace';
 import { OfficialReactSurfaceBoundary } from '@/plugins/platform/officialSurfaceHost';
 import { VIEWPORT_ZOOM_RANGE } from '@/editor/features/blueprint/editor/model/viewport';
+import { BlueprintProjectRunnerSurface } from '../runner';
 import { CanvasPlaceholder } from './CanvasPlaceholder';
 import { CanvasRouteDiagnostics } from './CanvasRouteDiagnostics';
 import {
@@ -40,7 +41,8 @@ export function BlueprintEditorCanvas({
   entryDocumentId,
   rendererHost,
   currentPath,
-  interactionMode,
+  canvasMode,
+  projectRunner,
   viewportWidth,
   viewportHeight,
   zoom,
@@ -130,9 +132,11 @@ export function BlueprintEditorCanvas({
   const scale = Math.min(2, Math.max(0.4, zoom / 100));
   const showGrid = assist.includes('grid');
   const showSelectionDiagnostics = diagnostics.includes('selection');
+  const isDesignMode = canvasMode === 'design';
   const { setNodeRef: setCanvasDropRef, isOver: isCanvasOver } = useDroppable({
     id: 'canvas-drop',
     data: { kind: 'canvas' },
+    disabled: !isDesignMode,
   });
 
   useEffect(() => {
@@ -349,8 +353,6 @@ export function BlueprintEditorCanvas({
     onSelectNode(location);
   };
 
-  const isDesignMode = interactionMode === 'design';
-
   const reportBlockingIssues = useCallback(
     (issues: readonly PIRRendererBlockingIssue[]) => {
       setBlockingIssues(issues);
@@ -358,6 +360,11 @@ export function BlueprintEditorCanvas({
     },
     [onBlockingIssuesChange]
   );
+
+  useEffect(() => {
+    if (canvasMode !== 'run' || !blockingIssues.length) return;
+    reportBlockingIssues([]);
+  }, [blockingIssues.length, canvasMode, reportBlockingIssues]);
 
   return (
     <section
@@ -389,40 +396,51 @@ export function BlueprintEditorCanvas({
               className="BlueprintEditorCanvasArtboard relative overflow-auto overscroll-contain border border-(--border-default) bg-(--bg-canvas) shadow-(--shadow-lg) **:data-[pir-missing=true]:outline **:data-[pir-missing=true]:outline-offset-2 **:data-[pir-missing=true]:outline-(--danger-color) **:data-[pir-missing=true]:outline-dashed **:data-[pir-selected=true]:outline-2 **:data-[pir-selected=true]:outline-offset-2 **:data-[pir-selected=true]:outline-(--accent-color)"
               style={{ width: canvasWidth, height: canvasHeight }}
             >
-              <OfficialReactSurfaceBoundary>
-                {projection.status === 'ready' ? (
-                  <PIRRenderer
-                    plan={projection.plan}
-                    host={rendererHost}
-                    rootParamsById={rootParamsById}
-                    rootStateById={rootStateById}
-                    rootDataById={rootDataById}
-                    rootComponentPropsById={rootComponentPropsById}
-                    rootComponentVariantsById={rootComponentVariantsById}
-                    resolveCollectionPreviewState={
-                      resolveCollectionPreviewState
-                    }
-                    dispatchTrigger={dispatchTrigger}
-                    selectedLocation={
-                      isDesignMode ? selectedLocation : undefined
-                    }
-                    hiddenLocations={hiddenLocations}
-                    onNodeSelect={isDesignMode ? handleNodeSelect : undefined}
-                    onBlockingIssues={reportBlockingIssues}
-                  />
-                ) : (
-                  <CanvasPlaceholder
-                    title={t('canvas.unavailableTitle', {
-                      defaultValue: 'Preview unavailable',
-                    })}
-                    description={
-                      projection.issues[0]?.message ??
-                      t('canvas.placeholderDescription')
-                    }
-                  />
-                )}
-              </OfficialReactSurfaceBoundary>
-              <CanvasRouteDiagnostics diagnostics={canvasDiagnostics} />
+              {canvasMode === 'run' ? (
+                <BlueprintProjectRunnerSurface
+                  currentPath={currentPath}
+                  runner={projectRunner}
+                />
+              ) : (
+                <>
+                  <OfficialReactSurfaceBoundary>
+                    {projection.status === 'ready' ? (
+                      <PIRRenderer
+                        plan={projection.plan}
+                        host={rendererHost}
+                        rootParamsById={rootParamsById}
+                        rootStateById={rootStateById}
+                        rootDataById={rootDataById}
+                        rootComponentPropsById={rootComponentPropsById}
+                        rootComponentVariantsById={rootComponentVariantsById}
+                        resolveCollectionPreviewState={
+                          resolveCollectionPreviewState
+                        }
+                        dispatchTrigger={dispatchTrigger}
+                        selectedLocation={
+                          isDesignMode ? selectedLocation : undefined
+                        }
+                        hiddenLocations={hiddenLocations}
+                        onNodeSelect={
+                          isDesignMode ? handleNodeSelect : undefined
+                        }
+                        onBlockingIssues={reportBlockingIssues}
+                      />
+                    ) : (
+                      <CanvasPlaceholder
+                        title={t('canvas.unavailableTitle', {
+                          defaultValue: 'Preview unavailable',
+                        })}
+                        description={
+                          projection.issues[0]?.message ??
+                          t('canvas.placeholderDescription')
+                        }
+                      />
+                    )}
+                  </OfficialReactSurfaceBoundary>
+                  <CanvasRouteDiagnostics diagnostics={canvasDiagnostics} />
+                </>
+              )}
             </div>
           </div>
         </div>

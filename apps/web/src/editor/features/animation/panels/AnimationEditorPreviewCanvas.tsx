@@ -1,17 +1,11 @@
-import { Minus, Pause, Play, Plus, RotateCcw, SkipBack } from 'lucide-react';
-import {
-  createElement,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { Minus, Play, Plus, RotateCcw, SkipBack, Square } from 'lucide-react';
+import { createElement, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type {
   AnimationTimeline,
   SvgFilterDefinition,
 } from '@prodivix/animation';
+import { evaluateAnimationTimelineAtCursor } from '@prodivix/animation';
 import {
   PIRRenderer,
   type PIRRendererBlockingIssue,
@@ -21,7 +15,10 @@ import {
   createWorkspacePirProjectionPlan,
   type WorkspaceSnapshot,
 } from '@prodivix/workspace';
-import { buildAnimationPreviewSnapshot } from '@prodivix/runtime-browser';
+import {
+  projectAnimationFrameToBrowserPreview,
+  type AnimationPreviewSnapshot,
+} from '@prodivix/runtime-browser';
 import { pirWebRendererHost } from '@/pir/pirWebRendererHost';
 
 type AnimationEditorPreviewCanvasProps = {
@@ -36,6 +33,10 @@ type AnimationEditorPreviewCanvasProps = {
   onZoomChange: (nextZoom: number) => void;
   selectedNodeId?: string;
   onSelectNodeId?: (nodeId: string) => void;
+  executionRunning?: boolean;
+  runtimePreview?: AnimationPreviewSnapshot;
+  onPlay?: () => void;
+  onStop?: () => void;
 };
 
 const clampZoom = (value: number) =>
@@ -70,57 +71,29 @@ export const AnimationEditorPreviewCanvas = ({
   onZoomChange,
   selectedNodeId,
   onSelectNodeId,
+  executionRunning = false,
+  runtimePreview,
+  onPlay,
+  onStop,
 }: AnimationEditorPreviewCanvasProps) => {
   const { t } = useTranslation('editor');
-  const [playing, setPlaying] = useState(false);
   const [rendererIssues, setRendererIssues] = useState<
     readonly PIRRendererBlockingIssue[]
   >([]);
-  const cursorRef = useRef(cursorMs);
 
-  useEffect(() => {
-    cursorRef.current = cursorMs;
-  }, [cursorMs]);
-
-  useEffect(() => {
-    if (!playing) return;
-    if (!timeline || !onCursorChange) return;
-
-    let rafId = 0;
-    let lastTs: number | null = null;
-
-    const tick = (ts: number) => {
-      if (lastTs === null) lastTs = ts;
-      const delta = ts - lastTs;
-      lastTs = ts;
-
-      const durationMs = timeline.durationMs;
-      if (durationMs > 0) {
-        let nextMs = cursorRef.current + delta;
-        if (nextMs >= durationMs) nextMs = nextMs % durationMs;
-        cursorRef.current = nextMs;
-        onCursorChange(nextMs);
-      }
-
-      rafId = window.requestAnimationFrame(tick);
-    };
-
-    rafId = window.requestAnimationFrame(tick);
-    return () => {
-      window.cancelAnimationFrame(rafId);
-    };
-  }, [onCursorChange, playing, timeline]);
-
-  const preview = useMemo(
+  const authoredPreview = useMemo(
     () =>
-      buildAnimationPreviewSnapshot({
-        targetDocumentId: entryDocumentId,
-        timeline,
-        cursorMs,
-        svgFilters,
-      }),
+      projectAnimationFrameToBrowserPreview(
+        evaluateAnimationTimelineAtCursor({
+          timeline,
+          cursorMs,
+          svgFilters,
+        }),
+        entryDocumentId
+      ),
     [cursorMs, entryDocumentId, svgFilters, timeline]
   );
+  const preview = runtimePreview ?? authoredPreview;
   const projection = useMemo(
     () =>
       workspace
@@ -156,9 +129,8 @@ export const AnimationEditorPreviewCanvas = ({
           type="button"
           onClick={() => {
             if (!timeline || !onCursorChange) return;
-            cursorRef.current = 0;
+            onStop?.();
             onCursorChange(0);
-            setPlaying(false);
           }}
           className="inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-black/8 disabled:opacity-40"
           aria-label={t('animationEditor.preview.jumpToStart')}
@@ -170,23 +142,24 @@ export const AnimationEditorPreviewCanvas = ({
         <button
           type="button"
           onClick={() => {
-            if (!timeline || !onCursorChange) return;
-            setPlaying((prev) => !prev);
+            if (!timeline) return;
+            if (executionRunning) onStop?.();
+            else onPlay?.();
           }}
           className="inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-black/8 disabled:opacity-40"
           aria-label={
-            playing
-              ? t('animationEditor.preview.pause')
+            executionRunning
+              ? t('animationEditor.preview.stop')
               : t('animationEditor.preview.play')
           }
           title={
-            playing
-              ? t('animationEditor.preview.pause')
+            executionRunning
+              ? t('animationEditor.preview.stop')
               : t('animationEditor.preview.play')
           }
-          disabled={!timeline || !onCursorChange}
+          disabled={!timeline || (!onPlay && !onStop)}
         >
-          {playing ? <Pause size={14} /> : <Play size={14} />}
+          {executionRunning ? <Square size={12} /> : <Play size={14} />}
         </button>
         <div className="mx-1 h-5 w-px bg-black/10" />
         <button

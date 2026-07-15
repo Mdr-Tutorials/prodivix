@@ -1,4 +1,10 @@
-import { queryCodeSlotSemanticRelations } from '@prodivix/authoring';
+import {
+  queryCodeSlotSemanticRelations,
+  resolveCodeSourceSpanOffsets,
+  type CodeAuthoringCapability,
+  type CodeAuthoringOrigin,
+} from '@prodivix/authoring';
+import type { SourceSpan } from '@prodivix/diagnostics';
 import {
   isWorkspaceCodeDocumentContent,
   type WorkspaceSnapshot,
@@ -24,6 +30,7 @@ export type CodeAuthoringOpenResult =
         | 'semantic-index-stale'
         | 'semantic-reference-missing'
         | 'semantic-reference-unresolved'
+        | 'source-span-unavailable'
         | 'slot-unavailable';
     }>;
 
@@ -32,6 +39,9 @@ export const openWorkspaceCodeArtifact = (input: {
   artifactId: string;
   presentation?: CodeAuthoringOverlayPresentation;
   slotId?: string;
+  sourceSpan?: SourceSpan;
+  origin: CodeAuthoringOrigin;
+  capabilityIds?: readonly CodeAuthoringCapability[];
 }): CodeAuthoringOpenResult => {
   const document = input.workspace.docsById[input.artifactId];
   if (
@@ -41,12 +51,22 @@ export const openWorkspaceCodeArtifact = (input: {
   ) {
     return { status: 'unavailable', reason: 'artifact-unavailable' };
   }
+  if (
+    input.sourceSpan &&
+    (input.sourceSpan.artifactId !== document.id ||
+      !resolveCodeSourceSpanOffsets(document.content.source, input.sourceSpan))
+  ) {
+    return { status: 'unavailable', reason: 'source-span-unavailable' };
+  }
   const presentation = input.presentation ?? 'maximized';
   openCodeAuthoringOverlay({
     workspaceId: input.workspace.id,
     artifactId: input.artifactId,
     presentation,
     ...(input.slotId ? { slotId: input.slotId } : {}),
+    ...(input.sourceSpan ? { sourceSpan: input.sourceSpan } : {}),
+    origin: input.origin,
+    ...(input.capabilityIds ? { capabilityIds: input.capabilityIds } : {}),
   });
   return { status: 'opened', artifactId: input.artifactId, presentation };
 };
@@ -54,6 +74,7 @@ export const openWorkspaceCodeArtifact = (input: {
 export const openWorkspaceCodeSlotDefinition = (input: {
   workspace: WorkspaceSnapshot;
   slotId: string;
+  origin: CodeAuthoringOrigin;
 }): CodeAuthoringOpenResult => {
   const environment = createWorkspaceCodeLanguageEnvironment(input.workspace);
   if (!environment.semanticIndex || !environment.codeSlotRegistry) {
@@ -82,6 +103,10 @@ export const openWorkspaceCodeSlotDefinition = (input: {
     workspace: input.workspace,
     artifactId: relations.projection.binding.reference.artifactId,
     slotId: input.slotId,
+    sourceSpan: relations.projection.binding.reference.sourceSpan,
+    origin: input.origin.targetRef
+      ? input.origin
+      : { ...input.origin, targetRef: slot.ownerRef },
     presentation: resolveCodeAuthoringPresentation(slot.kind),
   });
 };

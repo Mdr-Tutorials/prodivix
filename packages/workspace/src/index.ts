@@ -35,6 +35,14 @@ export {
   selectWorkspaceDesignTokenDocumentResults,
 } from './workspaceDesignTokenDocument';
 export {
+  createWorkspaceDataSourceDocumentUpdateCommand,
+  decodeWorkspaceDataSourceDocument,
+  isCanonicalWorkspaceDataSourceDocumentContent,
+  isWorkspaceDataSourceDocument,
+  selectWorkspaceDataSourceDocument,
+  selectWorkspaceDataSourceDocumentResults,
+} from './workspaceDataSourceDocument';
+export {
   collectWorkspaceDesignTokenResolverDocumentReferences,
   createWorkspaceDesignTokenResolverDocumentUpdateCommand,
   decodeWorkspaceDesignTokenResolverDocument,
@@ -52,6 +60,19 @@ export {
   isWorkspaceProjectConfigDocumentContent,
 } from './workspaceResourceDocument';
 export { createWorkspaceVfsIntentPlan } from './workspaceVfsIntent';
+export {
+  WORKSPACE_COMMAND_DOMAINS,
+  WORKSPACE_COMMAND_NAMESPACE_DOMAIN_RULES,
+  WORKSPACE_DOCUMENT_POLICIES,
+  WORKSPACE_DOCUMENT_TYPES,
+  getWorkspaceDocumentDomain,
+  getWorkspaceDocumentPolicy,
+  isWorkspaceCommandDomain,
+  isWorkspaceDocumentCommandDomain,
+  isWorkspaceDocumentPatchPathAllowed,
+  isWorkspaceDocumentType,
+  resolveWorkspaceCommandNamespaceDomain,
+} from './workspaceContractRegistry';
 export {
   WorkspaceCodecError,
   applyWorkspaceMutation,
@@ -265,6 +286,11 @@ export type {
   WorkspaceDocumentRenameIntentRequest,
 } from './workspaceCommand';
 export type {
+  WorkspaceDocumentCommandDomain,
+  WorkspaceDocumentPatchPolicy,
+  WorkspaceDocumentPolicy,
+} from './workspaceContractRegistry';
+export type {
   WorkspaceHistoryDocumentDomain,
   WorkspaceHistoryEntry,
   WorkspaceHistoryExecutionOptions,
@@ -301,6 +327,11 @@ export type {
   WorkspaceAssetDocumentContent,
   WorkspaceProjectConfigDocumentContent,
 } from './workspaceResourceDocument';
+export type {
+  CreateWorkspaceDataSourceDocumentUpdateCommandInput,
+  WorkspaceDataSourceDocument,
+  WorkspaceDataSourceReadResult,
+} from './workspaceDataSourceDocument';
 export type {
   WorkspaceVfsIntentPlan,
   WorkspaceVfsIntentRequest,

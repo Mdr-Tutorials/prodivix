@@ -1,4 +1,75 @@
 {
+  "execution": {
+    "title": "Execution",
+    "expand": "Expand execution console",
+    "collapse": "Collapse execution console",
+    "restart": "Restart execution",
+    "stop": "Stop execution",
+    "reloadPreview": "Reload preview",
+    "openPreview": "Open preview in a new tab",
+    "clear": "Clear console",
+    "empty": "No execution output yet.",
+    "eventCount": "{{count}} events",
+    "filter": {
+      "all": "All",
+      "errors": "Errors"
+    },
+    "status": {
+      "idle": "Idle",
+      "compiling": "Compiling",
+      "blocked": "Blocked",
+      "queued": "Queued",
+      "starting": "Starting",
+      "running": "Running",
+      "cancelling": "Stopping",
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "cancelled": "Stopped",
+      "timed-out": "Timed out"
+    }
+  },
+  "testing": {
+    "title": "Workspace tests",
+    "subtitle": "Run the current canonical revision as the same standalone React/Vite project that Prodivix exports.",
+    "actions": {
+      "run": "Run tests",
+      "rerun": "Run again",
+      "stop": "Stop",
+      "openCode": "Open code",
+      "openSource": "Open test source"
+    },
+    "summary": {
+      "total": "Total",
+      "files": "Files",
+      "cases": "Cases",
+      "passed": "Passed",
+      "failed": "Failed",
+      "failedFiles": "Failed files: {{count}}",
+      "skipped": "Skipped",
+      "todo": "Todo"
+    },
+    "running": {
+      "title": "Running workspace tests",
+      "description": "Preparing the isolated project, installing dependencies, and executing its test plan."
+    },
+    "report": {
+      "title": "Latest test report",
+      "current": "Current revision",
+      "outdated": "Earlier revision"
+    },
+    "empty": {
+      "title": "No test run yet",
+      "description": "Run the exported project checks and Workspace test files against this exact revision."
+    },
+    "blocked": {
+      "title": "Tests could not start",
+      "description": "Resolve the compilation diagnostics, then run the same revision again."
+    },
+    "failed": {
+      "title": "The test run failed",
+      "description": "Review the current run in the Execution console, then run this revision again."
+    }
+  },
   "home": {
     "welcomeTitle": "Welcome back",
     "actions": {
@@ -105,9 +176,14 @@
       "close": "Close code editor",
       "openWorkspace": "Open Code Workspace",
       "discardTitle": "Discard unsaved code?",
-      "discardMessage": "Your unsaved edits in this code artifact will be discarded.",
+      "discardMessage": "Your unsaved edits in this Code Authoring session will be discarded.",
       "keepEditing": "Keep editing",
       "discard": "Discard"
+    },
+    "session": {
+      "staleDraft": "The canonical file changed while this draft was open. Reconcile or discard the draft before saving.",
+      "discardDraft": "Use canonical file",
+      "returnToRequestedArtifact": "Return to the requested artifact"
     }
   },
   "bar": {
@@ -1633,8 +1709,8 @@
     },
     "preview": {
       "jumpToStart": "Jump to start",
-      "pause": "Pause",
       "play": "Play",
+      "stop": "Stop",
       "zoomOut": "Zoom out",
       "zoomIn": "Zoom in",
       "resetZoom": "Reset zoom",
@@ -1733,6 +1809,8 @@
     "manager": {
       "title": "Node Graphs",
       "namePlaceholder": "Graph name",
+      "run": "Run",
+      "stop": "Stop",
       "new": "New",
       "clone": "Clone",
       "delete": "Delete"

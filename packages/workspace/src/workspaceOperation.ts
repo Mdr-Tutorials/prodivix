@@ -1,15 +1,15 @@
 import type { WorkspaceDocumentId, WorkspaceSnapshot } from './types';
 import {
   resolveWorkspaceCommandDomain,
-  type WorkspaceCommandDomain,
   type WorkspaceCommandEnvelope,
   type WorkspaceTransactionEnvelope,
 } from './workspaceCommand';
+import {
+  isWorkspaceDocumentCommandDomain,
+  type WorkspaceDocumentCommandDomain,
+} from './workspaceContractRegistry';
 
-export type WorkspaceHistoryDocumentDomain = Extract<
-  WorkspaceCommandDomain,
-  'pir' | 'nodegraph' | 'animation' | 'token' | 'code' | 'resource'
->;
+export type WorkspaceHistoryDocumentDomain = WorkspaceDocumentCommandDomain;
 
 export type WorkspaceHistoryScope =
   | {
@@ -41,20 +41,6 @@ export type WorkspaceOperation = (
   redoOf?: string;
   sourceOperationIds?: string[];
 };
-
-const DOCUMENT_DOMAINS: readonly WorkspaceHistoryDocumentDomain[] = [
-  'pir',
-  'nodegraph',
-  'animation',
-  'token',
-  'code',
-  'resource',
-];
-
-const isDocumentDomain = (
-  domain: WorkspaceCommandDomain
-): domain is WorkspaceHistoryDocumentDomain =>
-  DOCUMENT_DOMAINS.includes(domain as WorkspaceHistoryDocumentDomain);
 
 const valuesEqual = (left: unknown, right: unknown): boolean => {
   if (Object.is(left, right)) return true;
@@ -168,7 +154,7 @@ export const resolveWorkspaceCommandScope = (
   command: WorkspaceCommandEnvelope
 ): WorkspaceHistoryScope => {
   const domain = resolveWorkspaceCommandDomain(command);
-  if (command.target.documentId && isDocumentDomain(domain)) {
+  if (command.target.documentId && isWorkspaceDocumentCommandDomain(domain)) {
     return {
       kind: 'document',
       workspaceId: command.target.workspaceId,

@@ -1,4 +1,5 @@
 import { validatePirDocument } from '@prodivix/pir';
+import { isDataSourceDocument } from '@prodivix/data';
 import type {
   WorkspaceDocument,
   WorkspaceDocumentType,
@@ -16,25 +17,10 @@ import {
   isDtcgDesignTokenDocument,
   isDtcgDesignTokenResolverDocument,
 } from '@prodivix/tokens';
-
-const WORKSPACE_DOCUMENT_TYPES: ReadonlySet<WorkspaceDocumentType> = new Set([
-  'pir-page',
-  'pir-layout',
-  'pir-component',
-  'pir-graph',
-  'pir-animation',
-  'design-tokens',
-  'design-token-resolver',
-  'code',
-  'asset',
-  'project-config',
-]);
-
-const PIR_DOCUMENT_TYPES: ReadonlySet<WorkspaceDocumentType> = new Set([
-  'pir-page',
-  'pir-layout',
-  'pir-component',
-]);
+import {
+  isPirWorkspaceDocumentType,
+  isWorkspaceDocumentType,
+} from './workspaceContractRegistry';
 
 const WORKSPACE_DOCUMENT_FIELDS = new Set([
   'id',
@@ -139,12 +125,13 @@ export const isCanonicalPirDocumentContent = (content: unknown): boolean => {
 
 const isValidDocumentContent = (
   document: Record<string, unknown>,
-  documentType: WorkspaceDocumentType
+  documentType: WorkspaceDocumentType,
+  documentId: string
 ): boolean => {
   if (!Object.hasOwn(document, 'content') || document.content === undefined) {
     return false;
   }
-  if (PIR_DOCUMENT_TYPES.has(documentType)) {
+  if (isPirWorkspaceDocumentType(documentType)) {
     return isCanonicalPirDocumentContent(document.content);
   }
   if (documentType === 'pir-animation') {
@@ -164,6 +151,9 @@ const isValidDocumentContent = (
   }
   if (documentType === 'project-config') {
     return isWorkspaceProjectConfigDocumentContent(document.content);
+  }
+  if (documentType === 'data-source') {
+    return isDataSourceDocument(document.content, { documentId });
   }
   if (documentType !== 'code') return true;
   if (!isWorkspaceCodeDocumentContent(document.content)) return false;
@@ -228,7 +218,7 @@ export const validateWorkspaceDocumentRecord = (
   const documentType = value.type;
   if (
     typeof documentType !== 'string' ||
-    !WORKSPACE_DOCUMENT_TYPES.has(documentType as WorkspaceDocumentType)
+    !isWorkspaceDocumentType(documentType)
   ) {
     issues.push({
       code: 'WKS_DOCUMENT_TYPE_INVALID',
@@ -236,7 +226,7 @@ export const validateWorkspaceDocumentRecord = (
       message: 'Workspace document type is not supported.',
       documentId,
     });
-  } else if (!isValidDocumentContent(value, documentType)) {
+  } else if (!isValidDocumentContent(value, documentType, documentId)) {
     issues.push({
       code: 'WKS_DOCUMENT_CONTENT_INVALID',
       path: `${path}/content`,

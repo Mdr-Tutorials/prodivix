@@ -30,6 +30,18 @@ const parseCubicBezier = (
     : (numbers as [number, number, number, number]);
 };
 
+export const isSupportedAnimationEasing = (easing?: string): boolean => {
+  const value = easing?.trim() || 'linear';
+  return (
+    value === 'linear' ||
+    value === 'ease' ||
+    value === 'ease-in' ||
+    value === 'ease-out' ||
+    value === 'ease-in-out' ||
+    parseCubicBezier(value) !== null
+  );
+};
+
 const cubicBezier = (
   x1: number,
   y1: number,
@@ -166,9 +178,14 @@ export const resolveTimelineCursorMs = (
 
   const iterationIndex = Math.floor(elapsedMs / durationMs);
   const loopMs = elapsedMs - iterationIndex * durationMs;
+  const easing = timeline.easing?.trim();
+  const easedLoopMs =
+    !easing || easing === 'linear'
+      ? loopMs
+      : resolveEasing(easing)(clamp01(loopMs / durationMs)) * durationMs;
   return isReversedIteration(timeline.direction, iterationIndex)
-    ? durationMs - loopMs
-    : loopMs;
+    ? durationMs - easedLoopMs
+    : easedLoopMs;
 };
 
 const coerceNumber = (value: number | string) => {

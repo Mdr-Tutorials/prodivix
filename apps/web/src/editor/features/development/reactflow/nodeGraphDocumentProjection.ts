@@ -1,7 +1,6 @@
 import type { NodeGraphDocument, NodeGraphPort } from '@prodivix/nodegraph';
 import type { Edge, Node } from '@xyflow/react';
 import type { GraphNodeData } from './GraphNode';
-import { normalizeCases } from './graphNodeShared';
 import { createNode } from './nodeGraphEditorModel';
 import { createNodeId } from './nodeGraphEditorUtils';
 import { toStableGraphNode } from './nodeGraphStableNode';
@@ -235,7 +234,6 @@ export const createStarterNodeGraphCanvas = (): Readonly<{
     createNode('process', { x: 720, y: 120 }),
     createNode('end', { x: 980, y: 250 }),
   ];
-  const switchCases = normalizeCases(nodes[1]!.data.cases);
   return {
     nodes,
     edges: [
@@ -250,9 +248,7 @@ export const createStarterNodeGraphCanvas = (): Readonly<{
       {
         id: `edge-${createNodeId()}`,
         source: nodes[1]!.id,
-        sourceHandle: switchCases[0]
-          ? `out.control.case-${switchCases[0].id}`
-          : 'out.control.default',
+        sourceHandle: 'out.control.default',
         target: nodes[2]!.id,
         targetHandle: 'in.control.prev',
         type: 'smoothstep',

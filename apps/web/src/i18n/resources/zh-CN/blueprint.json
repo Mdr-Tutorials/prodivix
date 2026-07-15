@@ -31,6 +31,16 @@
     "placeholderTitle": "拖拽组件到画布",
     "placeholderDescription": "从组件库拖拽开始搭建。"
   },
+  "runner": {
+    "previewTitle": "运行中的项目预览",
+    "preparingTitle": "正在准备项目 Runner",
+    "preparingDescription": "正在编译 Workspace 并启动隔离的浏览器运行时。",
+    "failedTitle": "项目 Runner 不可用",
+    "stoppedTitle": "项目 Runner 已停止",
+    "start": "启动",
+    "retry": "重试",
+    "updating": "正在更新项目预览…"
+  },
   "assistant": {
     "title": "AI 助手",
     "expand": "展开 AI 助手",
@@ -584,7 +594,9 @@
       "design": "设计",
       "designTitle": "设计模式（Ctrl+Alt+I）",
       "interactive": "交互",
-      "interactiveTitle": "交互模式（Ctrl+Alt+I）"
+      "interactiveTitle": "交互模式（Ctrl+Alt+I）",
+      "run": "运行",
+      "runTitle": "运行项目（Ctrl+Alt+R）"
     },
     "routeDebug": {
       "label": "调试",

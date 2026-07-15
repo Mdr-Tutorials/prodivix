@@ -36,7 +36,7 @@ features:
 Prodivix 已经具备语义化视觉/代码混合作者闭环，包括 PIR-current、组件复用、受控源码往返、统一诊断、可逆 History、持久化写入链路和 React/Vite 导出验证。
 
 ::: warning Alpha 边界
-Prodivix 尚未承诺生产稳定性。Test、Deployment、完整 Data/API lifecycle、多框架 target、远程执行与团队协作尚未交付。文档会明确区分“可用能力”和“尚未交付能力”。
+Prodivix 尚未承诺生产稳定性。Workspace Test 已能运行 exact export snapshot，但尚不等同于 G3 VerificationEvidence；Deployment、完整 Data/API lifecycle、多框架 target、远程执行与团队协作继续按各自 Gate 建设。
 :::
 
 ## 从哪里开始

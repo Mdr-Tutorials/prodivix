@@ -363,7 +363,7 @@ func mustMarshalWorkspaceCapabilities(capabilities []string) string {
 	return string(payload)
 }
 
-func validateWorkspaceDocumentContent(documentType WorkspaceDocumentType, payload json.RawMessage) error {
+func validateWorkspaceDocumentContent(documentType WorkspaceDocumentType, payload json.RawMessage, documentIDs ...string) error {
 	if documentType == WorkspaceDocumentTypePIRGraph {
 		return validateNodeGraphDocument(payload)
 	}
@@ -372,6 +372,13 @@ func validateWorkspaceDocumentContent(documentType WorkspaceDocumentType, payloa
 	}
 	if documentType == WorkspaceDocumentTypeCode {
 		return validateWorkspaceCodeDocument(payload)
+	}
+	if documentType == WorkspaceDocumentTypeDataSource {
+		documentID := ""
+		if len(documentIDs) > 0 {
+			documentID = documentIDs[0]
+		}
+		return validateDataSourceDocument(payload, documentID)
 	}
 	if documentType == WorkspaceDocumentTypeDesignTokens {
 		return validateDesignTokenDocument(payload)
@@ -480,7 +487,7 @@ func withStoreTimeout(ctx context.Context) (context.Context, context.CancelFunc)
 
 func isValidWorkspaceDocumentType(documentType WorkspaceDocumentType) bool {
 	switch documentType {
-	case WorkspaceDocumentTypePIRPage, WorkspaceDocumentTypePIRLayout, WorkspaceDocumentTypePIRComponent, WorkspaceDocumentTypePIRGraph, WorkspaceDocumentTypePIRAnimation, WorkspaceDocumentTypeDesignTokens, WorkspaceDocumentTypeTokenResolver, WorkspaceDocumentTypeCode, WorkspaceDocumentTypeAsset, WorkspaceDocumentTypeProjectConfig:
+	case WorkspaceDocumentTypePIRPage, WorkspaceDocumentTypePIRLayout, WorkspaceDocumentTypePIRComponent, WorkspaceDocumentTypePIRGraph, WorkspaceDocumentTypePIRAnimation, WorkspaceDocumentTypeDesignTokens, WorkspaceDocumentTypeTokenResolver, WorkspaceDocumentTypeCode, WorkspaceDocumentTypeDataSource, WorkspaceDocumentTypeAsset, WorkspaceDocumentTypeProjectConfig:
 		return true
 	default:
 		return false

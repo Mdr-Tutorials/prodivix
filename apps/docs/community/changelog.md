@@ -4,8 +4,13 @@
 
 ## Unreleased
 
-- 开始建设 ExecutionProvider/ExecutionJob、Browser/Remote Runner 与项目运行环境。
-- 开始建设 Data/API IR、runtime zones、SecretRef、binary asset 与 auth/server-function contract。
+- 建立 transport-neutral ExecutionProvider/ExecutionJob、Execution Session coordinator 与 Browser Project Runner；蓝图 Design/Interactive/Run 三模式、独立工程 snapshot、依赖安装、Vite/HMR、共享 Execution Center/Console 与原位 iframe 已贯通。
+- NodeGraph editor Run/Stop 与 Blueprint `run-nodegraph` trigger 已硬切到 domain-owned same-context ExecutionProvider；默认 starter、实时 trace/log、诊断、SourceTrace、取消、timeout 与共享 Console 已贯通，旧 browser action 直调协议已删除。
+- Animation Play/Stop/Restart 已硬切到 domain-owned Runtime Port 与 same-context ExecutionProvider；完整单 timeline lifecycle、timeline easing、target capability、generation-fenced Browser effect lease、SourceTrace 与共享 Console 已贯通，旧编辑器私有 RAF lifecycle 已删除。
+- Browser Preview/Test 已使用独立 provider descriptor、Job 与 Session，共享 Browser Runtime Host 的 filesystem/dependency lifecycle；Workspace Test 页面已接入 canonical `ExecutionTestReport` 与共享 Execution Center。
+- 继续建设 Remote Isolated Runner、Terminal/Network 产品面和多 runtime zone。
+- 建立 DataSourceDocument/DataOperationReference current contract、strict wire codec、`data-source` typed Workspace/Semantic foundation，以及 reference-only environment/Secret identity；PIR binding、runtime adapter 与 Secret resolution 继续建设。
+- 继续建设完整 runtime zones、binary asset 与 auth/server-function contract。
 - 继续补齐产品文档、易用性和已发现的跨表面一致性问题。
 
 ## Semantic Hybrid Authoring

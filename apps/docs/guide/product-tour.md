@@ -15,7 +15,7 @@
 | Resources  | 管理资源、依赖、Token、导入代码与项目文件 | 可用                     |
 | Issues     | 汇总 Workspace、PIR、Code、Graph 等诊断   | 可用                     |
 | Export     | 检查并生成生产导出计划                    | React/Vite target 已验证 |
-| Test       | 未来测试工作台入口                        | 尚未完成                 |
+| Test       | 运行当前导出工程并查看用例报告与日志      | Browser 纵切可用         |
 | Deployment | 未来部署工作流入口                        | 尚未完成                 |
 
 ## Blueprint 的工作区

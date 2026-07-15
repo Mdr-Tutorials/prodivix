@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 
 const corePackages = {
-  animation: new Set(['@prodivix/authoring']),
+  animation: new Set(['@prodivix/authoring', '@prodivix/runtime-core']),
   router: new Set(['@prodivix/authoring']),
   diagnostics: new Set(),
   authoring: new Set(['@prodivix/diagnostics', '@prodivix/shared']),
@@ -15,6 +15,8 @@ const corePackages = {
   workspace: new Set([
     '@prodivix/animation',
     '@prodivix/authoring',
+    '@prodivix/data',
+    '@prodivix/diagnostics',
     '@prodivix/nodegraph',
     '@prodivix/pir',
     '@prodivix/router',
@@ -26,7 +28,8 @@ const corePackages = {
     '@prodivix/router',
     '@prodivix/workspace',
   ]),
-  'runtime-core': new Set(),
+  'runtime-core': new Set(['@prodivix/diagnostics']),
+  data: new Set(['@prodivix/authoring', '@prodivix/runtime-core']),
   nodegraph: new Set(['@prodivix/authoring', '@prodivix/runtime-core']),
 };
 
@@ -97,7 +100,7 @@ for (const [packageDirectory, allowedDependencies] of Object.entries(
         packageDirectory === 'workspace-sync' &&
         specifier.startsWith('@prodivix/pir') &&
         (relative(repoRoot, file).replaceAll('\\', '/') !==
-          'packages/workspace-sync/src/workspaceOperationCommitPirWire.ts' ||
+          'packages/workspace-sync/src/workspaceOperationCommitProjection.ts' ||
           specifier !== '@prodivix/pir/wire')
       ) {
         issues.push(

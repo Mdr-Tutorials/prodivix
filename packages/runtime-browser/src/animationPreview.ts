@@ -1,17 +1,15 @@
-import {
-  evaluateAnimationFrame,
-  evaluateAnimationTimelineAtCursor,
-} from '@prodivix/animation';
-import type {
-  AnimationFrame,
-  AnimationTimeline,
-  SvgFilterDefinition,
-} from '@prodivix/animation';
+import type { AnimationFrame, SvgFilterDefinition } from '@prodivix/animation';
 
-export type AnimationPreviewSnapshot = {
+export type AnimationPreviewSnapshot = Readonly<{
   cssText: string;
-  svgFilters: SvgFilterDefinition[];
-};
+  svgFilters: readonly SvgFilterDefinition[];
+}>;
+
+export const EMPTY_ANIMATION_PREVIEW_SNAPSHOT: AnimationPreviewSnapshot =
+  Object.freeze({
+    cssText: '',
+    svgFilters: Object.freeze([]),
+  });
 
 const escapeCssAttributeValue = (value: string) =>
   value
@@ -21,7 +19,21 @@ const escapeCssAttributeValue = (value: string) =>
     .replaceAll('\r', '\\d ')
     .replaceAll('\f', '\\c ');
 
-const projectFrame = (
+const cloneSvgFilters = (
+  svgFilters: readonly SvgFilterDefinition[]
+): readonly SvgFilterDefinition[] =>
+  Object.freeze(
+    svgFilters.map((filter) => ({
+      ...filter,
+      primitives: filter.primitives.map((primitive) => ({
+        ...primitive,
+        ...(primitive.attrs ? { attrs: { ...primitive.attrs } } : {}),
+      })),
+    }))
+  );
+
+/** Projects an already-evaluated, transport-neutral frame for a browser renderer. */
+export const projectAnimationFrameToBrowserPreview = (
   frame: AnimationFrame,
   targetDocumentId: string
 ): AnimationPreviewSnapshot => {
@@ -41,37 +53,8 @@ const projectFrame = (
       `[data-pir-document-id="${escapeCssAttributeValue(targetDocumentId)}"][data-pir-node-id="${escapeCssAttributeValue(nodeId)}"] {${declarations.join('')}}`
     );
   });
-  return { cssText: rules.join('\n'), svgFilters: frame.svgFilters };
+  return Object.freeze({
+    cssText: rules.join('\n'),
+    svgFilters: cloneSvgFilters(frame.svgFilters),
+  });
 };
-
-export const buildAnimationPreviewSnapshot = ({
-  timeline,
-  cursorMs,
-  svgFilters,
-  targetDocumentId,
-}: {
-  timeline: AnimationTimeline | undefined;
-  cursorMs: number;
-  svgFilters: SvgFilterDefinition[];
-  targetDocumentId: string;
-}): AnimationPreviewSnapshot =>
-  projectFrame(
-    evaluateAnimationTimelineAtCursor({ timeline, cursorMs, svgFilters }),
-    targetDocumentId
-  );
-
-export const buildAnimationPreviewSnapshotFromTimelines = ({
-  timelines,
-  globalMs,
-  svgFilters,
-  targetDocumentId,
-}: {
-  timelines: AnimationTimeline[];
-  globalMs: number;
-  svgFilters: SvgFilterDefinition[];
-  targetDocumentId: string;
-}): AnimationPreviewSnapshot =>
-  projectFrame(
-    evaluateAnimationFrame({ timelines, globalMs, svgFilters }),
-    targetDocumentId
-  );
