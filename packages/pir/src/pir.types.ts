@@ -1,4 +1,5 @@
 import type { CodeReference, TriggerBinding } from '@prodivix/authoring';
+import type { DataOperationReference } from '@prodivix/data';
 
 export type PIRJsonValue =
   null | boolean | number | string | readonly PIRJsonValue[] | PIRJsonObject;
@@ -159,11 +160,18 @@ export type PIRCollectionKeyBinding =
   | Readonly<{ kind: 'binding'; value: PIRValueBinding }>
   | Readonly<{ kind: 'index' }>;
 
+export type PIRCollectionDataLifecycleMapping = Readonly<{
+  kind: 'data-operation';
+  dataId: string;
+  idle: 'loading' | 'empty';
+}>;
+
 export type PIRCollectionNode = Readonly<{
   id: string;
   kind: 'collection';
   source: PIRCollectionSourceBinding;
   key: PIRCollectionKeyBinding;
+  lifecycle?: PIRCollectionDataLifecycleMapping;
   symbols: Readonly<{
     itemId: string;
     itemName: string;
@@ -211,6 +219,11 @@ export type PIRLogicDefinition = Readonly<{
       }>
     >
   >;
+  dataById?: Readonly<Record<string, PIRDataOperationBinding>>;
+}>;
+
+export type PIRDataOperationBinding = Readonly<{
+  operation: DataOperationReference;
 }>;
 
 export type PIRDocument = Readonly<{

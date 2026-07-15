@@ -37,6 +37,7 @@
     "@prodivix/animation": "workspace:*",
     "@prodivix/authoring": "workspace:*",
     "@prodivix/code-language": "workspace:*",
+    "@prodivix/data": "workspace:*",
     "@prodivix/diagnostics": "workspace:*",
     "@prodivix/i18n": "workspace:*",
     "@prodivix/nodegraph": "workspace:*",

@@ -3,6 +3,7 @@ import type {
   PIRCollectionProjectionLocation,
 } from '@prodivix/pir';
 import type {
+  PIRDataOperationRuntimePort,
   PIRRenderLocation,
   PIRRendererBlockingIssue,
   PIRRendererHost,
@@ -17,6 +18,7 @@ export type BlueprintEditorCanvasProps = {
   workspace: WorkspaceSnapshot;
   entryDocumentId: string;
   rendererHost: PIRRendererHost;
+  dataOperationRuntime: PIRDataOperationRuntimePort;
   currentPath: string;
   canvasMode: BlueprintCanvasMode;
   projectRunner: BlueprintProjectRunnerSurfaceController;

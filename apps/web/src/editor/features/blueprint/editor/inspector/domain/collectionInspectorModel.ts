@@ -4,6 +4,10 @@ import type {
   WorkspaceSymbolKind,
 } from '@prodivix/authoring';
 import {
+  createDataSourceScopeId,
+  type DataOperationReference,
+} from '@prodivix/data';
+import {
   PIR_COLLECTION_BINDING_LOCATIONS,
   createPirBindingCandidate,
   resolvePirCollectionBindingScope,
@@ -93,6 +97,24 @@ export type CollectionInspectorBindingCandidate = Readonly<{
   local: boolean;
 }>;
 
+export type CollectionInspectorDataOperationCandidate = Readonly<{
+  id: string;
+  symbolId: string;
+  label: string;
+  detail: string;
+  reference: DataOperationReference;
+}>;
+
+export type CollectionInspectorDataOperationView = Readonly<{
+  binding?: Readonly<{
+    dataId: string;
+    operation: DataOperationReference;
+    idle: 'loading' | 'empty';
+    path?: string;
+  }>;
+  candidates: readonly CollectionInspectorDataOperationCandidate[];
+}>;
+
 export type CollectionInspectorCandidateScope = Readonly<{
   location: PIRCollectionBindingLocation;
   status: 'ready' | 'unavailable' | 'stale';
@@ -125,6 +147,7 @@ export type CollectionInspectorModel = Readonly<{
   candidateScopes: Readonly<
     Record<PIRCollectionBindingLocation, CollectionInspectorCandidateScope>
   >;
+  dataOperation: CollectionInspectorDataOperationView;
   semanticStatus: CollectionInspectorSemanticStatus;
 }>;
 
@@ -389,6 +412,88 @@ const compareCandidates = (
   compareText(left.symbolKind, right.symbolKind) ||
   compareText(left.id, right.id);
 
+const projectDataOperationCandidates = (
+  workspace: WorkspaceSnapshot,
+  semanticIndex: WorkspaceSemanticIndex
+): readonly CollectionInspectorDataOperationCandidate[] =>
+  Object.freeze(
+    Object.values(workspace.docsById)
+      .filter((document) => document.type === 'data-source')
+      .flatMap((document) => {
+        const result = semanticIndex.queryVisibleSymbols({
+          scopeId: createDataSourceScopeId(workspace.id, document.id),
+          symbolKinds: ['data-operation'],
+          expectedTypeRef: 'data-operation:query',
+          expectedSnapshotIdentity: semanticIndex.snapshotIdentity,
+        });
+        if (result.status !== 'resolved') return [];
+        return result.symbols.flatMap((symbol) => {
+          if (
+            symbol.kind !== 'data-operation' ||
+            symbol.typeRef !== 'data-operation:query' ||
+            symbol.ownerRef.kind !== 'data-operation'
+          ) {
+            return [];
+          }
+          return [
+            Object.freeze({
+              id: symbol.id,
+              symbolId: symbol.id,
+              label: symbol.displayName ?? symbol.name,
+              detail:
+                symbol.qualifiedName ??
+                `${symbol.ownerRef.documentId}.${symbol.ownerRef.operationId}`,
+              reference: Object.freeze({
+                documentId: symbol.ownerRef.documentId,
+                operationId: symbol.ownerRef.operationId,
+              }),
+            }),
+          ];
+        });
+      })
+      .filter(
+        (candidate, index, candidates) =>
+          candidates.findIndex(({ id }) => id === candidate.id) === index
+      )
+      .sort(
+        (left, right) =>
+          compareText(left.label, right.label) ||
+          compareText(left.detail, right.detail) ||
+          compareText(left.id, right.id)
+      )
+  );
+
+const projectDataOperationView = (
+  document: PIRDocument,
+  collection: PIRCollectionNode,
+  candidates: readonly CollectionInspectorDataOperationCandidate[]
+): CollectionInspectorDataOperationView => {
+  const lifecycle = collection.lifecycle;
+  const source = collection.source;
+  const operationBinding = lifecycle
+    ? document.logic?.dataById?.[lifecycle.dataId]
+    : undefined;
+  const sourceBinding =
+    source.kind === 'binding' && source.value.kind === 'data'
+      ? source.value
+      : undefined;
+  return Object.freeze({
+    ...(lifecycle &&
+    operationBinding &&
+    sourceBinding?.dataId === lifecycle.dataId
+      ? {
+          binding: Object.freeze({
+            dataId: lifecycle.dataId,
+            operation: operationBinding.operation,
+            idle: lifecycle.idle,
+            ...(sourceBinding.path ? { path: sourceBinding.path } : {}),
+          }),
+        }
+      : {}),
+    candidates,
+  });
+};
+
 const unavailableCandidateScopes = (
   status: 'unavailable' | 'stale'
 ): CollectionInspectorModel['candidateScopes'] =>
@@ -591,6 +696,9 @@ export const createCollectionInspectorModel = (
           ? 'stale'
           : 'unavailable'
       );
+  const dataOperationCandidates = semanticIndex
+    ? projectDataOperationCandidates(input.workspace, semanticIndex)
+    : Object.freeze([]);
 
   return Object.freeze({
     status: 'ready',
@@ -626,6 +734,11 @@ export const createCollectionInspectorModel = (
       }),
       regions: projectRegions(read.decodedContent, node.id),
       candidateScopes,
+      dataOperation: projectDataOperationView(
+        read.decodedContent,
+        node,
+        dataOperationCandidates
+      ),
       semanticStatus,
     }),
   });

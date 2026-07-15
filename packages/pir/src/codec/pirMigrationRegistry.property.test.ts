@@ -6,8 +6,24 @@ import {
   upgradePirWireDocument,
 } from './pirMigrationRegistry';
 import { decodePirDocument, encodePirDocument } from './pirCodec';
+import { migratePirWireV14ToV15 } from './pirWireMigrationV14ToV15';
 
 describe('PIR wire migration registry properties', () => {
+  it('promotes v1.4 additively without mutating the source wire value', () => {
+    fc.assert(
+      fc.property(fc.jsonValue(), (payload) => {
+        const wire = { version: '1.4', payload } as const;
+        const before = structuredClone(wire);
+        expect(migratePirWireV14ToV15(wire)).toEqual({
+          version: '1.5',
+          payload,
+        });
+        expect(wire).toEqual(before);
+      }),
+      { numRuns: 30 }
+    );
+  });
+
   it('passes the generated current wire version without a domain migration', () => {
     fc.assert(
       fc.property(fc.jsonValue(), (payload) => {

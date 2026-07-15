@@ -26,6 +26,7 @@ import {
   type SemanticSnapshotIdentity,
   type WorkspaceReferenceFact,
 } from '@prodivix/authoring';
+import { createDataOperationSymbolId } from '@prodivix/data';
 import type { PIRDocument } from '../pir.types';
 import { createPirSemanticContributionProvider } from './pirSemanticContributionProvider';
 
@@ -165,6 +166,14 @@ const createComponentDocument = (reverse: boolean): PIRDocument => ({
 
 const createPageDocument = (reverse: boolean): PIRDocument => ({
   logic: {
+    dataById: {
+      'catalog-rows': {
+        operation: {
+          documentId: 'data-catalog',
+          operationId: 'list-products',
+        },
+      },
+    },
     state: {
       'state-items': {
         name: 'items',
@@ -216,11 +225,16 @@ const createPageDocument = (reverse: boolean): PIRDocument => ({
               kind: 'collection',
               source: {
                 kind: 'binding',
-                value: { kind: 'state', stateId: 'state-items' },
+                value: { kind: 'data', dataId: 'catalog-rows' },
               },
               key: {
                 kind: 'binding',
                 value: { kind: 'collection-symbol', symbolId: 'outer-item' },
+              },
+              lifecycle: {
+                kind: 'data-operation',
+                dataId: 'catalog-rows',
+                idle: 'loading',
               },
               symbols: {
                 itemId: 'outer-item',
@@ -533,6 +547,51 @@ describe('PIR-current semantic contribution provider properties', () => {
               'page-root'
             ),
           });
+          expect(
+            getReference(contribution, workspaceId, 'outer', '/source', 'data')
+              .target
+          ).toEqual({
+            kind: 'symbol-id',
+            symbolId: createPirDataSymbolId(
+              workspaceId,
+              PAGE_DOCUMENT_ID,
+              'catalog-rows'
+            ),
+          });
+          expect(
+            getReference(
+              contribution,
+              workspaceId,
+              'outer',
+              '/lifecycle/dataId',
+              'collection-data-lifecycle'
+            ).target
+          ).toEqual({
+            kind: 'symbol-id',
+            symbolId: createPirDataSymbolId(
+              workspaceId,
+              PAGE_DOCUMENT_ID,
+              'catalog-rows'
+            ),
+          });
+          expect(contribution.references).toContainEqual(
+            expect.objectContaining({
+              id: createSemanticId(
+                'pir-data-operation-reference',
+                workspaceId,
+                PAGE_DOCUMENT_ID,
+                'catalog-rows'
+              ),
+              target: {
+                kind: 'symbol-id',
+                symbolId: createDataOperationSymbolId(
+                  workspaceId,
+                  'data-catalog',
+                  'list-products'
+                ),
+              },
+            })
+          );
           expect(
             getReference(
               contribution,

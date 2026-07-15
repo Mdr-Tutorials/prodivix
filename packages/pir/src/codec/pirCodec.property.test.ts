@@ -132,8 +132,16 @@ const createValidDocument = (
     collection: {
       id: 'collection',
       kind: 'collection',
-      source: { kind: 'literal', value: [{ id: 1 }, { id: 2 }] },
+      source: {
+        kind: 'binding',
+        value: { kind: 'data', dataId: 'rows' },
+      },
       key: { kind: 'index' },
+      lifecycle: {
+        kind: 'data-operation',
+        dataId: 'rows',
+        idle: 'loading',
+      },
       symbols: {
         itemId: 'collection-item',
         itemName: 'item',
@@ -152,6 +160,16 @@ const createValidDocument = (
 
   return {
     ...empty,
+    logic: {
+      dataById: {
+        rows: {
+          operation: {
+            documentId: 'data-catalog',
+            operationId: 'list-products',
+          },
+        },
+      },
+    },
     componentContract: createContract(propOrder),
     ui: {
       graph: {
@@ -228,7 +246,8 @@ describe('PIR wire codec properties', () => {
           'invalid-discriminant',
           'raw-code',
           'legacy-list',
-          'missing-outlet-bindings'
+          'missing-outlet-bindings',
+          'lifecycle-source-mismatch'
         ),
         (invalidCase) => {
           const wire = createMutableWire();
@@ -242,8 +261,13 @@ describe('PIR wire codec properties', () => {
             wire.ui.graph.nodesById.collection!.list = {
               source: { $data: 'items' },
             };
-          } else {
+          } else if (invalidCase === 'missing-outlet-bindings') {
             delete wire.ui.graph.nodesById['slot-outlet']!.bindings;
+          } else {
+            wire.ui.graph.nodesById.collection!.source = {
+              kind: 'binding',
+              value: { kind: 'data', dataId: 'other-rows' },
+            };
           }
 
           expect(decodePirDocument(wire)).toMatchObject({ ok: false });

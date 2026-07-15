@@ -1,7 +1,9 @@
+import type { DataLifecycleSnapshot } from '@prodivix/data';
 import type {
   PIRCollectionPreviewInput,
   PIRCollectionProjectionLocation,
   PIRCollectionProjectionIssue,
+  PIRDataOperationBinding,
   PIRRuntimeValueScope,
   PIRTriggerBinding,
   PIRValueBinding,
@@ -18,6 +20,10 @@ import type {
   ExportModule,
   ExportProgramContribution,
 } from '#src/export/types';
+
+export const PIR_REACT_COMPILE_DIAGNOSTIC_CODES = Object.freeze({
+  dataRuntimeAdapterMissing: 'PIR_EXPORT_DATA_RUNTIME_ADAPTER_MISSING',
+} as const);
 
 export type PIRReactRuntimeTriggerDispatch = Readonly<{
   binding: PIRTriggerBinding;
@@ -38,6 +44,13 @@ export type PIRReactCodeReference = Extract<
   { kind: 'code' }
 >['reference'];
 
+export type PIRReactDataLifecycleSnapshotRequest = Readonly<{
+  documentId: string;
+  instancePath: string;
+  dataId: string;
+  binding: PIRDataOperationBinding;
+}>;
+
 /** Runtime capabilities required by generated PIR modules. */
 export type PIRReactRuntimePort = Readonly<{
   dispatchTrigger(input: PIRReactRuntimeTriggerDispatch): void;
@@ -47,6 +60,9 @@ export type PIRReactRuntimePort = Readonly<{
   reportCollectionProjectionIssues?(
     input: PIRReactCollectionProjectionIssueReport
   ): void;
+  resolveDataLifecycleSnapshot(
+    request: PIRReactDataLifecycleSnapshotRequest
+  ): DataLifecycleSnapshot | undefined;
   resolveCodeValue(
     reference: PIRReactCodeReference,
     scope: PIRRuntimeValueScope

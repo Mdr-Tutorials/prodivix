@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { DndContext, DragOverlay } from '@dnd-kit/core';
 import { ChevronRight, SlidersHorizontal } from 'lucide-react';
+import type { PIRDataOperationRuntimePort } from '@prodivix/pir-react-renderer';
 import {
   useEditorShortcut,
   useWorkspaceHistoryShortcuts,
@@ -32,6 +33,15 @@ export type BlueprintEditorProps = Readonly<{
   entryDocumentId?: string;
   compactHeader?: boolean;
 }>;
+
+const BLUEPRINT_AUTHORING_IDLE_DATA_RUNTIME = Object.freeze({
+  resolveSnapshot: ({ binding }) =>
+    Object.freeze({
+      operation: binding.operation,
+      sequence: 0,
+      status: 'idle' as const,
+    }),
+} satisfies PIRDataOperationRuntimePort);
 
 const UnavailableAuthoringPanel = ({ label }: { label: string }) => (
   <div className="flex min-h-0 flex-1 items-center justify-center p-4 text-center text-xs text-(--text-muted)">
@@ -290,6 +300,7 @@ export function BlueprintEditor({
               workspace={controller.workspace}
               entryDocumentId={controller.entryDocumentId}
               rendererHost={controller.rendererHost}
+              dataOperationRuntime={BLUEPRINT_AUTHORING_IDLE_DATA_RUNTIME}
               currentPath={addressBar.currentPath}
               canvasMode={canvas.canvasMode}
               projectRunner={{
@@ -331,6 +342,9 @@ export function BlueprintEditor({
               onCollectionPreviewChange={inspector.onCollectionPreviewChange}
               onUpdateInstanceBindings={inspector.onUpdateInstanceBindings}
               onUpdateCollection={inspector.onUpdateCollection}
+              onBindCollectionDataOperation={
+                inspector.onBindCollectionDataOperation
+              }
               onOpenDefinition={inspector.onOpenDefinition}
               onFindReferences={inspector.onFindReferences}
               onOpenCodeArtifact={inspector.onOpenCodeArtifact}

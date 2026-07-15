@@ -42,6 +42,8 @@ export type {
   PIRElementHostEntry,
   PIRElementProjectionInput,
   PIRElementProjectionResult,
+  PIRDataLifecycleSnapshotRequest,
+  PIRDataOperationRuntimePort,
   PIRExternalTriggerBinding,
   PIRRenderLocation,
   PIRRendererBlockingIssue,

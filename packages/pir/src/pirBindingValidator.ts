@@ -16,6 +16,8 @@ export const PIR_BINDING_VALIDATION_CODES = Object.freeze({
   slotOutletBinding: 'PIR_SLOT_OUTLET_BINDING',
   collectionSymbolUnresolved: 'PIR_COLLECTION_SYMBOL_UNRESOLVED',
   collectionSymbolScope: 'PIR_COLLECTION_SYMBOL_SCOPE',
+  dataUnresolved: 'PIR_DATA_UNRESOLVED',
+  dataScope: 'PIR_DATA_SCOPE',
 } as const);
 
 export type PIRBindingValidationCode =
@@ -47,8 +49,8 @@ type CollectionSymbolOwner = Readonly<{
   role: 'item' | 'index' | 'error';
 }>;
 
-type CollectionBindingOccurrenceKind =
-  'node' | 'collection-source' | 'collection-key';
+type BindingOccurrenceKind =
+  'node' | 'collection-source' | 'collection-key' | 'data-scope';
 
 export type PIRInstanceSlotScope = Readonly<{
   instanceNodeId: string;
@@ -140,7 +142,7 @@ const createCollectionSymbolOwners = (
 const isCollectionSymbolVisible = (
   owner: CollectionSymbolOwner,
   occurrenceNodeId: string,
-  occurrenceKind: CollectionBindingOccurrenceKind,
+  occurrenceKind: BindingOccurrenceKind,
   placements: ReadonlyMap<string, ParentPlacement>
 ): boolean => {
   if (owner.nodeId === occurrenceNodeId) {
@@ -157,6 +159,25 @@ const isCollectionSymbolVisible = (
         ? placement.regionName === 'error'
         : placement.regionName === 'item';
     }
+    currentNodeId = placement.ownerNodeId;
+  }
+  return false;
+};
+
+const isElementDataVisible = (
+  ownerNodeId: string,
+  occurrenceNodeId: string,
+  occurrenceKind: BindingOccurrenceKind,
+  placements: ReadonlyMap<string, ParentPlacement>
+): boolean => {
+  if (ownerNodeId === occurrenceNodeId) return occurrenceKind !== 'data-scope';
+  const visited = new Set<string>();
+  let currentNodeId = occurrenceNodeId;
+  while (!visited.has(currentNodeId)) {
+    visited.add(currentNodeId);
+    const placement = placements.get(currentNodeId);
+    if (!placement) return false;
+    if (placement.ownerNodeId === ownerNodeId) return true;
     currentNodeId = placement.ownerNodeId;
   }
   return false;
@@ -204,9 +225,30 @@ export const validatePirBindings = (
     fieldPath: string,
     value: PIRValueBinding | undefined,
     slotScope: PIRInstanceSlotScope | undefined,
-    occurrenceKind: CollectionBindingOccurrenceKind = 'node'
+    occurrenceKind: BindingOccurrenceKind = 'node'
   ): void => {
     if (!value) return;
+    if (value.kind === 'data') {
+      if (hasOwn(document.logic?.dataById ?? {}, value.dataId)) return;
+      const owner = graph.nodesById[value.dataId];
+      const memberPath = `${nodeFieldPath(nodeId, fieldPath)}/dataId`;
+      if (owner?.kind !== 'element' || !owner.data) {
+        addIssue(
+          PIR_BINDING_VALIDATION_CODES.dataUnresolved,
+          memberPath,
+          `data "${value.dataId}" does not resolve in this document.`
+        );
+      } else if (
+        !isElementDataVisible(value.dataId, nodeId, occurrenceKind, placements)
+      ) {
+        addIssue(
+          PIR_BINDING_VALIDATION_CODES.dataScope,
+          memberPath,
+          `Element data "${value.dataId}" is not visible from this lexical scope.`
+        );
+      }
+      return;
+    }
     if (value.kind === 'collection-symbol') {
       const symbolPath = `${nodeFieldPath(nodeId, fieldPath)}/symbolId`;
       const owner = collectionSymbolOwners.get(value.symbolId);
@@ -325,14 +367,15 @@ export const validatePirBindings = (
         ['value', node.data.value],
         ['mock', node.data.mock],
       ] as const) {
-        validateValue(nodeId, `/data/${field}`, value, slotScope);
+        validateValue(nodeId, `/data/${field}`, value, slotScope, 'data-scope');
       }
       for (const [name, value] of sortedEntries(node.data.extend ?? {})) {
         validateValue(
           nodeId,
           `/data/extend/${escapeJsonPointerSegment(name)}`,
           value,
-          slotScope
+          slotScope,
+          'data-scope'
         );
       }
     }

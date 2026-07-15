@@ -15,6 +15,8 @@ import type {
 import { REACT_VITE_DEPENDENCIES } from '#src/export/presets/reactVite';
 import { reactAdapter } from '#src/react/adapter';
 import { createPirCollectionRuntimeSource } from '#src/react/collectionRuntime';
+import { PIR_REACT_COMPILE_DIAGNOSTIC_CODES } from '#src/react/compiler.types';
+import { createPirDataOperationRuntimeSource } from '#src/react/dataOperationRuntime';
 import { PIRReactImportRegistry } from '#src/react/importRegistry';
 import { createPirReactNodeCompiler } from '#src/react/nodeCompiler';
 import {
@@ -46,6 +48,9 @@ const compareText = (left: string, right: string): number =>
   left < right ? -1 : left > right ? 1 : 0;
 
 const toJson = (value: unknown): string => JSON.stringify(value) ?? 'null';
+
+const escapeJsonPointerToken = (value: string): string =>
+  value.replaceAll('~', '~0').replaceAll('/', '~1');
 
 const compileDefaultedRecord = (
   sourceExpression: string,
@@ -126,6 +131,7 @@ const createGeneratedRuntimePrelude = (useEffectExpression: string): string =>
   paramsById: Readonly<Record<string, unknown>>;
   stateById: Readonly<Record<string, unknown>>;
   dataById: Readonly<Record<string, unknown>>;
+  dataLifecycleById: Readonly<Record<string, __PdxDataLifecycleSnapshot>>;
   collectionSymbolsById: Readonly<Record<string, unknown>>;
   componentPropsById: Readonly<Record<string, unknown>>;
   componentVariantsById: Readonly<Record<string, unknown>>;
@@ -151,6 +157,7 @@ type __PdxRuntimePort = Readonly<{
   dispatchTrigger(input: Readonly<{ binding: unknown; payload: unknown; scope: __PdxScope; setStateById: __PdxStateUpdater }>): void;
   resolveCollectionPreviewState?(location: __PdxCollectionLocation): __PdxCollectionPreviewInput | undefined;
   reportCollectionProjectionIssues?(input: Readonly<{ location: __PdxCollectionLocation; issues: readonly __PdxCollectionProjectionIssue[] }>): void;
+  resolveDataLifecycleSnapshot(request: __PdxDataLifecycleSnapshotRequest): __PdxDataLifecycleSnapshot | undefined;
   resolveCodeValue(reference: __PdxCodeReference, scope: __PdxScope): unknown;
 }>;
 
@@ -197,6 +204,8 @@ const __pdxRenderValue = (value: unknown): any => value;
 
 ${createPirCollectionRuntimeSource(useEffectExpression)}
 
+${createPirDataOperationRuntimeSource()}
+
 ${PIR_PROJECTION_PATH_RUNTIME_SOURCE}`;
 
 /** Compiles one validated document from the shared PIR projection plan. */
@@ -213,6 +222,17 @@ export const compilePirReactDocument = (
     input.workspaceDocument.path
   );
   const diagnostics: CompileDiagnostic[] = [];
+  for (const dataId of Object.keys(document.logic?.dataById ?? {}).sort(
+    compareText
+  )) {
+    diagnostics.push({
+      code: PIR_REACT_COMPILE_DIAGNOSTIC_CODES.dataRuntimeAdapterMissing,
+      severity: 'error',
+      source: 'export',
+      message: `PIR data binding "${dataId}" requires a Data runtime adapter for React export.`,
+      path: `/docsById/${escapeJsonPointerToken(documentId)}/content/logic/dataById/${escapeJsonPointerToken(dataId)}`,
+    });
+  }
   const imports = new PIRReactImportRegistry({
     ...input.packageResolver,
     packageVersions: {
@@ -250,6 +270,7 @@ export const compilePirReactDocument = (
     document.componentContract
   );
   const stateValues = compileStateValues(document);
+  const dataOperationBindings = toJson(document.logic?.dataById ?? {});
   const body = `${createGeneratedRuntimePrelude(useEffectLocal)}
 
 export default function ${moduleName}({
@@ -267,10 +288,18 @@ export default function ${moduleName}({
   }, []);
   const __pdxComponentPropsById = ${componentProps};
   const __pdxComponentVariantsById = ${componentVariants};
+  const __pdxDataProjection = __pdxProjectDocumentDataLifecycle(
+    __pdxRuntime,
+    ${toJson(documentId)},
+    __pdxInstancePath,
+    ${dataOperationBindings}
+  );
+  if (__pdxDataProjection.status === 'blocked') return null;
   const __pdxDefinitionScope: __PdxScope = {
     paramsById: __pdxParamsById,
     stateById: __pdxStateById,
-    dataById: {},
+    dataById: __pdxDataProjection.dataById,
+    dataLifecycleById: __pdxDataProjection.lifecycleByDataId,
     collectionSymbolsById: {},
     componentPropsById: __pdxComponentPropsById,
     componentVariantsById: __pdxComponentVariantsById,

@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react';
+import type { DataOperationReference } from '@prodivix/data';
 import {
   createEmptyPirComponentContract,
   type PIRCollectionNode,
@@ -13,6 +14,7 @@ import {
   createWorkspaceComponentDefinitionTransactionPlan,
   createWorkspaceComponentExtractionTransactionPlan,
   createWorkspaceCollectionInsertTransactionPlan,
+  createWorkspaceCollectionDataOperationBindingTransactionPlan,
   createWorkspaceCollectionUpdateTransactionPlan,
   createWorkspaceComponentInstanceBindingsUpdateTransactionPlan,
   createWorkspaceComponentInstanceTransactionPlan,
@@ -339,6 +341,37 @@ export const useWorkspaceComponentAuthoring = () => {
     [applyTransaction, workspace]
   );
 
+  const bindCollectionDataOperation = useCallback(
+    async (input: {
+      documentId: string;
+      collectionNodeId: string;
+      dataId: string;
+      operation: DataOperationReference;
+      idle: 'loading' | 'empty';
+      path?: string;
+    }): Promise<WorkspaceComponentAuthoringOutcome> => {
+      if (!workspace) {
+        return { status: 'rejected', message: 'No Workspace is loaded.' };
+      }
+      const plan = createWorkspaceCollectionDataOperationBindingTransactionPlan(
+        {
+          workspace,
+          baseRevision: workspace.workspaceRev,
+          transactionId: createWorkspaceClientOperationId(
+            'collection-data-operation-bind'
+          ),
+          issuedAt: new Date().toISOString(),
+          ...input,
+        }
+      );
+      if (plan.status === 'rejected') {
+        return { status: 'rejected', message: firstIssueMessage(plan) };
+      }
+      return applyTransaction(plan.plan.transaction);
+    },
+    [applyTransaction, workspace]
+  );
+
   const planExtraction = useCallback(
     (input: {
       sourceDocumentId: string;
@@ -392,6 +425,7 @@ export const useWorkspaceComponentAuthoring = () => {
     updateInstanceBindings,
     insertCollection,
     updateCollection,
+    bindCollectionDataOperation,
     planExtraction,
     setActiveDocumentId,
   };

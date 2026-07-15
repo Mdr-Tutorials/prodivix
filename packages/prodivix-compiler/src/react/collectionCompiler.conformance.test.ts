@@ -350,6 +350,52 @@ const createCollectionPage = (
   });
 };
 
+const createDataBoundCollectionPage = (): WorkspaceDocument => {
+  const base = createCollectionPage([]);
+  const content = base.content as PIRDocument;
+  const collection = content.ui.graph.nodesById.products as Extract<
+    PIRNode,
+    { kind: 'collection' }
+  >;
+  return {
+    ...base,
+    content: {
+      ...content,
+      logic: {
+        dataById: {
+          products: {
+            operation: {
+              documentId: 'catalog-data',
+              operationId: 'list-products',
+            },
+          },
+        },
+      },
+      ui: {
+        ...content.ui,
+        graph: {
+          ...content.ui.graph,
+          nodesById: {
+            ...content.ui.graph.nodesById,
+            products: {
+              ...collection,
+              source: {
+                kind: 'binding',
+                value: { kind: 'data', dataId: 'products' },
+              },
+              lifecycle: {
+                kind: 'data-operation',
+                dataId: 'products',
+                idle: 'loading',
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+};
+
 const createCollectionSlotDefinition = (): WorkspaceDocument => {
   const contract: PIRComponentContract = {
     ...emptyContract(),
@@ -455,6 +501,26 @@ const createCollectionSlotPage = (): WorkspaceDocument => {
 };
 
 describe('PIR Collection compiler conformance', () => {
+  it('fails closed with a stable diagnostic when no Data runtime adapter exists', () => {
+    const result = compileWorkspacePirReactModules({
+      workspace: createWorkspace([
+        createDataBoundCollectionPage(),
+        createCardDefinition(),
+      ]),
+      entryDocumentId: 'page',
+    });
+
+    expect(result.status).toBe('blocked');
+    expect(result.modules).toEqual([]);
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: 'PIR_EXPORT_DATA_RUNTIME_ADAPTER_MISSING',
+        severity: 'error',
+        path: '/docsById/page/content/logic/dataById/products',
+      })
+    );
+  });
+
   it('compiles nested Collection scopes, Component items and state regions', async () => {
     const result = compileWorkspacePirReactModules({
       workspace: createWorkspace([

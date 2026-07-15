@@ -5,6 +5,7 @@ import type {
   PIRCollectionPreviewInput,
   PIRCollectionRegions,
 } from '@prodivix/pir';
+import type { DataOperationReference } from '@prodivix/data';
 import type { PIRRenderLocation } from '@prodivix/pir-react-renderer';
 import type { WorkspaceSnapshot } from '@prodivix/workspace';
 import { IconPickerModal } from './components/IconPickerModal';
@@ -55,6 +56,14 @@ export type BlueprintEditorInspectorProps = {
     collection: PIRCollectionNode;
     regions: PIRCollectionRegions;
   }) => void | Promise<void>;
+  onBindCollectionDataOperation: (update: {
+    documentId: string;
+    collectionNodeId: string;
+    dataId: string;
+    operation: DataOperationReference;
+    idle: 'loading' | 'empty';
+    path?: string;
+  }) => void | Promise<void>;
   onOpenDefinition: (documentId: string) => void;
   onFindReferences: (documentId: string) => void;
   onOpenCodeArtifact: (artifactId: string) => void;
@@ -99,6 +108,7 @@ export function BlueprintEditorInspector({
   onCollectionPreviewChange,
   onUpdateInstanceBindings,
   onUpdateCollection,
+  onBindCollectionDataOperation,
   onOpenDefinition,
   onFindReferences,
   onOpenCodeArtifact,
@@ -164,6 +174,14 @@ export function BlueprintEditorInspector({
       collection,
       regions: collectionRegionsFromModel(collectionModel),
     });
+  };
+
+  const updateCollectionSource = (
+    source: PIRCollectionNode['source']
+  ): void => {
+    if (!collectionModel) return;
+    const { lifecycle: _lifecycle, ...collection } = collectionModel.collection;
+    void updateCollectionNode({ ...collection, source });
   };
 
   const handleCollectionSymbolNameChange = (
@@ -281,10 +299,12 @@ export function BlueprintEditorInspector({
                         model={collectionModel}
                         preview={collectionPreview}
                         disabled={readonly}
-                        onSourceChange={(source) =>
-                          void updateCollectionNode({
-                            ...collectionModel.collection,
-                            source,
+                        onSourceChange={updateCollectionSource}
+                        onDataOperationChange={(binding) =>
+                          void onBindCollectionDataOperation({
+                            documentId: collectionModel.location.documentId,
+                            collectionNodeId: collectionModel.collection.id,
+                            ...binding,
                           })
                         }
                         onKeyChange={(key) =>

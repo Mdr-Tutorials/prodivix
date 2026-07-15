@@ -67,6 +67,7 @@ export type PIRLiftedEventBoundaryDependency = Readonly<{
 
 export type PIRPreservedReferenceKind =
   | 'code-artifact'
+  | 'data-operation'
   | 'url'
   | 'route'
   | 'nodegraph'

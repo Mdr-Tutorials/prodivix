@@ -40,6 +40,7 @@ export function BlueprintEditorCanvas({
   workspace,
   entryDocumentId,
   rendererHost,
+  dataOperationRuntime,
   currentPath,
   canvasMode,
   projectRunner,
@@ -408,6 +409,7 @@ export function BlueprintEditorCanvas({
                       <PIRRenderer
                         plan={projection.plan}
                         host={rendererHost}
+                        dataOperationRuntime={dataOperationRuntime}
                         rootParamsById={rootParamsById}
                         rootStateById={rootStateById}
                         rootDataById={rootDataById}

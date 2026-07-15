@@ -41,6 +41,9 @@ export type PIRSemanticBindingContext = Readonly<{
 const compareText = (left: string, right: string): number =>
   left < right ? -1 : left > right ? 1 : 0;
 
+const hasOwn = (value: object, key: PropertyKey): boolean =>
+  Object.prototype.hasOwnProperty.call(value, key);
+
 const sortedEntries = <T>(
   value: Readonly<Record<string, T>>
 ): Array<[string, T]> =>
@@ -155,7 +158,11 @@ const addValueBindingReference = (
           input.value.dataId
         ),
       };
-      requiresDurableTarget = false;
+      requiresDurableTarget = hasOwn(
+        input.context.document.logic?.dataById ?? {},
+        input.value.dataId
+      );
+      resolutionMode = 'visible';
       break;
     case 'collection-symbol': {
       const symbolId = input.context.collectionSymbolIds.get(
@@ -534,6 +541,26 @@ export const addPirCollectionFacts = (
       scopeId: collectionScopeId,
       value: node.key.value,
       kind: 'collection-key',
+    });
+  }
+  if (node.lifecycle) {
+    addReference(contribution, {
+      context,
+      nodeId,
+      fieldPath: '/lifecycle/dataId',
+      role: 'collection-data-lifecycle',
+      scopeId: nodeParentScopeId,
+      kind: 'binding',
+      target: {
+        kind: 'symbol-id',
+        symbolId: createPirDataSymbolId(
+          context.workspaceId,
+          context.documentId,
+          node.lifecycle.dataId
+        ),
+      },
+      resolutionMode: 'visible',
+      requiresDurableTarget: true,
     });
   }
 };

@@ -1,15 +1,19 @@
 import { transformWithEsbuild } from 'vite';
 import { describe, expect, it } from 'vitest';
+import type { DataLifecycleSnapshot } from '@prodivix/data';
 import {
   appendPirProjectionCollectionItemPath,
   appendPirProjectionComponentPath,
   appendPirProjectionSlotPath,
   createPirProjectionRootPath,
   projectPirCollection,
+  resolvePirCollectionDataLifecycle,
   resolvePirValueBinding,
+  type PIRCollectionDataLifecycleMapping,
   type PIRCollectionNode,
   type PIRCollectionPreviewInput,
   type PIRCodeValueResolver,
+  type PIRDataOperationBinding,
   type PIRRuntimeValueScope,
 } from '@prodivix/pir';
 import { createPirCollectionRuntimeSource } from '#src/react/collectionRuntime';
@@ -58,6 +62,11 @@ type RuntimeExports = Readonly<{
     nodeId: string,
     keyIdentity: string
   ) => string;
+  resolveLifecycle: (
+    binding: PIRDataOperationBinding,
+    mapping: PIRCollectionDataLifecycleMapping,
+    snapshot: DataLifecycleSnapshot
+  ) => unknown;
 }>;
 
 type Effect = () => void | (() => void);
@@ -72,6 +81,7 @@ ${PIR_PROJECTION_PATH_RUNTIME_SOURCE}
   project: __pdxProjectCollection,
   report: __PdxCollectionIssueReporter,
   appendCollectionPath: __pdxAppendCollectionItemPath,
+  resolveLifecycle: __pdxResolveCollectionDataLifecycle,
 };`;
   const transformed = await transformWithEsbuild(source, 'runtime.ts', {
     loader: 'ts',
@@ -158,7 +168,81 @@ const createCollection = (
   },
 });
 
+const DATA_OPERATION = Object.freeze({
+  documentId: 'catalog-data',
+  operationId: 'list-products',
+});
+
+const DATA_BINDING: PIRDataOperationBinding = Object.freeze({
+  operation: DATA_OPERATION,
+});
+
+const DATA_LIFECYCLE_MAPPING: PIRCollectionDataLifecycleMapping = Object.freeze(
+  {
+    kind: 'data-operation',
+    dataId: 'products',
+    idle: 'loading',
+  }
+);
+
+const DATA_LIFECYCLE_SCENARIOS: readonly DataLifecycleSnapshot[] = [
+  { operation: DATA_OPERATION, sequence: 0, status: 'idle' },
+  {
+    operation: DATA_OPERATION,
+    sequence: 1,
+    status: 'loading',
+    invocationId: 'invocation-1',
+    attempt: 1,
+    startedAt: 1,
+  },
+  {
+    operation: DATA_OPERATION,
+    sequence: 2,
+    status: 'success',
+    invocationId: 'invocation-1',
+    attempt: 1,
+    startedAt: 1,
+    completedAt: 2,
+    value: [],
+  },
+  {
+    operation: DATA_OPERATION,
+    sequence: 3,
+    status: 'empty',
+    invocationId: 'invocation-1',
+    attempt: 1,
+    startedAt: 1,
+    completedAt: 2,
+  },
+  {
+    operation: DATA_OPERATION,
+    sequence: 4,
+    status: 'error',
+    invocationId: 'invocation-1',
+    attempt: 1,
+    startedAt: 1,
+    completedAt: 2,
+    error: { code: 'FAILED', message: 'failed', retryable: false },
+  },
+];
+
 describe('standalone PIR Collection runtime conformance', () => {
+  it.each(DATA_LIFECYCLE_SCENARIOS)(
+    'matches the shared lifecycle resolver for $status',
+    async (snapshot) => {
+      const runtime = await loadRuntime(() => undefined);
+      expect(
+        runtime.resolveLifecycle(DATA_BINDING, DATA_LIFECYCLE_MAPPING, snapshot)
+      ).toEqual(
+        resolvePirCollectionDataLifecycle({
+          binding: DATA_BINDING,
+          mapping: DATA_LIFECYCLE_MAPPING,
+          snapshot,
+        })
+      );
+    }
+  );
+
   it('matches the canonical evaluator across state, scope and key outcomes', async () => {
     const itemKey = {
       kind: 'binding' as const,

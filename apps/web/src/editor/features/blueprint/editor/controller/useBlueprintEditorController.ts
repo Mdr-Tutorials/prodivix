@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { createComponentSymbolId } from '@prodivix/authoring';
+import type { DataOperationReference } from '@prodivix/data';
 import type {
   PIRCollectionPreviewInput,
   PIRCollectionProjectionLocation,
@@ -138,6 +139,7 @@ export const useBlueprintEditorController = (
     readonly,
     applyCommand,
     applyTransaction,
+    bindCollectionDataOperation,
     updateCollection,
     updateInstanceBindings,
     setActiveDocumentId,
@@ -1024,6 +1026,21 @@ export const useBlueprintEditorController = (
         const outcome = await updateCollection(input);
         setStatusMessage(
           outcome.status === 'applied' ? 'Collection updated.' : outcome.message
+        );
+      },
+      onBindCollectionDataOperation: async (input: {
+        documentId: string;
+        collectionNodeId: string;
+        dataId: string;
+        operation: DataOperationReference;
+        idle: 'loading' | 'empty';
+        path?: string;
+      }) => {
+        const outcome = await bindCollectionDataOperation(input);
+        setStatusMessage(
+          outcome.status === 'applied'
+            ? 'Collection data operation bound.'
+            : outcome.message
         );
       },
       onOpenDefinition: openComponentDefinition,

@@ -23,6 +23,7 @@
     "typecheck": "tsc -b tsconfig.test.json --pretty false"
   },
   "dependencies": {
+    "@prodivix/data": "workspace:*",
     "@prodivix/pir": "workspace:*",
     "@prodivix/router": "workspace:*",
     "@prodivix/ui": "workspace:*",

@@ -645,6 +645,9 @@ const workspacePirRuntime = {
   resolveCodeValue() {
     return undefined;
   },
+  resolveDataLifecycleSnapshot() {
+    return undefined;
+  },
 } as const;
 
 const normalizePath = (value: string) => {

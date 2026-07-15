@@ -1,8 +1,10 @@
 import type React from 'react';
+import type { DataLifecycleSnapshot } from '@prodivix/data';
 import type {
   PIRCodeValueResolver,
   PIRCollectionPreviewInput,
   PIRCollectionProjectionLocation,
+  PIRDataOperationBinding,
   PIRElementNode,
   PIRRuntimeValueScope,
   PIRTriggerBinding,
@@ -64,10 +66,27 @@ export type PIRRendererHost = Readonly<{
   resolveCodeValue?: PIRCodeValueResolver;
 }>;
 
+export type PIRDataLifecycleSnapshotRequest = Readonly<{
+  documentId: string;
+  instancePath: string;
+  dataId: string;
+  binding: PIRDataOperationBinding;
+}>;
+
+/** Runtime-owned, instance-addressed lifecycle input consumed by the projection. */
+export type PIRDataOperationRuntimePort = Readonly<{
+  resolveSnapshot(
+    request: PIRDataLifecycleSnapshotRequest
+  ): DataLifecycleSnapshot | undefined;
+}>;
+
 export const PIR_RENDERER_BLOCKING_ISSUE_CODES = Object.freeze({
   elementResolverMissing: 'PIR_RENDER_ELEMENT_RESOLVER_MISSING',
   codeResolverMissing: 'PIR_RENDER_CODE_RESOLVER_MISSING',
   collectionProjectionBlocked: 'PIR_RENDER_COLLECTION_PROJECTION_BLOCKED',
+  dataLifecycleUnavailable: 'PIR_RENDER_DATA_LIFECYCLE_UNAVAILABLE',
+  dataLifecycleProjectionBlocked:
+    'PIR_RENDER_DATA_LIFECYCLE_PROJECTION_BLOCKED',
 } as const);
 
 export type PIRRendererBlockingIssueCode =
@@ -80,6 +99,7 @@ export type PIRRendererBlockingIssue = Readonly<{
   message: string;
   documentId: string;
   nodeId: string;
+  dataId?: string;
   instancePath?: string;
   elementType?: string;
 }>;
@@ -107,6 +127,7 @@ export type PIRRendererProps = Readonly<{
   rootDataById?: Readonly<Record<string, unknown>>;
   rootComponentPropsById?: Readonly<Record<string, unknown>>;
   rootComponentVariantsById?: Readonly<Record<string, string | undefined>>;
+  dataOperationRuntime?: PIRDataOperationRuntimePort;
   resolveCollectionPreviewState?: (
     location: PIRCollectionProjectionLocation
   ) => PIRCollectionPreviewInput | undefined;

@@ -2,6 +2,7 @@ import {
   createComponentSymbolId,
   createPirNodeScopeId,
   createPirNodeSymbolId,
+  createPirDataSymbolId,
   createPirParamSymbolId,
   createPirRegionSymbolId,
   createPirStateSymbolId,
@@ -9,6 +10,7 @@ import {
   createWorkspaceDocumentSymbolId,
   type WorkspaceDependencyContribution,
 } from '@prodivix/authoring';
+import { createDataOperationSymbolId } from '@prodivix/data';
 import type { PIRDocument } from '../pir.types';
 import { createPirInstanceSlotScopes } from '../pirBindingValidator';
 import {
@@ -147,6 +149,47 @@ const addDocumentLogicFacts = (
       kind: dependencyKind,
       sourceSymbolId: symbolId,
       targetSymbolId: ownerSymbolId,
+    });
+  }
+  for (const [dataId, binding] of sortedEntries(
+    context.document.logic?.dataById ?? {}
+  )) {
+    const symbolId = createPirDataSymbolId(
+      context.workspaceId,
+      context.documentId,
+      dataId
+    );
+    const operationSymbolId = createDataOperationSymbolId(
+      context.workspaceId,
+      binding.operation.documentId,
+      binding.operation.operationId
+    );
+    contribution.symbols.push({
+      id: symbolId,
+      stability: 'durable',
+      kind: 'data',
+      name: dataId,
+      qualifiedName: `${context.documentId}.logic.dataById.${dataId}`,
+      scopeId: context.baseScopeId,
+      ownerRef,
+      typeRef: 'data-operation-result',
+      capabilityIds: ['data-operation-binding'],
+    });
+    contribution.references.push({
+      id: createSemanticId(
+        'pir-data-operation-reference',
+        context.workspaceId,
+        context.documentId,
+        dataId
+      ),
+      kind: 'data-operation',
+      sourceRef: ownerRef,
+      sourceSymbolId: symbolId,
+      scopeId: context.baseScopeId,
+      target: { kind: 'symbol-id', symbolId: operationSymbolId },
+      resolutionMode: 'addressable',
+      expectedTypeRefs: ['data-operation:query'],
+      requiresDurableTarget: true,
     });
   }
 };

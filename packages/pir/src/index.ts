@@ -29,6 +29,7 @@ export * from './mutations/pirElementAuthoringMutations';
 export * from './extraction/pirSubtreeExtraction';
 export * from './projection/pirComponentProjection';
 export * from './projection/pirCollectionProjection';
+export * from './projection/pirCollectionDataLifecycle';
 export * from './projection/pirProjectionPath';
 export { readValueByPath } from './projection/readValueByPath';
 export {

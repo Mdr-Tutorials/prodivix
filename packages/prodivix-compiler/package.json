@@ -35,6 +35,7 @@
   "dependencies": {
     "@prodivix/animation": "workspace:*",
     "@prodivix/authoring": "workspace:*",
+    "@prodivix/data": "workspace:*",
     "@prodivix/nodegraph": "workspace:*",
     "@prodivix/pir": "workspace:*",
     "@prodivix/router": "workspace:*",

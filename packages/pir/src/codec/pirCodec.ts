@@ -211,6 +211,25 @@ const checkCodeReference: ValueChecker = (value, path, issues) => {
   checkOptional(object, 'sourceSpan', path, issues, checkSourceSpan);
 };
 
+const checkDataOperationReference: ValueChecker = (value, path, issues) => {
+  const object = checkObject(
+    value,
+    path,
+    ['documentId', 'operationId'],
+    ['documentId', 'operationId'],
+    issues
+  );
+  if (!object) return;
+  checkString(object.documentId, `${path}.documentId`, issues);
+  checkString(object.operationId, `${path}.operationId`, issues);
+};
+
+const checkDataOperationBinding: ValueChecker = (value, path, issues) => {
+  const object = checkObject(value, path, ['operation'], ['operation'], issues);
+  if (!object) return;
+  checkDataOperationReference(object.operation, `${path}.operation`, issues);
+};
+
 const checkTriggerBinding: ValueChecker = (value, path, issues) => {
   if (!isRecord(value)) {
     addIssue(issues, path, 'Expected a trigger binding object.');
@@ -772,7 +791,7 @@ const checkCollectionNode: ValueChecker = (value, path, issues) => {
   const object = checkObject(
     value,
     path,
-    ['id', 'kind', 'source', 'key', 'symbols'],
+    ['id', 'kind', 'source', 'key', 'lifecycle', 'symbols'],
     ['id', 'kind', 'source', 'key', 'symbols'],
     issues
   );
@@ -781,6 +800,47 @@ const checkCollectionNode: ValueChecker = (value, path, issues) => {
   checkLiteral(object.kind, 'collection', `${path}.kind`, issues);
   checkCollectionSource(object.source, `${path}.source`, issues);
   checkCollectionKey(object.key, `${path}.key`, issues);
+  if (Object.hasOwn(object, 'lifecycle')) {
+    const lifecycle = checkObject(
+      object.lifecycle,
+      `${path}.lifecycle`,
+      ['kind', 'dataId', 'idle'],
+      ['kind', 'dataId', 'idle'],
+      issues
+    );
+    if (lifecycle) {
+      checkLiteral(
+        lifecycle.kind,
+        'data-operation',
+        `${path}.lifecycle.kind`,
+        issues
+      );
+      checkString(lifecycle.dataId, `${path}.lifecycle.dataId`, issues);
+      if (lifecycle.idle !== 'loading' && lifecycle.idle !== 'empty') {
+        addIssue(
+          issues,
+          `${path}.lifecycle.idle`,
+          'Expected loading or empty.'
+        );
+      }
+      const source = object.source;
+      const sourceValue = isRecord(source) ? source.value : undefined;
+      if (
+        typeof lifecycle.dataId === 'string' &&
+        (!isRecord(source) ||
+          source.kind !== 'binding' ||
+          !isRecord(sourceValue) ||
+          sourceValue.kind !== 'data' ||
+          sourceValue.dataId !== lifecycle.dataId)
+      ) {
+        addIssue(
+          issues,
+          `${path}.source`,
+          'A lifecycle-aware Collection source must be a data binding with the same dataId as its lifecycle mapping.'
+        );
+      }
+    }
+  }
   const symbols = checkObject(
     object.symbols,
     `${path}.symbols`,
@@ -873,7 +933,13 @@ const checkUiGraph: ValueChecker = (value, path, issues) => {
 };
 
 const checkLogicDefinition: ValueChecker = (value, path, issues) => {
-  const object = checkObject(value, path, ['props', 'state'], [], issues);
+  const object = checkObject(
+    value,
+    path,
+    ['props', 'state', 'dataById'],
+    [],
+    issues
+  );
   if (!object) return;
   if (Object.hasOwn(object, 'props')) {
     checkRecordValues(
@@ -926,6 +992,14 @@ const checkLogicDefinition: ValueChecker = (value, path, issues) => {
         checkOptional(definition, 'typeRef', entryPath, issues, checkString);
         checkJsonValue(definition.initial, `${entryPath}.initial`, issues);
       }
+    );
+  }
+  if (Object.hasOwn(object, 'dataById')) {
+    checkRecordValues(
+      object.dataById,
+      `${path}.dataById`,
+      issues,
+      checkDataOperationBinding
     );
   }
 };

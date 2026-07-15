@@ -10,6 +10,7 @@ import {
   type PIRRuntimeValueScope,
   type PIRTriggerBinding,
 } from '@prodivix/pir';
+import type { DataLifecycleSnapshot } from '@prodivix/data';
 import type { WorkspacePirDocument } from '@prodivix/workspace';
 import type {
   PIRRenderLocation,
@@ -25,6 +26,7 @@ export type PIRRuntimeComponentEventBinding = Readonly<{
 
 export type PIRInternalRenderScope = PIRRenderScopeSnapshot &
   Readonly<{
+    dataLifecycleById: Readonly<Record<string, DataLifecycleSnapshot>>;
     componentEventsById: Readonly<
       Record<string, PIRRuntimeComponentEventBinding>
     >;
@@ -129,6 +131,7 @@ export const createPirDocumentScope = (
     setStateById: (stateId: string, value: unknown) => void;
     paramsById?: Readonly<Record<string, unknown>>;
     dataById?: Readonly<Record<string, unknown>>;
+    dataLifecycleById?: Readonly<Record<string, DataLifecycleSnapshot>>;
     componentInput?: PIRComponentRuntimeInput;
     rootComponentPropsById?: Readonly<Record<string, unknown>>;
     rootComponentVariantsById?: Readonly<Record<string, string | undefined>>;
@@ -146,6 +149,9 @@ export const createPirDocumentScope = (
     ),
     stateById: input.stateById,
     dataById: Object.freeze({ ...(input.dataById ?? EMPTY_RECORD) }),
+    dataLifecycleById: Object.freeze({
+      ...(input.dataLifecycleById ?? EMPTY_RECORD),
+    }),
     collectionSymbolsById: EMPTY_RECORD,
     componentPropsById:
       input.componentInput?.propsById ?? rootContractValues.propsById,

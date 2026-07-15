@@ -1,4 +1,5 @@
 export { compileWorkspacePirReactModules } from '#src/react/workspaceCompiler';
+export { PIR_REACT_COMPILE_DIAGNOSTIC_CODES } from '#src/react/compiler.types';
 export { createPirReactModuleId } from '#src/react/moduleNaming';
 export {
   CONTROLLED_REACT_JSX_NODE_ID_ATTRIBUTE,
@@ -37,6 +38,7 @@ export type {
   CompileWorkspacePirReactModulesInput,
   PIRReactCollectionProjectionIssueReport,
   PIRReactCodeReference,
+  PIRReactDataLifecycleSnapshotRequest,
   PIRReactRuntimePort,
   PIRReactStateUpdater,
   PIRReactRuntimeTriggerDispatch,

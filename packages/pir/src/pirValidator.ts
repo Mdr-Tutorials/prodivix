@@ -25,6 +25,8 @@ export const PIR_VALIDATION_CODES = {
   contractVariant: 'PIR_CONTRACT_VARIANT',
   contractPartTarget: 'PIR_CONTRACT_PART_TARGET',
   contractToken: 'PIR_CONTRACT_TOKEN',
+  dataOperationBinding: 'PIR_DATA_OPERATION_BINDING',
+  dataScopeId: 'PIR_DATA_SCOPE_ID',
   slotOutlet: 'PIR_SLOT_OUTLET',
   slotOutletDuplicate: 'PIR_SLOT_OUTLET_DUPLICATE',
   collectionSymbolId: 'PIR_COLLECTION_SYMBOL_ID',
@@ -33,6 +35,7 @@ export const PIR_VALIDATION_CODES = {
   collectionKey: 'PIR_COLLECTION_KEY',
   collectionChildren: 'PIR_COLLECTION_CHILDREN',
   collectionRegion: 'PIR_COLLECTION_REGION',
+  collectionLifecycle: 'PIR_COLLECTION_LIFECYCLE',
   graphRegionOwner: 'PIR_GRAPH_REGION_OWNER',
   componentInstanceChildren: 'PIR_COMPONENT_INSTANCE_CHILDREN',
   componentInstanceBindingKey: 'PIR_COMPONENT_INSTANCE_BINDING_KEY',
@@ -69,6 +72,14 @@ const isNonEmptyString = (value: unknown): value is string =>
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isDataOperationReference = (value: unknown): boolean =>
+  isPlainObject(value) &&
+  Object.keys(value).every(
+    (key) => key === 'documentId' || key === 'operationId'
+  ) &&
+  isNonEmptyString(value.documentId) &&
+  isNonEmptyString(value.operationId);
 
 const escapeJsonPointerSegment = (value: string) =>
   value.replace(/~/g, '~0').replace(/\//g, '~1');
@@ -603,6 +614,41 @@ const validateCollection = (
     );
   }
 
+  if (node.lifecycle !== undefined) {
+    const lifecycle = node.lifecycle as unknown;
+    const validLifecycle =
+      isPlainObject(lifecycle) &&
+      Object.keys(lifecycle).every((key) =>
+        ['kind', 'dataId', 'idle'].includes(key)
+      ) &&
+      lifecycle.kind === 'data-operation' &&
+      isNonEmptyString(lifecycle.dataId) &&
+      (lifecycle.idle === 'loading' || lifecycle.idle === 'empty');
+    if (!validLifecycle) {
+      addIssue(
+        issues,
+        PIR_VALIDATION_CODES.collectionLifecycle,
+        `${nodePath}/lifecycle`,
+        'Collection lifecycle must declare an exact data-operation dataId and idle mapping.'
+      );
+    } else {
+      const sourceMatchesLifecycle =
+        isPlainObject(source) &&
+        source.kind === 'binding' &&
+        isPlainObject(source.value) &&
+        source.value.kind === 'data' &&
+        source.value.dataId === lifecycle.dataId;
+      if (!sourceMatchesLifecycle) {
+        addIssue(
+          issues,
+          PIR_VALIDATION_CODES.collectionLifecycle,
+          `${nodePath}/source`,
+          'A lifecycle-aware Collection source must be a data binding with the same dataId as its lifecycle mapping.'
+        );
+      }
+    }
+  }
+
   if ((graph.childIdsById[nodeId] ?? []).length > 0) {
     addIssue(
       issues,
@@ -748,6 +794,63 @@ const validateStructuralNodes = (document: PIRDocument, issues: IssueList) => {
   }
 };
 
+const validateLogicDataBindings = (
+  document: PIRDocument,
+  issues: IssueList
+): void => {
+  const dataById = document.logic?.dataById ?? {};
+  const elementDataIds = new Set(
+    Object.values(document.ui.graph.nodesById).flatMap((node) =>
+      node.kind === 'element' && node.data ? [node.id] : []
+    )
+  );
+
+  for (const [dataId, binding] of sortedEntries(dataById)) {
+    const path = `/logic/dataById/${escapeJsonPointerSegment(dataId)}`;
+    if (!isNonEmptyString(dataId)) {
+      addIssue(
+        issues,
+        PIR_VALIDATION_CODES.dataScopeId,
+        path,
+        'Logic data id must be non-empty.'
+      );
+    }
+    if (elementDataIds.has(dataId)) {
+      addIssue(
+        issues,
+        PIR_VALIDATION_CODES.dataScopeId,
+        path,
+        'Logic data id must not collide with an Element-owned local data scope.'
+      );
+    }
+    const candidate = binding as unknown;
+    if (
+      !isPlainObject(candidate) ||
+      Object.keys(candidate).length !== 1 ||
+      !hasOwn(candidate, 'operation') ||
+      !isDataOperationReference(candidate.operation)
+    ) {
+      addIssue(
+        issues,
+        PIR_VALIDATION_CODES.dataOperationBinding,
+        path,
+        'Logic data binding must contain exactly one valid DataOperationReference.'
+      );
+    }
+  }
+
+  for (const [nodeId, node] of sortedEntries(document.ui.graph.nodesById)) {
+    if (node.kind !== 'collection' || !node.lifecycle) continue;
+    if (hasOwn(dataById, node.lifecycle.dataId)) continue;
+    addIssue(
+      issues,
+      PIR_VALIDATION_CODES.collectionLifecycle,
+      `/ui/graph/nodesById/${escapeJsonPointerSegment(nodeId)}/lifecycle/dataId`,
+      `Collection lifecycle dataId "${node.lifecycle.dataId}" must reference logic.dataById.`
+    );
+  }
+};
+
 /**
  * Validates the local structural invariants of a decoded PIR-current document.
  * Cross-document component resolution remains a Workspace validator concern.
@@ -764,6 +867,7 @@ export const validatePirDocument = (
     issues
   );
   validateStructuralNodes(document, issues);
+  validateLogicDataBindings(document, issues);
   issues.push(...validatePirBindings(document, options));
 
   return { valid: issues.length === 0, issues };

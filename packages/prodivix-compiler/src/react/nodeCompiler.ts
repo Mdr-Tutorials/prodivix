@@ -502,7 +502,9 @@ export const createPirReactNodeCompiler = (
 
     const suffix = toIdentifier(node.id);
     const locationName = `__pdxCollectionLocation_${suffix}`;
+    const manualPreviewName = `__pdxCollectionManualPreview_${suffix}`;
     const previewName = `__pdxCollectionPreview_${suffix}`;
+    const lifecycleName = `__pdxCollectionLifecycle_${suffix}`;
     const projectionName = `__pdxCollectionProjection_${suffix}`;
     const itemName = `__pdxCollectionItem_${suffix}`;
     const sourceExpression =
@@ -541,9 +543,49 @@ export const createPirReactNodeCompiler = (
       `${projectionName}.scope`,
       instancePathExpression
     );
+    const lifecycleBinding = node.lifecycle
+      ? context.document.logic?.dataById?.[node.lifecycle.dataId]
+      : undefined;
+    if (node.lifecycle && !lifecycleBinding) {
+      addDiagnostic(
+        'PIR_EXPORT_COLLECTION_DATA_BINDING_MISSING',
+        `Collection ${node.id} references missing local data binding ${node.lifecycle.dataId}.`,
+        `${nodePath}/lifecycle/dataId`
+      );
+    }
+    const lifecycleSetup = node.lifecycle
+      ? `const __pdxCollectionDataBinding_${suffix}: __PdxDataOperationBinding | undefined = ${lifecycleBinding ? toJson(lifecycleBinding) : 'undefined'};
+      const __pdxCollectionDataSnapshot_${suffix} = ${parentScopeExpression}.dataLifecycleById[${toJson(node.lifecycle.dataId)}];
+      const ${lifecycleName} = ${manualPreviewName}.state === 'auto'
+        ? (__pdxCollectionDataBinding_${suffix} && __pdxCollectionDataSnapshot_${suffix}
+          ? __pdxResolveCollectionDataLifecycle(
+              __pdxCollectionDataBinding_${suffix},
+              ${toJson(node.lifecycle)},
+              __pdxCollectionDataSnapshot_${suffix}
+            )
+          : {
+              status: 'blocked' as const,
+              issues: [__pdxCollectionIssue(
+                'PIR_DATA_LIFECYCLE_SNAPSHOT_UNAVAILABLE',
+                '/lifecycle/dataId',
+                'Collection Data lifecycle is unavailable in this document instance.'
+              )],
+            })
+        : undefined;
+      if (${lifecycleName}?.status === 'blocked') {
+        return <__PdxCollectionIssueReporter runtime={__pdxRuntime} location={${locationName}} issues={${lifecycleName}.issues} />;
+      }
+      const ${previewName}: __PdxCollectionPreviewInput = ${lifecycleName}?.status === 'ready'
+        ? {
+            state: ${lifecycleName}.state,
+            ...(${lifecycleName}.errorValue === undefined ? {} : { errorValue: ${lifecycleName}.errorValue }),
+          }
+        : ${manualPreviewName};`
+      : `const ${previewName}: __PdxCollectionPreviewInput = ${manualPreviewName};`;
     return `(() => {
       const ${locationName}: __PdxCollectionLocation = { documentId: ${toJson(context.documentId)}, nodeId: ${toJson(node.id)}, instancePath: ${instancePathExpression} };
-      const ${previewName} = __pdxRuntime.resolveCollectionPreviewState?.(${locationName}) ?? { state: 'auto' as const };
+      const ${manualPreviewName}: __PdxCollectionPreviewInput = __pdxRuntime.resolveCollectionPreviewState?.(${locationName}) ?? { state: 'auto' as const };
+      ${lifecycleSetup}
       const ${projectionName} = __pdxProjectCollection({
         parentScope: ${parentScopeExpression},
         preview: ${previewName},

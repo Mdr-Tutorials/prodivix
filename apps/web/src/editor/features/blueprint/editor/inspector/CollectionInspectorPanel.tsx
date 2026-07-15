@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, CircleAlert } from 'lucide-react';
+import type { DataOperationReference } from '@prodivix/data';
 import {
   PIR_COLLECTION_PREVIEW_STATES,
   type PIRCollectionKeyBinding,
@@ -10,6 +11,7 @@ import {
 } from '@prodivix/pir';
 import type {
   CollectionInspectorBindingCandidate,
+  CollectionInspectorDataOperationCandidate,
   CollectionInspectorModel,
   CollectionInspectorRegionName,
   CollectionInspectorSymbolRole,
@@ -27,6 +29,12 @@ export type CollectionInspectorPanelProps = Readonly<{
   preview: PIRCollectionPreviewInput;
   disabled?: boolean;
   onSourceChange: (source: PIRCollectionSourceBinding) => void;
+  onDataOperationChange: (binding: {
+    dataId: string;
+    operation: DataOperationReference;
+    idle: 'loading' | 'empty';
+    path?: string;
+  }) => void;
   onKeyChange: (key: PIRCollectionKeyBinding) => void;
   onSymbolNameChange: (
     role: Extract<CollectionInspectorSymbolRole, 'item' | 'index'>,
@@ -58,6 +66,32 @@ const candidateLabel = (
   const locality = candidate.local ? 'Local · ' : '';
   const type = candidate.typeRef ? ` · ${candidate.typeRef}` : '';
   return `${locality}${candidate.label}${type}`;
+};
+
+const operationIdentity = (operation: DataOperationReference): string =>
+  `${operation.documentId}\u0000${operation.operationId}`;
+
+const currentOperationCandidateId = (
+  candidates: readonly CollectionInspectorDataOperationCandidate[],
+  operation: DataOperationReference | undefined
+): string =>
+  operation
+    ? (candidates.find(
+        (candidate) =>
+          operationIdentity(candidate.reference) ===
+          operationIdentity(operation)
+      )?.id ?? '')
+    : '';
+
+const createCollectionDataId = (model: CollectionInspectorModel): string => {
+  const current = model.dataOperation.binding?.dataId;
+  if (current) return current;
+  const base = `${model.collection.id.replace(/[^A-Za-z0-9._:-]/g, '-')}-data`;
+  const existing = model.document.logic?.dataById ?? {};
+  if (!Object.hasOwn(existing, base)) return base;
+  let suffix = 2;
+  while (Object.hasOwn(existing, `${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
 };
 
 function InspectorField({
@@ -122,6 +156,7 @@ export function CollectionInspectorPanel({
   preview,
   disabled = false,
   onSourceChange,
+  onDataOperationChange,
   onKeyChange,
   onSymbolNameChange,
   onPreviewChange,
@@ -129,6 +164,9 @@ export function CollectionInspectorPanel({
 }: CollectionInspectorPanelProps) {
   const sourceCandidates = model.candidateScopes.source.candidates;
   const keyCandidates = model.candidateScopes.key.candidates;
+  const operationBinding = model.dataOperation.binding;
+  const operationCandidates = model.dataOperation.candidates;
+  const sourceMode = operationBinding ? 'data-operation' : model.source.kind;
   const literalSourceText = useMemo(
     () =>
       model.source.kind === 'literal'
@@ -138,11 +176,18 @@ export function CollectionInspectorPanel({
   );
   const [literalDraft, setLiteralDraft] = useState(literalSourceText);
   const [literalError, setLiteralError] = useState<string>();
+  const [resultPathDraft, setResultPathDraft] = useState(
+    operationBinding?.path ?? ''
+  );
 
   useEffect(() => {
     setLiteralDraft(literalSourceText);
     setLiteralError(undefined);
   }, [literalSourceText]);
+
+  useEffect(() => {
+    setResultPathDraft(operationBinding?.path ?? '');
+  }, [operationBinding?.dataId, operationBinding?.path]);
 
   const sourceCandidateId =
     model.source.kind === 'binding'
@@ -153,19 +198,56 @@ export function CollectionInspectorPanel({
       ? currentCandidateId(keyCandidates, model.key.binding)
       : '';
   const sourceReadOnly =
-    disabled || (model.source.kind === 'binding' && model.source.readOnly);
+    disabled ||
+    (sourceMode !== 'data-operation' &&
+      model.source.kind === 'binding' &&
+      model.source.readOnly);
   const keyReadOnly =
     disabled || (model.key.kind === 'binding' && model.key.readOnly);
 
-  const changeSourceMode = (kind: 'literal' | 'binding') => {
-    if (kind === model.source.kind) return;
+  const changeSourceMode = (kind: 'literal' | 'binding' | 'data-operation') => {
+    if (kind === sourceMode) return;
     if (kind === 'literal') {
       onSourceChange({ kind: 'literal', value: [] });
+      return;
+    }
+    if (kind === 'data-operation') {
+      const candidate = operationCandidates[0];
+      if (candidate) {
+        onDataOperationChange({
+          dataId: createCollectionDataId(model),
+          operation: candidate.reference,
+          idle: 'loading',
+        });
+      }
       return;
     }
     const candidate = sourceCandidates[0];
     if (candidate)
       onSourceChange({ kind: 'binding', value: candidate.binding });
+  };
+
+  const updateDataOperation = (
+    next: Partial<{
+      operation: DataOperationReference;
+      idle: 'loading' | 'empty';
+      path: string;
+    }>
+  ) => {
+    if (!operationBinding) return;
+    const path = (next.path ?? operationBinding.path)?.trim();
+    onDataOperationChange({
+      dataId: operationBinding.dataId,
+      operation: next.operation ?? operationBinding.operation,
+      idle: next.idle ?? operationBinding.idle,
+      ...(path ? { path } : {}),
+    });
+  };
+
+  const commitResultPath = () => {
+    const nextPath = resultPathDraft.trim();
+    if (nextPath === (operationBinding?.path ?? '')) return;
+    updateDataOperation({ path: nextPath });
   };
 
   const changeKeyMode = (kind: 'index' | 'binding') => {
@@ -217,7 +299,9 @@ export function CollectionInspectorPanel({
         <span className="rounded-full border border-(--border-default) px-2 py-0.5 text-[9px] text-(--text-muted)">
           {model.source.kind === 'literal'
             ? `${model.source.itemCount} items`
-            : 'Bound source'}
+            : sourceMode === 'data-operation'
+              ? 'Data operation'
+              : 'Bound source'}
         </span>
       </header>
 
@@ -226,11 +310,12 @@ export function CollectionInspectorPanel({
         <InspectorField label="Source">
           <select
             className={controlClassName}
-            value={model.source.kind}
+            value={sourceMode}
             disabled={sourceReadOnly}
             onChange={(event) =>
               changeSourceMode(
-                event.currentTarget.value as 'literal' | 'binding'
+                event.currentTarget.value as
+                  'literal' | 'binding' | 'data-operation'
               )
             }
           >
@@ -238,9 +323,18 @@ export function CollectionInspectorPanel({
             <option value="binding" disabled={sourceCandidates.length === 0}>
               Symbol
             </option>
+            <option
+              value="data-operation"
+              disabled={
+                operationCandidates.length === 0 &&
+                operationBinding === undefined
+              }
+            >
+              Data operation
+            </option>
           </select>
         </InspectorField>
-        {model.source.kind === 'literal' ? (
+        {sourceMode === 'literal' && model.source.kind === 'literal' ? (
           <label className="flex flex-col gap-1 text-[10px] text-(--text-muted)">
             <span>Literal items</span>
             <textarea
@@ -259,7 +353,7 @@ export function CollectionInspectorPanel({
               </span>
             ) : null}
           </label>
-        ) : (
+        ) : sourceMode === 'binding' && model.source.kind === 'binding' ? (
           <>
             <InspectorField label="Symbol">
               <BindingCandidateSelect
@@ -278,7 +372,83 @@ export function CollectionInspectorPanel({
               </p>
             ) : null}
           </>
-        )}
+        ) : operationBinding ? (
+          <>
+            <InspectorField label="Operation">
+              <select
+                className={controlClassName}
+                value={currentOperationCandidateId(
+                  operationCandidates,
+                  operationBinding.operation
+                )}
+                disabled={disabled || operationCandidates.length === 0}
+                onChange={(event) => {
+                  const candidate = operationCandidates.find(
+                    ({ id }) => id === event.currentTarget.value
+                  );
+                  if (candidate)
+                    updateDataOperation({ operation: candidate.reference });
+                }}
+              >
+                {currentOperationCandidateId(
+                  operationCandidates,
+                  operationBinding.operation
+                ) ? null : (
+                  <option value="">
+                    {operationBinding.operation.documentId} ·{' '}
+                    {operationBinding.operation.operationId}
+                  </option>
+                )}
+                {operationCandidates.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.label} · {candidate.detail}
+                  </option>
+                ))}
+              </select>
+            </InspectorField>
+            <InspectorField label="Local data">
+              <code className="block truncate rounded-md border border-(--border-default) bg-(--bg-canvas) px-2 py-1.5 text-[10px] text-(--text-secondary)">
+                {operationBinding.dataId}
+              </code>
+            </InspectorField>
+            <InspectorField label="Result path">
+              <input
+                className={controlClassName}
+                value={resultPathDraft}
+                disabled={disabled}
+                placeholder="Array root"
+                onChange={(event) =>
+                  setResultPathDraft(event.currentTarget.value)
+                }
+                onBlur={commitResultPath}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.currentTarget.blur();
+                  }
+                }}
+              />
+            </InspectorField>
+            <InspectorField label="Idle state">
+              <select
+                className={controlClassName}
+                value={operationBinding.idle}
+                disabled={disabled}
+                onChange={(event) =>
+                  updateDataOperation({
+                    idle: event.currentTarget.value as 'loading' | 'empty',
+                  })
+                }
+              >
+                <option value="loading">Loading</option>
+                <option value="empty">Empty</option>
+              </select>
+            </InspectorField>
+            <p className="m-0 text-[9px] leading-4 text-(--text-muted)">
+              Runtime status maps to loading, item, empty, and error regions;
+              success never infers empty from the result shape.
+            </p>
+          </>
+        ) : null}
 
         <InspectorField label="Key">
           <select

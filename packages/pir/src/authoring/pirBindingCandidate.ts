@@ -134,6 +134,17 @@ const collectExpectedBindingSymbols = (
       binding: freezeBinding({ kind: 'state', stateId }),
     });
   }
+  for (const dataId of Object.keys(input.document.logic?.dataById ?? {}).sort(
+    compareText
+  )) {
+    expected.push({
+      id: createPirDataSymbolId(input.workspaceId, input.documentId, dataId),
+      kind: 'data',
+      stability: 'durable',
+      scopeId: baseScopeId,
+      binding: freezeBinding({ kind: 'data', dataId }),
+    });
+  }
 
   for (const [nodeId, node] of sortedEntries(
     input.document.ui.graph.nodesById

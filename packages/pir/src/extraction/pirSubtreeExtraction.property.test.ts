@@ -27,7 +27,10 @@ const createSourceDocument = (reverse: boolean): PIRDocument => {
       {
         id: 'collection',
         kind: 'collection',
-        source: { kind: 'literal', value: [{ id: 'one' }] },
+        source: {
+          kind: 'binding',
+          value: { kind: 'data', dataId: 'catalog-rows' },
+        },
         key: {
           kind: 'binding',
           value: {
@@ -35,6 +38,11 @@ const createSourceDocument = (reverse: boolean): PIRDocument => {
             symbolId: 'outer-item',
             path: 'id',
           },
+        },
+        lifecycle: {
+          kind: 'data-operation',
+          dataId: 'catalog-rows',
+          idle: 'loading',
         },
         symbols: {
           itemId: 'outer-item',
@@ -94,6 +102,14 @@ const createSourceDocument = (reverse: boolean): PIRDocument => {
       },
     },
     logic: {
+      dataById: {
+        'catalog-rows': {
+          operation: {
+            documentId: 'data-catalog',
+            operationId: 'list-products',
+          },
+        },
+      },
       props: { title: { name: 'title', typeRef: 'string' } },
       state: {
         visibility: {
@@ -152,6 +168,21 @@ describe('PIR-current subtree extraction properties', () => {
             'panel',
             'root',
           ]);
+          expect(result.definitionDocument.logic?.dataById).toEqual({
+            'catalog-rows': {
+              operation: {
+                documentId: 'data-catalog',
+                operationId: 'list-products',
+              },
+            },
+          });
+          expect(
+            result.boundaryDependencies.some(
+              (dependency) =>
+                dependency.kind === 'typed-reference' &&
+                dependency.referenceKind === 'data-operation'
+            )
+          ).toBe(true);
         } else {
           expect(
             result.sourceDocument.ui.graph.regionsById?.collection?.item
@@ -182,7 +213,6 @@ describe('PIR-current subtree extraction properties', () => {
     fc.assert(
       fc.property(
         fc.constantFrom(
-          'external-inbound',
           'unresolved',
           'slot-outlet',
           'opaque-input',
@@ -193,27 +223,7 @@ describe('PIR-current subtree extraction properties', () => {
           const source = createSourceDocument(reverse);
           const graph = source.ui.graph;
           let document: PIRDocument = source;
-          if (violation === 'external-inbound') {
-            const root = graph.nodesById.root;
-            document = {
-              ...source,
-              ui: {
-                graph: {
-                  ...graph,
-                  nodesById: {
-                    ...graph.nodesById,
-                    root:
-                      root?.kind === 'element'
-                        ? {
-                            ...root,
-                            text: { kind: 'data', dataId: 'panel' },
-                          }
-                        : root!,
-                  },
-                },
-              },
-            };
-          } else if (violation === 'unresolved') {
+          if (violation === 'unresolved') {
             const panel = graph.nodesById.panel;
             document = {
               ...source,

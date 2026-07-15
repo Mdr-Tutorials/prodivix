@@ -5,6 +5,7 @@ import type {
 } from '@prodivix/pir';
 import type { WorkspacePirProjectionPlan } from '@prodivix/workspace';
 import type {
+  PIRDataOperationRuntimePort,
   PIRRenderLocation,
   PIRRendererBlockingIssue,
   PIRResolvedRendererHost,
@@ -18,8 +19,14 @@ export type PIRProjectionRuntime = Readonly<{
   resolveCollectionPreviewState?: (
     location: PIRCollectionProjectionLocation
   ) => PIRCollectionPreviewInput | undefined;
+  dataOperationRuntime?: PIRDataOperationRuntimePort;
   reportCollectionBlockingIssues: (
     location: PIRCollectionProjectionLocation,
+    issues: readonly PIRRendererBlockingIssue[]
+  ) => void;
+  reportDataBlockingIssues: (
+    documentId: string,
+    instancePath: string,
     issues: readonly PIRRendererBlockingIssue[]
   ) => void;
   selectedLocation?: PIRRenderLocation;
@@ -34,3 +41,8 @@ export const createPirCollectionLocationIdentity = (
   location: PIRCollectionProjectionLocation
 ): string =>
   JSON.stringify([location.documentId, location.nodeId, location.instancePath]);
+
+export const createPirDataLocationIdentity = (
+  documentId: string,
+  instancePath: string
+): string => JSON.stringify([documentId, instancePath]);

@@ -368,6 +368,9 @@ export const analyzePirSubtreeExtraction = (
       variantAxesById: {},
     },
     ui: { graph: definitionGraph },
+    ...(Object.keys(boundary.dataById).length > 0
+      ? { logic: { dataById: boundary.dataById } }
+      : {}),
   };
   const sourceDocument: PIRDocument = {
     ...source.document,

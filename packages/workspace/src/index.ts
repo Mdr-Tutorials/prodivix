@@ -123,6 +123,11 @@ export {
   createWorkspaceComponentInstanceTransactionPlan,
 } from './component/workspaceComponentAuthoringTransaction';
 export {
+  WORKSPACE_PIR_DATA_BINDING_PLAN_ISSUE_CODES,
+  createWorkspaceCollectionDataOperationBindingTransactionPlan,
+  createWorkspacePirDataOperationBindingTransactionPlan,
+} from './data/workspacePirDataOperationBindingTransaction';
+export {
   WORKSPACE_PIR_GRAPH_AUTHORING_ISSUE_CODES,
   createWorkspacePIRCollectionUnwrapTransactionPlan,
   createWorkspacePIRElementBatchUpdateTransactionPlan,
@@ -285,6 +290,14 @@ export type {
   WorkspaceDocumentDeleteIntentRequest,
   WorkspaceDocumentRenameIntentRequest,
 } from './workspaceCommand';
+export type {
+  CreateWorkspaceCollectionDataOperationBindingTransactionInput,
+  CreateWorkspacePirDataOperationBindingTransactionInput,
+  WorkspacePirDataBindingPlanIssue,
+  WorkspacePirDataBindingPlanIssueCode,
+  WorkspacePirDataOperationBindingTransactionPlan,
+  WorkspacePirDataOperationBindingTransactionPlanResult,
+} from './data/workspacePirDataOperationBindingTransaction';
 export type {
   WorkspaceDocumentCommandDomain,
   WorkspaceDocumentPatchPolicy,

@@ -2,6 +2,7 @@ import type {
   PIRComponentEventContract,
   PIRComponentPropContract,
   PIRDocument,
+  PIRDataOperationBinding,
   PIRTriggerBinding,
   PIRValueBinding,
 } from '../pir.types';
@@ -48,6 +49,7 @@ export type PIRExtractionBoundaryResult = Readonly<{
   componentEventsById: Readonly<Record<string, PIRComponentEventContract>>;
   instancePropBindings: Readonly<Record<string, PIRValueBinding>>;
   instanceEventBindings: Readonly<Record<string, PIRTriggerBinding>>;
+  dataById: Readonly<Record<string, PIRDataOperationBinding>>;
 }>;
 
 export type PIRExtractionBoundaryAnalyzer = Readonly<{
@@ -70,6 +72,10 @@ export type PIRExtractionBoundaryAnalyzer = Readonly<{
       'component-definition' | 'component-member' | 'component-slot'
     >,
     targetId: string,
+    occurrence: PIRExtractionOccurrence
+  ): void;
+  recordDataOperationBinding(
+    dataId: string,
     occurrence: PIRExtractionOccurrence
   ): void;
   recordSlotOutlet(
@@ -166,6 +172,7 @@ export const createPirExtractionBoundaryAnalyzer = (
   const preserved: PIRPreservedReferenceBoundaryDependency[] = [];
   const blocked: PIRBlockedBoundaryDependency[] = [];
   const issues: PIRSubtreeExtractionIssue[] = [];
+  const preservedDataIds = new Set<string>();
 
   const recordIssue = (
     code: PIRSubtreeExtractionIssueCode,
@@ -238,6 +245,29 @@ export const createPirExtractionBoundaryAnalyzer = (
     );
   };
 
+  const recordDataOperationBinding = (
+    dataId: string,
+    occurrence: PIRExtractionOccurrence
+  ): void => {
+    const binding = context.document.logic?.dataById?.[dataId];
+    if (!binding) {
+      recordBlocked(
+        'unresolved-value',
+        occurrence,
+        `Cannot preserve data-operation binding "${dataId}" because it does not exist in logic.dataById.`,
+        PIR_SUBTREE_EXTRACTION_ISSUE_CODES.unresolvedBoundary,
+        dataId
+      );
+      return;
+    }
+    preservedDataIds.add(dataId);
+    recordPreserved(
+      'data-operation',
+      `${binding.operation.documentId}#${binding.operation.operationId}`,
+      occurrence
+    );
+  };
+
   const isVisible = (
     kind: PIRLiftedValueKind,
     sourceId: string,
@@ -280,6 +310,13 @@ export const createPirExtractionBoundaryAnalyzer = (
           : value.reference.artifactId,
         occurrence
       );
+      return value;
+    }
+    if (
+      value.kind === 'data' &&
+      context.document.logic?.dataById?.[value.dataId]
+    ) {
+      recordDataOperationBinding(value.dataId, occurrence);
       return value;
     }
 
@@ -550,6 +587,11 @@ export const createPirExtractionBoundaryAnalyzer = (
         dependency.instanceBinding,
       ])
     );
+    const dataById = Object.fromEntries(
+      [...preservedDataIds]
+        .sort(compareText)
+        .map((dataId) => [dataId, context.document.logic!.dataById![dataId]!])
+    );
     return Object.freeze({
       dependencies: Object.freeze(dependencies),
       issues: Object.freeze(sortedIssues),
@@ -557,6 +599,7 @@ export const createPirExtractionBoundaryAnalyzer = (
       componentEventsById: Object.freeze(events),
       instancePropBindings: Object.freeze(bindings),
       instanceEventBindings: Object.freeze(eventBindings),
+      dataById: Object.freeze(dataById),
     });
   };
 
@@ -565,6 +608,7 @@ export const createPirExtractionBoundaryAnalyzer = (
     inspectExternalValueBinding,
     rewriteTrigger,
     recordComponentReference: recordPreserved,
+    recordDataOperationBinding,
     recordSlotOutlet,
     recordComponentPartTarget,
     finish,

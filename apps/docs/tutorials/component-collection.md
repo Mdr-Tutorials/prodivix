@@ -38,13 +38,15 @@ Prodivix 把复用建模为 Component Definition、Public Contract、Component I
 
 选择适合作为重复模板的组件或结构，添加 Collection，并配置：
 
-- 数据源引用
+- literal、局部 Symbol 或 Data operation 数据源
 - `item` 与可选 `index` 绑定
 - 稳定 key
 - empty、loading、error 等状态
 - 对模板中 props、文本或 slot 的字段绑定
 
 Collection 是 PIR-current 中的一等领域模型。它不依赖画布层临时 `map()` 字符串，也不要求复制 N 份子树。
+
+选择 Data operation 时，Inspector 从当前 Workspace Semantic Index 列出 query。一次原子修改会同时保存 operation reference、局部 `dataId`、可选结果路径和 Collection lifecycle。运行状态固定映射到 loading、item、empty、error 区域；success 不会因为结果恰好是空数组而被猜成 empty。Data runtime 尚未提供匹配 snapshot 时，Preview/Export 会明确阻断，而不是静默渲染 `undefined`。
 
 ## 6. 验证语义和导出
 

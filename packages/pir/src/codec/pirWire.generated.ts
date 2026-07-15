@@ -122,7 +122,7 @@ export type PIRWireCollectionKeyBinding =
 export type PIRWireNodeIdArray = string[];
 
 export interface PIRWireDocument {
-  version: '1.4';
+  version: '1.5';
   metadata?: PIRWireMetadata;
   componentContract?: PIRWireComponentContract;
   ui: {
@@ -296,7 +296,13 @@ export interface PIRWireCollectionNode {
   kind: 'collection';
   source: PIRWireCollectionSourceBinding;
   key: PIRWireCollectionKeyBinding;
+  lifecycle?: PIRWireCollectionDataLifecycleMapping;
   symbols: PIRWireCollectionSymbols;
+}
+export interface PIRWireCollectionDataLifecycleMapping {
+  kind: 'data-operation';
+  dataId: string;
+  idle: 'loading' | 'empty';
 }
 export interface PIRWireCollectionSymbols {
   itemId: string;
@@ -318,6 +324,9 @@ export interface PIRWireLogicDefinition {
   state?: {
     [k: string]: PIRWireLogicStateDefinition;
   };
+  dataById?: {
+    [k: string]: PIRWireDataOperationBinding;
+  };
 }
 export interface PIRWireLogicPropDefinition {
   name?: string;
@@ -330,5 +339,12 @@ export interface PIRWireLogicStateDefinition {
   typeRef?: string;
   initial: PIRWireJsonValue;
 }
+export interface PIRWireDataOperationBinding {
+  operation: PIRWireDataOperationReference;
+}
+export interface PIRWireDataOperationReference {
+  documentId: string;
+  operationId: string;
+}
 
-export const CURRENT_PIR_WIRE_VERSION = '1.4' as PIRWireDocument['version'];
+export const CURRENT_PIR_WIRE_VERSION = '1.5' as PIRWireDocument['version'];

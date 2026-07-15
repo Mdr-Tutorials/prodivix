@@ -11,6 +11,7 @@
       "#src/*": ["./src/*"],
       "@prodivix/animation": ["../animation/src"],
       "@prodivix/authoring": ["../authoring/src"],
+      "@prodivix/data": ["../data/src"],
       "@prodivix/nodegraph": ["../nodegraph/src"],
       "@prodivix/pir": ["../pir/src"],
       "@prodivix/router": ["../router/src"],
@@ -33,6 +34,9 @@
     },
     {
       "path": "../authoring"
+    },
+    {
+      "path": "../data"
     },
     {
       "path": "../nodegraph"

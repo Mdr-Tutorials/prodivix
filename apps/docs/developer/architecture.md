@@ -54,9 +54,9 @@ Test provider 运行 exact Workspace revision 生成的独立 React/Vite snapsho
 
 ## Data 与执行环境边界
 
-`@prodivix/data` 定义无版本号 current DataSourceDocument、DataOperationReference、schema、query/mutation、policy、lifecycle 与 wire codec。Canonical Workspace 以 `data-source` document 持久化作者态，并把 source/schema/operation contribution 组合进 revision-bound Semantic Index。现有 PIR `dataId` 仍是文档内局部数据作用域，不是全局 operation identity。
+`@prodivix/data` 定义无版本号 current DataSourceDocument、DataOperationReference、schema、query/mutation、policy、lifecycle 与 wire codec。Canonical Workspace 以 `data-source` document 持久化作者态，并把 source/schema/operation contribution 组合进 revision-bound Semantic Index。PIR `logic.dataById` 用 durable reference 把一个全局 query 映射到文档内局部 `dataId`；Collection 保存同一 `dataId` 的 source 和显式 lifecycle mapping。`dataId` 本身不是全局 operation identity。
 
-ExecutionEnvironmentSnapshotRef、EnvironmentBindingReference 与 SecretRef 当前只携带 identity。带 environment reference 的 ExecutionRequest 自动要求 provider `environment-binding` capability；不支持的 provider 在兼容性检查阶段拒绝。Secret value 不进入 Workspace、request、log、artifact 或客户端产物。当前 strict shape 不会从任意 literal 的名字或内容猜测秘密；adapter configuration schema、Secret resolver、runtime-zone permission、PIR binding 与 Preview/Export CRUD execution 仍属于后续 G2 纵切。
+ExecutionEnvironmentSnapshotRef、EnvironmentBindingReference 与 SecretRef 当前只携带 identity。带 environment reference 的 ExecutionRequest 自动要求 provider `environment-binding` capability；不支持的 provider 在兼容性检查阶段拒绝。Secret value 不进入 Workspace、request、log、artifact 或客户端产物。当前 strict shape 不会从任意 literal 的名字或内容猜测秘密；adapter configuration schema、Secret resolver、runtime-zone permission、operation trigger 与 Preview/Export CRUD execution 仍属于后续 G2 纵切。
 
 ## 生产模型演进
 

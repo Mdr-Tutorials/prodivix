@@ -134,31 +134,39 @@ const rewriteElementNode = (
 const rewriteCollectionNode = (
   node: Extract<PIRNode, { kind: 'collection' }>,
   analyzer: PIRExtractionBoundaryAnalyzer
-): PIRNode => ({
-  ...node,
-  source:
-    node.source.kind === 'literal'
-      ? node.source
-      : {
-          kind: 'binding',
-          value: analyzer.rewriteValueBinding(
-            node.source.value,
-            valueOccurrence(node.id, '/source/value', node.source.value),
-            'collection-source'
-          ),
-        },
-  key:
-    node.key.kind === 'index'
-      ? node.key
-      : {
-          kind: 'binding',
-          value: analyzer.rewriteValueBinding(
-            node.key.value,
-            valueOccurrence(node.id, '/key/value', node.key.value),
-            'collection-key'
-          ),
-        },
-});
+): PIRNode => {
+  if (node.lifecycle) {
+    analyzer.recordDataOperationBinding(node.lifecycle.dataId, {
+      nodeId: node.id,
+      fieldPath: '/lifecycle/dataId',
+    });
+  }
+  return {
+    ...node,
+    source:
+      node.source.kind === 'literal'
+        ? node.source
+        : {
+            kind: 'binding',
+            value: analyzer.rewriteValueBinding(
+              node.source.value,
+              valueOccurrence(node.id, '/source/value', node.source.value),
+              'collection-source'
+            ),
+          },
+    key:
+      node.key.kind === 'index'
+        ? node.key
+        : {
+            kind: 'binding',
+            value: analyzer.rewriteValueBinding(
+              node.key.value,
+              valueOccurrence(node.id, '/key/value', node.key.value),
+              'collection-key'
+            ),
+          },
+  };
+};
 
 const rewriteComponentInstanceNode = (
   node: Extract<PIRNode, { kind: 'component-instance' }>,

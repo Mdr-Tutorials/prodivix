@@ -5,6 +5,10 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: '@prodivix/data',
+        replacement: fileURLToPath(new URL('../data/src', import.meta.url)),
+      },
+      {
         find: '@prodivix/pir',
         replacement: fileURLToPath(new URL('../pir/src', import.meta.url)),
       },

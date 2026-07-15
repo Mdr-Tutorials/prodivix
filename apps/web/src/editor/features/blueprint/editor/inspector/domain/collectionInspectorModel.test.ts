@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { PIRDocument } from '@prodivix/pir';
+import {
+  JSON_SCHEMA_2020_12_URI,
+  type DataSourceDocument,
+} from '@prodivix/data';
+import type { PIRCollectionNode, PIRDocument } from '@prodivix/pir';
 import type { PIRRenderLocation } from '@prodivix/pir-react-renderer';
 import type { WorkspaceSnapshot } from '@prodivix/workspace';
 import {
@@ -125,6 +129,43 @@ const location: PIRRenderLocation = {
   role: 'source',
 };
 
+const dataSourceDocument: DataSourceDocument = {
+  source: {
+    id: 'records-source',
+    adapterId: 'core.mock',
+    runtimeZone: 'client',
+    bindingsById: {},
+    configurationByKey: {},
+  },
+  schemasById: {
+    records: {
+      id: 'records',
+      schema: {
+        $schema: JSON_SCHEMA_2020_12_URI,
+        type: 'array',
+        items: { type: 'object' },
+      },
+    },
+  },
+  operationsById: {
+    list: {
+      id: 'list',
+      name: 'List records',
+      kind: 'query',
+      outputSchemaId: 'records',
+      configurationByKey: {},
+      policies: {},
+    },
+    create: {
+      id: 'create',
+      kind: 'mutation',
+      outputSchemaId: 'records',
+      configurationByKey: {},
+      policies: {},
+    },
+  },
+};
+
 describe('Collection Inspector model', () => {
   it('projects typed Collection state, regions, and scope-aware candidates', () => {
     const result = createCollectionInspectorModel({ workspace, location });
@@ -208,5 +249,100 @@ describe('Collection Inspector model', () => {
         paramId: 'records',
       })
     ).toBeUndefined();
+  });
+
+  it('projects query operation choices and the canonical Collection lifecycle binding', () => {
+    const boundCollection: PIRCollectionNode = {
+      ...(document.ui.graph.nodesById.collection as PIRCollectionNode),
+      source: {
+        kind: 'binding',
+        value: { kind: 'data', dataId: 'records', path: 'items' },
+      },
+      lifecycle: {
+        kind: 'data-operation',
+        dataId: 'records',
+        idle: 'loading',
+      },
+    };
+    const operationDocument: PIRDocument = {
+      ...document,
+      logic: {
+        ...document.logic,
+        dataById: {
+          records: {
+            operation: {
+              documentId: 'data-records',
+              operationId: 'list',
+            },
+          },
+        },
+      },
+      ui: {
+        graph: {
+          ...document.ui.graph,
+          nodesById: {
+            ...document.ui.graph.nodesById,
+            collection: boundCollection,
+          },
+        },
+      },
+    };
+    const operationWorkspace: WorkspaceSnapshot = {
+      ...workspace,
+      treeById: {
+        ...workspace.treeById,
+        'tree-root': {
+          ...workspace.treeById['tree-root']!,
+          children: ['page-node', 'data-node'],
+        },
+        'data-node': {
+          id: 'data-node',
+          kind: 'doc',
+          name: 'records.data.json',
+          parentId: 'tree-root',
+          docId: 'data-records',
+        },
+      },
+      docsById: {
+        ...workspace.docsById,
+        'page-collection': {
+          ...workspace.docsById['page-collection']!,
+          content: operationDocument,
+        },
+        'data-records': {
+          id: 'data-records',
+          type: 'data-source',
+          path: '/data/records.data.json',
+          contentRev: 1,
+          metaRev: 1,
+          content: dataSourceDocument,
+        },
+      },
+    };
+
+    const result = createCollectionInspectorModel({
+      workspace: operationWorkspace,
+      location,
+    });
+
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+    expect(result.model.dataOperation.binding).toEqual({
+      dataId: 'records',
+      operation: { documentId: 'data-records', operationId: 'list' },
+      idle: 'loading',
+      path: 'items',
+    });
+    expect(
+      result.model.dataOperation.candidates.map((candidate) => ({
+        label: candidate.label,
+        reference: candidate.reference,
+      }))
+    ).toEqual([
+      {
+        label: 'List records',
+        reference: { documentId: 'data-records', operationId: 'list' },
+      },
+    ]);
   });
 });

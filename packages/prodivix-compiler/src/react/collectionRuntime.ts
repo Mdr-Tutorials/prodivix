@@ -66,6 +66,41 @@ type __PdxCollectionProjectionRuntimeInput = Readonly<{
   resolveKey: (scope: __PdxScope, index: number) => unknown;
 }>;
 
+type __PdxDataOperationReference = Readonly<{
+  documentId: string;
+  operationId: string;
+}>;
+
+type __PdxDataOperationBinding = Readonly<{
+  operation: __PdxDataOperationReference;
+}>;
+
+type __PdxDataLifecycleSnapshot = Readonly<{
+  operation: __PdxDataOperationReference;
+  status: 'idle' | 'loading' | 'success' | 'empty' | 'error';
+  value?: unknown;
+  error?: unknown;
+}>;
+
+type __PdxCollectionDataLifecycleMapping = Readonly<{
+  kind: 'data-operation';
+  dataId: string;
+  idle: 'loading' | 'empty';
+}>;
+
+type __PdxCollectionDataLifecycleResolution =
+  | Readonly<{
+      status: 'ready';
+      state: 'item' | 'empty' | 'loading' | 'error';
+      dataId: string;
+      value?: unknown;
+      errorValue?: unknown;
+    }>
+  | Readonly<{
+      status: 'blocked';
+      issues: readonly __PdxCollectionProjectionIssue[];
+    }>;
+
 const __pdxCollectionIssue = (
   code: string,
   path: string,
@@ -77,6 +112,50 @@ const __pdxCollectionIssue = (
   message,
   ...(itemIndex === undefined ? {} : { itemIndex }),
 });
+
+const __pdxResolveCollectionDataLifecycle = (
+  binding: __PdxDataOperationBinding,
+  mapping: __PdxCollectionDataLifecycleMapping,
+  snapshot: __PdxDataLifecycleSnapshot
+): __PdxCollectionDataLifecycleResolution => {
+  if (
+    binding.operation.documentId !== snapshot.operation.documentId ||
+    binding.operation.operationId !== snapshot.operation.operationId
+  ) {
+    return {
+      status: 'blocked',
+      issues: [
+        __pdxCollectionIssue(
+          'PIR_COLLECTION_DATA_OPERATION_MISMATCH',
+          '/snapshot/operation',
+          'Data lifecycle snapshot operation must match the Collection data binding operation.'
+        ),
+      ],
+    };
+  }
+  switch (snapshot.status) {
+    case 'idle':
+      return { status: 'ready', state: mapping.idle, dataId: mapping.dataId };
+    case 'loading':
+      return { status: 'ready', state: 'loading', dataId: mapping.dataId };
+    case 'success':
+      return {
+        status: 'ready',
+        state: 'item',
+        dataId: mapping.dataId,
+        value: snapshot.value,
+      };
+    case 'empty':
+      return { status: 'ready', state: 'empty', dataId: mapping.dataId };
+    case 'error':
+      return {
+        status: 'ready',
+        state: 'error',
+        dataId: mapping.dataId,
+        errorValue: snapshot.error,
+      };
+  }
+};
 
 const __pdxCollectionItemScope = (
   parentScope: __PdxScope,

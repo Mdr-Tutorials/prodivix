@@ -8,6 +8,7 @@ import type {
 } from './PIRRenderer.types';
 import {
   createPirCollectionLocationIdentity,
+  createPirDataLocationIdentity,
   type PIRProjectionRuntime,
 } from './runtime/pirProjectionRuntime';
 import { resolvePirRendererHost } from './host/pirRendererHost';
@@ -38,6 +39,7 @@ const haveSameBlockingIssues = (
       issue.message === right[index]?.message &&
       issue.documentId === right[index]?.documentId &&
       issue.nodeId === right[index]?.nodeId &&
+      issue.dataId === right[index]?.dataId &&
       issue.instancePath === right[index]?.instancePath
   );
 
@@ -54,6 +56,7 @@ export const PIRRenderer: React.FC<PIRRendererProps> = ({
   rootDataById,
   rootComponentPropsById,
   rootComponentVariantsById,
+  dataOperationRuntime,
   resolveCollectionPreviewState,
   dispatchTrigger,
   selectedLocation,
@@ -65,18 +68,14 @@ export const PIRRenderer: React.FC<PIRRendererProps> = ({
     () => resolvePirRendererHost(plan, host),
     [host, plan]
   );
-  const [collectionIssueState, setCollectionIssueState] = useState<{
+  const [projectionIssueState, setProjectionIssueState] = useState<{
     plan: PIRRendererProps['plan'];
     byLocation: Readonly<Record<string, readonly PIRRendererBlockingIssue[]>>;
   }>({ plan, byLocation: {} });
-  const reportCollectionBlockingIssues = useCallback(
-    (
-      location: PIRCollectionProjectionLocation,
-      issues: readonly PIRRendererBlockingIssue[]
-    ) => {
-      const identity = createPirCollectionLocationIdentity(location);
+  const reportBlockingIssuesAt = useCallback(
+    (identity: string, issues: readonly PIRRendererBlockingIssue[]) => {
       const sorted = [...issues].sort(compareBlockingIssues);
-      setCollectionIssueState((current) => {
+      setProjectionIssueState((current) => {
         const byLocation = current.plan === plan ? current.byLocation : {};
         if (sorted.length === 0) {
           if (!Object.hasOwn(byLocation, identity)) {
@@ -97,16 +96,39 @@ export const PIRRenderer: React.FC<PIRRendererProps> = ({
     },
     [plan]
   );
+  const reportCollectionBlockingIssues = useCallback(
+    (
+      location: PIRCollectionProjectionLocation,
+      issues: readonly PIRRendererBlockingIssue[]
+    ) =>
+      reportBlockingIssuesAt(
+        `collection:${createPirCollectionLocationIdentity(location)}`,
+        issues
+      ),
+    [reportBlockingIssuesAt]
+  );
+  const reportDataBlockingIssues = useCallback(
+    (
+      documentId: string,
+      instancePath: string,
+      issues: readonly PIRRendererBlockingIssue[]
+    ) =>
+      reportBlockingIssuesAt(
+        `data:${createPirDataLocationIdentity(documentId, instancePath)}`,
+        issues
+      ),
+    [reportBlockingIssuesAt]
+  );
   const blockingIssues = useMemo(
     () =>
       hostResolution.status === 'blocked'
         ? hostResolution.issues
-        : collectionIssueState.plan === plan
-          ? Object.values(collectionIssueState.byLocation)
+        : projectionIssueState.plan === plan
+          ? Object.values(projectionIssueState.byLocation)
               .flat()
               .sort(compareBlockingIssues)
           : [],
-    [collectionIssueState, hostResolution, plan]
+    [hostResolution, plan, projectionIssueState]
   );
   useEffect(() => {
     onBlockingIssues(blockingIssues);
@@ -119,6 +141,8 @@ export const PIRRenderer: React.FC<PIRRendererProps> = ({
             host: hostResolution.host,
             dispatchTrigger,
             reportCollectionBlockingIssues,
+            reportDataBlockingIssues,
+            ...(dataOperationRuntime ? { dataOperationRuntime } : {}),
             ...(resolveCollectionPreviewState
               ? { resolveCollectionPreviewState }
               : {}),
@@ -129,11 +153,13 @@ export const PIRRenderer: React.FC<PIRRendererProps> = ({
         : null,
     [
       dispatchTrigger,
+      dataOperationRuntime,
       hiddenLocations,
       hostResolution,
       onNodeSelect,
       plan,
       reportCollectionBlockingIssues,
+      reportDataBlockingIssues,
       resolveCollectionPreviewState,
       selectedLocation,
     ]

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import type { DataJsonValue, DataLifecycleSnapshot } from '@prodivix/data';
 import {
   appendPirProjectionComponentPath,
   createPirProjectionRootPath,
@@ -7,6 +8,7 @@ import {
   type PIRJsonValue,
 } from '@prodivix/pir';
 import { PIRRenderer } from '../PIRRenderer';
+import type { PIRDataOperationRuntimePort } from '../PIRRenderer.types';
 import {
   createContract,
   createProjectionPlan,
@@ -148,6 +150,125 @@ const createNestedCollectionPage = (
       children: { item: ['parentLabel', 'counter'] },
     },
   });
+
+const DATA_OPERATION = Object.freeze({
+  documentId: 'catalog-data',
+  operationId: 'list-products',
+});
+
+const createLifecycleCollectionDocument = (
+  id: string,
+  type: 'pir-page' | 'pir-component' = 'pir-page'
+) =>
+  createWorkspaceDocument({
+    id,
+    type,
+    rootId: 'collection',
+    ...(type === 'pir-component' ? { contract: createContract() } : {}),
+    logic: { dataById: { products: { operation: DATA_OPERATION } } },
+    nodesById: {
+      collection: {
+        id: 'collection',
+        kind: 'collection',
+        source: {
+          kind: 'binding',
+          value: { kind: 'data', dataId: 'products' },
+        },
+        key: {
+          kind: 'binding',
+          value: {
+            kind: 'collection-symbol',
+            symbolId: 'product',
+            path: 'id',
+          },
+        },
+        lifecycle: {
+          kind: 'data-operation',
+          dataId: 'products',
+          idle: 'loading',
+        },
+        symbols: {
+          itemId: 'product',
+          itemName: 'product',
+          indexId: 'product-index',
+          indexName: 'productIndex',
+          errorId: 'products-error',
+        },
+      },
+      item: {
+        id: 'item',
+        kind: 'element',
+        type: 'p',
+        text: {
+          kind: 'collection-symbol',
+          symbolId: 'product',
+          path: 'name',
+        },
+      },
+      loading: {
+        id: 'loading',
+        kind: 'element',
+        type: 'p',
+        text: { kind: 'literal', value: 'lifecycle-loading' },
+      },
+      empty: {
+        id: 'empty',
+        kind: 'element',
+        type: 'p',
+        text: { kind: 'literal', value: 'lifecycle-empty' },
+      },
+      error: {
+        id: 'error',
+        kind: 'element',
+        type: 'p',
+        text: {
+          kind: 'collection-symbol',
+          symbolId: 'products-error',
+          path: 'message',
+        },
+      },
+    },
+    regionsById: {
+      collection: {
+        item: ['item'],
+        loading: ['loading'],
+        empty: ['empty'],
+        error: ['error'],
+      },
+    },
+  });
+
+const lifecycleSnapshot = (
+  status: DataLifecycleSnapshot['status'],
+  value?: DataJsonValue
+): DataLifecycleSnapshot => {
+  const base = { operation: DATA_OPERATION, sequence: 1 } as const;
+  if (status === 'idle') return { ...base, status };
+  const active = {
+    ...base,
+    invocationId: 'invocation-1',
+    attempt: 1,
+    startedAt: 1,
+  } as const;
+  if (status === 'loading') return { ...active, status: 'loading' };
+  if (status === 'success') {
+    return {
+      ...active,
+      status: 'success',
+      completedAt: 2,
+      value: value ?? null,
+    };
+  }
+  if (status === 'empty') {
+    return { ...active, status: 'empty', completedAt: 2 };
+  }
+  return {
+    ...active,
+    status: 'error',
+    completedAt: 2,
+    error: { code: 'DATA_FAILED', message: String(value), retryable: false },
+  };
+};
 
 describe('PIRRenderer Collection conformance', () => {
   it('keeps nested parent scope and Component state attached to stable item keys', () => {
@@ -391,6 +512,127 @@ describe('PIRRenderer Collection conformance', () => {
       ]);
       expect(location).not.toHaveProperty('role');
     }
+  });
+
+  it.each([
+    [lifecycleSnapshot('idle'), 'lifecycle-loading'],
+    [lifecycleSnapshot('loading'), 'lifecycle-loading'],
+    [
+      lifecycleSnapshot('success', [{ id: 'one', name: 'lifecycle-item' }]),
+      'lifecycle-item',
+    ],
+    [lifecycleSnapshot('empty'), 'lifecycle-empty'],
+    [lifecycleSnapshot('error', 'lifecycle-error'), 'lifecycle-error'],
+  ] as const)(
+    'maps the %s Data lifecycle without inferring Collection state',
+    (snapshot, expectedText) => {
+      const page = createLifecycleCollectionDocument('page');
+      const dataOperationRuntime: PIRDataOperationRuntimePort = {
+        resolveSnapshot: () => snapshot,
+      };
+      render(
+        <PIRRenderer
+          plan={createProjectionPlan('page', [page])}
+          host={nativeHost}
+          dataOperationRuntime={dataOperationRuntime}
+          dispatchTrigger={vi.fn()}
+          onBlockingIssues={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText(expectedText)).toBeTruthy();
+    }
+  );
+
+  it('isolates lifecycle snapshots by Component instance and lets manual preview win', () => {
+    const definition = createLifecycleCollectionDocument(
+      'product-list',
+      'pir-component'
+    );
+    const page = createWorkspaceDocument({
+      id: 'page',
+      type: 'pir-page',
+      rootId: 'root',
+      nodesById: {
+        root: { id: 'root', kind: 'element', type: 'main' },
+        left: {
+          id: 'left',
+          kind: 'component-instance',
+          componentDocumentId: 'product-list',
+          bindings: { props: {}, events: {}, variants: {} },
+        },
+        right: {
+          id: 'right',
+          kind: 'component-instance',
+          componentDocumentId: 'product-list',
+          bindings: { props: {}, events: {}, variants: {} },
+        },
+      },
+      childIdsById: { root: ['left', 'right'] },
+    });
+    const leftPath = appendPirProjectionComponentPath(
+      createPirProjectionRootPath('page'),
+      'page',
+      'left',
+      'product-list'
+    );
+    const resolveSnapshot = vi.fn(
+      (
+        request: Parameters<PIRDataOperationRuntimePort['resolveSnapshot']>[0]
+      ) =>
+        lifecycleSnapshot('success', [
+          {
+            id: request.instancePath,
+            name:
+              request.instancePath === leftPath ? 'left-item' : 'right-item',
+          },
+        ])
+    );
+    render(
+      <PIRRenderer
+        plan={createProjectionPlan('page', [page, definition])}
+        host={nativeHost}
+        dataOperationRuntime={{ resolveSnapshot }}
+        resolveCollectionPreviewState={(location) => ({
+          state: location.instancePath === leftPath ? 'loading' : 'auto',
+        })}
+        dispatchTrigger={vi.fn()}
+        onBlockingIssues={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('lifecycle-loading')).toBeTruthy();
+    expect(screen.queryByText('left-item')).toBeNull();
+    expect(screen.getByText('right-item')).toBeTruthy();
+    expect(
+      new Set(
+        resolveSnapshot.mock.calls.map(([request]) => request.instancePath)
+      ).size
+    ).toBe(2);
+  });
+
+  it('fails closed when a durable data binding has no runtime snapshot', async () => {
+    const page = createLifecycleCollectionDocument('page');
+    const onBlockingIssues = vi.fn();
+    render(
+      <PIRRenderer
+        plan={createProjectionPlan('page', [page])}
+        host={nativeHost}
+        dispatchTrigger={vi.fn()}
+        onBlockingIssues={onBlockingIssues}
+      />
+    );
+
+    expect(screen.queryByText('lifecycle-loading')).toBeNull();
+    await waitFor(() =>
+      expect(onBlockingIssues).toHaveBeenLastCalledWith([
+        expect.objectContaining({
+          code: 'PIR_RENDER_DATA_LIFECYCLE_UNAVAILABLE',
+          documentId: 'page',
+          dataId: 'products',
+        }),
+      ])
+    );
   });
 
   it('fails closed and reports a dynamic non-array source', async () => {

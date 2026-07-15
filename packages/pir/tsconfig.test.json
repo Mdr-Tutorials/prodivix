@@ -6,6 +6,7 @@
     "noEmit": true,
     "paths": {
       "@prodivix/authoring": ["../authoring/dist/index.d.ts"],
+      "@prodivix/data": ["../data/dist/index.d.ts"],
       "@prodivix/diagnostics": ["../diagnostics/dist/index.d.ts"]
     }
   },
@@ -14,6 +15,9 @@
   "references": [
     {
       "path": "../authoring"
+    },
+    {
+      "path": "../data"
     },
     {
       "path": "../diagnostics"

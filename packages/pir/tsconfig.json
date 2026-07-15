@@ -10,6 +10,7 @@
     "noEmit": false,
     "paths": {
       "@prodivix/authoring": ["../authoring/src"],
+      "@prodivix/data": ["../data/src"],
       "@prodivix/diagnostics": ["../diagnostics/src"]
     }
   },
@@ -24,6 +25,9 @@
   "references": [
     {
       "path": "../authoring"
+    },
+    {
+      "path": "../data"
     },
     {
       "path": "../diagnostics"

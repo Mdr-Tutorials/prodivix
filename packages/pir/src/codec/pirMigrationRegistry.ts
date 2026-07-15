@@ -1,5 +1,6 @@
 import { CURRENT_PIR_WIRE_VERSION } from './pirWire.generated';
 import { PIR_WIRE_MIGRATION_V13_TO_V14 } from './pirWireMigrationV13ToV14';
+import { PIR_WIRE_MIGRATION_V14_TO_V15 } from './pirWireMigrationV14ToV15';
 
 export { CURRENT_PIR_WIRE_VERSION } from './pirWire.generated';
 
@@ -184,7 +185,7 @@ export const createPirMigrationRegistry = (
 
 export const PIR_MIGRATION_REGISTRY = createPirMigrationRegistry({
   currentVersion: CURRENT_PIR_WIRE_VERSION,
-  migrations: [PIR_WIRE_MIGRATION_V13_TO_V14],
+  migrations: [PIR_WIRE_MIGRATION_V13_TO_V14, PIR_WIRE_MIGRATION_V14_TO_V15],
 });
 
 export const upgradePirWireDocument = (

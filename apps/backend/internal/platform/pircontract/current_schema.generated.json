@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://prodivix.dev/schemas/pir/v1.4.json",
-  "title": "Prodivix PIR Document v1.4",
+  "$id": "https://prodivix.dev/schemas/pir/v1.5.json",
+  "title": "Prodivix PIR Document v1.5",
   "$ref": "#/$defs/pirDocument",
   "$defs": {
     "jsonValue": {
@@ -384,6 +384,23 @@
       },
       "additionalProperties": false
     },
+    "dataOperationReference": {
+      "type": "object",
+      "required": ["documentId", "operationId"],
+      "properties": {
+        "documentId": { "type": "string" },
+        "operationId": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "dataOperationBinding": {
+      "type": "object",
+      "required": ["operation"],
+      "properties": {
+        "operation": { "$ref": "#/$defs/dataOperationReference" }
+      },
+      "additionalProperties": false
+    },
     "dataScope": {
       "type": "object",
       "properties": {
@@ -533,6 +550,16 @@
       },
       "additionalProperties": false
     },
+    "collectionDataLifecycleMapping": {
+      "type": "object",
+      "required": ["kind", "dataId", "idle"],
+      "properties": {
+        "kind": { "const": "data-operation" },
+        "dataId": { "type": "string" },
+        "idle": { "type": "string", "enum": ["loading", "empty"] }
+      },
+      "additionalProperties": false
+    },
     "collectionNode": {
       "type": "object",
       "required": ["id", "kind", "source", "key", "symbols"],
@@ -541,6 +568,9 @@
         "kind": { "const": "collection" },
         "source": { "$ref": "#/$defs/collectionSourceBinding" },
         "key": { "$ref": "#/$defs/collectionKeyBinding" },
+        "lifecycle": {
+          "$ref": "#/$defs/collectionDataLifecycleMapping"
+        },
         "symbols": { "$ref": "#/$defs/collectionSymbols" }
       },
       "additionalProperties": false
@@ -624,6 +654,12 @@
           "additionalProperties": {
             "$ref": "#/$defs/logicStateDefinition"
           }
+        },
+        "dataById": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/dataOperationBinding"
+          }
         }
       },
       "additionalProperties": false
@@ -643,7 +679,7 @@
       "type": "object",
       "required": ["version", "ui"],
       "properties": {
-        "version": { "const": "1.4" },
+        "version": { "const": "1.5" },
         "metadata": { "$ref": "#/$defs/metadata" },
         "componentContract": { "$ref": "#/$defs/componentContract" },
         "ui": {
