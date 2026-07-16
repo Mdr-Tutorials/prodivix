@@ -1,4 +1,5 @@
 import {
+  assertExecutableProjectCapabilitySupport,
   createExecutionJobController,
   createExecutionProviderDescriptor,
   getExecutionProviderCompatibility,
@@ -7,12 +8,8 @@ import {
   type ExecutionJobController,
   type ExecutionProvider,
   type ExecutionRequest,
+  type ExecutableProjectSnapshot,
 } from '@prodivix/runtime-core';
-import {
-  createBrowserProjectSnapshot,
-  type BrowserProjectSnapshot,
-  type BrowserProjectSnapshotInput,
-} from './browserProject';
 import type {
   BrowserProjectRuntimeFactory,
   WebContainerRuntimeOptions,
@@ -27,15 +24,12 @@ import {
 export const WEB_CONTAINER_EXECUTION_PROVIDER_ID =
   'prodivix.browser.web-container';
 
-export type ResolveBrowserProjectSnapshot = (
+export type ResolveExecutableProjectSnapshot = (
   request: ExecutionRequest
-) =>
-  | BrowserProjectSnapshot
-  | BrowserProjectSnapshotInput
-  | Promise<BrowserProjectSnapshot | BrowserProjectSnapshotInput>;
+) => ExecutableProjectSnapshot | Promise<ExecutableProjectSnapshot>;
 
 export type BrowserProjectRunnerOptions = Readonly<{
-  resolveProject: ResolveBrowserProjectSnapshot;
+  resolveProject: ResolveExecutableProjectSnapshot;
   runtimeHost?: BrowserProjectRuntimeHost;
   createRuntime?: BrowserProjectRuntimeFactory;
   webContainer?: WebContainerRuntimeOptions;
@@ -65,6 +59,7 @@ const providerDescriptor = createExecutionProviderDescriptor({
     'dependency-install',
     'filesystem',
     'hmr',
+    'source-trace',
     'streaming-logs',
     'timeout',
   ],
@@ -203,14 +198,14 @@ export const createBrowserProjectRunner = (
   };
 
   const startServer = async (
-    snapshot: BrowserProjectSnapshot,
+    snapshot: ExecutableProjectSnapshot,
     controller: ExecutionJobController,
     lease: BrowserProjectRuntimeHostLease
   ): Promise<string> => {
     emitLog(controller, 'Starting the isolated project server.');
     previewUrl = undefined;
     const ready = waitForServerReady();
-    const process = await runtimeHost.spawn(ownerId, snapshot.startCommand, {
+    const process = await runtimeHost.spawn(ownerId, snapshot.previewCommand, {
       lease,
       label: 'dev',
       kind: 'server',
@@ -287,13 +282,18 @@ export const createBrowserProjectRunner = (
     try {
       const resolved = await options.resolveProject(request);
       if (!isJobRunnable(controller)) return;
-      const snapshot = createBrowserProjectSnapshot(resolved);
+      const snapshot = resolved;
+      assertExecutableProjectCapabilitySupport(
+        snapshot,
+        'preview',
+        providerDescriptor.capabilities
+      );
       if (
-        snapshot.workspaceId !== request.workspace.workspaceId ||
-        snapshot.snapshotId !== request.workspace.snapshotId
+        snapshot.workspace.workspaceId !== request.workspace.workspaceId ||
+        snapshot.workspace.snapshotId !== request.workspace.snapshotId
       ) {
         throw new Error(
-          'Resolved browser project identity does not match the execution request.'
+          'Resolved executable project identity does not match the execution request.'
         );
       }
       emitLog(controller, 'Preparing the executable project snapshot.');

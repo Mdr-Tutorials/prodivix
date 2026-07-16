@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   EXECUTION_TEST_REPORT_TRACE_NAME,
+  createExecutableProjectSnapshot,
   createExecutionRequest,
   type ExecutionJob,
   type ExecutionJobEvent,
 } from '@prodivix/runtime-core';
-import { createBrowserProjectSnapshot } from './browserProject';
 import {
   BROWSER_PROJECT_TEST_EXECUTION_PROVIDER_ID,
   createBrowserProjectTestRunner,
@@ -37,9 +37,13 @@ const vitestReport = (failed = false): string =>
   });
 
 const snapshot = (snapshotId: string) =>
-  createBrowserProjectSnapshot({
-    workspaceId: 'workspace',
-    snapshotId,
+  createExecutableProjectSnapshot({
+    workspace: { workspaceId: 'workspace', snapshotId },
+    target: {
+      presetId: 'react-vite',
+      framework: 'react',
+      runtime: 'vite',
+    },
     files: [
       {
         path: 'package.json',
@@ -65,6 +69,13 @@ const snapshot = (snapshotId: string) =>
         ],
       },
     ],
+    dependencyPlan: { manifestFilePath: 'package.json' },
+    entrypoints: [{ kind: 'test', path: 'src/App.test.tsx' }],
+    capabilityRequirements: {
+      preview: ['filesystem'],
+      build: ['filesystem', 'build'],
+      test: ['filesystem', 'test'],
+    },
   });
 
 const request = (snapshotId: string, timeoutMs?: number) =>

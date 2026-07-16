@@ -36,6 +36,15 @@ export {
   toExecutionTestReportValue,
 } from './executionTestReport';
 export {
+  assertExecutableProjectCapabilitySupport,
+  createExecutableProjectSnapshot,
+  DEFAULT_EXECUTABLE_PROJECT_TEST_REPORT_PATH,
+  EXECUTABLE_PROJECT_COMMANDS,
+  EXECUTABLE_PROJECT_LIMITS,
+  EXECUTABLE_PROJECT_SNAPSHOT_FORMAT,
+  normalizeExecutableProjectPath,
+} from './executableProject';
+export {
   EXECUTION_INVOCATION_KINDS,
   EXECUTION_PROFILES,
   EXECUTION_PROVIDER_CAPABILITIES,
@@ -88,6 +97,24 @@ export type {
   ExecutionTestStatus,
   ExecutionTestTool,
 } from './executionTestReport';
+export type {
+  ExecutableProjectCacheHints,
+  ExecutableProjectCapabilityRequirements,
+  ExecutableProjectCommand,
+  ExecutableProjectCommandName,
+  ExecutableProjectDependencyPlan,
+  ExecutableProjectDependencyPlanInput,
+  ExecutableProjectEntrypoint,
+  ExecutableProjectEntrypointKind,
+  ExecutableProjectFile,
+  ExecutableProjectPublicBuildConfigurationEntry,
+  ExecutableProjectResourceHints,
+  ExecutableProjectSnapshot,
+  ExecutableProjectSnapshotInput,
+  ExecutableProjectTarget,
+  ExecutableProjectTestPlan,
+  ExecutableProjectTestPlanInput,
+} from './executableProject';
 export type {
   ExecutionArtifact,
   ExecutionArtifactKind,

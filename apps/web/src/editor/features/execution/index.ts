@@ -5,5 +5,4 @@ export * from './executionConsoleModel';
 export * from './executionSessionEnvironment';
 export * from './nodeGraphExecutionClient';
 export * from './useExecutionSession';
-export * from './workspaceBrowserProjectPlan';
 export * from './workspaceExecutionIdentity';

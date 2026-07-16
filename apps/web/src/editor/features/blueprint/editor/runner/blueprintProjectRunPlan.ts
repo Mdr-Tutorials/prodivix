@@ -1,19 +1,19 @@
-import type { CompileDiagnostic } from '@prodivix/prodivix-compiler';
-import type { BrowserProjectSnapshot } from '@prodivix/runtime-browser';
+import {
+  generateWorkspaceReactViteExecutableProject,
+  type CompileDiagnostic,
+} from '@prodivix/prodivix-compiler';
 import {
   createExecutionRequest,
+  type ExecutableProjectSnapshot,
   type ExecutionRequest,
 } from '@prodivix/runtime-core';
 import type { WorkspaceSnapshot } from '@prodivix/workspace';
-import {
-  createClientExecutionRequestId,
-  createWorkspaceBrowserProjectPlan,
-} from '@/editor/features/execution';
+import { createClientExecutionRequestId } from '@/editor/features/execution';
 
 export type BlueprintProjectRunPlan =
   | Readonly<{
       status: 'ready';
-      snapshot: BrowserProjectSnapshot;
+      snapshot: ExecutableProjectSnapshot;
       request: ExecutionRequest;
     }>
   | Readonly<{
@@ -25,13 +25,13 @@ export type BlueprintProjectRunPlan =
 export const createBlueprintProjectRunPlan = (
   workspace: WorkspaceSnapshot
 ): BlueprintProjectRunPlan => {
-  const project = createWorkspaceBrowserProjectPlan(workspace);
+  const project = generateWorkspaceReactViteExecutableProject(workspace);
   if (project.status === 'blocked') return project;
   const request = createExecutionRequest({
     requestId: createClientExecutionRequestId('project-run'),
     profile: 'preview',
     runtimeZone: 'client',
-    workspace: project.workspace,
+    workspace: project.snapshot.workspace,
     invocation: {
       kind: 'workspace',
       targetRef: { kind: 'workspace', workspaceId: workspace.id },

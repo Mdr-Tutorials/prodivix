@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyPirDocument } from '@prodivix/pir';
 import type { WorkspaceSnapshot } from '@prodivix/workspace';
+import { generateWorkspaceReactViteExecutableProject } from '#src/executableProject/workspaceExecutableProject';
 import { compileWorkspaceToExportProgram } from './workspaceProject';
 
 const workspace: WorkspaceSnapshot = {
@@ -99,5 +100,43 @@ describe('standalone domain export conformance', () => {
     expect(program.diagnostics).not.toContainEqual(
       expect.objectContaining({ code: 'WKS-EXPORT-DOCUMENT-UNSUPPORTED' })
     );
+  });
+
+  it('produces the provider-neutral executable project from the exact revision', () => {
+    const result = generateWorkspaceReactViteExecutableProject(workspace);
+
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+    expect(result.snapshot).toMatchObject({
+      format: 'prodivix.executable-project.v1',
+      workspace: {
+        workspaceId: workspace.id,
+        snapshotId: expect.stringContaining(`${workspace.id}|w=1|r=1|o=1`),
+      },
+      target: {
+        presetId: 'react-vite',
+        framework: 'react',
+        runtime: 'vite',
+      },
+      buildCommand: {
+        command: 'corepack',
+        args: ['pnpm', 'run', 'build'],
+      },
+    });
+    expect(result.snapshot.contentDigest).toMatch(/^sha256-[a-f0-9]{64}$/u);
+    expect(result.snapshot.dependencyPlan).toMatchObject({
+      manifestFilePath: 'package.json',
+      installFingerprint: expect.stringMatching(/^sha256-[a-f0-9]{64}$/u),
+    });
+    expect(result.snapshot.entrypoints).toEqual([
+      { kind: 'build', path: 'index.html' },
+      { kind: 'preview', path: 'index.html' },
+      { kind: 'test', path: 'src/App.test.tsx' },
+    ]);
+    expect(result.snapshot.capabilityRequirements.test).toContain('test');
+    expect(result.snapshot.publicBuildConfiguration).toEqual([]);
+    expect(
+      result.snapshot.files.some((file) => file.path === 'package.json')
+    ).toBe(true);
   });
 });

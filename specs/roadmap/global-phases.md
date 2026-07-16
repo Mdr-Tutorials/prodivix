@@ -3,7 +3,7 @@
 ## 状态
 
 - DecisionStatus：Accepted
-- 日期：2026-07-14
+- 日期：2026-07-16
 - 当前产品位置：G1 Passed / G2 Foundation
 - 关联：
   - `specs/decisions/37.verified-semantic-authoring-architecture.md`
@@ -15,6 +15,7 @@
   - `specs/decisions/38.blueprint-component-instance-and-collection.md`
   - `specs/decisions/31.production-export-planner.md`
   - `specs/decisions/45.data-operation-and-environment-reference-foundation.md`
+  - `specs/implementation/g2-executable-full-stack-workspace.md`
   - `specs/roadmap/g0-closure-evidence.md`
 
 ## 文档目的
@@ -88,19 +89,19 @@ flowchart LR
 
 ## 当前全局判断
 
-截至 2026-07-15，Prodivix 位于：
+截至 2026-07-16，Prodivix 位于：
 
 > G1 已通过 / G2 基础阶段。语义化视觉/代码混合作者闭环已形成可重复验证证据，当前进入可执行全栈 Workspace 的建设阶段。
 
-| Global Phase | ProductGateStatus | 当前实现成熟度                            | 说明                                                                                                                                                                                                                                                                                                                                                                       |
-| ------------ | ----------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| G0           | Passed            | Implemented                               | Canonical Workspace、History、Atomic Commit、Revision Conflict、唯一生产写入链路、双 Durable Outbox、正式 local replica、revision-aware Issues 与 Golden Conformance 已落地；`pnpm run verify:g0` 的 8 个阶段与六项退出 Gate 已完整通过，证据见 `g0-closure-evidence.md`                                                                                                   |
-| G1           | Passed            | Implemented / PIR-current / Semantic Code | Workspace Semantic Index、无版本 PIR-current、Component/Collection、Renderer-Compiler parity、原子 extraction、TS/JS/CSS/SCSS/GLSL/WGSL、独立 Shader Compile、跨编辑器 CodeSlot、controlled round-trip、Token/Resolver/Asset provider、完整 S5 产品表面、唯一 durable 生产写入链，以及独立 React/Vite build/browser Gate 已形成闭环                                        |
-| G2           | In Progress       | Execution + Data Authoring Foundation     | ExecutionProvider/Job、共享 Browser Runtime Host、Preview/Test 与 NodeGraph/Animation provider 已建立；DataSourceDocument/DataOperationReference、PIR/Collection binding 与 lifecycle mapping、typed Workspace/Semantic 和引用式 environment/Secret contract 已落地；Data runtime、协议 adapter、Secret resolution、Remote Runner、Terminal/Network 与第二 target 继续建设 |
-| G3           | Blocked           | Early                                     | NodeGraph 已形成无 DOM 执行内核；Animation 已形成完整单 timeline lifecycle、Runtime Port 与 Browser effect projection；G3 统一完成 composition、route/reduced-motion/CodeSlot 行为、conflict 与 VerificationEvidence                                                                                                                                                       |
-| G4           | Blocked           | Foundation Only                           | AI gateway、streaming、tool 和 trace 有基础；真实 Workspace 写入仍未达到产品 Gate                                                                                                                                                                                                                                                                                          |
-| G5           | Blocked           | Not Started Systematically                | 单设备 local replica 已形成基础；multi-device sync、presence、Review、Production Feedback 与完整 Local-first 团队闭环尚未形成                                                                                                                                                                                                                                              |
-| G6           | Blocked           | Infrastructure Preview                    | Plugin Host 和三类官方插件较成熟，但 SDK、conformance、签名、Marketplace 和多 Target Gate 尚未完成                                                                                                                                                                                                                                                                         |
+| Global Phase | ProductGateStatus | 当前实现成熟度                            | 说明                                                                                                                                                                                                                                                                                                                                |
+| ------------ | ----------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| G0           | Passed            | Implemented                               | Canonical Workspace、History、Atomic Commit、Revision Conflict、唯一生产写入链路、双 Durable Outbox、正式 local replica、revision-aware Issues 与 Golden Conformance 已落地；`pnpm run verify:g0` 的 8 个阶段与六项退出 Gate 已完整通过，证据见 `g0-closure-evidence.md`                                                            |
+| G1           | Passed            | Implemented / PIR-current / Semantic Code | Workspace Semantic Index、无版本 PIR-current、Component/Collection、Renderer-Compiler parity、原子 extraction、TS/JS/CSS/SCSS/GLSL/WGSL、独立 Shader Compile、跨编辑器 CodeSlot、controlled round-trip、Token/Resolver/Asset provider、完整 S5 产品表面、唯一 durable 生产写入链，以及独立 React/Vite build/browser Gate 已形成闭环 |
+| G2           | In Progress       | Execution + Data Authoring Foundation     | ExecutionProvider/Job、neutral snapshot、Browser Providers、Remote codec/client、Control Plane/PostgreSQL/HTTP、Worker Agent 与 rootless Podman sandbox/GitHub Gate 已建立；Data 作者态与引用式 environment/Secret contract 已落地；Remote provider、Data runtime、Secret resolution、Terminal/Network 与第二 target 继续建设       |
+| G3           | Blocked           | Early                                     | NodeGraph 已形成无 DOM 执行内核；Animation 已形成完整单 timeline lifecycle、Runtime Port 与 Browser effect projection；G3 统一完成 composition、route/reduced-motion/CodeSlot 行为、conflict 与 VerificationEvidence                                                                                                                |
+| G4           | Blocked           | Foundation Only                           | AI gateway、streaming、tool 和 trace 有基础；真实 Workspace 写入仍未达到产品 Gate                                                                                                                                                                                                                                                   |
+| G5           | Blocked           | Not Started Systematically                | 单设备 local replica 已形成基础；multi-device sync、presence、Review、Production Feedback 与完整 Local-first 团队闭环尚未形成                                                                                                                                                                                                       |
+| G6           | Blocked           | Infrastructure Preview                    | Plugin Host 和三类官方插件较成熟，但 SDK、conformance、签名、Marketplace 和多 Target Gate 尚未完成                                                                                                                                                                                                                                  |
 
 ## G0：Truth & Change Kernel
 
@@ -234,11 +235,12 @@ S6 Golden G1 已完成。旅程覆盖原子抽取、3 个 instances、props/even
 2. Browser Runner 与 Remote Isolated Runner；实现可替换，不锁定单一供应商。
 3. 项目文件、依赖安装、Vite 构建、HMR、Terminal、Console、Network 和 Test 运行入口。
 4. Data/API IR：query、mutation、schema、pagination、cache、retry、optimistic update、loading/empty/error。
-5. OpenAPI、GraphQL 和 AsyncAPI adapter。
+5. OpenAPI、GraphQL 和明确 capability 范围的 AsyncAPI adapter；long-lived subscription 必须先有 stream lifecycle ADR。
 6. `client / worker / server / edge / build / test` runtime zones。
 7. `SecretRef`、环境绑定、权限和 mock/live adapter；Secret 不进入 PIR 和客户端产物。
 8. 二进制 Asset 管线：hash、去重、元数据、转换和交付策略。
 9. Auth、session、permission 和 server function 的稳定 runtime contract。
+10. 一个受控的第二 framework target，用于证明 ExportProgram、Data runtime 与执行契约可移植；Public Target SDK 和广泛 target 目录仍属于 G6。
 
 ### 当前基础
 
@@ -257,11 +259,18 @@ S6 Golden G1 已完成。旅程覆盖原子抽取、3 个 instances、props/even
 - `@prodivix/runtime-core` 已提供 reference-only ExecutionEnvironmentSnapshotRef、EnvironmentBindingReference 与 SecretRef，并允许 ExecutionRequest 绑定 immutable environment snapshot identity。Environment value map 不进入 request；Secret material 不进入 Workspace、request、log、artifact 或客户端产物。
 - PIR 现有 `dataId` 继续表示 PIR 文档内局部数据作用域，不是全局 operation identity。`logic.dataById` 已保存 durable DataOperationReference binding，Collection Inspector 通过 Semantic Index 选择 query，并以原子 Transaction 同时写入 local binding、source 与显式 lifecycle mapping。Renderer/Compiler 按 document instance 消费匹配 snapshot；success 不从返回数组形状猜 empty，无 runtime snapshot 时 fail closed。
 - Data operation trigger/input、runtime/adapter registry、Secret resolver/runtime-zone permission、OpenAPI/GraphQL/AsyncAPI adapter，以及 Preview/Export CRUD parity 尚未完成。
-- Remote Isolated provider、Terminal/Network 与多 framework runner 继续作为 G2 后续交付。
+- provider-neutral snapshot、Remote codec/client/Control Plane/PostgreSQL/HTTP、Worker Agent，以及 D2 lease-fenced durable event/log、content-addressed artifact blob、总预算与 retention sweep 已完成；生产默认 rootless Podman sandbox adapter 和 remote-only GitHub Isolation Gate 已实现，首次推送后生成远端通过证据。Remote providers 与 install/runtime network/command execution policy 尚待实现。
+- Remote Isolated provider、Terminal/Network 与单一第二 target 可移植性证明继续作为 G2 后续交付；广泛 Multi-target/Target SDK 生态属于 G6。
+- 二进制 Asset pipeline，以及 Auth/session/permission/server function 尚无覆盖完整运行边界的 Accepted ADR；它们必须先完成决策与 implementation，再进入 G2 closure。
 
 ### 退出 Gate
 
-一个标准 CRUD 应用能够连接声明式 API，完整处理鉴权、loading、empty、error、mutation、retry 和 optimistic update，并在 Preview 与 Export 中通过同一组行为场景。
+1. 一个标准 CRUD 应用能够连接声明式 API，完整处理鉴权、loading、empty、error、mutation、retry、pagination 和 optimistic update。
+2. Browser 与 Remote Preview/Test/Build 消费同一 exact Workspace revision 和 Executable Project Snapshot，并通过相同 execution conformance；Console、Terminal、Network 与 Test 能定位回作者态 SourceTrace。
+3. mock/live、runtime zone、permission 与 Secret resolution fail closed；Secret 不进入 Workspace、request、snapshot、log、diagnostic、artifact、test report、生成源码或客户端产物。
+4. 二进制 Asset，以及 Auth/session/permission/server function 具有稳定 contract、运行实现和可重复安全证据。
+5. React/Vite 与 G2 选定的单一第二 target 在 Preview、Test 和 standalone Export 中通过同一 CRUD runtime conformance journey，并独立完成 install、typecheck、test、build 与 browser smoke。
+6. 所有 runtime lifecycle、cache、report、Terminal/Network 和 execution filesystem 保持可丢弃；采纳变化仍通过唯一 Workspace Command/Transaction/Outbox/Atomic Commit 链路。
 
 ## G3：Behavior & Verification Closure
 
@@ -342,7 +351,7 @@ G0 已完成的单设备 local replica 是这里的恢复基线，不等于 G5 L
 1. Public Plugin SDK、Connector SDK、conformance kit 和 capability matrix。
 2. 插件签名、权限审查、版本生命周期、撤权和供应链策略。
 3. Inspector、NodeGraph、Animation、Data/API、Compiler、AI Context 和 Deployment 等稳定 extension points。
-4. 第二框架 Target 通过与 React/Vite 相同的 Golden Conformance Suite。
+4. Public Target SDK、capability matrix 与 conformance kit 能让更多 framework/第三方 Target 复用 G2 已验证的 ExportProgram 和 runtime semantics。
 5. 企业私有 Runner、自托管和 server/edge adapter。
 6. 模板、Design System、Component、Behavior、Connector 和 Plugin Marketplace。
 7. 社区作品、Fork/Remix、教育内容和创作者机制。
@@ -373,16 +382,17 @@ G0 已完成的单设备 local replica 是这里的恢复基线，不等于 G5 L
 | Workspace Semantic Index / Code / Contract / Tokens | G1     | 视觉、代码与跨领域引用长期共存的核心                 |
 | Data / API / Secret / Runtime Zones                 | G2     | 真实应用执行基础                                     |
 | Browser / Remote ExecutionProvider                  | G2     | Preview、Test、Build 的统一宿主                      |
+| 单一第二 framework target 可移植性证明              | G2     | 验证 ExportProgram 与 Data runtime 不绑定 React      |
 | NodeGraph / Animation / Behavior Scenario           | G3     | 共享交互语义与验证闭环                               |
 | AI Action / Agent Control / Eval                    | G4     | 不拥有独立写入协议                                   |
 | Local-first / Git Review / Deploy / Telemetry       | G5     | 团队与生产闭环                                       |
-| SDK / Marketplace / Multi-target                    | G6     | 依赖前述稳定 Gate                                    |
+| SDK / Marketplace / Target ecosystem                | G6     | 依赖前述稳定 Gate                                    |
 
 ## G0-G2 通过前暂停扩张的范围
 
 1. 新增更多官方组件库；Ant Design、MUI 和 Radix 足以验证平台。
 2. 扩张 NodeGraph 节点目录或 Animation track 数量，而不先重建语义内核。
-3. React/Vite 之外的新框架 Target。
+3. 超出 G2 明确选择的单一可移植性证明之外，继续扩张 React/Vite 外的新框架 Target。
 4. Marketplace、社区和大量新 extension points。
 5. 全项目自治 AI 或无验证的 AI 写入。
 6. 全域 CRDT 实时协作。

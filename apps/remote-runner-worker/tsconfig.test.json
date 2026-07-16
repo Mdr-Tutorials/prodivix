@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "noEmit": true,
+    "tsBuildInfoFile": "./node_modules/.cache/tsconfig.test.tsbuildinfo",
+    "paths": {
+      "@prodivix/runtime-core": ["../../packages/runtime-core/dist/index.d.ts"],
+      "@prodivix/runtime-remote": [
+        "../../packages/runtime-remote/dist/index.d.ts"
+      ]
+    }
+  },
+  "include": ["src/**/*", "scripts/**/*"],
+  "exclude": ["node_modules", "dist"],
+  "references": [
+    { "path": "../../packages/runtime-core" },
+    { "path": "../../packages/runtime-remote" }
+  ]
+}

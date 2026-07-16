@@ -1,15 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { createBrowserProjectSnapshot } from './browserProject';
+import { createExecutableProjectSnapshot } from '@prodivix/runtime-core';
 import {
   BrowserProjectRuntimeHostBusyError,
   createBrowserProjectRuntimeHost,
 } from './browserProjectRuntimeHost';
 import { createBrowserProjectRuntimeHarness } from './__tests__/browserProjectRuntimeHarness';
 
-const snapshot = (version: string, source = 'export const value = 1;') =>
-  createBrowserProjectSnapshot({
-    workspaceId: 'workspace',
-    snapshotId: `snapshot-${version}`,
+const snapshot = (
+  version: string,
+  source = 'export const value = 1;',
+  dependencyInstall: 'reuse-if-matched' | 'isolated' = 'reuse-if-matched'
+) =>
+  createExecutableProjectSnapshot({
+    workspace: {
+      workspaceId: 'workspace',
+      snapshotId: `snapshot-${version}`,
+    },
+    target: {
+      presetId: 'react-vite',
+      framework: 'react',
+      runtime: 'vite',
+    },
     files: [
       {
         path: 'package.json',
@@ -17,9 +28,30 @@ const snapshot = (version: string, source = 'export const value = 1;') =>
       },
       { path: 'src/main.ts', contents: source },
     ],
+    dependencyPlan: { manifestFilePath: 'package.json' },
+    entrypoints: [{ kind: 'preview', path: 'src/main.ts' }],
+    capabilityRequirements: {
+      preview: ['filesystem'],
+      build: ['filesystem', 'build'],
+      test: ['filesystem', 'test'],
+    },
+    cacheHints: { dependencyInstall },
   });
 
 describe('browser project runtime host conformance', () => {
+  it('honors an isolated dependency-install cache policy', async () => {
+    const harness = createBrowserProjectRuntimeHarness();
+    const host = createBrowserProjectRuntimeHost({
+      createRuntime: harness.createRuntime,
+    });
+    await host.prepare('owner-a', snapshot('1', undefined, 'isolated'));
+    await host.prepare('owner-a', snapshot('1', undefined, 'isolated'));
+    expect(
+      harness.commands.filter((command) => command.args?.includes('install'))
+    ).toHaveLength(2);
+    await host.dispose();
+  });
+
   it('lazily shares files and installs while preserving owner-scoped processes', async () => {
     const harness = createBrowserProjectRuntimeHarness();
     const host = createBrowserProjectRuntimeHost({

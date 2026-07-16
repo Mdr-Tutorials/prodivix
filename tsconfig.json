@@ -32,6 +32,18 @@
       "path": "./packages/runtime-core"
     },
     {
+      "path": "./packages/runtime-remote"
+    },
+    {
+      "path": "./packages/runtime-remote-postgres"
+    },
+    {
+      "path": "./apps/remote-runner-control-plane"
+    },
+    {
+      "path": "./apps/remote-runner-worker"
+    },
+    {
       "path": "./packages/data"
     },
     {

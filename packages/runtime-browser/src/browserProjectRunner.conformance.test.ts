@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createExecutableProjectSnapshot,
   createExecutionRequest,
   type ExecutionJob,
 } from '@prodivix/runtime-core';
@@ -107,23 +108,35 @@ describe('browser project runner conformance', () => {
     const runner = createBrowserProjectRunner({
       createRuntime: async () => harness.runtime,
       createJobId: (input) => `job-${input.requestId}`,
-      resolveProject: (input) => ({
-        workspaceId: input.workspace.workspaceId,
-        snapshotId: input.workspace.snapshotId,
-        files: [
-          {
-            path: 'package.json',
-            contents: JSON.stringify({
-              scripts: { dev: 'vite' },
-              dependencies: {},
-            }),
+      resolveProject: (input) =>
+        createExecutableProjectSnapshot({
+          workspace: input.workspace,
+          target: {
+            presetId: 'react-vite',
+            framework: 'react',
+            runtime: 'vite',
           },
-          {
-            path: 'src/main.tsx',
-            contents: `export const revision = '${input.workspace.snapshotId}';`,
+          files: [
+            {
+              path: 'package.json',
+              contents: JSON.stringify({
+                scripts: { dev: 'vite' },
+                dependencies: {},
+              }),
+            },
+            {
+              path: 'src/main.tsx',
+              contents: `export const revision = '${input.workspace.snapshotId}';`,
+            },
+          ],
+          dependencyPlan: { manifestFilePath: 'package.json' },
+          entrypoints: [{ kind: 'preview', path: 'src/main.tsx' }],
+          capabilityRequirements: {
+            preview: ['filesystem', 'hmr'],
+            build: ['filesystem', 'build'],
+            test: ['filesystem', 'test'],
           },
-        ],
-      }),
+        }),
     });
 
     const first = await runner.provider.start(request('one'));

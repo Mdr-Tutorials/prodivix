@@ -1,7 +1,5 @@
-import type {
-  BrowserProjectCommand,
-  BrowserProjectFileTree,
-} from '../browserProject';
+import type { ExecutableProjectCommand } from '@prodivix/runtime-core';
+import type { BrowserProjectFileTree } from '../browserProjectFileTree';
 import type {
   BrowserProjectRuntime,
   BrowserProjectRuntimeProcess,
@@ -20,7 +18,7 @@ export type RuntimeCommandPlan = Readonly<{
 }>;
 
 export type RuntimeHarnessProcess = Readonly<{
-  command: BrowserProjectCommand;
+  command: ExecutableProjectCommand;
   killed(): boolean;
   settle(exitCode: number): void;
 }>;
@@ -61,7 +59,7 @@ const flattenTree = (
 
 export const createBrowserProjectRuntimeHarness = () => {
   const files = new Map<string, string | Uint8Array>();
-  const commands: BrowserProjectCommand[] = [];
+  const commands: ExecutableProjectCommand[] = [];
   const commandPlans: RuntimeCommandPlan[] = [];
   const processes: RuntimeHarnessProcess[] = [];
   const serverReadyListeners = new Set<(url: string, port: number) => void>();

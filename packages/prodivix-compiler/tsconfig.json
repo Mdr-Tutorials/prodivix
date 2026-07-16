@@ -12,9 +12,11 @@
       "@prodivix/animation": ["../animation/src"],
       "@prodivix/authoring": ["../authoring/src"],
       "@prodivix/data": ["../data/src"],
+      "@prodivix/diagnostics": ["../diagnostics/src"],
       "@prodivix/nodegraph": ["../nodegraph/src"],
       "@prodivix/pir": ["../pir/src"],
       "@prodivix/router": ["../router/src"],
+      "@prodivix/runtime-core": ["../runtime-core/src"],
       "@prodivix/shared": ["../shared/src"],
       "@prodivix/shared/*": ["../shared/src/*"],
       "@prodivix/workspace": ["../workspace/src"]
@@ -39,6 +41,9 @@
       "path": "../data"
     },
     {
+      "path": "../diagnostics"
+    },
+    {
       "path": "../nodegraph"
     },
     {
@@ -46,6 +51,9 @@
     },
     {
       "path": "../router"
+    },
+    {
+      "path": "../runtime-core"
     },
     {
       "path": "../shared"

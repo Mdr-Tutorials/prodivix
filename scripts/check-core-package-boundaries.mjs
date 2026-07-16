@@ -29,6 +29,14 @@ const corePackages = {
     '@prodivix/workspace',
   ]),
   'runtime-core': new Set(['@prodivix/diagnostics']),
+  'runtime-remote': new Set([
+    '@prodivix/diagnostics',
+    '@prodivix/runtime-core',
+  ]),
+  'runtime-remote-postgres': new Set([
+    '@prodivix/runtime-core',
+    '@prodivix/runtime-remote',
+  ]),
   data: new Set(['@prodivix/authoring', '@prodivix/runtime-core']),
   nodegraph: new Set(['@prodivix/authoring', '@prodivix/runtime-core']),
 };

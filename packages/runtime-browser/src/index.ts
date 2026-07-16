@@ -7,12 +7,7 @@ export {
   createBrowserAnimationEffectStore,
 } from './browserAnimationEffectStore';
 export { createBrowserAnimationIdFactory } from './browserAnimationIds';
-export {
-  createBrowserProjectFileTree,
-  createBrowserProjectSnapshot,
-  DEFAULT_BROWSER_PROJECT_TEST_REPORT_PATH,
-  normalizeBrowserProjectPath,
-} from './browserProject';
+export { createBrowserProjectFileTree } from './browserProjectFileTree';
 export {
   createBrowserProjectRunner,
   WEB_CONTAINER_EXECUTION_PROVIDER_ID,
@@ -36,19 +31,11 @@ export type {
   BrowserAnimationEffectStoreStatus,
   CreateBrowserAnimationEffectStoreInput,
 } from './browserAnimationEffectStore';
-export type {
-  BrowserProjectCommand,
-  BrowserProjectFile,
-  BrowserProjectFileTree,
-  BrowserProjectSnapshot,
-  BrowserProjectSnapshotInput,
-  BrowserProjectTestPlan,
-  BrowserProjectTestPlanInput,
-} from './browserProject';
+export type { BrowserProjectFileTree } from './browserProjectFileTree';
 export type {
   BrowserProjectRunner,
   BrowserProjectRunnerOptions,
-  ResolveBrowserProjectSnapshot,
+  ResolveExecutableProjectSnapshot,
 } from './browserProjectRunner';
 export type {
   BrowserProjectRuntimeHost,

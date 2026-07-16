@@ -1,27 +1,21 @@
-import {
-  generateWorkspaceReactViteBundle,
-  type CompileDiagnostic,
-  type ExportSourceTrace,
-} from '@prodivix/prodivix-compiler';
-import {
-  createBrowserProjectSnapshot,
-  DEFAULT_BROWSER_PROJECT_TEST_REPORT_PATH,
-  type BrowserProjectCommand,
-  type BrowserProjectSnapshot,
-} from '@prodivix/runtime-browser';
 import type { DiagnosticTargetRef } from '@prodivix/diagnostics';
-import type {
-  ExecutionSourceTrace,
-  ExecutionWorkspaceSnapshotRef,
+import {
+  createExecutableProjectSnapshot,
+  DEFAULT_EXECUTABLE_PROJECT_TEST_REPORT_PATH,
+  type ExecutableProjectCommand,
+  type ExecutableProjectSnapshot,
+  type ExecutionSourceTrace,
+  type ExecutionWorkspaceSnapshotRef,
 } from '@prodivix/runtime-core';
 import type { WorkspaceSnapshot } from '@prodivix/workspace';
-import { createWorkspaceExecutionSnapshotRef } from './workspaceExecutionIdentity';
+import type { CompileDiagnostic } from '#src/core/diagnostics';
+import type { ExportSourceTrace } from '#src/export/types';
+import { generateWorkspaceReactViteBundle } from '#src/react/workspaceProject';
 
-export type WorkspaceBrowserProjectPlan =
+export type WorkspaceExecutableProjectResult =
   | Readonly<{
       status: 'ready';
-      snapshot: BrowserProjectSnapshot;
-      workspace: ExecutionWorkspaceSnapshotRef;
+      snapshot: ExecutableProjectSnapshot;
     }>
   | Readonly<{
       status: 'blocked';
@@ -49,10 +43,17 @@ const readPackageManager = (
   }
 };
 
+const readLockFilePath = (
+  files: readonly Readonly<{ path: string }>[]
+): string | undefined =>
+  ['pnpm-lock.yaml', 'package-lock.json', 'yarn.lock', 'bun.lock'].find(
+    (path) => files.some((file) => file.path === path)
+  );
+
 const packageManagerCommand = (
   packageManager: PackageManagerName,
   args: readonly string[]
-): BrowserProjectCommand =>
+): ExecutableProjectCommand =>
   packageManager === 'npm' || packageManager === 'bun'
     ? Object.freeze({
         command: packageManager,
@@ -105,10 +106,38 @@ const executionSourceTrace = (
       `${trace.sourceRef.domain}:${trace.sourceRef.id}`,
   });
 
-/** Produces the single standalone project snapshot consumed by Preview and Test. */
-export const createWorkspaceBrowserProjectPlan = (
+const createWorkspaceExecutionSnapshotRef = (
   workspace: WorkspaceSnapshot
-): WorkspaceBrowserProjectPlan => {
+): ExecutionWorkspaceSnapshotRef => {
+  const documents = Object.values(workspace.docsById).sort((left, right) =>
+    left.id.localeCompare(right.id)
+  );
+  const documentRevisions = documents
+    .map(
+      (document) =>
+        `${encodeURIComponent(document.id)}@${document.contentRev}.${document.metaRev}`
+    )
+    .join(',');
+  return Object.freeze({
+    workspaceId: workspace.id,
+    snapshotId: `${workspace.id}|w=${workspace.workspaceRev}|r=${workspace.routeRev}|o=${workspace.opSeq}|d=${documentRevisions}`,
+    partitionRevisions: Object.freeze({
+      workspace: String(workspace.workspaceRev),
+      route: String(workspace.routeRev),
+      ...Object.fromEntries(
+        documents.flatMap((document) => [
+          [`document:${document.id}:content`, String(document.contentRev)],
+          [`document:${document.id}:meta`, String(document.metaRev)],
+        ])
+      ),
+    }),
+  });
+};
+
+/** Compiles one exact Workspace revision into the provider-neutral project contract. */
+export const generateWorkspaceReactViteExecutableProject = (
+  workspace: WorkspaceSnapshot
+): WorkspaceExecutableProjectResult => {
   const bundle = generateWorkspaceReactViteBundle(workspace);
   const blockingDiagnostics =
     bundle.metadata?.blockingDiagnostics ??
@@ -121,10 +150,14 @@ export const createWorkspaceBrowserProjectPlan = (
   }
 
   const packageManager = readPackageManager(bundle.files);
-  const workspaceRef = createWorkspaceExecutionSnapshotRef(workspace);
-  const snapshot = createBrowserProjectSnapshot({
-    workspaceId: workspace.id,
-    snapshotId: workspaceRef.snapshotId,
+  const lockFilePath = readLockFilePath(bundle.files);
+  const snapshot = createExecutableProjectSnapshot({
+    workspace: createWorkspaceExecutionSnapshotRef(workspace),
+    target: {
+      presetId: 'react-vite',
+      framework: 'react',
+      runtime: 'vite',
+    },
     files: bundle.files.map((file) => ({
       path: file.path,
       contents: file.contents,
@@ -132,17 +165,59 @@ export const createWorkspaceBrowserProjectPlan = (
         executionSourceTrace(trace, workspace.id)
       ),
     })),
+    dependencyPlan: {
+      manifestFilePath: 'package.json',
+      ...(lockFilePath ? { lockFilePath } : {}),
+    },
+    entrypoints: [
+      { kind: 'preview', path: 'index.html' },
+      { kind: 'build', path: 'index.html' },
+      { kind: 'test', path: 'src/App.test.tsx' },
+    ],
+    capabilityRequirements: {
+      preview: [
+        'artifacts',
+        'cancellation',
+        'console',
+        'dependency-install',
+        'filesystem',
+        'hmr',
+        'source-trace',
+        'streaming-logs',
+      ],
+      build: [
+        'artifacts',
+        'build',
+        'dependency-install',
+        'filesystem',
+        'source-trace',
+      ],
+      test: [
+        'artifacts',
+        'dependency-install',
+        'filesystem',
+        'source-trace',
+        'test',
+      ],
+    },
+    publicBuildConfiguration: [],
+    resourceHints: {
+      timeoutMs: 120_000,
+      maxOutputBytes: 16 * 1024 * 1024,
+    },
+    cacheHints: { dependencyInstall: 'reuse-if-matched' },
     installCommand: packageManagerCommand(packageManager, [
       'install',
       ...(packageManager === 'pnpm' ? ['--no-frozen-lockfile'] : []),
     ]),
-    startCommand: packageManagerCommand(packageManager, [
+    previewCommand: packageManagerCommand(packageManager, [
       'run',
       'dev',
       '--',
       '--host',
       '0.0.0.0',
     ]),
+    buildCommand: packageManagerCommand(packageManager, ['run', 'build']),
     testPlan: {
       framework: 'vitest',
       command: packageManagerCommand(packageManager, [
@@ -151,14 +226,10 @@ export const createWorkspaceBrowserProjectPlan = (
         '--',
         '--reporter=default',
         '--reporter=json',
-        `--outputFile.json=${DEFAULT_BROWSER_PROJECT_TEST_REPORT_PATH}`,
+        `--outputFile.json=${DEFAULT_EXECUTABLE_PROJECT_TEST_REPORT_PATH}`,
       ]),
-      reportFilePath: DEFAULT_BROWSER_PROJECT_TEST_REPORT_PATH,
+      reportFilePath: DEFAULT_EXECUTABLE_PROJECT_TEST_REPORT_PATH,
     },
   });
-  return Object.freeze({
-    status: 'ready',
-    snapshot,
-    workspace: workspaceRef,
-  });
+  return Object.freeze({ status: 'ready', snapshot });
 };

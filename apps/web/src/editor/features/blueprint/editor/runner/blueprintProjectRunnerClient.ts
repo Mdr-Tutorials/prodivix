@@ -1,8 +1,9 @@
-import {
-  createBrowserProjectRunner,
-  type BrowserProjectSnapshot,
-} from '@prodivix/runtime-browser';
-import type { ExecutionJob, ExecutionRequest } from '@prodivix/runtime-core';
+import { createBrowserProjectRunner } from '@prodivix/runtime-browser';
+import type {
+  ExecutableProjectSnapshot,
+  ExecutionJob,
+  ExecutionRequest,
+} from '@prodivix/runtime-core';
 import {
   browserProjectRuntimeHost,
   executionSessionCoordinator,
@@ -27,7 +28,7 @@ let consumerCount = 0;
 let pendingStop: ReturnType<typeof globalThis.setTimeout> | undefined;
 
 export const startBlueprintProject = async (
-  snapshot: BrowserProjectSnapshot,
+  snapshot: ExecutableProjectSnapshot,
   request: ExecutionRequest
 ): Promise<ExecutionJob> => {
   const releaseSnapshot = retainBrowserProjectExecutionSnapshot(snapshot);
@@ -40,7 +41,9 @@ export const startBlueprintProject = async (
   }
   void job.completion.finally(releaseSnapshot);
   executionSessionCoordinator.activate({
-    sessionId: getBlueprintProjectExecutionSessionId(snapshot.workspaceId),
+    sessionId: getBlueprintProjectExecutionSessionId(
+      snapshot.workspace.workspaceId
+    ),
     label: 'Project Preview',
     job,
   });

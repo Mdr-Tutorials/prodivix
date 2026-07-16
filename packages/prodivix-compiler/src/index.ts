@@ -45,6 +45,10 @@ export {
   generateWorkspaceReactViteBundle,
   type WorkspaceReactViteCompileOptions,
 } from '#src/react/workspaceProject';
+export {
+  generateWorkspaceReactViteExecutableProject,
+  type WorkspaceExecutableProjectResult,
+} from '#src/executableProject/workspaceExecutableProject';
 export { compileAnimationExportContributions } from '#src/animation/compileAnimation';
 export { compileNodeGraphExportContributions } from '#src/nodegraph/compileNodeGraph';
 export type {

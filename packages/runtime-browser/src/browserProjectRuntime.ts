@@ -1,7 +1,5 @@
-import type {
-  BrowserProjectCommand,
-  BrowserProjectFileTree,
-} from './browserProject';
+import type { ExecutableProjectCommand } from '@prodivix/runtime-core';
+import type { BrowserProjectFileTree } from './browserProjectFileTree';
 
 export type BrowserProjectRuntimeProcess = Readonly<{
   exit: Promise<number>;
@@ -21,7 +19,9 @@ export type BrowserProjectRuntime = Readonly<{
   readFile(path: string): Promise<string | Uint8Array>;
   writeFile(path: string, contents: string | Uint8Array): Promise<void>;
   remove(path: string): Promise<void>;
-  spawn(command: BrowserProjectCommand): Promise<BrowserProjectRuntimeProcess>;
+  spawn(
+    command: ExecutableProjectCommand
+  ): Promise<BrowserProjectRuntimeProcess>;
   onServerReady(listener: (url: string, port: number) => void): () => void;
   onPreviewError(
     listener: (error: BrowserProjectRuntimePreviewError) => void
@@ -84,13 +84,9 @@ export const createWebContainerRuntime = async (
     writeFile: (path, contents) => container.fs.writeFile(path, contents),
     remove: (path) => container.fs.rm(path, { force: true, recursive: true }),
     spawn: async (command) => {
-      const process = await container.spawn(
-        command.command,
-        [...(command.args ?? [])],
-        {
-          ...(command.environment ? { env: { ...command.environment } } : {}),
-        }
-      );
+      const process = await container.spawn(command.command, [
+        ...(command.args ?? []),
+      ]);
       return Object.freeze({
         exit: process.exit,
         output: process.output,

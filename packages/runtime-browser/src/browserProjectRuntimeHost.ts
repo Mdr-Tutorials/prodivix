@@ -1,9 +1,9 @@
 import {
-  createBrowserProjectFileTree,
-  normalizeBrowserProjectPath,
-  type BrowserProjectCommand,
-  type BrowserProjectSnapshot,
-} from './browserProject';
+  normalizeExecutableProjectPath,
+  type ExecutableProjectCommand,
+  type ExecutableProjectSnapshot,
+} from '@prodivix/runtime-core';
+import { createBrowserProjectFileTree } from './browserProjectFileTree';
 import {
   createWebContainerRuntime,
   type BrowserProjectRuntime,
@@ -65,11 +65,11 @@ export type BrowserProjectRuntimeHostPrepareResult = Readonly<{
 export type BrowserProjectRuntimeHost = Readonly<{
   prepare(
     ownerId: string,
-    snapshot: BrowserProjectSnapshot
+    snapshot: ExecutableProjectSnapshot
   ): Promise<BrowserProjectRuntimeHostPrepareResult>;
   spawn(
     ownerId: string,
-    command: BrowserProjectCommand,
+    command: ExecutableProjectCommand,
     options: Readonly<{
       lease: BrowserProjectRuntimeHostLease;
       label?: string;
@@ -116,10 +116,10 @@ export class BrowserProjectRuntimeHostLeaseError extends Error {
 }
 
 export class BrowserProjectCommandError extends Error {
-  readonly command: BrowserProjectCommand;
+  readonly command: ExecutableProjectCommand;
   readonly exitCode: number;
 
-  constructor(command: BrowserProjectCommand, exitCode: number) {
+  constructor(command: ExecutableProjectCommand, exitCode: number) {
     super(
       `Browser project command ${command.command} exited with code ${exitCode}.`
     );
@@ -128,17 +128,6 @@ export class BrowserProjectCommandError extends Error {
     this.exitCode = exitCode;
   }
 }
-
-const dependencyFileNames = new Set([
-  '.npmrc',
-  'bun.lock',
-  'bun.lockb',
-  'package-lock.json',
-  'package.json',
-  'pnpm-lock.yaml',
-  'pnpm-workspace.yaml',
-  'yarn.lock',
-]);
 
 const normalizeOwnerId = (value: string): string => {
   const normalized = value.trim();
@@ -183,18 +172,10 @@ const contentFingerprint = (contents: string | Uint8Array): string => {
 };
 
 const projectDependencyFingerprint = (
-  snapshot: BrowserProjectSnapshot
-): string =>
-  JSON.stringify({
-    install: snapshot.installCommand,
-    files: snapshot.files
-      .filter((file) =>
-        dependencyFileNames.has(file.path.split('/').at(-1) ?? '')
-      )
-      .map((file) => [file.path, contentFingerprint(file.contents)]),
-  });
+  snapshot: ExecutableProjectSnapshot
+): string => snapshot.dependencyPlan.installFingerprint;
 
-const projectFileFingerprint = (snapshot: BrowserProjectSnapshot): string =>
+const projectFileFingerprint = (snapshot: ExecutableProjectSnapshot): string =>
   JSON.stringify(
     snapshot.files.map((file) => [file.path, contentFingerprint(file.contents)])
   );
@@ -304,7 +285,7 @@ export const createBrowserProjectRuntimeHost = (
 
   const syncFiles = async (
     value: BrowserProjectRuntime,
-    snapshot: BrowserProjectSnapshot
+    snapshot: ExecutableProjectSnapshot
   ): Promise<void> => {
     if (!mounted) {
       await value.mount(createBrowserProjectFileTree(snapshot.files));
@@ -392,7 +373,7 @@ export const createBrowserProjectRuntimeHost = (
 
   const spawnOwnedProcess = async (
     ownerValue: string,
-    command: BrowserProjectCommand,
+    command: ExecutableProjectCommand,
     spawnOptions: Readonly<{
       label?: string;
       kind?: 'command' | 'server';
@@ -445,7 +426,7 @@ export const createBrowserProjectRuntimeHost = (
 
   const spawn = (
     ownerValue: string,
-    command: BrowserProjectCommand,
+    command: ExecutableProjectCommand,
     spawnOptions: Readonly<{
       lease: BrowserProjectRuntimeHostLease;
       label?: string;
@@ -484,7 +465,7 @@ export const createBrowserProjectRuntimeHost = (
 
   const prepare = (
     ownerValue: string,
-    snapshot: BrowserProjectSnapshot
+    snapshot: ExecutableProjectSnapshot
   ): Promise<BrowserProjectRuntimeHostPrepareResult> => {
     const ownerId = normalizeOwnerId(ownerValue);
     return enqueue(async () => {
@@ -495,6 +476,7 @@ export const createBrowserProjectRuntimeHost = (
       const dependencyFingerprint = projectDependencyFingerprint(snapshot);
       const fileFingerprint = projectFileFingerprint(snapshot);
       const dependenciesChanged =
+        snapshot.cacheHints.dependencyInstall === 'isolated' ||
         dependencyFingerprint !== installedDependencyFingerprint;
       const filesChanged = fileFingerprint !== preparedProjectFingerprint;
       const foreignOwners = [...processesByOwner.keys()].filter(
@@ -535,8 +517,8 @@ export const createBrowserProjectRuntimeHost = (
       const lease = Object.freeze({
         ownerId,
         generation: leaseGeneration,
-        workspaceId: snapshot.workspaceId,
-        snapshotId: snapshot.snapshotId,
+        workspaceId: snapshot.workspace.workspaceId,
+        snapshotId: snapshot.workspace.snapshotId,
       });
       activeLease = lease;
       return Object.freeze({
@@ -557,21 +539,21 @@ export const createBrowserProjectRuntimeHost = (
     mkdir: (path, lease) =>
       enqueue(async () => {
         assertLease(lease.ownerId, lease);
-        const normalized = normalizeBrowserProjectPath(path);
+        const normalized = normalizeExecutableProjectPath(path);
         const value = await resolveRuntime();
         await value.mkdir(normalized);
       }),
     readFile: (path, lease) =>
       enqueue(async () => {
         assertLease(lease.ownerId, lease);
-        const normalized = normalizeBrowserProjectPath(path);
+        const normalized = normalizeExecutableProjectPath(path);
         const value = await resolveRuntime();
         return value.readFile(normalized);
       }),
     remove: (path, lease) =>
       enqueue(async () => {
         assertLease(lease.ownerId, lease);
-        const normalized = normalizeBrowserProjectPath(path);
+        const normalized = normalizeExecutableProjectPath(path);
         if (
           [...managedFiles.keys()].some(
             (candidate) =>

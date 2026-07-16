@@ -1,0 +1,103 @@
+name: G2 Rootless Sandbox
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'apps/remote-runner-worker/**'
+      - 'packages/runtime-core/**'
+      - 'packages/runtime-remote/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig*.json'
+      - '.github/workflows/g2-rootless-sandbox.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/remote-runner-worker/**'
+      - 'packages/runtime-core/**'
+      - 'packages/runtime-remote/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig*.json'
+      - '.github/workflows/g2-rootless-sandbox.yml'
+
+concurrency:
+  group: g2-rootless-sandbox-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  rootless-podman:
+    name: Rootless Podman Isolation Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install rootless Podman
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes podman uidmap slirp4netns fuse-overlayfs
+
+          runner_user="$(id --user --name)"
+          runner_uid="$(id --user)"
+          grep --quiet "^${runner_user}:" /etc/subuid || sudo usermod --add-subuids 100000-165535 "${runner_user}"
+          grep --quiet "^${runner_user}:" /etc/subgid || sudo usermod --add-subgids 100000-165535 "${runner_user}"
+
+          sudo loginctl enable-linger "${runner_user}"
+          sudo systemctl start "user@${runner_uid}.service"
+          runtime_dir="/run/user/${runner_uid}"
+          test -S "${runtime_dir}/bus"
+          echo "XDG_RUNTIME_DIR=${runtime_dir}" >> "${GITHUB_ENV}"
+          echo "DBUS_SESSION_BUS_ADDRESS=unix:path=${runtime_dir}/bus" >> "${GITHUB_ENV}"
+
+          mkdir --parents "${HOME}/.config/containers"
+          printf '[engine]\ncgroup_manager="systemd"\nevents_logger="file"\n' > "${HOME}/.config/containers/containers.conf"
+
+      - name: Verify rootless engine
+        shell: bash
+        run: |
+          test "$(id --user)" -ne 0
+          podman system migrate
+          test "$(podman info --format '{{.Host.Security.Rootless}}')" = 'true'
+          podman info --format json > rootless-podman-info.json
+
+      - name: Run isolation Gate
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm run verify:g2:rootless-sandbox | tee rootless-sandbox-gate.jsonl
+
+      - name: Upload Gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: g2-rootless-sandbox-evidence
+          path: |
+            rootless-podman-info.json
+            rootless-sandbox-gate.jsonl
+          if-no-files-found: warn
+          retention-days: 14

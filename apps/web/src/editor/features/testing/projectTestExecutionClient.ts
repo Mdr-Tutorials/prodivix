@@ -1,8 +1,9 @@
-import {
-  createBrowserProjectTestRunner,
-  type BrowserProjectSnapshot,
-} from '@prodivix/runtime-browser';
-import type { ExecutionJob, ExecutionRequest } from '@prodivix/runtime-core';
+import { createBrowserProjectTestRunner } from '@prodivix/runtime-browser';
+import type {
+  ExecutableProjectSnapshot,
+  ExecutionJob,
+  ExecutionRequest,
+} from '@prodivix/runtime-core';
 import {
   browserProjectRuntimeHost,
   executionSessionCoordinator,
@@ -23,7 +24,7 @@ const runner = createBrowserProjectTestRunner({
 });
 
 export const startProjectTests = async (
-  snapshot: BrowserProjectSnapshot,
+  snapshot: ExecutableProjectSnapshot,
   request: ExecutionRequest
 ): Promise<ExecutionJob> => {
   const releaseSnapshot = retainBrowserProjectExecutionSnapshot(snapshot);
@@ -36,7 +37,7 @@ export const startProjectTests = async (
   }
   void job.completion.finally(releaseSnapshot);
   executionSessionCoordinator.activate({
-    sessionId: getProjectTestExecutionSessionId(snapshot.workspaceId),
+    sessionId: getProjectTestExecutionSessionId(snapshot.workspace.workspaceId),
     label: 'Workspace Tests',
     job,
   });

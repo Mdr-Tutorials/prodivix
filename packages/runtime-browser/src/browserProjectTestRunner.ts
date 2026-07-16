@@ -1,5 +1,6 @@
 import {
   EXECUTION_TEST_REPORT_TRACE_NAME,
+  assertExecutableProjectCapabilitySupport,
   createExecutionJobController,
   createExecutionProviderDescriptor,
   getExecutionProviderCompatibility,
@@ -11,12 +12,8 @@ import {
   type ExecutionRequest,
   type ExecutionSourceTrace,
   type ExecutionTestReport,
+  type ExecutableProjectSnapshot,
 } from '@prodivix/runtime-core';
-import {
-  createBrowserProjectSnapshot,
-  type BrowserProjectSnapshot,
-  type BrowserProjectSnapshotInput,
-} from './browserProject';
 import type {
   BrowserProjectRuntimeFactory,
   WebContainerRuntimeOptions,
@@ -32,10 +29,7 @@ export const BROWSER_PROJECT_TEST_EXECUTION_PROVIDER_ID =
 
 export type ResolveBrowserProjectTestSnapshot = (
   request: ExecutionRequest
-) =>
-  | BrowserProjectSnapshot
-  | BrowserProjectSnapshotInput
-  | Promise<BrowserProjectSnapshot | BrowserProjectSnapshotInput>;
+) => ExecutableProjectSnapshot | Promise<ExecutableProjectSnapshot>;
 
 export type BrowserProjectTestRunnerOptions = Readonly<{
   resolveProject: ResolveBrowserProjectTestSnapshot;
@@ -122,7 +116,7 @@ const reportSourceTrace = (
   ]);
 
 const resolveSnapshotFileSourceTrace = (
-  snapshot: BrowserProjectSnapshot,
+  snapshot: ExecutableProjectSnapshot,
   reportedPath: string,
   fallback: readonly ExecutionSourceTrace[]
 ): readonly ExecutionSourceTrace[] => {
@@ -311,13 +305,18 @@ export const createBrowserProjectTestRunner = (
     try {
       const resolved = await options.resolveProject(request);
       if (!isJobRunnable(controller)) return;
-      const snapshot = createBrowserProjectSnapshot(resolved);
+      const snapshot = resolved;
+      assertExecutableProjectCapabilitySupport(
+        snapshot,
+        'test',
+        providerDescriptor.capabilities
+      );
       if (
-        snapshot.workspaceId !== request.workspace.workspaceId ||
-        snapshot.snapshotId !== request.workspace.snapshotId
+        snapshot.workspace.workspaceId !== request.workspace.workspaceId ||
+        snapshot.workspace.snapshotId !== request.workspace.snapshotId
       ) {
         throw new Error(
-          'Resolved browser project identity does not match the test execution request.'
+          'Resolved executable project identity does not match the test execution request.'
         );
       }
       emitLog(controller, 'Preparing the project test snapshot.');

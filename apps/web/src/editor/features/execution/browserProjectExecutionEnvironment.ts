@@ -1,11 +1,9 @@
-import {
-  createBrowserProjectRuntimeHost,
-  type BrowserProjectSnapshot,
-} from '@prodivix/runtime-browser';
+import { createBrowserProjectRuntimeHost } from '@prodivix/runtime-browser';
+import type { ExecutableProjectSnapshot } from '@prodivix/runtime-core';
 
 type RetainedSnapshot = {
   references: number;
-  snapshot: BrowserProjectSnapshot;
+  snapshot: ExecutableProjectSnapshot;
 };
 
 const snapshots = new Map<string, RetainedSnapshot>();
@@ -13,49 +11,20 @@ const snapshots = new Map<string, RetainedSnapshot>();
 const snapshotKey = (workspaceId: string, snapshotId: string): string =>
   JSON.stringify([workspaceId, snapshotId]);
 
-const contentsEqual = (
-  left: string | Uint8Array,
-  right: string | Uint8Array
-): boolean => {
-  if (typeof left === 'string' || typeof right === 'string') {
-    return (
-      typeof left === 'string' && typeof right === 'string' && left === right
-    );
-  }
-  return (
-    left.byteLength === right.byteLength &&
-    left.every((value, index) => value === right[index])
-  );
-};
-
 const snapshotsEqual = (
-  left: BrowserProjectSnapshot,
-  right: BrowserProjectSnapshot
+  left: ExecutableProjectSnapshot,
+  right: ExecutableProjectSnapshot
 ): boolean =>
-  left.workspaceId === right.workspaceId &&
-  left.snapshotId === right.snapshotId &&
-  JSON.stringify(left.installCommand) ===
-    JSON.stringify(right.installCommand) &&
-  JSON.stringify(left.startCommand) === JSON.stringify(right.startCommand) &&
-  JSON.stringify(left.testPlan) === JSON.stringify(right.testPlan) &&
-  left.files.length === right.files.length &&
-  left.files.every((file, index) => {
-    const candidate = right.files[index];
-    return (
-      candidate !== undefined &&
-      file.path === candidate.path &&
-      contentsEqual(file.contents, candidate.contents) &&
-      JSON.stringify(file.sourceTrace ?? []) ===
-        JSON.stringify(candidate.sourceTrace ?? [])
-    );
-  });
+  left.workspace.workspaceId === right.workspace.workspaceId &&
+  left.workspace.snapshotId === right.workspace.snapshotId &&
+  left.contentDigest === right.contentDigest;
 
 export const browserProjectRuntimeHost = createBrowserProjectRuntimeHost();
 
 export const resolveBrowserProjectExecutionSnapshot = (
   workspaceId: string,
   snapshotId: string
-): BrowserProjectSnapshot => {
+): ExecutableProjectSnapshot => {
   const retained = snapshots.get(snapshotKey(workspaceId, snapshotId));
   if (!retained) {
     throw new Error(
@@ -67,14 +36,17 @@ export const resolveBrowserProjectExecutionSnapshot = (
 
 /** Keeps an immutable project snapshot alive for exactly as long as its jobs. */
 export const retainBrowserProjectExecutionSnapshot = (
-  snapshot: BrowserProjectSnapshot
+  snapshot: ExecutableProjectSnapshot
 ): (() => void) => {
-  const key = snapshotKey(snapshot.workspaceId, snapshot.snapshotId);
+  const key = snapshotKey(
+    snapshot.workspace.workspaceId,
+    snapshot.workspace.snapshotId
+  );
   const current = snapshots.get(key);
   if (current) {
     if (!snapshotsEqual(current.snapshot, snapshot)) {
       throw new Error(
-        `Executable project snapshot identity was reused with different content: ${snapshot.snapshotId}`
+        `Executable project snapshot identity was reused with different content: ${snapshot.workspace.snapshotId}`
       );
     }
     current.references += 1;
