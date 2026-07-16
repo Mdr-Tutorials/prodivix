@@ -175,8 +175,8 @@ export const createRootlessPodmanRunArguments = (
     `--pids-limit=${input.pids}`,
     `--ulimit=nofile=${input.openFiles}:${input.openFiles}`,
     '--ulimit=core=0:0',
-    `--tmpfs=/workspace:rw,nosuid,nodev,size=${input.diskMb}m,mode=0700,uid=${input.uid},gid=${input.gid}`,
-    `--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=${input.temporaryDirectoryMb}m,mode=0700,uid=${input.uid},gid=${input.gid}`,
+    `--tmpfs=/workspace:rw,nosuid,nodev,size=${input.diskMb}m,mode=0777`,
+    `--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=${input.temporaryDirectoryMb}m,mode=1777`,
     '--workdir=/workspace',
     input.imageReference,
   ]);
@@ -286,6 +286,16 @@ const normalizeInstallNetworkPolicy = (
     proxyContainerName: policy.proxyContainerName,
     allowedHosts,
   });
+};
+
+export const createRootlessInstallProxyUrl = (
+  proxyUrl: string,
+  traceId: string
+): string => {
+  const url = new URL(proxyUrl);
+  url.username = traceId;
+  url.password = 'prodivix-sandbox';
+  return url.toString();
 };
 
 const assertInstallProxyPolicy = async (
@@ -449,6 +459,37 @@ const assertContainerHasNoNetwork = async (
   );
   if (stdout.trim())
     throw new Error('Sandbox runtime network isolation could not be verified.');
+};
+
+const disconnectContainerNetwork = async (
+  podmanCommand: string,
+  networkName: string,
+  containerName: string
+): Promise<void> => {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    try {
+      await execFileAsync(
+        podmanCommand,
+        ['network', 'disconnect', '--force', networkName, containerName],
+        { env: podmanProcessEnvironment() }
+      );
+    } catch (error) {
+      lastError = error;
+    }
+    try {
+      await assertContainerHasNoNetwork(podmanCommand, containerName);
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+    await new Promise((resolveDelay) =>
+      setTimeout(resolveDelay, stopRetryIntervalMs)
+    );
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('Sandbox runtime network isolation failed.');
 };
 
 const exactRecord = (
@@ -630,7 +671,10 @@ export const decodeRootlessPodmanSandboxResult = (
       (record.exitCode === 0
         ? record.artifacts.length !== 1
         : record.artifacts.length !== 0)) ||
-    (profile === 'test' && record.artifacts.length !== 1) ||
+    (profile === 'test' &&
+      (record.exitCode === 0
+        ? record.artifacts.length !== 1
+        : record.artifacts.length > 1)) ||
     (profile === 'preview' &&
       (record.exitCode === 0
         ? record.artifacts.length !== 1
@@ -856,11 +900,10 @@ export const createRootlessPodmanSandbox = (
         await assertInstallProxyPolicy(podmanCommand, installNetworkPolicy);
       const installProxyUrl =
         installNetworkPolicy.mode === 'proxy-allowlist'
-          ? (() => {
-              const url = new URL(installNetworkPolicy.proxyUrl);
-              url.username = installTraceId;
-              return url.toString();
-            })()
+          ? createRootlessInstallProxyUrl(
+              installNetworkPolicy.proxyUrl,
+              installTraceId
+            )
           : undefined;
       const args = createRootlessPodmanRunArguments({
         name,
@@ -960,18 +1003,11 @@ export const createRootlessPodmanSandbox = (
         if (!controlBuffer.includes(installCompleteMarker)) return;
         phaseIsolationTask = (async () => {
           try {
-            await execFileAsync(
+            await disconnectContainerNetwork(
               podmanCommand,
-              [
-                'network',
-                'disconnect',
-                '--force',
-                installNetworkPolicy.networkName,
-                name,
-              ],
-              { env: podmanProcessEnvironment() }
+              installNetworkPolicy.networkName,
+              name
             );
-            await assertContainerHasNoNetwork(podmanCommand, name);
             child.stdin.end(`${continueExecutionToken}\n`);
           } catch {
             phaseIsolationFailure = true;
@@ -1059,12 +1095,17 @@ export const createRootlessPodmanSandbox = (
             stderr: redact(result.stderr, input.redactValues),
             ...(networkTraces.length ? { networkTraces } : {}),
           });
-        } catch {
+        } catch (error) {
+          const detail =
+            error instanceof Error ? error.message : 'Unknown decoder error.';
           return Object.freeze({
             status: 'failed',
             exitCode: 125,
             stdout: '',
-            stderr: 'Sandbox returned an invalid result envelope.',
+            stderr: redact(
+              `Sandbox returned an invalid result envelope: ${detail}`,
+              input.redactValues
+            ),
             outputTruncated: output.truncated,
             reason: 'invalid-sandbox-result',
           });

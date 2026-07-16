@@ -1,6 +1,13 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { lstat, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import {
+  lstat,
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { createInterface } from 'node:readline';
 
@@ -315,26 +322,64 @@ try {
       throw new TypeError('Sandbox public environment entry is invalid.');
     environment[entry.name] = entry.value;
   }
+  const installEnvironment = { ...environment };
+  for (const name of ['HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY']) {
+    if (typeof process.env[name] === 'string')
+      installEnvironment[name] = process.env[name];
+  }
+  const installCachePaths = [
+    '/tmp/.prodivix-npm-cache',
+    '/tmp/.prodivix-pnpm-store',
+    '/tmp/.prodivix-yarn-cache',
+    '/tmp/.prodivix-bun-cache',
+  ];
+  Object.assign(installEnvironment, {
+    npm_config_cache: installCachePaths[0],
+    npm_config_store_dir: installCachePaths[1],
+    YARN_CACHE_FOLDER: installCachePaths[2],
+    BUN_INSTALL_CACHE_DIR: installCachePaths[3],
+  });
   const installExitCode = await run(
     command(payload.installCommand),
-    environment,
+    installEnvironment,
     append
   );
   if (installExitCode !== 0) {
     controlLines.close();
     emitResult(installExitCode, output);
   } else {
+    await Promise.all(
+      installCachePaths.map((path) =>
+        rm(path, { recursive: true, force: true })
+      )
+    );
     await awaitExecutionPermission();
     const exitCode = await run(command(payload.command), environment, append);
-    const artifacts =
-      payload.profile === 'preview' && exitCode === 0
-        ? [await createPreviewArtifact(payload, maximumArtifactBytes)]
-        : payload.profile === 'build' && exitCode === 0
-          ? [await createBuildArtifact(payload, maximumArtifactBytes)]
-          : payload.profile === 'test'
-            ? [await createTestArtifact(payload, maximumArtifactBytes)]
-            : [];
-    emitResult(exitCode, output, artifacts);
+    let resultExitCode = exitCode;
+    let artifacts = [];
+    if (payload.profile === 'preview' && exitCode === 0)
+      artifacts = [await createPreviewArtifact(payload, maximumArtifactBytes)];
+    else if (payload.profile === 'build' && exitCode === 0)
+      artifacts = [await createBuildArtifact(payload, maximumArtifactBytes)];
+    else if (payload.profile === 'test') {
+      try {
+        artifacts = [await createTestArtifact(payload, maximumArtifactBytes)];
+      } catch (error) {
+        if (exitCode === 0) {
+          resultExitCode = 125;
+          append(
+            'stderr',
+            Buffer.from(
+              `Sandbox Test report capture failed: ${
+                error instanceof Error ? error.message : 'Unknown error.'
+              }\n`,
+              'utf8'
+            )
+          );
+        }
+      }
+    }
+    emitResult(resultExitCode, output, artifacts);
   }
 } catch {
   controlLines.close();

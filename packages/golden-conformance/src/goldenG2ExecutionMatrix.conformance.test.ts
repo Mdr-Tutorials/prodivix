@@ -36,6 +36,22 @@ describe('G2 Golden Browser/Remote execution contract matrix', () => {
         'src/components/component-order-summary/GoldenOrderSummary.tsx',
       ])
     );
+    const packageFile = matrix.snapshot.files.find(
+      (file) => file.path === 'package.json'
+    );
+    const checkoutModule = matrix.snapshot.files.find(
+      (file) => file.path === 'src/components/page-checkout/GoldenCheckout.tsx'
+    );
+    const readFile = (contents: string | Uint8Array) =>
+      typeof contents === 'string'
+        ? contents
+        : new TextDecoder().decode(contents);
+    expect(JSON.parse(readFile(packageFile?.contents ?? ''))).toMatchObject({
+      dependencies: { antd: '5.28.0' },
+    });
+    expect(readFile(checkoutModule?.contents ?? '')).toContain(
+      "import { Button } from 'antd';"
+    );
     expect(matrix.browser.mountedFilePaths).toEqual(
       projectExecutableProjectRuntimeFiles(matrix.snapshot)
         .map((file) => file.path)

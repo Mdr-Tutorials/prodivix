@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createRootlessPodmanRunArguments,
   createRootlessPodmanSandbox,
+  createRootlessInstallProxyUrl,
   decodeRootlessInstallProxyTraces,
   decodeRootlessPodmanSandboxResult,
   verifyRootlessPodmanEngine,
@@ -87,7 +88,12 @@ describe('rootless Podman sandbox contract', () => {
         '--ulimit=nofile=128:128',
         '--ulimit=core=0:0',
         '--log-driver=none',
+        '--tmpfs=/workspace:rw,nosuid,nodev,size=64m,mode=0777',
+        '--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=32m,mode=1777',
       ])
+    );
+    expect(args.some((arg) => /(?:^|,)uid=|(?:^|,)gid=/u.test(arg))).toBe(
+      false
     );
     expect(args.some((arg) => arg === '-v' || arg.startsWith('--volume'))).toBe(
       false
@@ -102,6 +108,14 @@ describe('rootless Podman sandbox contract', () => {
   });
 
   it('connects install only to an internal allowlist proxy without inheriting host environment', () => {
+    expect(
+      createRootlessInstallProxyUrl(
+        'http://prodivix-install-proxy:8080/',
+        'install-trace-1234'
+      )
+    ).toBe(
+      'http://install-trace-1234:prodivix-sandbox@prodivix-install-proxy:8080/'
+    );
     const args = createRootlessPodmanRunArguments({
       name: 'prodivix-gate',
       imageReference: `sha256:${'a'.repeat(64)}`,
@@ -471,6 +485,29 @@ describe('rootless Podman sandbox contract', () => {
       status: 'passed',
       completedAt: 2_000,
       summary: { totalFiles: 1, totalCases: 1 },
+    });
+
+    expect(
+      decodeRootlessPodmanSandboxResult(
+        JSON.stringify({
+          protocol: 'prodivix.sandbox-result.v1',
+          exitCode: 2,
+          stdout: Buffer.from('vitest configuration failed').toString('base64'),
+          stderr: '',
+          outputTruncated: false,
+          artifacts: [],
+        }),
+        snapshot,
+        'test',
+        2_000,
+        1_000,
+        128 * 1024
+      )
+    ).toMatchObject({
+      status: 'failed',
+      exitCode: 2,
+      stdout: 'vitest configuration failed',
+      artifacts: [],
     });
   });
 });

@@ -3,7 +3,6 @@ import {
   createExecutableProjectSnapshot,
   DEFAULT_EXECUTABLE_PROJECT_TEST_REPORT_PATH,
   type ExecutableProjectCommand,
-  type ExecutableProjectDataMockProvision,
   type ExecutableProjectSnapshot,
   type ExecutionSourceTrace,
   type ExecutionWorkspaceSnapshotRef,
@@ -11,7 +10,10 @@ import {
 import type { WorkspaceSnapshot } from '@prodivix/workspace';
 import type { CompileDiagnostic } from '#src/core/diagnostics';
 import type { ExportSourceTrace } from '#src/export/types';
-import { generateWorkspaceReactViteBundle } from '#src/react/workspaceProject';
+import {
+  generateWorkspaceReactViteBundle,
+  type WorkspaceReactViteCompileOptions,
+} from '#src/react/workspaceProject';
 
 export type WorkspaceExecutableProjectResult =
   | Readonly<{
@@ -23,9 +25,8 @@ export type WorkspaceExecutableProjectResult =
       diagnostics: readonly CompileDiagnostic[];
     }>;
 
-export type GenerateWorkspaceExecutableProjectOptions = Readonly<{
-  dataMockProvision?: ExecutableProjectDataMockProvision;
-}>;
+export type GenerateWorkspaceExecutableProjectOptions =
+  WorkspaceReactViteCompileOptions;
 
 type PackageManagerName = 'npm' | 'pnpm' | 'yarn' | 'bun';
 
@@ -68,6 +69,18 @@ const packageManagerCommand = (
         command: 'corepack',
         args: Object.freeze([packageManager, ...args]),
       });
+
+const packageManagerRunArguments = (
+  packageManager: PackageManagerName,
+  script: string,
+  args: readonly string[] = []
+): readonly string[] =>
+  Object.freeze([
+    'run',
+    script,
+    ...(packageManager === 'npm' && args.length ? ['--'] : []),
+    ...args,
+  ]);
 
 const executionTargetRef = (
   trace: ExportSourceTrace,
@@ -144,11 +157,7 @@ export const generateWorkspaceReactViteExecutableProject = (
   workspace: WorkspaceSnapshot,
   options: GenerateWorkspaceExecutableProjectOptions = {}
 ): WorkspaceExecutableProjectResult => {
-  const bundle = generateWorkspaceReactViteBundle(workspace, {
-    ...(options.dataMockProvision
-      ? { dataMockProvision: options.dataMockProvision }
-      : {}),
-  });
+  const bundle = generateWorkspaceReactViteBundle(workspace, options);
   const blockingDiagnostics =
     bundle.metadata?.blockingDiagnostics ??
     bundle.diagnostics.filter((diagnostic) => diagnostic.severity === 'error');
@@ -222,31 +231,34 @@ export const generateWorkspaceReactViteExecutableProject = (
       'install',
       ...(packageManager === 'pnpm' ? ['--no-frozen-lockfile'] : []),
     ]),
-    previewCommand: packageManagerCommand(packageManager, [
-      'run',
-      'dev',
-      '--',
-      '--host',
-      '0.0.0.0',
-    ]),
-    buildCommand: packageManagerCommand(packageManager, ['run', 'build']),
+    previewCommand: packageManagerCommand(
+      packageManager,
+      packageManagerRunArguments(packageManager, 'dev', ['--host', '0.0.0.0'])
+    ),
+    buildCommand: packageManagerCommand(
+      packageManager,
+      packageManagerRunArguments(packageManager, 'build')
+    ),
     previewPlan: {
       mode: 'static-bundle',
-      command: packageManagerCommand(packageManager, ['run', 'build']),
+      command: packageManagerCommand(
+        packageManager,
+        packageManagerRunArguments(packageManager, 'build')
+      ),
       outputDirectoryPath: 'dist',
       entryFilePath: 'index.html',
     },
     buildPlan: { outputDirectoryPath: 'dist' },
     testPlan: {
       framework: 'vitest',
-      command: packageManagerCommand(packageManager, [
-        'run',
-        'test',
-        '--',
-        '--reporter=default',
-        '--reporter=json',
-        `--outputFile.json=${DEFAULT_EXECUTABLE_PROJECT_TEST_REPORT_PATH}`,
-      ]),
+      command: packageManagerCommand(
+        packageManager,
+        packageManagerRunArguments(packageManager, 'test', [
+          '--reporter=default',
+          '--reporter=json',
+          `--outputFile.json=${DEFAULT_EXECUTABLE_PROJECT_TEST_REPORT_PATH}`,
+        ])
+      ),
       reportFilePath: DEFAULT_EXECUTABLE_PROJECT_TEST_REPORT_PATH,
     },
   });

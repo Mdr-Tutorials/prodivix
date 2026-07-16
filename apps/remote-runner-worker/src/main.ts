@@ -51,7 +51,7 @@ const sandbox =
           maximumDiskMb: integer('REMOTE_WORKER_MAX_DISK_MB', 4_096),
           maximumPids: integer('REMOTE_WORKER_MAX_PIDS', 256),
           maximumOpenFiles: integer('REMOTE_WORKER_MAX_OPEN_FILES', 1_024),
-          temporaryDirectoryMb: integer('REMOTE_WORKER_TMP_MB', 256),
+          temporaryDirectoryMb: integer('REMOTE_WORKER_TMP_MB', 1_024),
           maximumArtifactBytes: integer(
             'REMOTE_WORKER_MAX_ARTIFACT_BYTES',
             64 * 1024 * 1024

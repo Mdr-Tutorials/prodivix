@@ -8,6 +8,7 @@ import {
 import { parseVitestExecutionTestReport } from '@prodivix/runtime-vitest';
 import { generateWorkspaceReactViteExecutableProject } from '@prodivix/prodivix-compiler';
 import { authorGoldenWorkspace } from './goldenAuthoring';
+import { GOLDEN_CODEGEN_POLICY } from './goldenApp.fixture';
 
 export const GOLDEN_G2_REPORT_PATH = '.prodivix/test-report.json';
 export const GOLDEN_G2_BROWSER_PREVIEW_URL =
@@ -58,6 +59,7 @@ export const createGoldenG2ExecutableSnapshot =
   (): ExecutableProjectSnapshot => {
     const workspace = authorGoldenWorkspace().editedWorkspace;
     const executable = generateWorkspaceReactViteExecutableProject(workspace, {
+      codegenPolicySnapshot: GOLDEN_CODEGEN_POLICY,
       dataMockProvision: GOLDEN_G2_DATA_MOCK_PROVISION,
     });
     if (executable.status === 'blocked')

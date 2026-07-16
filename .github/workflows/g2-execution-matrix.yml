@@ -62,5 +62,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build TypeScript project references
+        run: pnpm exec tsc -b --pretty false
+
       - name: Run Golden execution contract matrix
         run: pnpm run verify:g2:execution-matrix

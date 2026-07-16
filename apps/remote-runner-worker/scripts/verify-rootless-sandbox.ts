@@ -45,13 +45,16 @@ const command = async (args: readonly string[]): Promise<string> => {
 };
 
 const immutableImageId = async (reference: string): Promise<string> => {
-  const id = await command([
+  const inspected = await command([
     'image',
     'inspect',
     '--format',
     '{{.Id}}',
     reference,
   ]);
+  const id = /^[a-f0-9]{64}$/u.test(inspected)
+    ? `sha256:${inspected}`
+    : inspected;
   if (!/^sha256:[a-f0-9]{64}$/u.test(id))
     throw new Error(`Container image has no immutable digest: ${reference}.`);
   return id;
@@ -278,11 +281,11 @@ const sandbox = createRootlessPodmanSandbox({
   },
   limits: {
     maximumCpuCores: 1,
-    maximumMemoryMb: 1_024,
+    maximumMemoryMb: 2_048,
     maximumDiskMb: 1_024,
     maximumPids: 128,
     maximumOpenFiles: 1_024,
-    temporaryDirectoryMb: 256,
+    temporaryDirectoryMb: 1_024,
     maximumArtifactBytes: 64 * 1024 * 1024,
   },
 });
@@ -430,7 +433,13 @@ const executeGolden = async (profile: 'preview' | 'test' | 'build') => {
   });
   if (result.status !== 'succeeded')
     throw new Error(
-      `Golden rootless ${profile} failed: ${result.stderr || result.stdout}`
+      `Golden rootless ${profile} failed ${JSON.stringify({
+        status: result.status,
+        exitCode: result.exitCode,
+        reason: result.reason,
+        outputTruncated: result.outputTruncated,
+        artifactCount: result.artifacts?.length ?? 0,
+      })}:\n${[result.stderr, result.stdout].filter(Boolean).join('\n')}`
     );
   if (result.artifacts?.length !== 1)
     throw new Error(`Golden rootless ${profile} produced no exact artifact.`);
@@ -477,11 +486,29 @@ if (
   throw new Error('Golden rootless Build drifted from its exact snapshot.');
 const bundleFacts = (files: typeof goldenBuildBundle.files) =>
   files.map(({ path, size, digest }) => ({ path, size, digest }));
+const dataMockBundlePath = '.prodivix/data-mock-provision.json';
+const previewDataMock = goldenPreviewBundle.files.find(
+  ({ path }) => path === dataMockBundlePath
+);
+const buildDataMock = goldenBuildBundle.files.find(
+  ({ path }) => path === dataMockBundlePath
+);
+if (!previewDataMock || buildDataMock)
+  throw new Error(
+    'Golden rootless profile-specific Data mock projection is invalid.'
+  );
 if (
-  JSON.stringify(bundleFacts(goldenPreviewBundle.files)) !==
-  JSON.stringify(bundleFacts(goldenBuildBundle.files))
+  JSON.stringify(
+    bundleFacts(
+      goldenPreviewBundle.files.filter(
+        ({ path }) => path !== dataMockBundlePath
+      )
+    )
+  ) !== JSON.stringify(bundleFacts(goldenBuildBundle.files))
 )
-  throw new Error('Golden rootless Preview and Build output facts diverged.');
+  throw new Error(
+    'Golden rootless Preview and Build shared output facts diverged.'
+  );
 
 const goldenTest = await executeGolden('test');
 const goldenTestArtifact = goldenTest.artifact;

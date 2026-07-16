@@ -221,6 +221,23 @@ describe('standalone domain export conformance', () => {
         command: 'corepack',
         args: ['pnpm', 'run', 'build'],
       },
+      previewCommand: {
+        command: 'corepack',
+        args: ['pnpm', 'run', 'dev', '--host', '0.0.0.0'],
+      },
+      testPlan: {
+        command: {
+          command: 'corepack',
+          args: [
+            'pnpm',
+            'run',
+            'test',
+            '--reporter=default',
+            '--reporter=json',
+            '--outputFile.json=.prodivix/test-report.json',
+          ],
+        },
+      },
       buildPlan: { outputDirectoryPath: 'dist' },
       previewPlan: {
         mode: 'static-bundle',
