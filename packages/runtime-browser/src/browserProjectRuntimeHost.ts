@@ -2,6 +2,7 @@ import {
   normalizeExecutableProjectPath,
   projectExecutableProjectRuntimeFiles,
   type ExecutableProjectCommand,
+  type ExecutableProjectEntrypointKind,
   type ExecutableProjectSnapshot,
 } from '@prodivix/runtime-core';
 import { createBrowserProjectFileTree } from './browserProjectFileTree';
@@ -66,7 +67,8 @@ export type BrowserProjectRuntimeHostPrepareResult = Readonly<{
 export type BrowserProjectRuntimeHost = Readonly<{
   prepare(
     ownerId: string,
-    snapshot: ExecutableProjectSnapshot
+    snapshot: ExecutableProjectSnapshot,
+    operation?: ExecutableProjectEntrypointKind
   ): Promise<BrowserProjectRuntimeHostPrepareResult>;
   spawn(
     ownerId: string,
@@ -176,9 +178,12 @@ const projectDependencyFingerprint = (
   snapshot: ExecutableProjectSnapshot
 ): string => snapshot.dependencyPlan.installFingerprint;
 
-const projectFileFingerprint = (snapshot: ExecutableProjectSnapshot): string =>
+const projectFileFingerprint = (
+  snapshot: ExecutableProjectSnapshot,
+  operation?: ExecutableProjectEntrypointKind
+): string =>
   JSON.stringify(
-    projectExecutableProjectRuntimeFiles(snapshot).map((file) => [
+    projectExecutableProjectRuntimeFiles(snapshot, operation).map((file) => [
       file.path,
       contentFingerprint(file.contents),
     ])
@@ -289,9 +294,13 @@ export const createBrowserProjectRuntimeHost = (
 
   const syncFiles = async (
     value: BrowserProjectRuntime,
-    snapshot: ExecutableProjectSnapshot
+    snapshot: ExecutableProjectSnapshot,
+    operation?: ExecutableProjectEntrypointKind
   ): Promise<void> => {
-    const runtimeFiles = projectExecutableProjectRuntimeFiles(snapshot);
+    const runtimeFiles = projectExecutableProjectRuntimeFiles(
+      snapshot,
+      operation
+    );
     if (!mounted) {
       await value.mount(createBrowserProjectFileTree(runtimeFiles));
       mounted = true;
@@ -470,7 +479,8 @@ export const createBrowserProjectRuntimeHost = (
 
   const prepare = (
     ownerValue: string,
-    snapshot: ExecutableProjectSnapshot
+    snapshot: ExecutableProjectSnapshot,
+    operation?: ExecutableProjectEntrypointKind
   ): Promise<BrowserProjectRuntimeHostPrepareResult> => {
     const ownerId = normalizeOwnerId(ownerValue);
     return enqueue(async () => {
@@ -479,7 +489,7 @@ export const createBrowserProjectRuntimeHost = (
       }
       activeLease = undefined;
       const dependencyFingerprint = projectDependencyFingerprint(snapshot);
-      const fileFingerprint = projectFileFingerprint(snapshot);
+      const fileFingerprint = projectFileFingerprint(snapshot, operation);
       const dependenciesChanged =
         snapshot.cacheHints.dependencyInstall === 'isolated' ||
         dependencyFingerprint !== installedDependencyFingerprint;
@@ -494,7 +504,7 @@ export const createBrowserProjectRuntimeHost = (
         await stopOwner(ownerId);
       }
       const value = await resolveRuntime();
-      await syncFiles(value, snapshot);
+      await syncFiles(value, snapshot, operation);
       preparedProjectFingerprint = fileFingerprint;
       if (dependenciesChanged) {
         publish({

@@ -646,14 +646,31 @@ const workspaceRoutes = [
 ${routeTable}
 ] as const;
 
+const workspaceDataRuntime = createWorkspaceDataRuntime();
+
 const workspacePirRuntime = {
-  ...createWorkspaceDataRuntime(),
-  dispatchTrigger(input: Readonly<{ binding: unknown }>) {
+  ...workspaceDataRuntime,
+  dispatchTrigger(input: Readonly<{
+    binding: unknown;
+    payload: unknown;
+    runtimeValuesById: Readonly<Record<string, unknown>>;
+    source: Readonly<{ documentId: string; nodeId: string; eventName: string; instancePath: string }>;
+  }>) {
     const binding = input.binding && typeof input.binding === 'object'
       ? input.binding as Readonly<Record<string, unknown>>
       : undefined;
     if (binding?.kind === 'open-url' && typeof binding.href === 'string' && typeof window !== 'undefined') {
       window.open(binding.href, '_blank', 'noopener,noreferrer');
+    }
+    if (binding?.kind === 'dispatch-data-operation') {
+      void workspaceDataRuntime.dispatchDataMutation({
+        binding: input.binding as Parameters<typeof workspaceDataRuntime.dispatchDataMutation>[0]['binding'],
+        payload: input.payload,
+        runtimeValuesById: input.runtimeValuesById,
+        source: input.source,
+      }).catch((error: unknown) => {
+        console.error(error instanceof Error ? error.message : 'DATA_MUTATION_FAILED');
+      });
     }
   },
   resolveCodeValue() {
@@ -695,7 +712,7 @@ export default function App() {
   const match = workspaceRoutes.find((route) => matchesRoutePath(route.path, pathname));
   if (!match) return <main data-prodivix-route-not-found="true">Route not found.</main>;
   const Page = match.Component;
-  return <Page __pdxRuntime={workspacePirRuntime} />;
+  return <Page __pdxRuntime={workspacePirRuntime} __pdxRouteId={match.routeNodeId} />;
 }
 `,
       sourceTrace: input.routeTopology.routes.flatMap(

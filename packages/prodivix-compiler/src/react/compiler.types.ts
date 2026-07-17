@@ -23,13 +23,21 @@ import type {
 
 export const PIR_REACT_COMPILE_DIAGNOSTIC_CODES = Object.freeze({
   dataOperationUnresolved: 'PIR_EXPORT_DATA_OPERATION_UNRESOLVED',
+  dataOperationKindMismatch: 'PIR_EXPORT_DATA_OPERATION_KIND_MISMATCH',
 } as const);
 
 export type PIRReactRuntimeTriggerDispatch = Readonly<{
   binding: PIRTriggerBinding;
   payload: unknown;
   scope: PIRRuntimeValueScope;
+  runtimeValuesById: Readonly<Record<string, unknown>>;
   setStateById: PIRReactStateUpdater;
+  source: Readonly<{
+    documentId: string;
+    nodeId: string;
+    eventName: string;
+    instancePath: string;
+  }>;
 }>;
 
 export type PIRReactStateUpdater = (stateId: string, value: unknown) => void;

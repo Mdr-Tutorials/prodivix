@@ -127,6 +127,7 @@ export type CodeSlotKind =
   | 'animation-script'
   | 'shader'
   | 'external-adapter'
+  | 'data-input-transform'
   | 'mounted-css'
   | 'route-loader'
   | 'route-action'
@@ -169,6 +170,34 @@ export type CodeSlotBindingProjection = Readonly<{
   ownerRef: DiagnosticTargetRef;
   semanticReferenceId: string;
 }>;
+
+export type DataOperationInputJsonValue =
+  | null
+  | boolean
+  | number
+  | string
+  | readonly DataOperationInputJsonValue[]
+  | Readonly<{ [key: string]: DataOperationInputJsonValue }>;
+
+/** Shared durable mapping shape; protocol resolution and execution remain Data-owned. */
+export type DataOperationInputBinding =
+  | Readonly<{ kind: 'literal'; value: DataOperationInputJsonValue }>
+  | Readonly<{ kind: 'trigger-payload'; path?: string }>
+  | Readonly<{ kind: 'runtime-value'; valueId: string; path?: string }>
+  | Readonly<{
+      kind: 'object';
+      propertiesByKey: Readonly<Record<string, DataOperationInputBinding>>;
+    }>
+  | Readonly<{
+      kind: 'array';
+      items: readonly DataOperationInputBinding[];
+    }>
+  | Readonly<{
+      kind: 'code';
+      slotId: string;
+      reference: CodeReference;
+      input: DataOperationInputBinding;
+    }>;
 
 export type TriggerBinding =
   | { kind: 'open-url'; href: string }

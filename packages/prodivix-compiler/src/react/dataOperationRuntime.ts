@@ -7,6 +7,14 @@ export const createPirDataOperationRuntimeSource =
   binding: __PdxDataOperationBinding;
 }>;
 
+type __PdxDataBindingsActivationRequest = Readonly<{
+  documentId: string;
+  instancePath: string;
+  currentRouteId?: string;
+  bindingsByDataId: Readonly<Record<string, __PdxDataOperationBinding>>;
+  runtimeValuesById: Readonly<Record<string, unknown>>;
+}>;
+
 type __PdxDocumentDataLifecycleProjection =
   | Readonly<{
       status: 'ready';

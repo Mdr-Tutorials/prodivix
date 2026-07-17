@@ -1,6 +1,14 @@
 package workspace
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
+
+const (
+	maxDataCacheDurationMS    = 7 * 24 * 60 * 60 * 1000
+	maxDataCacheKeyInputPaths = 64
+)
 
 func validateDataOperationPolicies(kind string, policies map[string]json.RawMessage, path string) error {
 	if kind == "query" {
@@ -13,6 +21,19 @@ func validateDataOperationPolicies(kind string, policies map[string]json.RawMess
 		}
 		if _, exists := policies["pagination"]; exists {
 			return dataSourceValidationError("%s/pagination is available only to queries", path)
+		}
+		if retry, exists := policies["retry"]; exists {
+			fields, err := decodeDataObject(retry, path+"/retry", []string{"maxAttempts", "backoff", "initialDelayMs"}, []string{"maxDelayMs"})
+			if err != nil {
+				return err
+			}
+			maxAttempts, err := decodeDataInteger(fields["maxAttempts"], path+"/retry/maxAttempts", 1)
+			if err != nil {
+				return err
+			}
+			if maxAttempts > 1 {
+				return dataSourceValidationError("%s/retry requires an explicit mutation idempotency contract", path)
+			}
 		}
 	}
 	if cache, exists := policies["cache"]; exists {
@@ -50,17 +71,73 @@ func validateDataCachePolicy(payload json.RawMessage, path string) error {
 	if strategy != "no-store" && strategy != "cache-first" && strategy != "network-first" && strategy != "stale-while-revalidate" {
 		return dataSourceValidationError("%s/strategy is unsupported", path)
 	}
-	for _, field := range []string{"ttlMs", "staleWhileRevalidateMs"} {
-		if value, exists := fields[field]; exists {
-			if _, err := decodeDataInteger(value, path+"/"+field, 0); err != nil {
-				return err
+	if strategy == "no-store" {
+		if len(fields) != 1 {
+			return dataSourceValidationError("%s no-store cannot declare cache lifetime or key fields", path)
+		}
+		return nil
+	}
+	if _, exists := fields["ttlMs"]; !exists {
+		return dataSourceValidationError("%s/ttlMs is required for stored cache policies", path)
+	}
+	ttl, err := decodeDataInteger(fields["ttlMs"], path+"/ttlMs", 1)
+	if err != nil {
+		return err
+	}
+	if ttl > maxDataCacheDurationMS {
+		return dataSourceValidationError("%s/ttlMs exceeds the cache duration budget", path)
+	}
+	if stale, exists := fields["staleWhileRevalidateMs"]; exists {
+		if strategy == "cache-first" {
+			return dataSourceValidationError("%s/staleWhileRevalidateMs is not supported by cache-first", path)
+		}
+		staleDuration, err := decodeDataInteger(stale, path+"/staleWhileRevalidateMs", 1)
+		if err != nil {
+			return err
+		}
+		if staleDuration > maxDataCacheDurationMS {
+			return dataSourceValidationError("%s/staleWhileRevalidateMs exceeds the cache duration budget", path)
+		}
+		if ttl+staleDuration > maxDataCacheDurationMS {
+			return dataSourceValidationError("%s fresh and stale retention exceeds the cache duration budget", path)
+		}
+	} else if strategy == "stale-while-revalidate" {
+		return dataSourceValidationError("%s/staleWhileRevalidateMs is required", path)
+	}
+	if paths, exists := fields["keyInputPaths"]; exists {
+		if err := validateUniqueDataStringArray(paths, path+"/keyInputPaths"); err != nil {
+			return err
+		}
+		var values []string
+		if err := json.Unmarshal(paths, &values); err != nil {
+			return dataSourceValidationError("%s/keyInputPaths must be an array", path)
+		}
+		if len(values) > maxDataCacheKeyInputPaths {
+			return dataSourceValidationError("%s/keyInputPaths exceeds the cache key path budget", path)
+		}
+		for index, value := range values {
+			if !isDataJSONPointer(value) {
+				return dataSourceValidationError("%s/keyInputPaths/%d must be an RFC 6901 JSON Pointer", path, index)
 			}
 		}
 	}
-	if paths, exists := fields["keyInputPaths"]; exists {
-		return validateUniqueDataStringArray(paths, path+"/keyInputPaths")
-	}
 	return nil
+}
+
+func isDataJSONPointer(value string) bool {
+	if !strings.HasPrefix(value, "/") {
+		return false
+	}
+	for index := 0; index < len(value); index++ {
+		if value[index] != '~' {
+			continue
+		}
+		if index+1 >= len(value) || (value[index+1] != '0' && value[index+1] != '1') {
+			return false
+		}
+		index++
+	}
+	return true
 }
 
 func validateUniqueDataStringArray(payload json.RawMessage, path string) error {
@@ -145,6 +222,21 @@ func validateDataPaginationPolicy(payload json.RawMessage, path string) error {
 			return err
 		}
 	}
+	limitInput, err := decodeDataCanonicalString(fields["limitInput"], path+"/limitInput")
+	if err != nil {
+		return err
+	}
+	positionField := "offsetInput"
+	if kind == "cursor" {
+		positionField = "cursorInput"
+	}
+	positionInput, err := decodeDataCanonicalString(fields[positionField], path+"/"+positionField)
+	if err != nil {
+		return err
+	}
+	if positionInput == limitInput {
+		return dataSourceValidationError("%s/%s and limitInput must be distinct", path, positionField)
+	}
 	for _, field := range optional {
 		if field == "maxLimit" {
 			continue
@@ -176,7 +268,7 @@ func validateDataOptimisticPolicy(payload json.RawMessage, path string) error {
 		payload,
 		path,
 		[]string{"kind", "action", "target", "rollback"},
-		[]string{"entityIdPath", "valueInputPath", "placement"},
+		[]string{"entityIdPath", "valueInputPath", "valueOutputPath", "placement"},
 	)
 	if err != nil {
 		return err
@@ -206,14 +298,34 @@ func validateDataOptimisticPolicy(payload json.RawMessage, path string) error {
 	if err := json.Unmarshal(fields["rollback"], &rollback); err != nil || rollback != "on-error" {
 		return dataSourceValidationError("%s/rollback must equal on-error", path)
 	}
-	for _, field := range []string{"entityIdPath", "valueInputPath"} {
+	for _, field := range []string{"entityIdPath", "valueInputPath", "valueOutputPath"} {
 		if _, exists := fields[field]; exists {
-			if _, err := decodeDataCanonicalString(fields[field], path+"/"+field); err != nil {
+			value, err := decodeDataCanonicalString(fields[field], path+"/"+field)
+			if err != nil {
 				return err
+			}
+			if !isDataJSONPointer(value) {
+				return dataSourceValidationError("%s/%s must be an RFC 6901 JSON Pointer", path, field)
 			}
 		}
 	}
+	if action == "create" || action == "update" {
+		if _, exists := fields["valueInputPath"]; !exists {
+			return dataSourceValidationError("%s/valueInputPath is required for create/update", path)
+		}
+		if _, exists := fields["valueOutputPath"]; !exists {
+			return dataSourceValidationError("%s/valueOutputPath is required for create/update", path)
+		}
+	}
+	if action == "update" || action == "delete" {
+		if _, exists := fields["entityIdPath"]; !exists {
+			return dataSourceValidationError("%s/entityIdPath is required for update/delete", path)
+		}
+	}
 	if placement, exists := fields["placement"]; exists {
+		if action != "create" {
+			return dataSourceValidationError("%s/placement is available only to create", path)
+		}
 		value, err := decodeDataCanonicalString(placement, path+"/placement")
 		if err != nil {
 			return err

@@ -93,6 +93,17 @@ const projectTrigger = (
       editable: true,
     };
   }
+  if (binding.kind === 'dispatch-data-operation') {
+    return {
+      trigger,
+      action: 'executeDataMutation',
+      params: {
+        operation: binding.operation,
+        input: binding.input,
+      },
+      editable: true,
+    };
+  }
   return {
     trigger,
     action: binding.kind,
@@ -187,6 +198,29 @@ const toEditableTrigger = (
       ...(event.params.inputMapping === undefined
         ? {}
         : { inputMapping: event.params.inputMapping }),
+    };
+  }
+  if (event.action === 'executeDataMutation') {
+    const operation = isObject(event.params.operation)
+      ? event.params.operation
+      : undefined;
+    const documentId =
+      typeof operation?.documentId === 'string'
+        ? operation.documentId.trim()
+        : '';
+    const operationId =
+      typeof operation?.operationId === 'string'
+        ? operation.operationId.trim()
+        : '';
+    if (!documentId || !operationId || !isObject(event.params.input))
+      return null;
+    return {
+      kind: 'dispatch-data-operation',
+      operation: { documentId, operationId },
+      input: event.params.input as Extract<
+        PIRTriggerBinding,
+        { kind: 'dispatch-data-operation' }
+      >['input'],
     };
   }
   const destination =

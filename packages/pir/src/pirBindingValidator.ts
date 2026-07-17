@@ -6,6 +6,7 @@ import type {
   PIRUiGraph,
   PIRValueBinding,
 } from './pir.types';
+import { inspectPirDataOperationInput } from './pirDataOperationInput';
 
 export const PIR_BINDING_VALIDATION_CODES = Object.freeze({
   componentEventEmission: 'PIR_COMPONENT_EVENT_EMISSION',
@@ -18,6 +19,7 @@ export const PIR_BINDING_VALIDATION_CODES = Object.freeze({
   collectionSymbolScope: 'PIR_COLLECTION_SYMBOL_SCOPE',
   dataUnresolved: 'PIR_DATA_UNRESOLVED',
   dataScope: 'PIR_DATA_SCOPE',
+  dataOperationTrigger: 'PIR_DATA_OPERATION_TRIGGER',
 } as const);
 
 export type PIRBindingValidationCode =
@@ -325,6 +327,29 @@ export const validatePirBindings = (
     trigger: PIRTriggerBinding,
     slotScope: PIRInstanceSlotScope | undefined
   ): void => {
+    if (trigger.kind === 'dispatch-data-operation') {
+      const path = nodeFieldPath(nodeId, fieldPath);
+      if (
+        !trigger.operation.documentId ||
+        trigger.operation.documentId !== trigger.operation.documentId.trim() ||
+        !trigger.operation.operationId ||
+        trigger.operation.operationId !== trigger.operation.operationId.trim()
+      ) {
+        addIssue(
+          PIR_BINDING_VALIDATION_CODES.dataOperationTrigger,
+          `${path}/operation`,
+          'Data mutation trigger must reference one canonical operation identity.'
+        );
+      }
+      if (!inspectPirDataOperationInput(trigger.input)) {
+        addIssue(
+          PIR_BINDING_VALIDATION_CODES.dataOperationTrigger,
+          `${path}/input`,
+          'Data mutation trigger input mapping must be canonical and bounded.'
+        );
+      }
+      return;
+    }
     if (trigger.kind !== 'emit-component-event') return;
     if (
       !document.componentContract ||

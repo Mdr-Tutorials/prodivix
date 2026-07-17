@@ -16,6 +16,7 @@ import (
 
 	backendconfig "github.com/Prodivix/prodivix/apps/backend/internal/config"
 	backendauth "github.com/Prodivix/prodivix/apps/backend/internal/modules/auth"
+	backendenvironment "github.com/Prodivix/prodivix/apps/backend/internal/modules/environment"
 	"github.com/gin-gonic/gin"
 )
 
@@ -23,6 +24,24 @@ type fakeGrantStore struct {
 	workspaceOwner map[string]string
 	executionOwner map[string]string
 	recordError    error
+	lastAuthority  ExecutionAuthority
+}
+
+type fakeEnvironmentVerifier struct {
+	available   bool
+	err         error
+	principal   backendenvironment.PrincipalSession
+	workspaceID string
+	reference   EnvironmentReference
+}
+
+func (verifier *fakeEnvironmentVerifier) Available() bool { return verifier.available }
+
+func (verifier *fakeEnvironmentVerifier) VerifySnapshotAccess(_ context.Context, principal backendenvironment.PrincipalSession, workspaceID string, environmentID string, revision string, mode string) error {
+	verifier.principal = principal
+	verifier.workspaceID = workspaceID
+	verifier.reference = EnvironmentReference{EnvironmentID: environmentID, Revision: revision, Mode: mode}
+	return verifier.err
 }
 
 func (store *fakeGrantStore) VerifyWorkspaceOwner(_ context.Context, ownerID string, workspaceID string) error {
@@ -32,14 +51,15 @@ func (store *fakeGrantStore) VerifyWorkspaceOwner(_ context.Context, ownerID str
 	return nil
 }
 
-func (store *fakeGrantStore) RecordExecution(_ context.Context, ownerID string, _ string, executionID string) error {
+func (store *fakeGrantStore) RecordExecution(_ context.Context, authority ExecutionAuthority) error {
 	if store.recordError != nil {
 		return store.recordError
 	}
-	if existing := store.executionOwner[executionID]; existing != "" && existing != ownerID {
+	if existing := store.executionOwner[authority.ExecutionID]; existing != "" && existing != authority.OwnerID {
 		return errors.New("execution owner conflict")
 	}
-	store.executionOwner[executionID] = ownerID
+	store.executionOwner[authority.ExecutionID] = authority.OwnerID
+	store.lastAuthority = authority
 	return nil
 }
 
@@ -76,23 +96,126 @@ func TestGatewayCancelsExecutionWhenDurableGrantCannotBeRecorded(t *testing.T) {
 	}
 }
 
-func (store *fakeGrantStore) VerifyExecutionOwner(_ context.Context, ownerID string, executionID string) error {
+func (store *fakeGrantStore) VerifyExecutionOwner(_ context.Context, ownerID string, sessionID string, executionID string) error {
 	if store.executionOwner[executionID] != ownerID {
+		return ErrExecutionNotFound
+	}
+	if store.lastAuthority.ExecutionID == executionID && store.lastAuthority.Environment != nil && store.lastAuthority.SessionID != sessionID {
 		return ErrExecutionNotFound
 	}
 	return nil
 }
 
 func testRouter(handler *Handler, userID string) *gin.Engine {
+	return testRouterSession(handler, userID, "session-1")
+}
+
+func testRouterSession(handler *Handler, userID string, sessionID string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	authenticate := func(c *gin.Context) {
 		c.Set("authUser", &backendauth.User{ID: userID})
+		c.Set("authSession", &backendauth.AuthenticatedSession{ID: sessionID, UserID: userID, ExpiresAt: time.Now().Add(time.Hour).UnixMilli()})
 		c.Next()
 	}
 	api := router.Group("/api")
 	RegisterRoutes(api, handler.Routes(authenticate))
 	return router
+}
+
+func TestGatewayPreflightsAndDurablyBindsExactEnvironmentSession(t *testing.T) {
+	store := &fakeGrantStore{workspaceOwner: map[string]string{"workspace-1": "user-1"}, executionOwner: map[string]string{}}
+	verifier := &fakeEnvironmentVerifier{available: true}
+	controlPlane := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		response.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(response, `{"protocol":"prodivix.remote-execution","version":1,"messageId":"message-1","operation":"create","ok":true,"payload":{"execution":{"executionId":"execution-env-1"}}}`)
+	}))
+	defer controlPlane.Close()
+	handler := NewHandler(store, backendconfig.RemoteRunnerConfig{BaseURL: controlPlane.URL, ClientToken: "service-token", Timeout: time.Second}, backendconfig.RemotePreviewHostConfig{}, verifier)
+	request := httptest.NewRequest(http.MethodPost, "/api/remote-executions", bytes.NewReader(envelope("create", map[string]any{
+		"request": map[string]any{
+			"workspace":   map[string]any{"workspaceId": "workspace-1"},
+			"environment": map[string]any{"environmentId": "environment-1", "revision": "revision-7", "mode": "live"},
+		},
+	})))
+	response := httptest.NewRecorder()
+	testRouterSession(handler, "user-1", "session-env-1").ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", response.Code, response.Body.String())
+	}
+	if verifier.principal != (backendenvironment.PrincipalSession{PrincipalID: "user-1", SessionID: "session-env-1"}) || verifier.workspaceID != "workspace-1" {
+		t.Fatalf("environment preflight identity drifted: %#v", verifier)
+	}
+	if store.lastAuthority.SessionID != "session-env-1" || store.lastAuthority.Environment == nil || *store.lastAuthority.Environment != (EnvironmentReference{EnvironmentID: "environment-1", Revision: "revision-7", Mode: "live"}) {
+		t.Fatalf("durable environment authority drifted: %#v", store.lastAuthority)
+	}
+}
+
+func TestGatewayRejectsStaleEnvironmentBeforeControlPlaneAndCrossSessionReplay(t *testing.T) {
+	proxied := false
+	controlPlane := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { proxied = true }))
+	defer controlPlane.Close()
+	store := &fakeGrantStore{workspaceOwner: map[string]string{"workspace-1": "user-1"}, executionOwner: map[string]string{}}
+	verifier := &fakeEnvironmentVerifier{available: true, err: backendenvironment.ErrPermissionDenied}
+	handler := NewHandler(store, backendconfig.RemoteRunnerConfig{BaseURL: controlPlane.URL, ClientToken: "service-token", Timeout: time.Second}, backendconfig.RemotePreviewHostConfig{}, verifier)
+	request := httptest.NewRequest(http.MethodPost, "/api/remote-executions", bytes.NewReader(envelope("create", map[string]any{
+		"request": map[string]any{"workspace": map[string]any{"workspaceId": "workspace-1"}, "environment": map[string]any{"environmentId": "environment-1", "revision": "stale", "mode": "live"}},
+	})))
+	response := httptest.NewRecorder()
+	testRouterSession(handler, "user-1", "session-1").ServeHTTP(response, request)
+	if response.Code != http.StatusNotFound || proxied {
+		t.Fatalf("stale environment reached Control Plane: status=%d proxied=%v", response.Code, proxied)
+	}
+
+	store.executionOwner["execution-env-1"] = "user-1"
+	store.lastAuthority = ExecutionAuthority{ExecutionID: "execution-env-1", OwnerID: "user-1", SessionID: "session-1", Environment: &EnvironmentReference{EnvironmentID: "environment-1", Revision: "revision-7", Mode: "live"}}
+	get := httptest.NewRequest(http.MethodPost, "/api/remote-executions", bytes.NewReader(envelope("get", map[string]any{"executionId": "execution-env-1"})))
+	getResponse := httptest.NewRecorder()
+	testRouterSession(handler, "user-1", "session-2").ServeHTTP(getResponse, get)
+	if getResponse.Code != http.StatusNotFound || proxied {
+		t.Fatalf("cross-session replay reached Control Plane: status=%d proxied=%v", getResponse.Code, proxied)
+	}
+}
+
+func TestGatewayRejectsEnvironmentMaterialEscapeHatchBeforePreflight(t *testing.T) {
+	proxied := false
+	controlPlane := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { proxied = true }))
+	defer controlPlane.Close()
+	store := &fakeGrantStore{workspaceOwner: map[string]string{"workspace-1": "user-1"}, executionOwner: map[string]string{}}
+	verifier := &fakeEnvironmentVerifier{available: true}
+	handler := NewHandler(store, backendconfig.RemoteRunnerConfig{BaseURL: controlPlane.URL, ClientToken: "service-token", Timeout: time.Second}, backendconfig.RemotePreviewHostConfig{}, verifier)
+	canary := "prodivix-secret-canary"
+	request := httptest.NewRequest(http.MethodPost, "/api/remote-executions", bytes.NewReader(envelope("create", map[string]any{
+		"request": map[string]any{"workspace": map[string]any{"workspaceId": "workspace-1"}, "environment": map[string]any{"environmentId": "environment-1", "revision": "revision-7", "mode": "live", "value": canary}},
+	})))
+	response := httptest.NewRecorder()
+	testRouter(handler, "user-1").ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || proxied || verifier.reference.EnvironmentID != "" {
+		t.Fatalf("environment material escape hatch was accepted: status=%d proxied=%v verifier=%#v", response.Code, proxied, verifier)
+	}
+	if strings.Contains(response.Body.String(), canary) {
+		t.Fatalf("Secret canary leaked to rejection response: %s", response.Body.String())
+	}
+}
+
+func TestGatewayDoesNotCancelExistingExecutionOnAuthorityConflict(t *testing.T) {
+	operations := make([]string, 0, 2)
+	controlPlane := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		var requestEnvelope remoteEnvelope
+		_ = json.NewDecoder(request.Body).Decode(&requestEnvelope)
+		operations = append(operations, requestEnvelope.Operation)
+		response.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(response, `{"protocol":"prodivix.remote-execution","version":1,"messageId":"message-1","operation":"create","ok":true,"payload":{"execution":{"executionId":"execution-1"}}}`)
+	}))
+	defer controlPlane.Close()
+	store := &fakeGrantStore{workspaceOwner: map[string]string{"workspace-1": "user-1"}, executionOwner: map[string]string{}, recordError: ErrExecutionAuthorityConflict}
+	handler := NewHandler(store, backendconfig.RemoteRunnerConfig{BaseURL: controlPlane.URL, ClientToken: "service-token", Timeout: time.Second}, backendconfig.RemotePreviewHostConfig{})
+	request := httptest.NewRequest(http.MethodPost, "/api/remote-executions", bytes.NewReader(envelope("create", map[string]any{"request": map[string]any{"workspace": map[string]any{"workspaceId": "workspace-1"}}})))
+	response := httptest.NewRecorder()
+	testRouter(handler, "user-1").ServeHTTP(response, request)
+	if response.Code != http.StatusConflict || len(operations) != 1 || operations[0] != "create" {
+		t.Fatalf("authority conflict cancelled an existing execution: status=%d operations=%v", response.Code, operations)
+	}
 }
 
 func envelope(operation string, payload any) []byte {

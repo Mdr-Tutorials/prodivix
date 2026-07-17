@@ -131,6 +131,11 @@ export type WorkspaceComponentExtractionReferenceTarget =
   | Readonly<{ kind: 'route'; routeId: string }>
   | Readonly<{ kind: 'nodegraph'; documentId: string }>
   | Readonly<{
+      kind: 'data-operation';
+      documentId: string;
+      operationId: string;
+    }>
+  | Readonly<{
       kind: 'animation';
       timelineId: string;
       documentId: string;

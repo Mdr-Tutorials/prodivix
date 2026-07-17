@@ -8,6 +8,7 @@ import type {
 } from '@/editor/features/blueprint/editor/inspector/panels/types';
 import type { MountedCssEntry } from '@/editor/features/blueprint/editor/inspector/components/classProtocol/mountedCss';
 import type { EditableTextField } from '@/editor/features/blueprint/editor/model/blueprintText';
+import type { DataOperationInspectorCandidate } from './domain/dataOperationInspectorModel';
 
 export type InspectorTab = 'basic' | 'style' | 'data' | 'code';
 
@@ -164,6 +165,7 @@ export type InspectorCodeContext = {
   hasLinkTriggerConflict: boolean;
   triggerEntries: TriggerEntry[];
   graphOptions: Array<{ id: string; label: string }>;
+  dataMutationOptions: readonly DataOperationInspectorCandidate[];
 };
 
 export type InspectorContextValue = InspectorCoreContext &

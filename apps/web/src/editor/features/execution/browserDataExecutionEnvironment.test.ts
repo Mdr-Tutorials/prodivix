@@ -1,10 +1,42 @@
-import { createDataOperationInvocation } from '@prodivix/data';
+import {
+  createDataLifecycleChannel,
+  createDataOperationInvocation,
+  type DataConfigurationValue,
+  type DataOperationPolicies,
+  type DataSourceDocument,
+} from '@prodivix/data';
 import { createExecutableProjectSnapshot } from '@prodivix/runtime-core';
 import { describe, expect, it, vi } from 'vitest';
 import {
   createBrowserDataExecutionEnvironment,
   createBrowserTestDataExecutionEnvironment,
 } from './browserDataExecutionEnvironment';
+
+const createDocument = (
+  sourceConfiguration: Readonly<Record<string, DataConfigurationValue>> = {},
+  operationConfiguration: Readonly<Record<string, DataConfigurationValue>> = {},
+  policies: DataOperationPolicies = {}
+): DataSourceDocument => ({
+  source: {
+    id: 'products-source',
+    adapterId: 'core.http',
+    runtimeZone: 'client',
+    bindingsById: {},
+    configurationByKey: sourceConfiguration,
+  },
+  schemasById: {
+    products: { id: 'products', schema: true },
+  },
+  operationsById: {
+    'list-products': {
+      id: 'list-products',
+      kind: 'query',
+      outputSchemaId: 'products',
+      configurationByKey: operationConfiguration,
+      policies,
+    },
+  },
+});
 
 describe('Browser Data execution composition', () => {
   it('carries one correlation identity through Data, HTTP, browser fetch, and Network trace', async () => {
@@ -45,28 +77,19 @@ describe('Browser Data execution composition', () => {
     });
     const result = await environment.execute({
       invocation,
-      source: {
-        id: 'products-source',
-        adapterId: 'core.http',
-        runtimeZone: 'client',
-        bindingsById: {},
-        configurationByKey: {
+      document: createDocument(
+        {
           baseUrl: {
             kind: 'literal',
             value: 'https://api.example.test/v1/',
           },
         },
-      },
-      operation: {
-        id: 'list-products',
-        kind: 'query',
-        outputSchemaId: 'products',
-        configurationByKey: {
+        {
           method: { kind: 'literal', value: 'GET' },
           path: { kind: 'literal', value: '/products' },
-        },
-        policies: {},
-      },
+        }
+      ),
+      lifecycleChannel: createDataLifecycleChannel(),
       signal: new AbortController().signal,
       publishNetworkTrace: (trace) => published.push(trace),
     });
@@ -138,28 +161,19 @@ describe('Browser Data execution composition', () => {
     const execute = () =>
       environment.execute({
         invocation,
-        source: {
-          id: 'products-source',
-          adapterId: 'core.http',
-          runtimeZone: 'client',
-          bindingsById: {},
-          configurationByKey: {
+        document: createDocument(
+          {
             baseUrl: {
               kind: 'literal',
               value: 'https://api.example.test/v1/',
             },
           },
-        },
-        operation: {
-          id: 'list-products',
-          kind: 'query',
-          outputSchemaId: 'products',
-          configurationByKey: {
+          {
             method: { kind: 'literal', value: 'GET' },
             path: { kind: 'literal', value: '/products' },
-          },
-          policies: {},
-        },
+          }
+        ),
+        lifecycleChannel: createDataLifecycleChannel(),
         signal: new AbortController().signal,
       });
 
@@ -175,6 +189,61 @@ describe('Browser Data execution composition', () => {
     await expect(execute()).rejects.toMatchObject({
       code: 'DATA_MOCK_RUNTIME_DISPOSED',
     });
+  });
+
+  it('owns one bounded cache per Browser Data environment', async () => {
+    const fetch = vi.fn(
+      async () => new Response('{"items":[{"id":"cached"}]}', { status: 200 })
+    );
+    const environment = createBrowserDataExecutionEnvironment({
+      fetch: fetch as typeof globalThis.fetch,
+    });
+    const document = createDocument(
+      {
+        baseUrl: {
+          kind: 'literal',
+          value: 'https://api.example.test/v1/',
+        },
+      },
+      {
+        method: { kind: 'literal', value: 'GET' },
+        path: { kind: 'literal', value: '/products' },
+      },
+      { cache: { strategy: 'cache-first', ttlMs: 60_000 } }
+    );
+    const lifecycleChannel = createDataLifecycleChannel();
+    const execute = (sequence: number) =>
+      environment.execute({
+        invocation: createDataOperationInvocation({
+          invocationId: `browser-cache-${sequence}`,
+          sequence,
+          attempt: 1,
+          startedAt: 100,
+          operation: {
+            documentId: 'data-products',
+            operationId: 'list-products',
+          },
+          documentRevision: '11',
+          runtimeZone: 'client',
+          mode: 'live',
+          activation: 'route',
+          input: { page: 1 },
+        }),
+        document,
+        lifecycleChannel,
+        signal: new AbortController().signal,
+      });
+
+    await expect(execute(1)).resolves.toMatchObject({
+      cache: { status: 'network' },
+    });
+    await expect(execute(2)).resolves.toMatchObject({
+      result: { value: { items: [{ id: 'cached' }] } },
+      cache: { status: 'hit-fresh' },
+      networkTraces: [],
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    environment.dispose();
   });
 
   it('denies Browser Test live Data unless explicitly enabled', () => {
@@ -198,23 +267,72 @@ describe('Browser Data execution composition', () => {
           activation: 'test',
           input: {},
         }),
-        source: {
-          id: 'products-source',
-          adapterId: 'core.http',
-          runtimeZone: 'client',
-          bindingsById: {},
-          configurationByKey: {},
-        },
-        operation: {
-          id: 'list-products',
-          kind: 'query',
-          outputSchemaId: 'products',
-          configurationByKey: {},
-          policies: {},
-        },
+        document: createDocument(),
+        lifecycleChannel: createDataLifecycleChannel(),
         signal: new AbortController().signal,
       })
     ).toThrow(/denies live mode/u);
+  });
+
+  it('dispatches typed query input and suppresses unchanged Browser activations', async () => {
+    const fetch = vi.fn(
+      async () => new Response('{"items":[{"id":"p1"}]}', { status: 200 })
+    );
+    const environment = createBrowserDataExecutionEnvironment({
+      fetch: fetch as typeof globalThis.fetch,
+      now: () => 100,
+    });
+    const document = createDocument(
+      {
+        baseUrl: {
+          kind: 'literal',
+          value: 'https://api.example.test/v1/',
+        },
+      },
+      {
+        method: { kind: 'literal', value: 'GET' },
+        path: { kind: 'literal', value: '/products' },
+      }
+    );
+    const request = {
+      operation: {
+        documentId: 'data-products',
+        operationId: 'list-products',
+      },
+      documentRevision: '11',
+      runtimeZone: 'client',
+      mode: 'live',
+      trigger: { kind: 'input-change', dependencyId: 'filters' },
+      input: {
+        kind: 'object',
+        propertiesByKey: {
+          search: { kind: 'trigger-payload', path: '/search' },
+          page: { kind: 'literal', value: 2 },
+        },
+      },
+      inputContext: { triggerPayload: { search: 'chair' } },
+    } as const;
+    const context = {
+      request,
+      document,
+      lifecycleChannel: createDataLifecycleChannel(),
+      signal: new AbortController().signal,
+    };
+
+    await expect(environment.dispatch(context)).resolves.toMatchObject({
+      status: 'dispatched',
+      invocation: {
+        sequence: 1,
+        activation: 'input-change',
+        input: { page: 2, search: 'chair' },
+      },
+      result: { result: { value: { items: [{ id: 'p1' }] } } },
+    });
+    await expect(environment.dispatch(context)).resolves.toEqual({
+      status: 'skipped-unchanged',
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    environment.dispose();
   });
 
   it('provisions Browser Test fixtures from the exact executable snapshot', async () => {
@@ -264,20 +382,8 @@ describe('Browser Data execution composition', () => {
           activation: 'test',
           input: {},
         }),
-        source: {
-          id: 'products-source',
-          adapterId: 'core.http',
-          runtimeZone: 'client',
-          bindingsById: {},
-          configurationByKey: {},
-        },
-        operation: {
-          id: 'list-products',
-          kind: 'query',
-          outputSchemaId: 'products',
-          configurationByKey: {},
-          policies: {},
-        },
+        document: createDocument(),
+        lifecycleChannel: createDataLifecycleChannel(),
         signal: new AbortController().signal,
       })
     ).resolves.toMatchObject({

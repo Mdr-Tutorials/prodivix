@@ -17,6 +17,7 @@ import (
 
 	backendconfig "github.com/Prodivix/prodivix/apps/backend/internal/config"
 	backendauth "github.com/Prodivix/prodivix/apps/backend/internal/modules/auth"
+	backendenvironment "github.com/Prodivix/prodivix/apps/backend/internal/modules/environment"
 	backendresponse "github.com/Prodivix/prodivix/apps/backend/internal/platform/http/response"
 	"github.com/gin-gonic/gin"
 )
@@ -30,6 +31,7 @@ var previewCapabilityLabel = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
 type Handler struct {
 	store             GrantStore
+	environments      EnvironmentAccessVerifier
 	baseURL           string
 	clientToken       string
 	httpClient        *http.Client
@@ -53,7 +55,18 @@ type createPayload struct {
 		Workspace struct {
 			WorkspaceID string `json:"workspaceId"`
 		} `json:"workspace"`
+		Environment json.RawMessage `json:"environment"`
 	} `json:"request"`
+}
+
+type EnvironmentAccessVerifier interface {
+	Available() bool
+	VerifySnapshotAccess(ctx context.Context, principal backendenvironment.PrincipalSession, workspaceID string, environmentID string, revision string, mode string) error
+}
+
+type envelopeAuthority struct {
+	workspaceID string
+	environment *EnvironmentReference
 }
 
 type executionPayload struct {
@@ -111,7 +124,7 @@ func normalizedPublicBaseURL(value string) string {
 	return baseURL
 }
 
-func NewHandler(store GrantStore, cfg backendconfig.RemoteRunnerConfig, previewCfg backendconfig.RemotePreviewHostConfig) *Handler {
+func NewHandler(store GrantStore, cfg backendconfig.RemoteRunnerConfig, previewCfg backendconfig.RemotePreviewHostConfig, environmentVerifier ...EnvironmentAccessVerifier) *Handler {
 	baseURL := strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/")
 	clientToken := strings.TrimSpace(cfg.ClientToken)
 	handler := &Handler{
@@ -122,6 +135,9 @@ func NewHandler(store GrantStore, cfg backendconfig.RemoteRunnerConfig, previewC
 		previewPublicURL: normalizedPublicBaseURL(previewCfg.PublicBaseURL),
 		previewToken:     strings.TrimSpace(previewCfg.Token),
 		previewTTL:       previewCfg.TTL,
+	}
+	if len(environmentVerifier) > 0 {
+		handler.environments = environmentVerifier[0]
 	}
 	if handler.baseURL != "" && handler.clientToken != "" && cfg.Timeout > 0 {
 		handler.httpClient = &http.Client{Timeout: cfg.Timeout}
@@ -174,40 +190,91 @@ func authUser(c *gin.Context) (*backendauth.User, bool) {
 	return user, ok
 }
 
-func (handler *Handler) authorizeEnvelope(c *gin.Context, ownerID string, envelope remoteEnvelope) (string, bool) {
+func authIdentity(c *gin.Context) (*backendauth.User, *backendauth.AuthenticatedSession, bool) {
+	user, ok := authUser(c)
+	if !ok {
+		return nil, nil, false
+	}
+	session, ok := backendauth.GetAuthSession(c)
+	if !ok || session.UserID != user.ID || strings.TrimSpace(session.ID) == "" {
+		backendresponse.Error(c, http.StatusUnauthorized, "API-2001", "Authentication required.")
+		return nil, nil, false
+	}
+	return user, session, true
+}
+
+func decodeEnvironmentReference(value json.RawMessage) (*EnvironmentReference, error) {
+	if len(value) == 0 || string(value) == "null" {
+		return nil, nil
+	}
+	var record map[string]json.RawMessage
+	if json.Unmarshal(value, &record) != nil || len(record) != 3 {
+		return nil, errors.New("invalid environment reference")
+	}
+	for _, key := range []string{"environmentId", "revision", "mode"} {
+		if _, ok := record[key]; !ok {
+			return nil, errors.New("invalid environment reference")
+		}
+	}
+	var reference EnvironmentReference
+	if json.Unmarshal(record["environmentId"], &reference.EnvironmentID) != nil || json.Unmarshal(record["revision"], &reference.Revision) != nil || json.Unmarshal(record["mode"], &reference.Mode) != nil {
+		return nil, errors.New("invalid environment reference")
+	}
+	if reference.EnvironmentID == "" || reference.EnvironmentID != strings.TrimSpace(reference.EnvironmentID) || reference.Revision == "" || reference.Revision != strings.TrimSpace(reference.Revision) || (reference.Mode != "mock" && reference.Mode != "live") {
+		return nil, errors.New("invalid environment reference")
+	}
+	return &reference, nil
+}
+
+func (handler *Handler) authorizeEnvelope(c *gin.Context, ownerID string, sessionID string, envelope remoteEnvelope) (envelopeAuthority, bool) {
 	if envelope.Protocol != "prodivix.remote-execution" || envelope.Version != 1 || strings.TrimSpace(envelope.MessageID) == "" {
 		backendresponse.Error(c, http.StatusBadRequest, "EXE-4001", "Remote execution envelope is invalid.")
-		return "", false
+		return envelopeAuthority{}, false
 	}
 	switch envelope.Operation {
 	case "negotiate":
-		return "", true
+		return envelopeAuthority{}, true
 	case "create":
 		var payload createPayload
 		if json.Unmarshal(envelope.Payload, &payload) != nil || strings.TrimSpace(payload.Request.Workspace.WorkspaceID) == "" {
 			backendresponse.Error(c, http.StatusBadRequest, "EXE-4001", "Remote create request has no Workspace identity.")
-			return "", false
+			return envelopeAuthority{}, false
 		}
 		workspaceID := strings.TrimSpace(payload.Request.Workspace.WorkspaceID)
 		if err := handler.store.VerifyWorkspaceOwner(c.Request.Context(), ownerID, workspaceID); err != nil {
 			backendresponse.Error(c, http.StatusNotFound, "EXE-4004", "Remote execution target was not found.")
-			return "", false
+			return envelopeAuthority{}, false
 		}
-		return workspaceID, true
+		environment, err := decodeEnvironmentReference(payload.Request.Environment)
+		if err != nil {
+			backendresponse.Error(c, http.StatusBadRequest, "EXE-4001", "Remote execution environment reference is invalid.")
+			return envelopeAuthority{}, false
+		}
+		if environment != nil {
+			if handler.environments == nil || !handler.environments.Available() {
+				backendresponse.Error(c, http.StatusServiceUnavailable, "ENV-5001", "Environment Secret store is unavailable.", backendresponse.WithRetryable(true))
+				return envelopeAuthority{}, false
+			}
+			if err := handler.environments.VerifySnapshotAccess(c.Request.Context(), backendenvironment.PrincipalSession{PrincipalID: ownerID, SessionID: sessionID}, workspaceID, environment.EnvironmentID, environment.Revision, environment.Mode); err != nil {
+				backendresponse.Error(c, http.StatusNotFound, "EXE-4004", "Remote execution target was not found.")
+				return envelopeAuthority{}, false
+			}
+		}
+		return envelopeAuthority{workspaceID: workspaceID, environment: environment}, true
 	case "get", "cancel", "events.read", "artifact.resolve":
 		var payload executionPayload
 		if json.Unmarshal(envelope.Payload, &payload) != nil || strings.TrimSpace(payload.ExecutionID) == "" {
 			backendresponse.Error(c, http.StatusBadRequest, "EXE-4001", "Remote request has no execution identity.")
-			return "", false
+			return envelopeAuthority{}, false
 		}
-		if err := handler.store.VerifyExecutionOwner(c.Request.Context(), ownerID, payload.ExecutionID); err != nil {
+		if err := handler.store.VerifyExecutionOwner(c.Request.Context(), ownerID, sessionID, payload.ExecutionID); err != nil {
 			backendresponse.Error(c, http.StatusNotFound, "EXE-4004", "Remote execution was not found.")
-			return "", false
+			return envelopeAuthority{}, false
 		}
-		return "", true
+		return envelopeAuthority{}, true
 	default:
 		backendresponse.Error(c, http.StatusBadRequest, "EXE-4001", "Remote execution operation is unsupported.")
-		return "", false
+		return envelopeAuthority{}, false
 	}
 }
 
@@ -255,7 +322,7 @@ func (handler *Handler) HandleEnvelope(c *gin.Context) {
 	if !handler.available(c) {
 		return
 	}
-	user, ok := authUser(c)
+	user, session, ok := authIdentity(c)
 	if !ok {
 		return
 	}
@@ -269,7 +336,7 @@ func (handler *Handler) HandleEnvelope(c *gin.Context) {
 		backendresponse.Error(c, http.StatusBadRequest, "EXE-4001", "Remote execution request is invalid JSON.")
 		return
 	}
-	workspaceID, authorized := handler.authorizeEnvelope(c, user.ID, envelope)
+	authority, authorized := handler.authorizeEnvelope(c, user.ID, session.ID, envelope)
 	if !authorized {
 		return
 	}
@@ -290,7 +357,17 @@ func (handler *Handler) HandleEnvelope(c *gin.Context) {
 			backendresponse.Error(c, http.StatusBadGateway, "EXE-5001", "Remote execution service returned an invalid create result.")
 			return
 		}
-		if err := handler.store.RecordExecution(c.Request.Context(), user.ID, workspaceID, created.Payload.Execution.ExecutionID); err != nil {
+		if err := handler.store.RecordExecution(c.Request.Context(), ExecutionAuthority{
+			ExecutionID: created.Payload.Execution.ExecutionID,
+			WorkspaceID: authority.workspaceID,
+			OwnerID:     user.ID,
+			SessionID:   session.ID,
+			Environment: authority.environment,
+		}); err != nil {
+			if errors.Is(err, ErrExecutionAuthorityConflict) {
+				backendresponse.Error(c, http.StatusConflict, "EXE-4009", "Remote execution identity conflicts with an existing authority.")
+				return
+			}
 			handler.compensateUnrecordedExecution(c, created, envelope.MessageID)
 			backendresponse.Error(c, http.StatusBadGateway, "EXE-5001", "Remote execution authorization could not be recorded.")
 			return
@@ -303,13 +380,13 @@ func (handler *Handler) HandleArtifactContent(c *gin.Context) {
 	if !handler.available(c) {
 		return
 	}
-	user, ok := authUser(c)
+	user, session, ok := authIdentity(c)
 	if !ok {
 		return
 	}
 	executionID := strings.TrimSpace(c.Param("executionId"))
 	artifactID := strings.TrimSpace(c.Param("artifactId"))
-	if executionID == "" || artifactID == "" || handler.store.VerifyExecutionOwner(c.Request.Context(), user.ID, executionID) != nil {
+	if executionID == "" || artifactID == "" || handler.store.VerifyExecutionOwner(c.Request.Context(), user.ID, session.ID, executionID) != nil {
 		backendresponse.Error(c, http.StatusNotFound, "EXE-4004", "Remote artifact was not found.")
 		return
 	}
@@ -405,13 +482,13 @@ func (handler *Handler) HandlePreviewSession(c *gin.Context) {
 	if !handler.previewAvailable(c) {
 		return
 	}
-	user, ok := authUser(c)
+	user, session, ok := authIdentity(c)
 	if !ok {
 		return
 	}
 	executionID := strings.TrimSpace(c.Param("executionId"))
 	artifactID := strings.TrimSpace(c.Param("artifactId"))
-	if executionID == "" || artifactID == "" || handler.store.VerifyExecutionOwner(c.Request.Context(), user.ID, executionID) != nil {
+	if executionID == "" || artifactID == "" || handler.store.VerifyExecutionOwner(c.Request.Context(), user.ID, session.ID, executionID) != nil {
 		backendresponse.Error(c, http.StatusNotFound, "EXE-4004", "Remote Preview artifact was not found.")
 		return
 	}

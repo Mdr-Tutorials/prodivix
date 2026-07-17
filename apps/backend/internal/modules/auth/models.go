@@ -36,6 +36,7 @@ func NewPublicUser(user *User) PublicUser {
 }
 
 type Session struct {
+	ID        string    `json:"-"`
 	Token     string    `json:"token"`
 	UserID    string    `json:"userId"`
 	CreatedAt time.Time `json:"createdAt"`

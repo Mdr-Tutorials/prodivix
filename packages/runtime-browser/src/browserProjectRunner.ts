@@ -302,7 +302,11 @@ export const createBrowserProjectRunner = (
         );
       }
       emitLog(controller, 'Preparing the executable project snapshot.');
-      const preparation = await runtimeHost.prepare(ownerId, snapshot);
+      const preparation = await runtimeHost.prepare(
+        ownerId,
+        snapshot,
+        'preview'
+      );
       if (!isJobRunnable(controller)) return;
       if (preparation.dependenciesInstalled) {
         emitLog(controller, 'Project dependencies are ready.');

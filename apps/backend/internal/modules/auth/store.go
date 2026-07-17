@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"errors"
@@ -160,6 +161,7 @@ func (store *SessionStore) Create(userID string, ttl time.Duration) *Session {
 	}
 	createdAt := time.Now().UTC()
 	session := &Session{
+		ID:        newID("session"),
 		Token:     newToken(),
 		UserID:    userID,
 		CreatedAt: createdAt,
@@ -167,9 +169,9 @@ func (store *SessionStore) Create(userID string, ttl time.Duration) *Session {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	const query = `INSERT INTO sessions (token, user_id, created_at, expires_at)
-VALUES ($1, $2, $3, $4)`
-	_, err := store.db.ExecContext(ctx, query, session.Token, session.UserID, session.CreatedAt, session.ExpiresAt)
+	const query = `INSERT INTO sessions (id, token, user_id, created_at, expires_at)
+VALUES ($1, $2, $3, $4, $5)`
+	_, err := store.db.ExecContext(ctx, query, session.ID, session.Token, session.UserID, session.CreatedAt, session.ExpiresAt)
 	if err != nil {
 		return nil
 	}
@@ -183,16 +185,28 @@ func (store *SessionStore) Get(token string) (*Session, bool) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	const query = `SELECT token, user_id, created_at, expires_at
+	const query = `SELECT id, token, user_id, created_at, expires_at
 FROM sessions
 WHERE token = $1 AND expires_at > NOW()`
 	row := store.db.QueryRowContext(ctx, query, token)
 	session := &Session{}
-	err := row.Scan(&session.Token, &session.UserID, &session.CreatedAt, &session.ExpiresAt)
+	var sessionID sql.NullString
+	err := row.Scan(&sessionID, &session.Token, &session.UserID, &session.CreatedAt, &session.ExpiresAt)
 	if err != nil {
 		return nil, false
 	}
+	if sessionID.Valid && sessionID.String != "" {
+		session.ID = sessionID.String
+	} else {
+		session.ID = legacySessionID(token)
+		_, _ = store.db.ExecContext(ctx, `UPDATE sessions SET id = $1 WHERE token = $2 AND id IS NULL`, session.ID, token)
+	}
 	return session, true
+}
+
+func legacySessionID(token string) string {
+	digest := sha256.Sum256([]byte(token))
+	return "session-sha256-" + hex.EncodeToString(digest[:])
 }
 
 func (store *SessionStore) Delete(token string) {

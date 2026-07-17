@@ -1,5 +1,6 @@
 import type {
   CodeReference,
+  DataOperationInputBinding,
   DataOperationReference,
   TriggerBinding,
 } from '@prodivix/authoring';
@@ -40,11 +41,18 @@ export type PIRValueBinding =
 
 export type PIRTriggerBinding =
   | TriggerBinding
+  | PIRDataOperationTriggerBinding
   | Readonly<{
       kind: 'emit-component-event';
       memberId: string;
       payload?: PIRValueBinding;
     }>;
+
+export type PIRDataOperationTriggerBinding = Readonly<{
+  kind: 'dispatch-data-operation';
+  operation: DataOperationReference;
+  input: DataOperationInputBinding;
+}>;
 
 export type PIRComponentPropContract = Readonly<{
   id: string;
@@ -227,7 +235,14 @@ export type PIRLogicDefinition = Readonly<{
 
 export type PIRDataOperationBinding = Readonly<{
   operation: DataOperationReference;
+  input?: DataOperationInputBinding;
+  activations?: readonly PIRDataQueryActivation[];
 }>;
+
+export type PIRDataQueryActivation =
+  | Readonly<{ kind: 'document' }>
+  | Readonly<{ kind: 'route'; routeId: string }>
+  | Readonly<{ kind: 'input-change'; dependencyId: string }>;
 
 export type PIRDocument = Readonly<{
   metadata?: Readonly<{

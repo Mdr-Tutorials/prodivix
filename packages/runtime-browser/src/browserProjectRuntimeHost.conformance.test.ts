@@ -69,7 +69,8 @@ describe('browser project runtime host conformance', () => {
     });
     const preparation = await host.prepare(
       'owner-data',
-      snapshot('data', undefined, 'reuse-if-matched', true)
+      snapshot('data', undefined, 'reuse-if-matched', true),
+      'preview'
     );
     await expect(
       host.readFile(
@@ -77,6 +78,26 @@ describe('browser project runtime host conformance', () => {
         preparation.lease
       )
     ).resolves.toContain('browser-runtime-test');
+    await expect(
+      host.readFile('public/.prodivix/data-runtime.json', preparation.lease)
+    ).resolves.toContain('"mode":"mock"');
+    const buildPreparation = await host.prepare(
+      'owner-data',
+      snapshot('data', undefined, 'reuse-if-matched', true),
+      'build'
+    );
+    await expect(
+      host.readFile(
+        'public/.prodivix/data-runtime.json',
+        buildPreparation.lease
+      )
+    ).resolves.toContain('"mode":"live"');
+    await expect(
+      host.readFile(
+        'public/.prodivix/data-mock-provision.json',
+        buildPreparation.lease
+      )
+    ).rejects.toThrow('Missing runtime file');
     await host.dispose();
   });
 

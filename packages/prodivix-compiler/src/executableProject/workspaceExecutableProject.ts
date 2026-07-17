@@ -170,6 +170,11 @@ export const generateWorkspaceReactViteExecutableProject = (
 
   const packageManager = readPackageManager(bundle.files);
   const lockFilePath = readLockFilePath(bundle.files);
+  const requiresLiveDataNetwork =
+    !options.dataMockProvision &&
+    Object.values(workspace.docsById).some(
+      (document) => document.type === 'data-source'
+    );
   const snapshot = createExecutableProjectSnapshot({
     workspace: createWorkspaceExecutionSnapshotRef(workspace),
     target: {
@@ -200,6 +205,7 @@ export const generateWorkspaceReactViteExecutableProject = (
         'console',
         'dependency-install',
         'filesystem',
+        ...(requiresLiveDataNetwork ? (['network'] as const) : []),
         'source-trace',
         'streaming-logs',
       ],

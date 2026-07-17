@@ -5,11 +5,13 @@ import type {
   PIRDocument,
   PIRUiGraph,
 } from './pir.types';
+import type { DataOperationInputBinding } from '@prodivix/authoring';
 import {
   PIR_BINDING_VALIDATION_CODES,
   validatePirBindings,
   type PIRBindingValidationOptions,
 } from './pirBindingValidator';
+import { inspectPirDataOperationInput } from './pirDataOperationInput';
 
 export const PIR_VALIDATION_CODES = {
   graphNodeId: 'PIR_GRAPH_NODE_ID',
@@ -80,6 +82,12 @@ const isDataOperationReference = (value: unknown): boolean =>
   ) &&
   isNonEmptyString(value.documentId) &&
   isNonEmptyString(value.operationId);
+
+const isCanonicalId = (value: unknown): value is string =>
+  isNonEmptyString(value) &&
+  value === value.trim() &&
+  !value.includes('\0') &&
+  value.length <= 4_096;
 
 const escapeJsonPointerSegment = (value: string) =>
   value.replace(/~/g, '~0').replace(/\//g, '~1');
@@ -824,9 +832,10 @@ const validateLogicDataBindings = (
       );
     }
     const candidate = binding as unknown;
+    const allowedKeys = new Set(['operation', 'input', 'activations']);
     if (
       !isPlainObject(candidate) ||
-      Object.keys(candidate).length !== 1 ||
+      !Object.keys(candidate).every((key) => allowedKeys.has(key)) ||
       !hasOwn(candidate, 'operation') ||
       !isDataOperationReference(candidate.operation)
     ) {
@@ -834,8 +843,95 @@ const validateLogicDataBindings = (
         issues,
         PIR_VALIDATION_CODES.dataOperationBinding,
         path,
-        'Logic data binding must contain exactly one valid DataOperationReference.'
+        'Logic data binding must contain one valid DataOperationReference and only supported Data authoring fields.'
       );
+      continue;
+    }
+    let normalizedInput: DataOperationInputBinding | undefined;
+    if (candidate.input !== undefined) {
+      try {
+        const inspected = inspectPirDataOperationInput(
+          candidate.input as DataOperationInputBinding
+        );
+        if (!inspected) throw new TypeError();
+        normalizedInput = candidate.input as DataOperationInputBinding;
+      } catch {
+        addIssue(
+          issues,
+          PIR_VALIDATION_CODES.dataOperationBinding,
+          `${path}/input`,
+          'Logic Data operation input mapping must be canonical and bounded.'
+        );
+      }
+    }
+    const inputFacts = normalizedInput
+      ? inspectPirDataOperationInput(normalizedInput)!
+      : { runtimeValueIds: new Set<string>(), usesTriggerPayload: false };
+    if (inputFacts.usesTriggerPayload) {
+      addIssue(
+        issues,
+        PIR_VALIDATION_CODES.dataOperationBinding,
+        `${path}/input`,
+        'Query input mapping cannot read a trigger payload.'
+      );
+    }
+    if (candidate.activations !== undefined) {
+      const activations = candidate.activations;
+      if (!Array.isArray(activations) || activations.length > 64) {
+        addIssue(
+          issues,
+          PIR_VALIDATION_CODES.dataOperationBinding,
+          `${path}/activations`,
+          'Logic Data query activations must be a bounded array.'
+        );
+        continue;
+      }
+      const activationKeys = new Set<string>();
+      activations.forEach((activation, index) => {
+        const activationPath = `${path}/activations/${index}`;
+        if (!isPlainObject(activation) || !isCanonicalId(activation.kind)) {
+          addIssue(
+            issues,
+            PIR_VALIDATION_CODES.dataOperationBinding,
+            activationPath,
+            'Data query activation is invalid.'
+          );
+          return;
+        }
+        const key = JSON.stringify(activation);
+        if (activationKeys.has(key)) {
+          addIssue(
+            issues,
+            PIR_VALIDATION_CODES.dataOperationBinding,
+            activationPath,
+            'Data query activations must be unique.'
+          );
+          return;
+        }
+        activationKeys.add(key);
+        if (activation.kind === 'document') {
+          if (Object.keys(activation).length === 1) return;
+        } else if (activation.kind === 'route') {
+          if (
+            Object.keys(activation).length === 2 &&
+            isCanonicalId(activation.routeId)
+          )
+            return;
+        } else if (activation.kind === 'input-change') {
+          if (
+            Object.keys(activation).length === 2 &&
+            isCanonicalId(activation.dependencyId) &&
+            inputFacts.runtimeValueIds.has(activation.dependencyId)
+          )
+            return;
+        }
+        addIssue(
+          issues,
+          PIR_VALIDATION_CODES.dataOperationBinding,
+          activationPath,
+          'Data query activation must be exact and input-change must reference a mapped runtime value.'
+        );
+      });
     }
   }
 

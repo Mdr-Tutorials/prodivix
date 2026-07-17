@@ -8,6 +8,8 @@ import { RUNTIME_ZONES } from './execution.types';
 export const EXECUTION_NETWORK_TRACE_NAME = 'network.request' as const;
 export const EXECUTION_NETWORK_TRACE_FORMAT =
   'prodivix.execution-network-trace.v1' as const;
+export const EXECUTION_NETWORK_BRIDGE_MESSAGE_TYPE =
+  'prodivix.execution-network-bridge.v1' as const;
 
 export type ExecutionNetworkTraceOutcome = 'allowed' | 'denied' | 'failed';
 
@@ -327,4 +329,33 @@ export const readExecutionNetworkTraceValue = (
   } catch {
     return undefined;
   }
+};
+
+export type ExecutionNetworkBridgeMessage = Readonly<{
+  type: typeof EXECUTION_NETWORK_BRIDGE_MESSAGE_TYPE;
+  trace: ExecutionValue;
+}>;
+
+/** Creates the only cross-origin preview message allowed to carry sanitized Network metadata. */
+export const toExecutionNetworkBridgeMessage = (
+  trace: ExecutionNetworkTrace
+): ExecutionNetworkBridgeMessage =>
+  Object.freeze({
+    type: EXECUTION_NETWORK_BRIDGE_MESSAGE_TYPE,
+    trace: toExecutionNetworkTraceValue(trace),
+  });
+
+/** Strictly decodes an untrusted iframe message without accepting headers, queries, bodies, or extra fields. */
+export const readExecutionNetworkBridgeMessage = (
+  value: unknown
+): ExecutionNetworkTrace | undefined => {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return undefined;
+  const record = value as Record<string, unknown>;
+  if (
+    Object.keys(record).some((key) => !['type', 'trace'].includes(key)) ||
+    record.type !== EXECUTION_NETWORK_BRIDGE_MESSAGE_TYPE
+  )
+    return undefined;
+  return readExecutionNetworkTraceValue(record.trace);
 };

@@ -141,6 +141,7 @@ export const compileWorkspacePirReactModules = (
   );
   const compiled = plan.dependencyFirstDocumentIds.map((documentId) =>
     compilePirReactDocument({
+      workspaceId: input.workspace.id,
       workspaceDocument: plan.documentsById[documentId]!,
       documentsById: plan.documentsById,
       moduleIdByDocumentId,

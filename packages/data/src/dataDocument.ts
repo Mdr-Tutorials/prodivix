@@ -1,5 +1,6 @@
 import { RUNTIME_ZONES, type RuntimeZone } from '@prodivix/runtime-core';
 import {
+  DATA_CACHE_POLICY_LIMITS,
   DATA_DOCUMENT_ISSUE_CODES,
   DATA_OPERATION_KINDS,
   JSON_SCHEMA_2020_12_URI,
@@ -59,6 +60,9 @@ const compareText = (left: string, right: string): number =>
 
 const escapePointerSegment = (value: string): string =>
   value.replaceAll('~', '~0').replaceAll('/', '~1');
+
+const isDataJsonPointer = (value: string): boolean =>
+  value.startsWith('/') && !/~(?:[^01]|$)/u.test(value);
 
 const childPath = (path: string, segment: string): string =>
   `${path === '/' ? '' : path}/${escapePointerSegment(segment)}`;
@@ -726,7 +730,7 @@ const parseCachePolicy = (
   const ttlMs =
     record.ttlMs === undefined
       ? undefined
-      : readSafeInteger(record.ttlMs, childPath(path, 'ttlMs'), issues, 0);
+      : readSafeInteger(record.ttlMs, childPath(path, 'ttlMs'), issues, 1);
   const staleWhileRevalidateMs =
     record.staleWhileRevalidateMs === undefined
       ? undefined
@@ -734,8 +738,33 @@ const parseCachePolicy = (
           record.staleWhileRevalidateMs,
           childPath(path, 'staleWhileRevalidateMs'),
           issues,
-          0
+          1
         );
+  if (ttlMs !== undefined && ttlMs > DATA_CACHE_POLICY_LIMITS.maxDurationMs)
+    appendIssue(
+      issues,
+      childPath(path, 'ttlMs'),
+      `Cache ttlMs must not exceed ${DATA_CACHE_POLICY_LIMITS.maxDurationMs}.`
+    );
+  if (
+    staleWhileRevalidateMs !== undefined &&
+    staleWhileRevalidateMs > DATA_CACHE_POLICY_LIMITS.maxDurationMs
+  )
+    appendIssue(
+      issues,
+      childPath(path, 'staleWhileRevalidateMs'),
+      `Cache staleWhileRevalidateMs must not exceed ${DATA_CACHE_POLICY_LIMITS.maxDurationMs}.`
+    );
+  if (
+    ttlMs !== undefined &&
+    staleWhileRevalidateMs !== undefined &&
+    ttlMs + staleWhileRevalidateMs > DATA_CACHE_POLICY_LIMITS.maxDurationMs
+  )
+    appendIssue(
+      issues,
+      path,
+      `Cache fresh and stale retention must not exceed ${DATA_CACHE_POLICY_LIMITS.maxDurationMs}.`
+    );
   let keyInputPaths: readonly string[] | undefined;
   if (record.keyInputPaths !== undefined) {
     if (!Array.isArray(record.keyInputPaths)) {
@@ -745,6 +774,14 @@ const parseCachePolicy = (
         'Expected an array.'
       );
     } else {
+      if (
+        record.keyInputPaths.length > DATA_CACHE_POLICY_LIMITS.maxKeyInputPaths
+      )
+        appendIssue(
+          issues,
+          childPath(path, 'keyInputPaths'),
+          `Cache key input paths must not exceed ${DATA_CACHE_POLICY_LIMITS.maxKeyInputPaths} entries.`
+        );
       const paths = record.keyInputPaths
         .map((item, index) =>
           readCanonicalString(
@@ -754,6 +791,14 @@ const parseCachePolicy = (
           )
         )
         .filter((item): item is string => Boolean(item));
+      paths.forEach((pointer, index) => {
+        if (!isDataJsonPointer(pointer))
+          appendIssue(
+            issues,
+            childPath(childPath(path, 'keyInputPaths'), String(index)),
+            'Cache key input paths must be RFC 6901 JSON Pointers.'
+          );
+      });
       if (new Set(paths).size !== paths.length) {
         appendIssue(
           issues,
@@ -764,12 +809,45 @@ const parseCachePolicy = (
       keyInputPaths = Object.freeze(paths);
     }
   }
+  if (record.strategy === 'no-store') {
+    if (
+      record.ttlMs !== undefined ||
+      record.staleWhileRevalidateMs !== undefined ||
+      record.keyInputPaths !== undefined
+    )
+      appendIssue(
+        issues,
+        path,
+        'no-store cache policy cannot declare cache lifetime or key fields.'
+      );
+  } else if (ttlMs === undefined) {
+    appendIssue(
+      issues,
+      childPath(path, 'ttlMs'),
+      'Stored cache policies require a positive ttlMs.'
+    );
+  }
+  if (record.strategy === 'cache-first' && staleWhileRevalidateMs !== undefined)
+    appendIssue(
+      issues,
+      childPath(path, 'staleWhileRevalidateMs'),
+      'cache-first does not accept staleWhileRevalidateMs.'
+    );
+  if (
+    record.strategy === 'stale-while-revalidate' &&
+    staleWhileRevalidateMs === undefined
+  )
+    appendIssue(
+      issues,
+      childPath(path, 'staleWhileRevalidateMs'),
+      'stale-while-revalidate requires a positive staleWhileRevalidateMs.'
+    );
   return Object.freeze({
     strategy: record.strategy as DataCachePolicy['strategy'],
     ...(ttlMs !== undefined ? { ttlMs } : {}),
     ...(staleWhileRevalidateMs !== undefined ? { staleWhileRevalidateMs } : {}),
     ...(keyInputPaths ? { keyInputPaths } : {}),
-  });
+  }) as DataCachePolicy;
 };
 
 const parseRetryPolicy = (
@@ -922,6 +1000,12 @@ const parsePaginationPolicy = (
     );
     if (!offsetInput || !limitInput || defaultLimit === undefined)
       return undefined;
+    if (offsetInput === limitInput)
+      appendIssue(
+        issues,
+        childPath(path, 'limitInput'),
+        'Pagination offsetInput and limitInput must be distinct.'
+      );
     return Object.freeze({
       kind: 'offset',
       offsetInput,
@@ -954,6 +1038,12 @@ const parsePaginationPolicy = (
   ) {
     return undefined;
   }
+  if (cursorInput === limitInput)
+    appendIssue(
+      issues,
+      childPath(path, 'limitInput'),
+      'Pagination cursorInput and limitInput must be distinct.'
+    );
   return Object.freeze({
     kind: 'cursor',
     cursorInput,
@@ -975,7 +1065,7 @@ const parseOptimisticPolicy = (
   checkExactKeys(
     record,
     new Set(['kind', 'action', 'target', 'rollback']),
-    new Set(['entityIdPath', 'valueInputPath', 'placement']),
+    new Set(['entityIdPath', 'valueInputPath', 'valueOutputPath', 'placement']),
     path,
     issues
   );
@@ -1030,6 +1120,47 @@ const parseOptimisticPolicy = (
     childPath(path, 'valueInputPath'),
     issues
   );
+  const valueOutputPath = readOptionalCanonicalString(
+    record.valueOutputPath,
+    childPath(path, 'valueOutputPath'),
+    issues
+  );
+  for (const [field, pointer] of [
+    ['entityIdPath', entityIdPath],
+    ['valueInputPath', valueInputPath],
+    ['valueOutputPath', valueOutputPath],
+  ] as const) {
+    if (pointer && !isDataJsonPointer(pointer))
+      appendIssue(
+        issues,
+        childPath(path, field),
+        `${field} must be an RFC 6901 JSON Pointer.`
+      );
+  }
+  if (
+    (record.action === 'create' || record.action === 'update') &&
+    (!valueInputPath || !valueOutputPath)
+  )
+    appendIssue(
+      issues,
+      path,
+      'Optimistic create/update requires valueInputPath and valueOutputPath.'
+    );
+  if (
+    (record.action === 'update' || record.action === 'delete') &&
+    !entityIdPath
+  )
+    appendIssue(
+      issues,
+      childPath(path, 'entityIdPath'),
+      'Optimistic update/delete requires entityIdPath.'
+    );
+  if (record.action !== 'create' && record.placement !== undefined)
+    appendIssue(
+      issues,
+      childPath(path, 'placement'),
+      'Placement is available only to optimistic create.'
+    );
   if (
     record.kind !== 'crud' ||
     (record.action !== 'create' &&
@@ -1046,6 +1177,7 @@ const parseOptimisticPolicy = (
     target,
     ...(entityIdPath ? { entityIdPath } : {}),
     ...(valueInputPath ? { valueInputPath } : {}),
+    ...(valueOutputPath ? { valueOutputPath } : {}),
     ...(record.placement === 'start' || record.placement === 'end'
       ? { placement: record.placement }
       : {}),
@@ -1187,6 +1319,16 @@ const parseOperations = (
         'Cache and pagination policies are available only to query operations.'
       );
     }
+    if (
+      rawOperation.kind === 'mutation' &&
+      policies.retry &&
+      policies.retry.maxAttempts > 1
+    )
+      appendIssue(
+        issues,
+        childPath(childPath(operationPath, 'policies'), 'retry'),
+        'Mutation retry requires an explicit idempotency contract and is not currently supported.'
+      );
     if (rawOperation.kind === 'query' && policies.optimistic) {
       appendIssue(
         issues,

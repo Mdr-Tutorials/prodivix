@@ -126,6 +126,7 @@ export {
   WORKSPACE_PIR_DATA_BINDING_PLAN_ISSUE_CODES,
   createWorkspaceCollectionDataOperationBindingTransactionPlan,
   createWorkspacePirDataOperationBindingTransactionPlan,
+  createWorkspacePirDataOperationTriggerTransactionPlan,
 } from './data/workspacePirDataOperationBindingTransaction';
 export {
   WORKSPACE_PIR_GRAPH_AUTHORING_ISSUE_CODES,
@@ -293,6 +294,7 @@ export type {
 export type {
   CreateWorkspaceCollectionDataOperationBindingTransactionInput,
   CreateWorkspacePirDataOperationBindingTransactionInput,
+  CreateWorkspacePirDataOperationTriggerTransactionInput,
   WorkspacePirDataBindingPlanIssue,
   WorkspacePirDataBindingPlanIssueCode,
   WorkspacePirDataOperationBindingTransactionPlan,

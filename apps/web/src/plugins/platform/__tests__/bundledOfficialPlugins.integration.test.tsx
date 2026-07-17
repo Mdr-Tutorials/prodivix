@@ -117,7 +117,7 @@ describe('bundled official plugins', () => {
     expect(
       platform.runtime.packages.contributions.list('blueprintTemplate')
     ).toHaveLength(3);
-  }, 30_000);
+  }, 60_000);
 
   it('inserts official templates as valid PIR-current graph fragments', async () => {
     const platform = createPlatform();

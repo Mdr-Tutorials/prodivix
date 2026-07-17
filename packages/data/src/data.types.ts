@@ -86,13 +86,30 @@ export type DataOperationKind = (typeof DATA_OPERATION_KINDS)[number];
 
 export type DataOperationReference = AuthoringDataOperationReference;
 
-export type DataCachePolicy = Readonly<{
-  strategy:
-    'no-store' | 'cache-first' | 'network-first' | 'stale-while-revalidate';
-  ttlMs?: number;
-  staleWhileRevalidateMs?: number;
-  keyInputPaths?: readonly string[];
-}>;
+export const DATA_CACHE_POLICY_LIMITS = Object.freeze({
+  maxDurationMs: 7 * 24 * 60 * 60_000,
+  maxKeyInputPaths: 64,
+} as const);
+
+export type DataCachePolicy =
+  | Readonly<{ strategy: 'no-store' }>
+  | Readonly<{
+      strategy: 'cache-first';
+      ttlMs: number;
+      keyInputPaths?: readonly string[];
+    }>
+  | Readonly<{
+      strategy: 'network-first';
+      ttlMs: number;
+      staleWhileRevalidateMs?: number;
+      keyInputPaths?: readonly string[];
+    }>
+  | Readonly<{
+      strategy: 'stale-while-revalidate';
+      ttlMs: number;
+      staleWhileRevalidateMs: number;
+      keyInputPaths?: readonly string[];
+    }>;
 
 export type DataRetryPolicy = Readonly<{
   maxAttempts: number;
@@ -129,6 +146,7 @@ export type DataOptimisticCrudEffectPolicy = Readonly<{
   target: DataOperationReference;
   entityIdPath?: string;
   valueInputPath?: string;
+  valueOutputPath?: string;
   placement?: 'start' | 'end';
   rollback: 'on-error';
 }>;

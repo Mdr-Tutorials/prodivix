@@ -11,6 +11,7 @@ import type {
 export const REACT_VITE_PACKAGE_MANAGER = 'pnpm@11.9.0';
 
 export const REACT_VITE_DEPENDENCIES = {
+  ajv: '^8.20.0',
   react: '^19.2.0',
   'react-dom': '^19.2.0',
 } as const;

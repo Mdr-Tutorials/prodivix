@@ -285,6 +285,16 @@ describe('executable project snapshot properties', () => {
         ({ path }) => path === 'public/.prodivix/data-mock-provision.json'
       )
     ).toBe(false);
+    const previewManifest = projectExecutableProjectRuntimeFiles(
+      snapshot,
+      'preview'
+    ).find(({ path }) => path === 'public/.prodivix/data-runtime.json');
+    const buildManifest = projectExecutableProjectRuntimeFiles(
+      snapshot,
+      'build'
+    ).find(({ path }) => path === 'public/.prodivix/data-runtime.json');
+    expect(previewManifest?.contents).toContain('"mode":"mock"');
+    expect(buildManifest?.contents).toContain('"mode":"live"');
     expect(() =>
       createExecutableProjectSnapshot({
         ...createInput(),
@@ -311,6 +321,15 @@ describe('executable project snapshot properties', () => {
             path: 'public/.prodivix/data-mock-provision.json',
             contents: '{}',
           },
+        ],
+      })
+    ).toThrow(/reserved for runtime projection/u);
+    expect(() =>
+      createExecutableProjectSnapshot({
+        ...createInput(),
+        files: [
+          ...createInput().files,
+          { path: 'public/.prodivix/data-runtime.json', contents: '{}' },
         ],
       })
     ).toThrow(/reserved for runtime projection/u);

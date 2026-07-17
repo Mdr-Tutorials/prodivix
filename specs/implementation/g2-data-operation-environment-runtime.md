@@ -3,10 +3,10 @@
 ## 状态
 
 - DecisionStatus：Accepted
-- ImplementationStatus：Canonical Foundation Implemented / Runtime D1-D2 In Progress
+- ImplementationStatus：Canonical Foundation Implemented / Runtime D1-D4 In Progress
 - ProductGateStatus：G2 In Progress
 - Global Phase：G2 Executable Full-stack Workspace
-- 日期：2026-07-16
+- 日期：2026-07-17
 - Owner：`@prodivix/data`、`@prodivix/data-http`、`@prodivix/data-mock`、
   `@prodivix/runtime-core`、protocol/runtime adapters、`@prodivix/prodivix-compiler`、composition root
 - 关联：
@@ -39,23 +39,45 @@ G2 完成的标志不是“能发一个 fetch”，而是同一 CRUD journey 在
 - 单个可逆 Workspace Transaction 原子写入 binding、source 与 lifecycle。
 - `ExecutionEnvironmentSnapshotRef`、`EnvironmentBindingReference`、`SecretRef` reference-only contract。
 - compiler/renderer 的 lifecycle projection port。
-- transport-safe invocation、mock/live-aware adapter registry、loading/success/empty/error execute kernel 与
-  operation/invocation/sequence/attempt Network correlation。
+- transport-safe invocation、mock/live-aware adapter registry、exact DataSourceDocument execution、
+  input/output JSON Schema 2020-12 preflight、instance-owned lifecycle stale fencing、
+  deterministic retry scheduler/backoff、offset/cursor pagination input/page fencing、
+  loading/success/empty/error execute kernel 与 operation/invocation/sequence/attempt Network correlation；
+  mutation 在没有显式 idempotency contract 时禁止自动 replay。
 - 独立 Browser live HTTP adapter/client-safe fetch，以及 session-scoped deterministic mock fixture adapter；
   mock 能在不改写 canonical source adapterId 的前提下覆盖协议 adapter。
+- `@prodivix/runtime-core` 的 environment snapshot/permission/material ports 与短期 resolution lease；exact
+  revision/mode/binding kind、adapter field、runtime zone、execution class、provider isolation、expiry/revoke
+  在 transport effect 前 fail closed。Data runtime 已接 preflight，HTTP public binding 与 server-side
+  authorization Secret 只在获准 transport callback 内消费，lease/audit/result/Network canary 不含明文。
+- Data cache policy kernel：bounded instance-owned LRU store、SHA-256 key、RFC 6901 input selection、exact
+  document/environment/runtime/adapter/target/principal partition，以及 cache-first/network-first/
+  stale-while-revalidate/no-store execution；携带 Secret binding 但缺 principal partition 时强制 no-store。
+- Data optimistic CRUD kernel：instance-owned compare-and-swap projection、invocation/sequence owner、显式
+  input/output/entity RFC 6901 mapping、authoritative reconcile、error/cancel inverse rollback，以及旧 owner
+  无权覆盖新 mutation 的 revalidation signal。
+- Data trigger/dispatch kernel：route/document/refresh/input-change/pagination/Blueprint event/CodeSlot/Test
+  typed origin，literal/trigger/runtime/object/array/CodeSlot input mapping，monotonic sequence、canonical query
+  equality、mutation dispatch identity replay fencing，以及 Browser execute composition。
+- React/Vite generated runtime 已从同一 Data current model 投影 public client live HTTP：显式 mock/live
+  runtime manifest、JSON Schema 2020-12、retry、offset/cursor response mapping、bounded SHA-256 cache、
+  optimistic CRUD/revalidation 与 sanitized Network correlation；environment/Secret 配置和非 client zone
+  在 standalone client 运行前 fail closed。Browser Preview iframe 仅允许 exact active frame/origin 的严格
+  Network bridge message 进入当前 Execution Job。
 
 ### 尚未实现
 
-- input binding、trigger、query activation、mutation dispatch 与 schema validation pipeline。
-- 生成工程 runtime 注入与完整 Remote operation 调度。
-- cache/retry/pagination/optimistic policy executor。
-- Secret resolver、runtime-zone permission、principal/session 与 environment lease。
+- production server/edge generated runtime、完整 Remote live operation gateway/CSP 调度；当前 generated live
+  纵切仅允许 public literal client HTTP。
+- production Environment/Secret store first vertical、principal/session partition 与 durable permission/audit
+  adapter 已落地；Remote create authority 已接 authenticated session 与 exact environment preflight，
+  server HTTP gateway/material resolution、key rotation/KMS adapter 与完整 cross-surface canary Gate 继续建设。
 - HTTP/OpenAPI、GraphQL、AsyncAPI importer/runtime adapter。
 - 完整 Data editor/Inspector/Issues/Network 产品旅程。
 - Preview/Test/Export 和第二 target 的 CRUD parity。
 
-当前 Web 的 lifecycle port 仍可能只提供 idle，生成工程的 resolver 仍可能返回 undefined。这是明确
-的 foundation 边界，不能描述为 Data runtime 已完成。
+当前 Browser/generated public client 与 mock lifecycle 已可执行，但 Remote live、server/edge
+environment/Secret 和第二 target 尚未闭环。这是明确边界，不能描述为完整 Data runtime。
 
 ## Canonical 与运行态边界
 
@@ -160,6 +182,12 @@ operation reference + data document revision + canonical input
 Secret value不进入 key。若无法获得安全的 principal/session partition，则受鉴权 query 默认
 `no-store`。cache entry 保存已验证 output 与 metadata，不保存 Secret、auth header 或未脱敏 trace。
 stale-while-revalidate 只能由新 sequence 更新；旧 revalidation 不覆盖新 input/revision。
+
+当前实现使用 content-only SHA-256 digest，不向 result 暴露 raw key payload；`keyInputPaths` 是 RFC 6901
+JSON Pointer。`cache-first` 只消费 fresh entry，`network-first` 仅在 retryable adapter failure 后使用
+仍在 fresh/stale retention window 内的已验证 entry；鉴权/permission 等 non-retryable failure 不回退。
+SWR stale hit 只返回 `revalidationRequired: true`，由产品层以新 sequence 显式调度，不在旧 invocation
+内启动不可见后台请求。
 
 ### Retry
 
@@ -270,11 +298,16 @@ incremental update 语义，必须先修订 ADR/current model。
 
 ### D1：Invocation 与 lifecycle kernel
 
-- [x] 定义 transport-safe invocation identity、activation、input、attempt/start、cancellation port 与
-      loading/success/empty/error execute projection；trigger dispatch 尚待产品接入。
-- [ ] query activation/refresh/input-change/pagination 与 mutation dispatch。
-- [ ] input/output JSON Schema validation、explicit empty 和 stale sequence fencing。
-- [ ] deterministic clock/scheduler/id ports 与 bounded lifecycle diagnostics。
+- [x] 定义 transport-safe invocation identity、typed trigger origin/input mapping、activation、attempt/start、
+      cancellation port 与 loading/success/empty/error execute projection。
+- [x] query route/document/refresh/input-change/pagination、Test activation 与 Blueprint event/CodeSlot/Test
+      mutation dispatch；canonical input equality、monotonic sequence、duplicate mutation identity 与
+      disconnect-after-dispatch replay 均 fail closed，Browser composition 已接入。
+- [x] exact DataSourceDocument input/output JSON Schema validation、explicit empty、bounded value/issue
+      projection，以及 instance-owned lifecycle channel 的 duplicate/stale/superseded fencing。
+- [x] deterministic retry scheduler、fixed/exponential bounded backoff、attempt lifecycle/Network correlation，
+      cancellation/supersede fencing，以及无 idempotency contract 的 mutation replay denial。
+- [x] dispatch deterministic clock/id ports；完整 bounded lifecycle diagnostics 继续建设。
 
 完成条件：in-memory fake adapter 可驱动完整 lifecycle，不依赖 React、fetch 或 provider SDK。
 
@@ -296,18 +329,33 @@ incremental update 语义，必须先修订 ADR/current model。
 
 ### D3：Environment、Secret 与 zone permission
 
-- [ ] environment snapshot resolver、binding resolver 与 revision check。
-- [ ] Secret lease/resolver、operation/adapter field/zone/provider permission matrix。
-- [ ] principal/session partition、expiry/revoke/audit metadata。
-- [ ] client-only/server gateway compile/preflight Gate 与 Secret canary suite。
+- [x] transport-neutral environment snapshot/permission/material ports、public binding resolver、exact revision/
+      mode/binding-kind check 与短期 resolution lease。
+- [x] Secret callback lease、operation/adapter field/runtime-zone/execution-class/provider-isolation permission
+      matrix；client/build、same-context/shared worker 默认拒绝，trusted isolated server path 才能注入。
+- [x] expiry/revoke、principal/session-bound resolution/cache partition 与 value-free audit metadata。
+- [x] Backend PostgreSQL production store first vertical：immutable revision、AES-256-GCM authenticated
+      encryption、exact binding/field durable grant、callback-only material 与 API/at-rest/use canary Gate。
+- [x] Data/HTTP effect 前 preflight 与首条 result/Network/audit Secret canary suite；client-only export/
+      server gateway compile Gate、Remote HTTP/material gateway composition、key rotation/KMS adapter 和
+      log/diagnostic/artifact/report/Terminal 全表面 canary 仍未完成。
 
 完成条件：未授权、错误 zone、stale environment 或缺 binding 均在执行前稳定拒绝；无明文泄漏。
 
 ### D4：HTTP runtime 与 OpenAPI importer
 
 - [x] 独立 `@prodivix/data-http` 的 Browser live HTTP 第一纵切：query scalar mapping、mutation JSON、
-      abort、safe status/error、显式 empty 与注入式 transport；timeout/schema/policy 继续建设。
-- [ ] cache/retry/pagination/optimistic policy kernel 第一实现。
+      abort、safe status/error、显式 empty、exact document schema preflight 与注入式 transport；
+      retryable HTTP status 已进入共享 retry executor；public environment configuration 和授权 server
+      Secret transport injection 已复用同一 resolution lease；timeout/完整 policy 继续建设。
+- [x] retry policy 与 offset/cursor pagination input/default/page consistency 第一实现；retry attempt 使用
+      独立 correlation，policy budget、ambiguous input 和 undeclared/missing/drift page 均 fail closed。
+- [x] bounded cache executor、canonical key partition、四种 strategy、Browser instance composition 与
+      stale revalidation signal；authenticated query 缺 principal partition 时 no-store。
+- [x] optimistic create/update/delete executor、target partition owner/version fencing、authoritative output
+      reconcile、error/cancel rollback 与 concurrent mutation property test；旧 inverse patch 不能覆盖新 owner。
+- [x] HTTP offset `totalPath` 与 cursor next/previous response path mapping；missing/invalid mapping fail closed，
+      不从 value shape 猜测 page。
 - [ ] OpenAPI import proposal、provenance、stable id、reimport diff/impact/conflict。
 - [ ] Data editor/Inspector/Issues/Network 产品纵切。
 
@@ -326,21 +374,26 @@ incremental update 语义，必须先修订 ADR/current model。
 
 - [ ] Browser 已接 protocol-neutral registry + HTTP + client-safe fetch；Remote 与 environment resolver 待接。
 - [x] Browser Network trace 已 correlation 到 operation/invocation/sequence/attempt/source trace，并进入
-      active Project Job/Session；Console/Test/Data correlation 继续建设。
+      active Project Job/Session；generated iframe 通过 strict envelope、exact origin 与 exact frame source
+      复用该 Job trace，Console/Test correlation 继续建设。
 - [ ] Browser Test Data composition 已具备 deterministic fixture、live opt-in、exact Executable Snapshot
       provisioning 与 session-namespaced CRUD cleanup；Browser Host、filesystem adapter 与 rootless Worker
       从同一 snapshot 投影 mock runtime asset。生成 React/Vite runtime 已对 PIR query binding 发布
-      loading/success/empty/error 并订阅刷新，Remote Preview/Test 通过同一 Worker 文件投影消费；standalone
-      mutation dispatch、live HTTP/policy correlation 待完成。
+      loading/success/empty/error 并订阅刷新，Remote Preview/Test 通过同一 Worker 文件投影消费；Browser
+      typed mutation dispatch 已接共享 execute kernel；standalone generated mock runtime 已执行 mutation CRUD
+      并重校验已激活 query，public client live HTTP 已执行 schema/retry/pagination/cache/optimistic 与 Network
+      correlation；Remote live gateway/CSP、server/edge environment injection 待完成。
 - [ ] disconnect/retry/cancel/timeout 不重复 mutation、不发布 stale result。
 
 完成条件：相同 snapshot/environment/fixture 在 Browser/Remote 得到相同 lifecycle/test outcome。
 
 ### D7：Compiler 与 target parity
 
-- [ ] ExportProgram/target manifest 表达 Data adapter/runtime/server gateway requirements。
-- [ ] React/Vite standalone mock query runtime 已不依赖 editor/backend 私有 runtime，并通过强制
-      install/typecheck/test/build Gate；mutation/live/policy 与完整 CRUD 仍待完成。
+- [x] React/Vite executable snapshot 对 Data runtime 显式投影 mock/live manifest；public live Data 项目声明
+      `network` capability，Test 强制 mock，missing fixture 不回退 live。server gateway requirement 待后续 target manifest。
+- [x] React/Vite standalone query/mutation runtime 已不依赖 editor/backend 私有 runtime，执行 durable
+      activation/input/event、mock CRUD 与 public client live HTTP/policy，并通过强制
+      install/typecheck/test/build Gate。
 - [ ] 单一第二 target 使用相同 Data current model、policy kernel 和 conformance fixtures。
 - [ ] client/server/edge split、Secret exclusion、install/typecheck/test/build/browser-smoke。
 
@@ -386,8 +439,10 @@ incremental update 语义，必须先修订 ADR/current model。
 ## 验收标准
 
 - [x] Canonical Data、PIR binding/lifecycle 和 reference-only environment foundation 完成。
-- [ ] query/mutation invocation、trigger、schema 和 deterministic lifecycle kernel 完成。
-- [ ] adapter registry、mock/live、policy executor 与 HTTP/OpenAPI 完成。
+- [x] query/mutation invocation、transport-neutral trigger/input dispatch、schema 和 deterministic lifecycle kernel 完成。
+- [x] PIR/Inspector trigger/input durable authoring与 React/Vite generated runtime execution projection 完成。
+- [ ] adapter registry、mock/live、policy executor 与 HTTP runtime 已形成 public client 纵切；OpenAPI、
+      server/edge gateway 与完整 Remote parity 尚待完成。
 - [ ] GraphQL 和明确冻结范围的 AsyncAPI capability 完成。
 - [ ] Environment/Secret resolver、zone permission 和 leak Gate 完成。
 - [ ] Browser/Remote Preview/Test 与 standalone 两 target CRUD parity 通过。

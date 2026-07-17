@@ -107,6 +107,7 @@ const compileTriggerHandler = (
   trigger: PIRTriggerBinding,
   scopeExpression: string,
   payloadName: string,
+  sourceExpression: string,
   context: PIRReactNodeCompileContext
 ): string => {
   if (trigger.kind === 'emit-component-event') {
@@ -118,8 +119,16 @@ const compileTriggerHandler = (
       : payloadName;
     return `(${payloadName}: unknown) => __pdxEventsById[${toJson(trigger.memberId)}]?.(${payload})`;
   }
-  return `(${payloadName}: unknown) => __pdxRuntime.dispatchTrigger({ binding: ${toJson(trigger)}, payload: ${payloadName}, scope: ${scopeExpression}, setStateById: __pdxSetStateById })`;
+  return `(${payloadName}: unknown) => __pdxRuntime.dispatchTrigger({ binding: ${toJson(trigger)}, payload: ${payloadName}, scope: ${scopeExpression}, runtimeValuesById: __pdxDataRuntimeValuesFromScope(${scopeExpression}), setStateById: __pdxSetStateById, source: ${sourceExpression} })`;
 };
+
+const compileTriggerSource = (
+  context: PIRReactNodeCompileContext,
+  nodeId: string,
+  eventName: string,
+  instancePathExpression: string
+): string =>
+  `{ documentId: ${toJson(context.documentId)}, nodeId: ${toJson(nodeId)}, eventName: ${toJson(eventName)}, instancePath: ${instancePathExpression} }`;
 
 const compileDataScopeExpression = (
   node: PIRNodeOfKind<'element'>,
@@ -272,7 +281,18 @@ export const createPirReactNodeCompiler = (
     )) {
       propExpressions.set(
         toReactEventName(eventName),
-        compileTriggerHandler(trigger, scopeExpression, '__pdxEvent', context)
+        compileTriggerHandler(
+          trigger,
+          scopeExpression,
+          '__pdxEvent',
+          compileTriggerSource(
+            context,
+            node.id,
+            eventName,
+            instancePathExpression
+          ),
+          context
+        )
       );
     }
     const propEntries = [...propExpressions.entries()]
@@ -370,7 +390,18 @@ export const createPirReactNodeCompiler = (
       .sort(([left], [right]) => compareText(left, right))
       .map(
         ([memberId, trigger]) =>
-          `${toJson(memberId)}: ${compileTriggerHandler(trigger, consumerScopeExpression, '__pdxPayload', context)}`
+          `${toJson(memberId)}: ${compileTriggerHandler(
+            trigger,
+            consumerScopeExpression,
+            '__pdxPayload',
+            compileTriggerSource(
+              context,
+              node.id,
+              memberId,
+              consumerInstancePathExpression
+            ),
+            context
+          )}`
       );
     const eventsExpression = `{ ${eventEntries.join(', ')} }`;
     const variantsExpression = compileInstanceVariantValues(node, context);
@@ -433,7 +464,7 @@ export const createPirReactNodeCompiler = (
       );
     }
     const slotsExpression = `{ ${slotEntries.join(', ')} }`;
-    return `<${targetLocal} {...{ __pdxRuntime, __pdxInstancePath: ${targetInstancePathExpression}, __pdxPropsById: ${propsExpression}, __pdxEventsById: ${eventsExpression}, __pdxVariantsById: ${variantsExpression}, __pdxSlotsById: ${slotsExpression} }} />`;
+    return `<${targetLocal} {...{ __pdxRuntime, __pdxInstancePath: ${targetInstancePathExpression}, __pdxRouteId, __pdxPropsById: ${propsExpression}, __pdxEventsById: ${eventsExpression}, __pdxVariantsById: ${variantsExpression}, __pdxSlotsById: ${slotsExpression} }} />`;
   };
 
   const compileSlotOutlet = (

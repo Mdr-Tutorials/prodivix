@@ -1,4 +1,5 @@
 import {
+  createCodeReferenceSemanticTarget,
   createComponentSymbolId,
   createDataOperationSymbolId,
   createPirNodeScopeId,
@@ -7,8 +8,10 @@ import {
   createPirParamSymbolId,
   createPirRegionSymbolId,
   createPirStateSymbolId,
+  createRouteSymbolId,
   createSemanticId,
   createWorkspaceDocumentSymbolId,
+  type DataOperationInputBinding,
   type WorkspaceDependencyContribution,
 } from '@prodivix/authoring';
 import type { PIRDocument } from '../pir.types';
@@ -190,6 +193,91 @@ const addDocumentLogicFacts = (
       resolutionMode: 'addressable',
       expectedTypeRefs: ['data-operation:query'],
       requiresDurableTarget: true,
+    });
+    const addInputReference = (
+      input: DataOperationInputBinding,
+      fieldPath: string
+    ): void => {
+      if (input.kind === 'runtime-value') {
+        contribution.references.push({
+          id: createSemanticId(
+            'pir-data-input-reference',
+            context.workspaceId,
+            context.documentId,
+            dataId,
+            fieldPath
+          ),
+          kind: 'binding',
+          sourceRef: ownerRef,
+          sourceSymbolId: symbolId,
+          scopeId: context.baseScopeId,
+          target: { kind: 'symbol-id', symbolId: input.valueId },
+          resolutionMode: 'visible',
+        });
+        return;
+      }
+      if (input.kind === 'code') {
+        const referencePath = `${fieldPath}/reference`;
+        contribution.references.push({
+          id: createSemanticId(
+            'pir-data-input-code-reference',
+            context.workspaceId,
+            context.documentId,
+            dataId,
+            referencePath
+          ),
+          kind: 'code-reference',
+          sourceRef: ownerRef,
+          sourceSymbolId: symbolId,
+          scopeId: context.baseScopeId,
+          target: createCodeReferenceSemanticTarget(
+            context.workspaceId,
+            input.reference
+          ),
+          resolutionMode:
+            input.reference.exportName && !input.reference.symbolId
+              ? 'addressable'
+              : 'visible',
+          requiresDurableTarget: true,
+        });
+        addInputReference(input.input, `${fieldPath}/input`);
+        return;
+      }
+      if (input.kind === 'object') {
+        Object.entries(input.propertiesByKey).forEach(([key, child]) =>
+          addInputReference(child, `${fieldPath}/propertiesByKey/${key}`)
+        );
+        return;
+      }
+      if (input.kind === 'array')
+        input.items.forEach((child, index) =>
+          addInputReference(child, `${fieldPath}/items/${index}`)
+        );
+    };
+    if (binding.input) addInputReference(binding.input, 'input');
+    binding.activations?.forEach((activation, index) => {
+      if (activation.kind === 'document') return;
+      contribution.references.push({
+        id: createSemanticId(
+          'pir-data-activation-reference',
+          context.workspaceId,
+          context.documentId,
+          dataId,
+          String(index)
+        ),
+        kind: 'binding',
+        sourceRef: ownerRef,
+        sourceSymbolId: symbolId,
+        scopeId: context.baseScopeId,
+        target: {
+          kind: 'symbol-id',
+          symbolId:
+            activation.kind === 'route'
+              ? createRouteSymbolId(context.workspaceId, activation.routeId)
+              : activation.dependencyId,
+        },
+        resolutionMode: 'visible',
+      });
     });
   }
 };

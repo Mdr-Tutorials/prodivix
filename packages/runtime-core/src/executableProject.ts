@@ -23,6 +23,7 @@ import {
 } from './executableProjectNormalization';
 import {
   EXECUTABLE_PROJECT_DATA_MOCK_PROVISION_PATH,
+  EXECUTABLE_PROJECT_DATA_RUNTIME_MANIFEST_PATH,
   EXECUTABLE_PROJECT_LIMITS,
   EXECUTABLE_PROJECT_SNAPSHOT_FORMAT,
   type ExecutableProjectCacheHints,
@@ -31,6 +32,7 @@ import {
   type ExecutableProjectCommand,
   type ExecutableProjectDependencyPlan,
   type ExecutableProjectDataMockProvision,
+  type ExecutableProjectDataRuntimeManifest,
   type ExecutableProjectEntrypoint,
   type ExecutableProjectEntrypointKind,
   type ExecutableProjectFile,
@@ -49,6 +51,7 @@ export {
   DEFAULT_EXECUTABLE_PROJECT_TEST_REPORT_PATH,
   EXECUTABLE_PROJECT_COMMANDS,
   EXECUTABLE_PROJECT_DATA_MOCK_PROVISION_PATH,
+  EXECUTABLE_PROJECT_DATA_RUNTIME_MANIFEST_PATH,
   EXECUTABLE_PROJECT_LIMITS,
   EXECUTABLE_PROJECT_SNAPSHOT_FORMAT,
 } from './executableProject.types';
@@ -66,6 +69,7 @@ export type {
   ExecutableProjectDataMockCollection,
   ExecutableProjectDataMockPage,
   ExecutableProjectDataMockProvision,
+  ExecutableProjectDataRuntimeManifest,
   ExecutableProjectEntrypoint,
   ExecutableProjectEntrypointKind,
   ExecutableProjectFile,
@@ -383,6 +387,14 @@ export const createExecutableProjectSnapshot = (
     throw new TypeError(
       'Executable project Data mock provision path is reserved for runtime projection.'
     );
+  if (
+    files.some(
+      (file) => file.path === EXECUTABLE_PROJECT_DATA_RUNTIME_MANIFEST_PATH
+    )
+  )
+    throw new TypeError(
+      'Executable project Data runtime manifest path is reserved for runtime projection.'
+    );
   const normalized = {
     workspace,
     target,
@@ -412,9 +424,23 @@ export const createExecutableProjectSnapshot = (
 export const projectExecutableProjectRuntimeFiles = (
   snapshot: ExecutableProjectSnapshot,
   operation?: ExecutableProjectEntrypointKind
-): readonly ExecutableProjectFile[] =>
-  Object.freeze([
+): readonly ExecutableProjectFile[] => {
+  const mode: ExecutableProjectDataRuntimeManifest['mode'] =
+    operation === 'test'
+      ? 'mock'
+      : snapshot.dataMockProvision && operation !== 'build'
+        ? 'mock'
+        : 'live';
+  const manifest: ExecutableProjectDataRuntimeManifest = Object.freeze({
+    format: 'prodivix.executable-data-runtime.v1',
+    mode,
+  });
+  return Object.freeze([
     ...snapshot.files,
+    Object.freeze({
+      path: EXECUTABLE_PROJECT_DATA_RUNTIME_MANIFEST_PATH,
+      contents: `${JSON.stringify(manifest)}\n`,
+    }),
     ...(snapshot.dataMockProvision && operation !== 'build'
       ? [
           Object.freeze({
@@ -424,6 +450,7 @@ export const projectExecutableProjectRuntimeFiles = (
         ]
       : []),
   ]);
+};
 
 /** Fails closed when an execution adapter cannot satisfy the selected project plan. */
 export const assertExecutableProjectCapabilitySupport = (

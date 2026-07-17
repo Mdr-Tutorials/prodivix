@@ -1,11 +1,15 @@
 export {
   createExecutionNetworkTrace,
+  EXECUTION_NETWORK_BRIDGE_MESSAGE_TYPE,
   EXECUTION_NETWORK_TRACE_FORMAT,
   EXECUTION_NETWORK_TRACE_NAME,
+  readExecutionNetworkBridgeMessage,
   readExecutionNetworkTraceValue,
+  toExecutionNetworkBridgeMessage,
   toExecutionNetworkTraceValue,
 } from './executionNetworkTrace';
 export type {
+  ExecutionNetworkBridgeMessage,
   ExecutionNetworkTrace,
   ExecutionNetworkCorrelation,
   ExecutionNetworkTraceOutcome,
@@ -50,6 +54,14 @@ export {
   EXECUTION_ENVIRONMENT_MODES,
 } from './executionEnvironment';
 export {
+  canResolveExecutionSecret,
+  createExecutionEnvironmentPrincipalPartitionId,
+  createExecutionEnvironmentResolutionService,
+  EXECUTION_ENVIRONMENT_EXECUTION_CLASSES,
+  EXECUTION_ENVIRONMENT_RESOLUTION_ERROR_CODES,
+  ExecutionEnvironmentResolutionError,
+} from './executionEnvironmentResolution';
+export {
   createExecutionTestReport,
   EXECUTION_TEST_REPORT_MEDIA_TYPE,
   EXECUTION_TEST_REPORT_TRACE_NAME,
@@ -67,6 +79,7 @@ export {
   DEFAULT_EXECUTABLE_PROJECT_TEST_REPORT_PATH,
   EXECUTABLE_PROJECT_COMMANDS,
   EXECUTABLE_PROJECT_DATA_MOCK_PROVISION_PATH,
+  EXECUTABLE_PROJECT_DATA_RUNTIME_MANIFEST_PATH,
   EXECUTABLE_PROJECT_LIMITS,
   EXECUTABLE_PROJECT_SNAPSHOT_FORMAT,
   normalizeExecutableProjectPath,
@@ -119,6 +132,25 @@ export type {
   SecretRef,
 } from './executionEnvironment';
 export type {
+  ExecutionEnvironmentBindingRequest,
+  ExecutionEnvironmentExecutionClass,
+  ExecutionEnvironmentPermissionDecision,
+  ExecutionEnvironmentPermissionDenial,
+  ExecutionEnvironmentPermissionGrant,
+  ExecutionEnvironmentPermissionPort,
+  ExecutionEnvironmentPrincipalPartition,
+  ExecutionEnvironmentResolutionAuditEvent,
+  ExecutionEnvironmentResolutionErrorCode,
+  ExecutionEnvironmentResolutionLease,
+  ExecutionEnvironmentResolutionLeaseMetadata,
+  ExecutionEnvironmentResolutionPurpose,
+  ExecutionEnvironmentResolutionRequest,
+  ExecutionEnvironmentResolutionService,
+  ExecutionEnvironmentSnapshot,
+  ExecutionEnvironmentSnapshotPort,
+  ExecutionSecretMaterialPort,
+} from './executionEnvironmentResolution';
+export type {
   ExecutionTestCaseResult,
   ExecutionTestCaseResultInput,
   ExecutionTestFileResult,
@@ -143,6 +175,7 @@ export type {
   ExecutableProjectDataMockCollection,
   ExecutableProjectDataMockPage,
   ExecutableProjectDataMockProvision,
+  ExecutableProjectDataRuntimeManifest,
   ExecutableProjectEntrypoint,
   ExecutableProjectEntrypointKind,
   ExecutableProjectFile,

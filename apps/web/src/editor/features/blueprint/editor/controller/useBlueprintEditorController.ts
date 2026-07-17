@@ -8,13 +8,17 @@ import {
 } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { createComponentSymbolId } from '@prodivix/authoring';
-import type { DataOperationReference } from '@prodivix/data';
+import type {
+  DataOperationInputBinding,
+  DataOperationReference,
+} from '@prodivix/data';
 import type {
   PIRCollectionPreviewInput,
   PIRCollectionProjectionLocation,
   PIRCollectionNode,
   PIRCollectionRegions,
   PIRComponentInstanceBindings,
+  PIRDataQueryActivation,
 } from '@prodivix/pir';
 import type {
   PIRRenderLocation,
@@ -800,6 +804,12 @@ export const useBlueprintEditorController = (
       );
       return;
     }
+    if (trigger.kind === 'dispatch-data-operation') {
+      setStatusMessage(
+        `Data mutation ${trigger.operation.operationId} requires an active Data execution context.`
+      );
+      return;
+    }
     setStatusMessage(
       `CodeArtifact ${trigger.reference.artifactId} requires a Code ExecutionProvider.`
     );
@@ -1035,6 +1045,8 @@ export const useBlueprintEditorController = (
         operation: DataOperationReference;
         idle: 'loading' | 'empty';
         path?: string;
+        input?: DataOperationInputBinding;
+        activations?: readonly PIRDataQueryActivation[];
       }) => {
         const outcome = await bindCollectionDataOperation(input);
         setStatusMessage(

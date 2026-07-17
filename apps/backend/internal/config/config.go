@@ -8,17 +8,22 @@ import (
 )
 
 type Config struct {
-	Address        string
-	Environment    string
-	TokenTTL       time.Duration
-	AllowedOrigins []string
-	DatabaseURL    string
-	DBMaxOpenConns int
-	DBMaxIdleConns int
-	DBMaxLifetime  time.Duration
-	GitHub         GitHubAppConfig
-	RemoteRunner   RemoteRunnerConfig
-	RemotePreview  RemotePreviewHostConfig
+	Address            string
+	Environment        string
+	TokenTTL           time.Duration
+	AllowedOrigins     []string
+	DatabaseURL        string
+	DBMaxOpenConns     int
+	DBMaxIdleConns     int
+	DBMaxLifetime      time.Duration
+	GitHub             GitHubAppConfig
+	RemoteRunner       RemoteRunnerConfig
+	RemotePreview      RemotePreviewHostConfig
+	EnvironmentSecrets EnvironmentSecretStoreConfig
+}
+
+type EnvironmentSecretStoreConfig struct {
+	MasterKey string
 }
 
 type RemoteRunnerConfig struct {
@@ -81,6 +86,9 @@ func LoadConfig() Config {
 			Token:         getEnv("REMOTE_PREVIEW_HOST_TOKEN", ""),
 			Timeout:       getEnvDuration("REMOTE_PREVIEW_HOST_TIMEOUT", 30*time.Second),
 			TTL:           getEnvDuration("REMOTE_PREVIEW_SESSION_TTL", 10*time.Minute),
+		},
+		EnvironmentSecrets: EnvironmentSecretStoreConfig{
+			MasterKey: getEnv("BACKEND_ENVIRONMENT_SECRET_KEY", ""),
 		},
 	}
 }

@@ -1,9 +1,19 @@
 import {
+  createMemoryDataOperationCacheStore,
   createDataOperationAdapterRegistry,
+  createDataOperationDispatchCoordinator,
   executeDataOperation,
-  type DataOperation,
+  type DataOperationCodeInputResolver,
+  type DataOperationDispatchRequest,
+  type DataOperationDispatchResult,
   type DataOperationInvocation,
-  type DataSourceDefinition,
+  type DataOperationCacheRuntime,
+  type DataOperationEnvironmentResolution,
+  type DataOptimisticProjectionSnapshot,
+  type DataOptimisticRuntime,
+  type DataOperationScheduler,
+  type DataLifecycleChannel,
+  type DataSourceDocument,
   type ExecuteDataOperationResult,
 } from '@prodivix/data';
 import {
@@ -23,21 +33,34 @@ import {
   createBrowserNetworkAdapter,
   type CreateBrowserNetworkAdapterOptions,
 } from '@prodivix/runtime-browser';
-import type {
-  ExecutableProjectSnapshot,
-  ExecutionNetworkTrace,
+import {
+  createExecutionEnvironmentPrincipalPartitionId,
+  type ExecutableProjectSnapshot,
+  type ExecutionNetworkTrace,
 } from '@prodivix/runtime-core';
 
 export type BrowserDataExecutionEnvironment = Readonly<{
-  execute(input: {
-    invocation: DataOperationInvocation;
-    source: DataSourceDefinition;
-    operation: DataOperation;
-    signal: AbortSignal;
-    publishNetworkTrace?(trace: ExecutionNetworkTrace): void;
-  }): Promise<ExecuteDataOperationResult>;
+  execute(input: BrowserDataExecuteInput): Promise<ExecuteDataOperationResult>;
+  dispatch(
+    input: BrowserDataDispatchInput
+  ): Promise<DataOperationDispatchResult<ExecuteDataOperationResult>>;
   dispose(): void;
 }>;
+
+export type BrowserDataExecuteContext = Readonly<{
+  document: DataSourceDocument;
+  lifecycleChannel: DataLifecycleChannel;
+  signal: AbortSignal;
+  optimistic?: DataOptimisticRuntime;
+  publishOptimistic?(snapshot: DataOptimisticProjectionSnapshot): void;
+  publishNetworkTrace?(trace: ExecutionNetworkTrace): void;
+}>;
+
+export type BrowserDataExecuteInput = BrowserDataExecuteContext &
+  Readonly<{ invocation: DataOperationInvocation }>;
+
+export type BrowserDataDispatchInput = BrowserDataExecuteContext &
+  Readonly<{ request: DataOperationDispatchRequest }>;
 
 export type BrowserDataMockProvision = Readonly<{
   fixtureSetId: string;
@@ -52,6 +75,10 @@ export type CreateBrowserDataExecutionEnvironmentOptions =
   CreateBrowserNetworkAdapterOptions &
     Readonly<{
       publishNetworkTrace?(trace: ExecutionNetworkTrace): void;
+      scheduler?: DataOperationScheduler;
+      cache?: DataOperationCacheRuntime;
+      environmentResolution?: DataOperationEnvironmentResolution;
+      codeInputResolver?: DataOperationCodeInputResolver;
       mock?: BrowserDataMockProvision;
       snapshot?: ExecutableProjectSnapshot;
       mockNamespaceId?: string;
@@ -68,6 +95,31 @@ export const createBrowserDataExecutionEnvironment = (
   options: CreateBrowserDataExecutionEnvironmentOptions = {}
 ): BrowserDataExecutionEnvironment => {
   const registry = createDataOperationAdapterRegistry();
+  const ownedCacheStore = options.cache
+    ? undefined
+    : createMemoryDataOperationCacheStore();
+  const environmentPartitionId = options.environmentResolution
+    ? createExecutionEnvironmentPrincipalPartitionId(
+        options.environmentResolution.principal
+      )
+    : undefined;
+  if (
+    options.cache?.partition &&
+    environmentPartitionId &&
+    options.cache.partition.partitionId !== environmentPartitionId
+  )
+    throw new TypeError(
+      'Browser Data cache partition does not match the environment principal/session.'
+    );
+  const cache: DataOperationCacheRuntime = Object.freeze({
+    ...(options.cache ?? {
+      store: ownedCacheStore!,
+      targetId: 'browser-data-runtime',
+    }),
+    ...(environmentPartitionId
+      ? { partition: Object.freeze({ partitionId: environmentPartitionId }) }
+      : {}),
+  });
   const network = createBrowserNetworkAdapter(options);
   registry.register(
     createDataHttpAdapter({ transport: network as DataHttpTransport })
@@ -99,21 +151,52 @@ export const createBrowserDataExecutionEnvironment = (
     });
     registry.register(mockSession.adapter);
   }
+  const execute = (
+    invocation: DataOperationInvocation,
+    input: BrowserDataExecuteContext
+  ): Promise<ExecuteDataOperationResult> =>
+    executeDataOperation({
+      registry,
+      invocation,
+      document: input.document,
+      lifecycleChannel: input.lifecycleChannel,
+      signal: input.signal,
+      cache,
+      ...(input.optimistic ? { optimistic: input.optimistic } : {}),
+      ...(input.publishOptimistic
+        ? { publishOptimistic: input.publishOptimistic }
+        : {}),
+      ...(options.now ? { now: options.now } : {}),
+      ...(options.scheduler ? { scheduler: options.scheduler } : {}),
+      ...(options.environmentResolution
+        ? { environmentResolution: options.environmentResolution }
+        : {}),
+      publishNetworkTrace(trace) {
+        options.publishNetworkTrace?.(trace);
+        input.publishNetworkTrace?.(trace);
+      },
+    });
+  const dispatcher = createDataOperationDispatchCoordinator<
+    BrowserDataExecuteContext,
+    ExecuteDataOperationResult
+  >({
+    resolveOperationKind(request, context) {
+      return context.document.operationsById[request.operation.operationId]
+        ?.kind;
+    },
+    execute,
+    ...(options.codeInputResolver
+      ? { codeInputResolver: options.codeInputResolver }
+      : {}),
+    ...(options.now ? { now: options.now } : {}),
+  });
   return Object.freeze({
-    execute: (input) =>
-      executeDataOperation({
-        registry,
-        invocation: input.invocation,
-        source: input.source,
-        operation: input.operation,
-        signal: input.signal,
-        publishNetworkTrace(trace) {
-          options.publishNetworkTrace?.(trace);
-          input.publishNetworkTrace?.(trace);
-        },
-      }),
+    execute: (input) => execute(input.invocation, input),
+    dispatch: (input) => dispatcher.dispatch(input.request, input),
     dispose() {
+      dispatcher.dispose();
       mockSession?.dispose();
+      void ownedCacheStore?.clear();
     },
   });
 };
@@ -134,6 +217,13 @@ export const createBrowserTestDataExecutionEnvironment = (
           'Browser Test Data execution denies live mode without explicit opt-in.'
         );
       return environment.execute(input);
+    },
+    dispatch(input) {
+      if (input.request.mode === 'live' && options.allowLive !== true)
+        throw new Error(
+          'Browser Test Data execution denies live mode without explicit opt-in.'
+        );
+      return environment.dispatch(input);
     },
     dispose: environment.dispose,
   });

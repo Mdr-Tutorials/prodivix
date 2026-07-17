@@ -6,6 +6,7 @@ import (
 
 	backendconfig "github.com/Prodivix/prodivix/apps/backend/internal/config"
 	backendauth "github.com/Prodivix/prodivix/apps/backend/internal/modules/auth"
+	backendenvironment "github.com/Prodivix/prodivix/apps/backend/internal/modules/environment"
 	backendgithub "github.com/Prodivix/prodivix/apps/backend/internal/modules/integrations/github"
 	backendproject "github.com/Prodivix/prodivix/apps/backend/internal/modules/project"
 	backendremoteexecution "github.com/Prodivix/prodivix/apps/backend/internal/modules/remoteexecution"
@@ -36,6 +37,10 @@ type RuntimeModules struct {
 		Store   *backendremoteexecution.Store
 		Handler *backendremoteexecution.Handler
 	}
+	Environment struct {
+		Store   *backendenvironment.Store
+		Handler *backendenvironment.Handler
+	}
 }
 
 func NewRuntimeModules(db *sql.DB, tokenTTL time.Duration, cfg backendconfig.Config) RuntimeModules {
@@ -52,7 +57,9 @@ func NewRuntimeModules(db *sql.DB, tokenTTL time.Duration, cfg backendconfig.Con
 	modules.Project.Handler = backendproject.NewHandler(modules.Project.Store, modules.Workspace.Module)
 	modules.GitHub.Handler = backendgithub.NewHandler(modules.GitHub.Store, modules.Project.Store, cfg.GitHub, cfg.Environment)
 	modules.RemoteExecution.Store = backendremoteexecution.NewStore(db)
-	modules.RemoteExecution.Handler = backendremoteexecution.NewHandler(modules.RemoteExecution.Store, cfg.RemoteRunner, cfg.RemotePreview)
+	modules.Environment.Store = backendenvironment.NewStore(db, cfg.EnvironmentSecrets.MasterKey)
+	modules.Environment.Handler = backendenvironment.NewHandler(modules.Environment.Store)
+	modules.RemoteExecution.Handler = backendremoteexecution.NewHandler(modules.RemoteExecution.Store, cfg.RemoteRunner, cfg.RemotePreview, modules.Environment.Store)
 	return modules
 }
 
@@ -70,5 +77,6 @@ func (modules RuntimeModules) Routes(requireAuth gin.HandlerFunc) Routes {
 		Project:         modules.Project.Handler.Routes(requireAuth),
 		Workspace:       modules.Workspace.Handler.Routes(requireAuth),
 		RemoteExecution: modules.RemoteExecution.Handler.Routes(requireAuth),
+		Environment:     modules.Environment.Handler.Routes(requireAuth),
 	}
 }

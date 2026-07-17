@@ -4,8 +4,12 @@ import type {
   PIRCollectionNode,
   PIRCollectionPreviewInput,
   PIRCollectionRegions,
+  PIRDataQueryActivation,
 } from '@prodivix/pir';
-import type { DataOperationReference } from '@prodivix/data';
+import type {
+  DataOperationInputBinding,
+  DataOperationReference,
+} from '@prodivix/data';
 import type { PIRRenderLocation } from '@prodivix/pir-react-renderer';
 import type { WorkspaceSnapshot } from '@prodivix/workspace';
 import { IconPickerModal } from './components/IconPickerModal';
@@ -63,6 +67,8 @@ export type BlueprintEditorInspectorProps = {
     operation: DataOperationReference;
     idle: 'loading' | 'empty';
     path?: string;
+    input?: DataOperationInputBinding;
+    activations?: readonly PIRDataQueryActivation[];
   }) => void | Promise<void>;
   onOpenDefinition: (documentId: string) => void;
   onFindReferences: (documentId: string) => void;

@@ -2,12 +2,13 @@ import { createBrowserProjectRunner } from '@prodivix/runtime-browser';
 import type {
   ExecutableProjectSnapshot,
   ExecutionJob,
+  ExecutionNetworkTrace,
   ExecutionRequest,
 } from '@prodivix/runtime-core';
 import type {
-  DataOperation,
   DataOperationInvocation,
-  DataSourceDefinition,
+  DataLifecycleChannel,
+  DataSourceDocument,
 } from '@prodivix/data';
 import {
   browserProjectRuntimeHost,
@@ -41,8 +42,8 @@ const browserDataExecutionEnvironment = createBrowserDataExecutionEnvironment({
 
 export const executeBlueprintProjectDataOperation = (input: {
   invocation: DataOperationInvocation;
-  source: DataSourceDefinition;
-  operation: DataOperation;
+  document: DataSourceDocument;
+  lifecycleChannel: DataLifecycleChannel;
   signal: AbortSignal;
 }) => browserDataExecutionEnvironment.execute(input);
 
@@ -52,6 +53,12 @@ let activeJob: ExecutionJob | undefined;
 let activeProvider: 'browser' | 'remote' | undefined;
 
 export type BlueprintProjectRunProvider = 'browser' | 'remote';
+
+/** Publishes sanitized traces emitted by the active local preview iframe into the same Execution Job. */
+export const publishBlueprintProjectNetworkTrace = (
+  trace: ExecutionNetworkTrace
+): boolean =>
+  activeProvider === 'browser' ? runner.publishNetworkTrace(trace) : false;
 
 export const startBlueprintProject = async (
   snapshot: ExecutableProjectSnapshot,

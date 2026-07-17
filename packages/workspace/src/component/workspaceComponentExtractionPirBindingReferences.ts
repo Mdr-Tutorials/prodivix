@@ -282,6 +282,24 @@ export const collectTriggerContribution = (
     );
     return;
   }
+  if (trigger.kind === 'dispatch-data-operation') {
+    contributions.push(
+      createStableExternalContribution(
+        {
+          id,
+          kind: 'data-operation-reference',
+          owner,
+          target: {
+            kind: 'data-operation',
+            documentId: trigger.operation.documentId,
+            operationId: trigger.operation.operationId,
+          },
+        },
+        'DataOperationReference uses a document-qualified stable target.'
+      )
+    );
+    return;
+  }
   contributions.push(
     createStableExternalContribution(
       {

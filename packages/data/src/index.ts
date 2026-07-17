@@ -3,9 +3,65 @@ export {
   createDataOperationAdapterRegistry,
   createDataOperationInvocation,
   createDataOperationNetworkTrace,
+  DATA_SCHEMA_RUNTIME_ERROR_CODES,
   DATA_OPERATION_ACTIVATIONS,
+  DataSchemaRuntimeError,
   executeDataOperation,
 } from './dataRuntime';
+export {
+  createDataOperationCachePlan,
+  createMemoryDataOperationCacheStore,
+  DATA_CACHE_RUNTIME_ERROR_CODES,
+  DATA_OPERATION_CACHE_STATUSES,
+  DataCacheRuntimeError,
+} from './dataCacheRuntime';
+export type {
+  DataCacheRuntimeErrorCode,
+  DataOperationCacheEntry,
+  DataOperationCachePartition,
+  DataOperationCachePlan,
+  DataOperationCacheResultMetadata,
+  DataOperationCacheRuntime,
+  DataOperationCacheStatus,
+  DataOperationCacheStore,
+} from './dataCacheRuntime';
+export {
+  createDataOperationDispatchCoordinator,
+  DATA_DISPATCH_ERROR_CODES,
+  DATA_DISPATCH_STATUSES,
+  DataOperationDispatchError,
+  normalizeDataOperationInputBinding,
+} from './dataDispatchRuntime';
+export type {
+  DataOperationCodeInputResolver,
+  DataOperationDispatchCoordinator,
+  DataOperationDispatchErrorCode,
+  DataOperationDispatchRequest,
+  DataOperationDispatchResult,
+  DataOperationDispatchStatus,
+  DataOperationInputBinding,
+  DataOperationInputContext,
+  DataOperationTriggerOrigin,
+} from './dataDispatchRuntime';
+export {
+  createDataOptimisticCrudPlan,
+  createMemoryDataOptimisticProjectionStore,
+  DATA_OPTIMISTIC_RESULT_STATUSES,
+  DATA_OPTIMISTIC_RUNTIME_ERROR_CODES,
+  DataOptimisticRuntimeError,
+} from './dataOptimisticRuntime';
+export type {
+  DataOptimisticCrudPlan,
+  DataOptimisticProjectionOwner,
+  DataOptimisticProjectionSnapshot,
+  DataOptimisticProjectionStore,
+  DataOptimisticProjectionWrite,
+  DataOptimisticResultMetadata,
+  DataOptimisticResultStatus,
+  DataOptimisticRuntime,
+  DataOptimisticRuntimeErrorCode,
+  DataOptimisticSettlement,
+} from './dataOptimisticRuntime';
 export type {
   DataOperationActivation,
   DataOperationAbortSignal,
@@ -15,9 +71,50 @@ export type {
   DataOperationAdapterRegistry,
   DataOperationAdapterResult,
   DataOperationInvocation,
+  DataSchemaRuntimeErrorCode,
   ExecuteDataOperationInput,
   ExecuteDataOperationResult,
 } from './dataRuntime';
+export {
+  DATA_ENVIRONMENT_RUNTIME_ERROR_CODES,
+  DataEnvironmentRuntimeError,
+} from './dataEnvironmentRuntime';
+export type {
+  DataEnvironmentRuntimeErrorCode,
+  DataOperationEnvironmentResolution,
+} from './dataEnvironmentRuntime';
+export {
+  applyDataPaginationInput,
+  DATA_PAGINATION_RUNTIME_ERROR_CODES,
+  DATA_RETRY_RUNTIME_ERROR_CODES,
+  DataPaginationRuntimeError,
+  DataRetryRuntimeError,
+  validateDataPaginationPage,
+} from './dataPolicyRuntime';
+export type {
+  DataOperationScheduler,
+  DataPaginationRuntimeErrorCode,
+  DataRetryRuntimeErrorCode,
+} from './dataPolicyRuntime';
+export {
+  createDataLifecycleChannel,
+  DATA_INVOCATION_ERROR_CODES,
+  DataInvocationError,
+} from './dataLifecycleChannel';
+export type {
+  DataInvocationErrorCode,
+  DataLifecycleChannel,
+  DataLifecycleLease,
+} from './dataLifecycleChannel';
+export {
+  createDataSchemaValidator,
+  defaultDataSchemaValidator,
+} from './dataSchemaValidator';
+export type {
+  DataSchemaValidationIssue,
+  DataSchemaValidationResult,
+  DataSchemaValidator,
+} from './dataSchemaValidator';
 export {
   createDataLifecycleSnapshot,
   createDataOperationReference,
@@ -38,6 +135,7 @@ export {
   DATA_SEMANTIC_PROVIDER_DESCRIPTOR,
 } from './dataSemanticContributionProvider';
 export {
+  DATA_CACHE_POLICY_LIMITS,
   DATA_LIFECYCLE_STATUSES,
   DATA_DOCUMENT_ISSUE_CODES,
   DATA_OPERATION_KINDS,

@@ -11,6 +11,7 @@ import { decodeControlledSourceManifest } from '@prodivix/authoring';
 import { createControlledCodeDocumentsPlan } from '@prodivix/prodivix-compiler';
 import type {
   PIRCollectionNode,
+  PIRDataOperationTriggerBinding,
   PIRElementNode,
   PIRUiGraph,
 } from '@prodivix/pir';
@@ -36,6 +37,7 @@ import {
   createWorkspacePIRCollectionUnwrapTransactionPlan,
   createWorkspacePIRElementBatchUpdateTransactionPlan,
   createWorkspacePIRElementUpdateTransactionPlan,
+  createWorkspacePirDataOperationTriggerTransactionPlan,
   createWorkspaceRouteIntentPlan,
   isWorkspaceCodeDocumentContent,
   selectWorkspaceAnimationDocumentResults,
@@ -61,6 +63,7 @@ import { resolveInspectorComponentMeta } from '@/editor/features/blueprint/edito
 import { resolveMountedCssEntries } from '@/editor/features/blueprint/editor/inspector/components/classProtocol/mountedCss';
 import { getPrimaryTextField } from '@/editor/features/blueprint/editor/model/blueprintText';
 import { findNodePlacement } from '@/editor/features/blueprint/editor/model/tree';
+import { createDataOperationInspectorCandidates } from '@/editor/features/blueprint/editor/inspector/domain/dataOperationInspectorModel';
 import {
   usePaletteRegistrySnapshot,
   useWebExtensionRegistrySnapshot,
@@ -86,6 +89,30 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const jsonEqual = (left: unknown, right: unknown): boolean =>
   JSON.stringify(left) === JSON.stringify(right);
+
+const toDataMutationTrigger = (
+  event: TriggerEntry
+): PIRDataOperationTriggerBinding | undefined => {
+  if (event.action !== 'executeDataMutation') return undefined;
+  const operation = isRecord(event.params.operation)
+    ? event.params.operation
+    : undefined;
+  const documentId =
+    typeof operation?.documentId === 'string'
+      ? operation.documentId.trim()
+      : '';
+  const operationId =
+    typeof operation?.operationId === 'string'
+      ? operation.operationId.trim()
+      : '';
+  if (!documentId || !operationId || !isRecord(event.params.input))
+    return undefined;
+  return {
+    kind: 'dispatch-data-operation',
+    operation: { documentId, operationId },
+    input: event.params.input as PIRDataOperationTriggerBinding['input'],
+  };
+};
 
 const findControlledCodeArtifactId = (
   workspace: WorkspaceSnapshot,
@@ -804,6 +831,10 @@ export const useBlueprintEditorInspectorController = ({
         })),
     [workspace]
   );
+  const dataMutationOptions = useMemo(
+    () => createDataOperationInspectorCandidates(workspace, 'mutation'),
+    [workspace]
+  );
   const triggerEntries = useMemo(
     () =>
       Object.entries(selectedNode?.events ?? {}).map(([key, event]) =>
@@ -1101,6 +1132,7 @@ export const useBlueprintEditorInspectorController = ({
       selectedParentNode,
       componentMeta,
       dataModelFieldPaths,
+      dispatchOperation,
       activeRouteDetails,
       canAttachLayoutToActiveRoute,
       canDetachLayoutFromActiveRoute,
@@ -1163,24 +1195,60 @@ export const useBlueprintEditorInspectorController = ({
           };
           return { ...current, events };
         }),
-      updateTrigger: (triggerKey, updater) =>
-        updateSelectedNode((current) => {
-          const raw = current.events?.[triggerKey];
-          if (!raw || raw.editable === false) return current;
-          const next = updater(toTriggerEntry(triggerKey, raw));
-          return {
-            ...current,
-            events: {
-              ...(current.events ?? {}),
-              [triggerKey]: {
-                trigger: next.trigger,
-                action: next.action,
-                params: next.params,
-                editable: true,
-              },
+      updateTrigger: (triggerKey, updater) => {
+        const raw = selectedNode?.events?.[triggerKey];
+        if (!raw || raw.editable === false) return;
+        const next = updater(toTriggerEntry(triggerKey, raw));
+        if (next.action === 'executeDataMutation') {
+          const trigger = toDataMutationTrigger(next);
+          if (!trigger || !selection || workspaceReadonly) {
+            report(
+              'Select a mutation and provide a valid typed input mapping.'
+            );
+            return;
+          }
+          const currentWorkspace = useEditorStore.getState().workspace;
+          const source =
+            currentWorkspace?.id === workspace.id
+              ? currentWorkspace
+              : workspace;
+          const plan = createWorkspacePirDataOperationTriggerTransactionPlan({
+            workspace: source,
+            baseRevision: source.workspaceRev,
+            transactionId: createWorkspaceClientOperationId(
+              'data-mutation-trigger'
+            ),
+            issuedAt: new Date().toISOString(),
+            documentId: selection.documentId,
+            nodeId: selection.nodeId,
+            previousEventName: triggerKey,
+            eventName: next.trigger,
+            replaceExisting: true,
+            trigger,
+          });
+          if (plan.status === 'rejected') {
+            report(firstPlanIssue(plan));
+            return;
+          }
+          void dispatchOperation({
+            kind: 'transaction',
+            transaction: plan.plan.transaction,
+          });
+          return;
+        }
+        updateSelectedNode((current) => ({
+          ...current,
+          events: {
+            ...(current.events ?? {}),
+            [triggerKey]: {
+              trigger: next.trigger,
+              action: next.action,
+              params: next.params,
+              editable: true,
             },
-          };
-        }),
+          },
+        }));
+      },
       removeTrigger: (triggerKey) =>
         updateSelectedNode((current) => {
           const raw = current.events?.[triggerKey];
@@ -1199,6 +1267,7 @@ export const useBlueprintEditorInspectorController = ({
         linkCapability?.triggerPolicy?.onClickWithDestination === 'warn',
       triggerEntries,
       graphOptions,
+      dataMutationOptions,
     }),
     [
       SelectedIconComponent,
@@ -1213,6 +1282,7 @@ export const useBlueprintEditorInspectorController = ({
       dataModelFieldPaths,
       expandedPanels,
       graphOptions,
+      dataMutationOptions,
       hasAnimationDefinition,
       hasOnClickTrigger,
       isAnimationMounted,
@@ -1240,6 +1310,7 @@ export const useBlueprintEditorInspectorController = ({
       selectedIconRef,
       selectedNode,
       selectedParentNode,
+      selection,
       targetPropKey,
       titlePropKey,
       togglePanel,
@@ -1247,6 +1318,7 @@ export const useBlueprintEditorInspectorController = ({
       triggerEntries,
       unmountSelectedNodeFromAnimation,
       updateSelectedNode,
+      workspace,
       workspaceReadonly,
     ]
   );

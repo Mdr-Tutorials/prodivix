@@ -85,7 +85,8 @@ const createDocument = (
           kind: 'crud',
           action: 'create',
           target: { documentId, operationId: 'list' },
-          valueInputPath: 'item',
+          valueInputPath: '/item',
+          valueOutputPath: '/item',
           placement: 'start',
           rollback: 'on-error',
         },
@@ -151,6 +152,121 @@ describe('Data source document properties', () => {
     expect(
       result.issues.some((entry) => entry.message.includes('Secret references'))
     ).toBe(true);
+  });
+
+  it('rejects mutation replay and ambiguous pagination input fields', () => {
+    const document = createDocument('data-doc', 'api');
+    const result = validateDataSourceDocument({
+      ...document,
+      operationsById: {
+        ...document.operationsById,
+        list: {
+          ...document.operationsById.list!,
+          policies: {
+            pagination: {
+              kind: 'offset',
+              offsetInput: 'page',
+              limitInput: 'page',
+              defaultLimit: 20,
+            },
+          },
+        },
+        create: {
+          ...document.operationsById.create!,
+          policies: {
+            retry: {
+              maxAttempts: 2,
+              backoff: 'fixed',
+              initialDelayMs: 10,
+            },
+          },
+        },
+      },
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: '/operationsById/list/policies/pagination/limitInput',
+        }),
+        expect.objectContaining({
+          path: '/operationsById/create/policies/retry',
+        }),
+      ])
+    );
+  });
+
+  it('rejects ambiguous cache lifetime and non-JSON-Pointer key selection', () => {
+    const document = createDocument('data-doc', 'api');
+    const invalidPolicies = [
+      {
+        strategy: 'stale-while-revalidate',
+        staleWhileRevalidateMs: 1_000,
+        keyInputPaths: ['filters.tenant', '/filters/~2tenant'],
+      },
+      { strategy: 'no-store', ttlMs: 1_000 },
+      { strategy: 'cache-first', ttlMs: 1_000, staleWhileRevalidateMs: 500 },
+    ];
+
+    for (const cache of invalidPolicies) {
+      const result = validateDataSourceDocument({
+        ...document,
+        operationsById: {
+          ...document.operationsById,
+          list: {
+            ...document.operationsById.list!,
+            policies: { cache },
+          },
+        },
+      });
+      expect(result.valid).toBe(false);
+      expect(
+        result.issues.some(
+          (issue) =>
+            issue.path.includes('/policies/cache') &&
+            (issue.message.includes('ttlMs') ||
+              issue.message.includes('JSON Pointers') ||
+              issue.message.includes('no-store') ||
+              issue.message.includes('cache-first'))
+        )
+      ).toBe(true);
+    }
+  });
+
+  it('rejects optimistic effects without explicit identity and value mappings', () => {
+    const document = createDocument('data-doc', 'api');
+    const result = validateDataSourceDocument({
+      ...document,
+      operationsById: {
+        ...document.operationsById,
+        create: {
+          ...document.operationsById.create!,
+          policies: {
+            optimistic: {
+              kind: 'crud',
+              action: 'update',
+              target: { documentId: 'data-doc', operationId: 'list' },
+              entityIdPath: 'id',
+              valueInputPath: '/item',
+              rollback: 'on-error',
+            },
+          },
+        },
+      },
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: '/operationsById/create/policies/optimistic/entityIdPath',
+        }),
+        expect.objectContaining({
+          path: '/operationsById/create/policies/optimistic',
+        }),
+      ])
+    );
   });
 
   it('preserves lifecycle time ordering for arbitrary valid timestamps', () => {

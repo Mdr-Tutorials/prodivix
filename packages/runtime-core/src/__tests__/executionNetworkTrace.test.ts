@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   createExecutionNetworkTrace,
   EXECUTION_NETWORK_TRACE_NAME,
+  readExecutionNetworkBridgeMessage,
   readExecutionNetworkTraceValue,
+  toExecutionNetworkBridgeMessage,
   toExecutionNetworkTraceValue,
 } from '../executionNetworkTrace';
 
@@ -44,6 +46,15 @@ describe('execution Network trace', () => {
     expect(
       readExecutionNetworkTraceValue(toExecutionNetworkTraceValue(trace))
     ).toEqual(trace);
+    expect(
+      readExecutionNetworkBridgeMessage(toExecutionNetworkBridgeMessage(trace))
+    ).toEqual(trace);
+    expect(
+      readExecutionNetworkBridgeMessage({
+        ...toExecutionNetworkBridgeMessage(trace),
+        authorization: 'secret',
+      })
+    ).toBeUndefined();
   });
 
   it('rejects credentials, paths, queries, and fragments', () => {

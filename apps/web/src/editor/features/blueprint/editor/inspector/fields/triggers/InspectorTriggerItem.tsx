@@ -5,6 +5,7 @@ import type { TriggerEntry } from '@/editor/features/blueprint/editor/inspector/
 import { useInspectorContext } from '@/editor/features/blueprint/editor/inspector/InspectorContext';
 import { TriggerNavigateFields } from './TriggerNavigateFields';
 import { TriggerGraphFields } from './TriggerGraphFields';
+import { TriggerDataMutationFields } from './TriggerDataMutationFields';
 
 const DOM_EVENT_TRIGGERS = [
   'onClick',
@@ -28,21 +29,30 @@ const BUILT_IN_ACTION_OPTIONS = [
     label: 'Execute Graph',
     labelKey: 'inspector.groups.triggers.actions.executeGraph',
   },
+  {
+    value: 'executeDataMutation',
+    label: 'Execute Data Mutation',
+    labelKey: 'inspector.groups.triggers.actions.executeDataMutation',
+  },
 ] as const;
 type BuiltInActionName = (typeof BUILT_IN_ACTION_OPTIONS)[number]['value'];
 const normalizeBuiltInAction = (
   value: string | undefined
 ): BuiltInActionName =>
-  value === 'executeGraph' ? 'executeGraph' : 'navigate';
+  value === 'executeGraph' || value === 'executeDataMutation'
+    ? value
+    : 'navigate';
 const createDefaultActionParams = (
   action: BuiltInActionName
 ): Record<string, unknown> =>
   action === 'executeGraph'
     ? { graphMode: 'existing', graphId: '' }
-    : { to: '' };
+    : action === 'executeDataMutation'
+      ? { operation: {}, input: { kind: 'literal', value: null } }
+      : { to: '' };
 
 export function InspectorTriggerItem({ item }: { item: TriggerEntry }) {
-  const { t, graphOptions, updateTrigger, removeTrigger } =
+  const { t, graphOptions, dataMutationOptions, updateTrigger, removeTrigger } =
     useInspectorContext();
   const editable = item.editable !== false;
   const toValue = typeof item.params.to === 'string' ? item.params.to : '';
@@ -72,6 +82,30 @@ export function InspectorTriggerItem({ item }: { item: TriggerEntry }) {
       : item.params.state === undefined
         ? ''
         : JSON.stringify(item.params.state);
+  const dataOperation =
+    item.params.operation &&
+    typeof item.params.operation === 'object' &&
+    !Array.isArray(item.params.operation)
+      ? (item.params.operation as {
+          documentId?: unknown;
+          operationId?: unknown;
+        })
+      : undefined;
+  const selectedDataOperation =
+    typeof dataOperation?.documentId === 'string' &&
+    typeof dataOperation.operationId === 'string'
+      ? {
+          documentId: dataOperation.documentId,
+          operationId: dataOperation.operationId,
+        }
+      : dataMutationOptions[0]?.reference;
+  const dataInput =
+    item.params.input &&
+    typeof item.params.input === 'object' &&
+    !Array.isArray(item.params.input)
+      ? (item.params
+          .input as import('@prodivix/data').DataOperationInputBinding)
+      : undefined;
 
   useEffect(() => {
     if (!editable) return;
@@ -154,14 +188,20 @@ export function InspectorTriggerItem({ item }: { item: TriggerEntry }) {
               defaultValue: 'Choose what should run when the event is fired.',
             })}
             onChange={(event) => {
+              const action = normalizeBuiltInAction(
+                event.target.value as BuiltInActionName
+              );
+              const params = createDefaultActionParams(action);
               updateTrigger(item.key, (currentEvent) => ({
                 ...currentEvent,
-                action: event.target.value,
-                params: createDefaultActionParams(
-                  normalizeBuiltInAction(
-                    event.target.value as BuiltInActionName
-                  )
-                ),
+                action,
+                params:
+                  action === 'executeDataMutation' && dataMutationOptions[0]
+                    ? {
+                        ...params,
+                        operation: dataMutationOptions[0].reference,
+                      }
+                    : params,
               }));
             }}
           >
@@ -205,12 +245,19 @@ export function InspectorTriggerItem({ item }: { item: TriggerEntry }) {
           stateValue={stateValue}
           disabled={!editable}
         />
-      ) : (
+      ) : actionValue === 'executeGraph' ? (
         <TriggerGraphFields
           itemKey={item.key}
           graphMode={graphMode}
           graphName={graphName}
           selectedGraphId={selectedGraphId}
+          disabled={!editable}
+        />
+      ) : (
+        <TriggerDataMutationFields
+          itemKey={item.key}
+          operation={selectedDataOperation}
+          input={dataInput}
           disabled={!editable}
         />
       )}

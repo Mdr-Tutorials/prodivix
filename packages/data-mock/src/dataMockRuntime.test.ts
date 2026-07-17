@@ -1,10 +1,12 @@
 import {
+  createDataLifecycleChannel,
   createDataOperationAdapterRegistry,
   createDataOperationInvocation,
   executeDataOperation,
   type DataOperation,
   type DataOperationAdapter,
   type DataJsonValue,
+  type DataSourceDocument,
   type DataSourceDefinition,
 } from '@prodivix/data';
 import { describe, expect, it } from 'vitest';
@@ -32,6 +34,24 @@ const source: DataSourceDefinition = {
   runtimeZone: 'client',
   bindingsById: {},
   configurationByKey: {},
+};
+
+const document = (
+  operationId: string,
+  kind: DataOperation['kind'],
+  policies: DataOperation['policies'] = {}
+): DataSourceDocument => {
+  const selectedOperation = { ...operation(operationId, kind), policies };
+  return {
+    source,
+    schemasById: {
+      [selectedOperation.outputSchemaId]: {
+        id: selectedOperation.outputSchemaId,
+        schema: true,
+      },
+    },
+    operationsById: { [operationId]: selectedOperation },
+  };
 };
 
 const invocation = (
@@ -87,7 +107,7 @@ describe('deterministic Data mock runtime', () => {
               operationId: 'list',
             },
             operationKind: 'query',
-            input: { page: 2 },
+            input: { limit: 20, offset: 20 },
             behavior: {
               kind: 'result',
               value: [],
@@ -109,9 +129,18 @@ describe('deterministic Data mock runtime', () => {
     registry.register(session.adapter);
     const result = await executeDataOperation({
       registry,
-      invocation: invocation('list', { page: 2 }),
-      source,
-      operation: operation('list', 'query'),
+      invocation: invocation('list', { offset: 20 }),
+      document: document('list', 'query', {
+        pagination: {
+          kind: 'offset',
+          offsetInput: 'offset',
+          limitInput: 'limit',
+          defaultLimit: 20,
+          maxLimit: 100,
+          totalPath: '/total',
+        },
+      }),
+      lifecycleChannel: createDataLifecycleChannel(),
       signal: new AbortController().signal,
       now: () => 125,
     });
@@ -208,8 +237,8 @@ describe('deterministic Data mock runtime', () => {
       executeDataOperation({
         registry,
         invocation: invocation(operationId, {}),
-        source,
-        operation: operation(operationId, 'query'),
+        document: document(operationId, 'query'),
+        lifecycleChannel: createDataLifecycleChannel(),
         signal: new AbortController().signal,
       });
 
@@ -301,8 +330,8 @@ describe('deterministic Data mock runtime', () => {
       executeDataOperation({
         registry,
         invocation: invocation('list', {}),
-        source,
-        operation: operation('list', 'query'),
+        document: document('list', 'query'),
+        lifecycleChannel: createDataLifecycleChannel(),
         signal: new AbortController().signal,
       })
     ).resolves.toMatchObject({
@@ -407,8 +436,8 @@ describe('deterministic Data mock runtime', () => {
       executeDataOperation({
         registry: adapterRegistry,
         invocation: invocation(operationId, input),
-        source,
-        operation: operation(operationId, kind),
+        document: document(operationId, kind),
+        lifecycleChannel: createDataLifecycleChannel(),
         signal: new AbortController().signal,
       });
 
@@ -498,8 +527,8 @@ describe('deterministic Data mock runtime', () => {
       executeDataOperation({
         registry,
         invocation: invocation('list', {}),
-        source,
-        operation: operation('list', 'query'),
+        document: document('list', 'query'),
+        lifecycleChannel: createDataLifecycleChannel(),
         signal: new AbortController().signal,
       })
     ).resolves.toMatchObject({

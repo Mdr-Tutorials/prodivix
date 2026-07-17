@@ -40,12 +40,16 @@ func NewHandler(users *UserStore, sessions *SessionStore, tokenTTL time.Duration
 func (handler *Handler) RequireAuth() gin.HandlerFunc {
 	return RequireAuth(
 		ResolveToken,
-		func(token string) (string, bool) {
+		func(token string) (*AuthenticatedSession, bool) {
 			session, ok := handler.sessions.Get(token)
 			if !ok {
-				return "", false
+				return nil, false
 			}
-			return session.UserID, true
+			return &AuthenticatedSession{
+				ID:        session.ID,
+				UserID:    session.UserID,
+				ExpiresAt: session.ExpiresAt.UnixMilli(),
+			}, true
 		},
 		func(userID string) (*User, bool) {
 			return handler.users.GetByID(userID)

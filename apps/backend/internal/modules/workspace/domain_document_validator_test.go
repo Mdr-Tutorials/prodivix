@@ -73,6 +73,46 @@ func TestStandaloneDomainDocumentValidation(t *testing.T) {
 			content:      `{"wireVersion":1,"source":{"id":"catalog","adapterId":"rest","runtimeZone":"server","bindingsById":{"api-key":{"kind":"secret-ref","reference":{"bindingId":"api-key"},"value":"plaintext"}},"configurationByKey":{}},"schemasById":{"product-list":{"id":"product-list","schema":true}},"operationsById":{"list-products":{"id":"list-products","kind":"query","outputSchemaId":"product-list","configurationByKey":{},"policies":{}}}}`,
 			wantError:    ErrDataSourceValidationFailed,
 		},
+		{
+			name:         "data source cache policy current",
+			documentType: WorkspaceDocumentTypeDataSource,
+			content:      `{"wireVersion":1,"source":{"id":"catalog","adapterId":"rest","runtimeZone":"server","bindingsById":{},"configurationByKey":{}},"schemasById":{"products":{"id":"products","schema":true}},"operationsById":{"list-products":{"id":"list-products","kind":"query","outputSchemaId":"products","configurationByKey":{},"policies":{"cache":{"strategy":"stale-while-revalidate","ttlMs":1000,"staleWhileRevalidateMs":5000,"keyInputPaths":["/tenant","/filters/~0tag"]}}}}}`,
+		},
+		{
+			name:         "data source rejects cache without ttl",
+			documentType: WorkspaceDocumentTypeDataSource,
+			content:      `{"wireVersion":1,"source":{"id":"catalog","adapterId":"rest","runtimeZone":"server","bindingsById":{},"configurationByKey":{}},"schemasById":{"products":{"id":"products","schema":true}},"operationsById":{"list-products":{"id":"list-products","kind":"query","outputSchemaId":"products","configurationByKey":{},"policies":{"cache":{"strategy":"cache-first"}}}}}`,
+			wantError:    ErrDataSourceValidationFailed,
+		},
+		{
+			name:         "data source rejects non pointer cache key",
+			documentType: WorkspaceDocumentTypeDataSource,
+			content:      `{"wireVersion":1,"source":{"id":"catalog","adapterId":"rest","runtimeZone":"server","bindingsById":{},"configurationByKey":{}},"schemasById":{"products":{"id":"products","schema":true}},"operationsById":{"list-products":{"id":"list-products","kind":"query","outputSchemaId":"products","configurationByKey":{},"policies":{"cache":{"strategy":"network-first","ttlMs":1000,"keyInputPaths":["tenant.id"]}}}}}`,
+			wantError:    ErrDataSourceValidationFailed,
+		},
+		{
+			name:         "data source optimistic policy current",
+			documentType: WorkspaceDocumentTypeDataSource,
+			content:      `{"wireVersion":1,"source":{"id":"catalog","adapterId":"rest","runtimeZone":"server","bindingsById":{},"configurationByKey":{}},"schemasById":{"product":{"id":"product","schema":true}},"operationsById":{"list-products":{"id":"list-products","kind":"query","outputSchemaId":"product","configurationByKey":{},"policies":{}},"update-product":{"id":"update-product","kind":"mutation","outputSchemaId":"product","configurationByKey":{},"policies":{"optimistic":{"kind":"crud","action":"update","target":{"documentId":"data-products","operationId":"list-products"},"entityIdPath":"/id","valueInputPath":"/item","valueOutputPath":"/item","rollback":"on-error"}}}}}`,
+		},
+		{
+			name:         "data source rejects incomplete optimistic mapping",
+			documentType: WorkspaceDocumentTypeDataSource,
+			content:      `{"wireVersion":1,"source":{"id":"catalog","adapterId":"rest","runtimeZone":"server","bindingsById":{},"configurationByKey":{}},"schemasById":{"product":{"id":"product","schema":true}},"operationsById":{"update-product":{"id":"update-product","kind":"mutation","outputSchemaId":"product","configurationByKey":{},"policies":{"optimistic":{"kind":"crud","action":"update","target":{"documentId":"data-products","operationId":"list-products"},"entityIdPath":"id","valueInputPath":"/item","rollback":"on-error"}}}}}`,
+			wantError:    ErrDataSourceValidationFailed,
+		},
+		{
+			name:         "data source rejects automatic mutation retry",
+			documentType: WorkspaceDocumentTypeDataSource,
+			content:      `{"wireVersion":1,"source":{"id":"catalog","adapterId":"rest","runtimeZone":"server","bindingsById":{},"configurationByKey":{}},"schemasById":{"product":{"id":"product","schema":true}},"operationsById":{"create-product":{"id":"create-product","kind":"mutation","outputSchemaId":"product","configurationByKey":{},"policies":{"retry":{"maxAttempts":2,"backoff":"fixed","initialDelayMs":10}}}}}`,
+			wantError:    ErrDataSourceValidationFailed,
+		},
+		{
+			name:         "data source rejects ambiguous pagination inputs",
+			documentType: WorkspaceDocumentTypeDataSource,
+			content:      `{"wireVersion":1,"source":{"id":"catalog","adapterId":"rest","runtimeZone":"server","bindingsById":{},"configurationByKey":{}},"schemasById":{"products":{"id":"products","schema":true}},"operationsById":{"list-products":{"id":"list-products","kind":"query","outputSchemaId":"products","configurationByKey":{},"policies":{"pagination":{"kind":"offset","offsetInput":"page","limitInput":"page","defaultLimit":20}}}}}`,
+			wantError:    ErrDataSourceValidationFailed,
+		},
 	}
 
 	for _, test := range tests {

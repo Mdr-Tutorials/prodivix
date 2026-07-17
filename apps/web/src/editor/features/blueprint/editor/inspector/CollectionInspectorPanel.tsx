@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, CircleAlert } from 'lucide-react';
-import type { DataOperationReference } from '@prodivix/data';
+import type {
+  DataOperationInputBinding,
+  DataOperationReference,
+} from '@prodivix/data';
 import {
   PIR_COLLECTION_PREVIEW_STATES,
   type PIRCollectionKeyBinding,
   type PIRCollectionPreviewInput,
   type PIRCollectionPreviewState,
   type PIRCollectionSourceBinding,
+  type PIRDataQueryActivation,
   type PIRJsonValue,
 } from '@prodivix/pir';
 import type {
@@ -34,6 +38,8 @@ export type CollectionInspectorPanelProps = Readonly<{
     operation: DataOperationReference;
     idle: 'loading' | 'empty';
     path?: string;
+    input?: DataOperationInputBinding;
+    activations?: readonly PIRDataQueryActivation[];
   }) => void;
   onKeyChange: (key: PIRCollectionKeyBinding) => void;
   onSymbolNameChange: (
@@ -179,6 +185,14 @@ export function CollectionInspectorPanel({
   const [resultPathDraft, setResultPathDraft] = useState(
     operationBinding?.path ?? ''
   );
+  const operationInputText = JSON.stringify(
+    operationBinding?.input ?? { kind: 'literal', value: {} },
+    null,
+    2
+  );
+  const [operationInputDraft, setOperationInputDraft] =
+    useState(operationInputText);
+  const [operationInputError, setOperationInputError] = useState<string>();
 
   useEffect(() => {
     setLiteralDraft(literalSourceText);
@@ -188,6 +202,11 @@ export function CollectionInspectorPanel({
   useEffect(() => {
     setResultPathDraft(operationBinding?.path ?? '');
   }, [operationBinding?.dataId, operationBinding?.path]);
+
+  useEffect(() => {
+    setOperationInputDraft(operationInputText);
+    setOperationInputError(undefined);
+  }, [operationInputText]);
 
   const sourceCandidateId =
     model.source.kind === 'binding'
@@ -218,6 +237,8 @@ export function CollectionInspectorPanel({
           dataId: createCollectionDataId(model),
           operation: candidate.reference,
           idle: 'loading',
+          input: { kind: 'literal', value: {} },
+          activations: [{ kind: 'document' }],
         });
       }
       return;
@@ -232,6 +253,8 @@ export function CollectionInspectorPanel({
       operation: DataOperationReference;
       idle: 'loading' | 'empty';
       path: string;
+      input: DataOperationInputBinding;
+      activations: readonly PIRDataQueryActivation[];
     }>
   ) => {
     if (!operationBinding) return;
@@ -240,6 +263,14 @@ export function CollectionInspectorPanel({
       dataId: operationBinding.dataId,
       operation: next.operation ?? operationBinding.operation,
       idle: next.idle ?? operationBinding.idle,
+      ...((next.input ?? operationBinding.input)
+        ? { input: next.input ?? operationBinding.input }
+        : {}),
+      ...((next.activations ?? operationBinding.activations)
+        ? {
+            activations: next.activations ?? operationBinding.activations ?? [],
+          }
+        : {}),
       ...(path ? { path } : {}),
     });
   };
@@ -248,6 +279,32 @@ export function CollectionInspectorPanel({
     const nextPath = resultPathDraft.trim();
     if (nextPath === (operationBinding?.path ?? '')) return;
     updateDataOperation({ path: nextPath });
+  };
+
+  const commitOperationInput = () => {
+    try {
+      const parsed = JSON.parse(
+        operationInputDraft
+      ) as DataOperationInputBinding;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+        throw new TypeError();
+      setOperationInputError(undefined);
+      updateDataOperation({ input: parsed });
+    } catch {
+      setOperationInputError('Enter a valid typed Data input binding.');
+    }
+  };
+
+  const toggleDocumentActivation = (enabled: boolean) => {
+    const current = operationBinding?.activations ?? [];
+    updateDataOperation({
+      activations: enabled
+        ? [
+            ...current.filter(({ kind }) => kind !== 'document'),
+            { kind: 'document' },
+          ]
+        : current.filter(({ kind }) => kind !== 'document'),
+    });
   };
 
   const changeKeyMode = (kind: 'index' | 'binding') => {
@@ -443,6 +500,42 @@ export function CollectionInspectorPanel({
                 <option value="empty">Empty</option>
               </select>
             </InspectorField>
+            <InspectorField label="Auto run">
+              <label className="inline-flex items-center gap-2 text-[10px] text-(--text-secondary)">
+                <input
+                  type="checkbox"
+                  checked={Boolean(
+                    operationBinding.activations?.some(
+                      ({ kind }) => kind === 'document'
+                    )
+                  )}
+                  disabled={disabled}
+                  onChange={(event) =>
+                    toggleDocumentActivation(event.currentTarget.checked)
+                  }
+                />
+                On document instance
+              </label>
+            </InspectorField>
+            <label className="flex flex-col gap-1 text-[10px] text-(--text-muted)">
+              <span>Typed input mapping</span>
+              <textarea
+                className={`${controlClassName} min-h-24 resize-y py-1.5 font-mono leading-4`}
+                value={operationInputDraft}
+                disabled={disabled}
+                spellCheck={false}
+                onChange={(event) =>
+                  setOperationInputDraft(event.currentTarget.value)
+                }
+                onBlur={commitOperationInput}
+              />
+              {operationInputError ? (
+                <span className="flex items-center gap-1 text-[9px] text-(--danger-default)">
+                  <CircleAlert size={10} />
+                  {operationInputError}
+                </span>
+              ) : null}
+            </label>
             <p className="m-0 text-[9px] leading-4 text-(--text-muted)">
               Runtime status maps to loading, item, empty, and error regions;
               success never infers empty from the result shape.

@@ -2,6 +2,7 @@ import {
   createExecutionNetworkTrace,
   RUNTIME_ZONES,
   type ExecutionEnvironmentSnapshotRef,
+  type ExecutionEnvironmentResolutionLease,
   type ExecutionNetworkCorrelation,
   type ExecutionNetworkTrace,
   type ExecutionSourceTrace,
@@ -15,9 +16,48 @@ import type {
   DataOperationReference,
   DataPageSnapshot,
   DataSourceDefinition,
+  DataSourceDocument,
 } from './data.types';
+import type { DataOperationTriggerOrigin } from './dataDispatchRuntime';
 import { DATA_OPERATION_KINDS } from './data.types';
+import {
+  createDataOperationCachePlan,
+  type DataOperationCacheResultMetadata,
+  type DataOperationCacheRuntime,
+} from './dataCacheRuntime';
 import { createDataLifecycleSnapshot } from './dataDocument';
+import {
+  resolveDataOperationEnvironment,
+  type DataOperationEnvironmentResolution,
+} from './dataEnvironmentRuntime';
+import { cloneDataJsonValue } from './dataJsonRuntime';
+import {
+  DATA_INVOCATION_ERROR_CODES,
+  DataInvocationError,
+  type DataLifecycleChannel,
+} from './dataLifecycleChannel';
+import {
+  createDataOptimisticCrudPlan,
+  type DataOptimisticCrudPlan,
+  type DataOptimisticProjectionSnapshot,
+  type DataOptimisticResultMetadata,
+  type DataOptimisticRuntime,
+} from './dataOptimisticRuntime';
+import {
+  applyDataPaginationInput,
+  calculateDataRetryDelay,
+  DATA_RETRY_RUNTIME_ERROR_CODES,
+  DataRetryRuntimeError,
+  defaultDataOperationScheduler,
+  resolveDataRetryPolicy,
+  validateDataPaginationPage,
+  type DataOperationScheduler,
+} from './dataPolicyRuntime';
+import {
+  defaultDataSchemaValidator,
+  type DataSchemaValidationIssue,
+  type DataSchemaValidator,
+} from './dataSchemaValidator';
 
 export const DATA_OPERATION_ACTIVATIONS = Object.freeze([
   'document',
@@ -26,6 +66,7 @@ export const DATA_OPERATION_ACTIVATIONS = Object.freeze([
   'input-change',
   'pagination',
   'event',
+  'code-slot',
   'test',
 ] as const);
 export type DataOperationActivation =
@@ -41,6 +82,7 @@ export type DataOperationInvocation = Readonly<{
   runtimeZone: RuntimeZone;
   mode: 'mock' | 'live';
   activation: DataOperationActivation;
+  trigger?: DataOperationTriggerOrigin;
   input: DataJsonValue;
   environment?: ExecutionEnvironmentSnapshotRef;
   sourceTrace?: readonly ExecutionSourceTrace[];
@@ -71,6 +113,7 @@ export type DataOperationAdapterInput = Readonly<{
   invocation: DataOperationInvocation;
   source: DataSourceDefinition;
   operation: DataOperation;
+  environment?: ExecutionEnvironmentResolutionLease;
   signal: DataOperationAbortSignal;
   publishNetworkTrace(trace: ExecutionNetworkTrace): void;
 }>;
@@ -99,11 +142,17 @@ export type DataOperationAdapterRegistry = Readonly<{
 export type ExecuteDataOperationInput = Readonly<{
   registry: DataOperationAdapterRegistry;
   invocation: DataOperationInvocation;
-  source: DataSourceDefinition;
-  operation: DataOperation;
+  document: DataSourceDocument;
+  lifecycleChannel: DataLifecycleChannel;
   signal: DataOperationAbortSignal;
+  cache?: DataOperationCacheRuntime;
+  optimistic?: DataOptimisticRuntime;
+  environmentResolution?: DataOperationEnvironmentResolution;
+  schemaValidator?: DataSchemaValidator;
+  scheduler?: DataOperationScheduler;
   now?: () => number;
   publishLifecycle?(snapshot: DataLifecycleSnapshot): void;
+  publishOptimistic?(snapshot: DataOptimisticProjectionSnapshot): void;
   publishNetworkTrace?(trace: ExecutionNetworkTrace): void;
 }>;
 
@@ -111,26 +160,145 @@ export type ExecuteDataOperationResult = Readonly<{
   result: DataOperationAdapterResult;
   lifecycle: DataLifecycleSnapshot;
   networkTraces: readonly ExecutionNetworkTrace[];
+  cache: DataOperationCacheResultMetadata;
+  optimistic: DataOptimisticResultMetadata;
 }>;
+
+export const DATA_SCHEMA_RUNTIME_ERROR_CODES = Object.freeze({
+  missing: 'DATA_SCHEMA_MISSING',
+  unsupported: 'DATA_SCHEMA_UNSUPPORTED',
+  inputInvalid: 'DATA_INPUT_SCHEMA_INVALID',
+  outputInvalid: 'DATA_OUTPUT_SCHEMA_INVALID',
+} as const);
+
+export type DataSchemaRuntimeErrorCode =
+  (typeof DATA_SCHEMA_RUNTIME_ERROR_CODES)[keyof typeof DATA_SCHEMA_RUNTIME_ERROR_CODES];
+
+export class DataSchemaRuntimeError extends Error {
+  readonly code: DataSchemaRuntimeErrorCode;
+  readonly retryable = false;
+  readonly phase: 'input' | 'output';
+  readonly schemaId: string;
+  readonly issues: readonly DataSchemaValidationIssue[];
+  readonly truncated: boolean;
+
+  constructor(input: {
+    code: DataSchemaRuntimeErrorCode;
+    phase: 'input' | 'output';
+    schemaId: string;
+    issues?: readonly DataSchemaValidationIssue[];
+    truncated?: boolean;
+  }) {
+    super('Data operation payload failed schema preflight.');
+    this.name = 'DataSchemaRuntimeError';
+    this.code = input.code;
+    this.phase = input.phase;
+    this.schemaId = input.schemaId;
+    this.issues = Object.freeze([...(input.issues ?? [])]);
+    this.truncated = input.truncated === true;
+  }
+}
 
 const normalized = (value: string, label: string): string => {
   const result = value.trim();
-  if (!result || result !== value || result.length > 4_096)
+  if (
+    !result ||
+    result !== value ||
+    result.includes('\0') ||
+    result.length > 4_096
+  )
     throw new TypeError(`${label} must be a normalized string.`);
   return result;
 };
 
-const cloneDataJsonValue = (value: DataJsonValue): DataJsonValue => {
-  if (value === null || typeof value !== 'object') return value;
-  if (Array.isArray(value))
-    return Object.freeze(value.map((entry) => cloneDataJsonValue(entry)));
-  return Object.freeze(
-    Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, entry]) => [key, cloneDataJsonValue(entry)])
-    )
-  );
+const normalizeTriggerOrigin = (
+  trigger: DataOperationTriggerOrigin
+): DataOperationTriggerOrigin => {
+  switch (trigger.kind) {
+    case 'route':
+      return Object.freeze({
+        kind: 'route',
+        routeId: normalized(trigger.routeId, 'Data trigger routeId'),
+      });
+    case 'document':
+      return Object.freeze({
+        kind: 'document',
+        documentId: normalized(trigger.documentId, 'Data trigger documentId'),
+      });
+    case 'refresh':
+      return Object.freeze({
+        kind: 'refresh',
+        ...(trigger.reason
+          ? { reason: normalized(trigger.reason, 'Data trigger reason') }
+          : {}),
+      });
+    case 'input-change':
+      return Object.freeze({
+        kind: 'input-change',
+        dependencyId: normalized(
+          trigger.dependencyId,
+          'Data trigger dependencyId'
+        ),
+      });
+    case 'pagination':
+      if (
+        trigger.action !== 'next' &&
+        trigger.action !== 'previous' &&
+        trigger.action !== 'replace'
+      )
+        throw new TypeError('Data pagination trigger action is unsupported.');
+      return Object.freeze({ kind: 'pagination', action: trigger.action });
+    case 'blueprint-event':
+      return Object.freeze({
+        kind: 'blueprint-event',
+        documentId: normalized(trigger.documentId, 'Data trigger documentId'),
+        nodeId: normalized(trigger.nodeId, 'Data trigger nodeId'),
+        eventName: normalized(trigger.eventName, 'Data trigger eventName'),
+        dispatchId: normalized(trigger.dispatchId, 'Data trigger dispatchId'),
+      });
+    case 'code-slot':
+      return Object.freeze({
+        kind: 'code-slot',
+        slotId: normalized(trigger.slotId, 'Data trigger slotId'),
+        reference: Object.freeze({
+          artifactId: normalized(
+            trigger.reference.artifactId,
+            'Data trigger artifactId'
+          ),
+          ...(trigger.reference.exportName
+            ? {
+                exportName: normalized(
+                  trigger.reference.exportName,
+                  'Data trigger exportName'
+                ),
+              }
+            : {}),
+          ...(trigger.reference.symbolId
+            ? {
+                symbolId: normalized(
+                  trigger.reference.symbolId,
+                  'Data trigger symbolId'
+                ),
+              }
+            : {}),
+          ...(trigger.reference.sourceSpan
+            ? {
+                sourceSpan: Object.freeze({
+                  ...trigger.reference.sourceSpan,
+                }),
+              }
+            : {}),
+        }),
+        dispatchId: normalized(trigger.dispatchId, 'Data trigger dispatchId'),
+      });
+    case 'test':
+      return Object.freeze({
+        kind: 'test',
+        testId: normalized(trigger.testId, 'Data trigger testId'),
+        dispatchId: normalized(trigger.dispatchId, 'Data trigger dispatchId'),
+      });
+  }
+  throw new TypeError('Data invocation trigger is unsupported.');
 };
 
 export const createDataOperationInvocation = (
@@ -142,6 +310,19 @@ export const createDataOperationInvocation = (
     throw new TypeError('Data invocation attempt must be positive.');
   if (!DATA_OPERATION_ACTIVATIONS.includes(input.activation))
     throw new TypeError('Data invocation activation is unsupported.');
+  const trigger = input.trigger
+    ? normalizeTriggerOrigin(input.trigger)
+    : undefined;
+  if (trigger) {
+    const expectedActivation: DataOperationActivation =
+      trigger.kind === 'blueprint-event'
+        ? 'event'
+        : trigger.kind === 'code-slot'
+          ? 'code-slot'
+          : trigger.kind;
+    if (input.activation !== expectedActivation)
+      throw new TypeError('Data invocation trigger activation drifted.');
+  }
   if (!(RUNTIME_ZONES as readonly RuntimeZone[]).includes(input.runtimeZone))
     throw new TypeError('Data invocation runtime zone is unsupported.');
   if (input.mode !== 'mock' && input.mode !== 'live')
@@ -171,6 +352,7 @@ export const createDataOperationInvocation = (
     runtimeZone: input.runtimeZone,
     mode: input.mode,
     activation: input.activation,
+    ...(trigger ? { trigger } : {}),
     input: cloneDataJsonValue(input.input),
     ...(input.environment ? { environment: input.environment } : {}),
     ...(input.sourceTrace
@@ -358,118 +540,352 @@ export const createDataOperationAdapterRegistry =
     });
   };
 
-/** Executes through the registered adapter and fences every Network trace to the exact invocation identity. */
+const validateOperationPayload = (
+  input: Readonly<{
+    document: DataSourceDocument;
+    schemaId: string;
+    value: DataJsonValue;
+    phase: 'input' | 'output';
+    validator: DataSchemaValidator;
+  }>
+): void => {
+  const schema = input.document.schemasById[input.schemaId];
+  if (!schema)
+    throw new DataSchemaRuntimeError({
+      code: DATA_SCHEMA_RUNTIME_ERROR_CODES.missing,
+      phase: input.phase,
+      schemaId: input.schemaId,
+    });
+  let validation: ReturnType<DataSchemaValidator['validate']>;
+  try {
+    validation = input.validator.validate(schema.schema, input.value);
+  } catch {
+    throw new DataSchemaRuntimeError({
+      code: DATA_SCHEMA_RUNTIME_ERROR_CODES.unsupported,
+      phase: input.phase,
+      schemaId: input.schemaId,
+    });
+  }
+  if (!validation.valid)
+    throw new DataSchemaRuntimeError({
+      code:
+        input.phase === 'input'
+          ? DATA_SCHEMA_RUNTIME_ERROR_CODES.inputInvalid
+          : DATA_SCHEMA_RUNTIME_ERROR_CODES.outputInvalid,
+      phase: input.phase,
+      schemaId: input.schemaId,
+      issues: validation.issues,
+      truncated: validation.truncated,
+    });
+};
+
+const safeRuntimeError = (
+  error: unknown
+): Readonly<{ code: string; retryable: boolean }> => {
+  const candidate = error as { code?: unknown; retryable?: unknown };
+  return Object.freeze({
+    code:
+      typeof candidate.code === 'string' &&
+      /^[A-Z][A-Z0-9_]{0,127}$/u.test(candidate.code)
+        ? candidate.code
+        : 'DATA_OPERATION_FAILED',
+    retryable: candidate.retryable === true,
+  });
+};
+
+/** Executes an exact Data document through the registered adapter and fences schema, lifecycle, and Network facts. */
 export const executeDataOperation = async (
   input: ExecuteDataOperationInput
 ): Promise<ExecuteDataOperationResult> => {
-  if (input.operation.id !== input.invocation.operation.operationId)
-    throw new Error(
-      'Data runtime operation identity does not match invocation.'
-    );
-  if (input.source.runtimeZone !== input.invocation.runtimeZone)
+  const operation =
+    input.document.operationsById[input.invocation.operation.operationId];
+  if (!operation)
+    throw new Error('Data runtime operation does not exist in the document.');
+  const source = input.document.source;
+  if (source.runtimeZone !== input.invocation.runtimeZone)
     throw new Error('Data source runtime zone does not match invocation.');
-  const adapter = input.registry.resolve(
-    input.source.adapterId,
-    input.invocation,
-    input.operation
-  );
-  const expectedCorrelation = createDataNetworkCorrelation(input.invocation);
+  const lease = input.lifecycleChannel.activate(input.invocation);
   const networkTraces: ExecutionNetworkTrace[] = [];
-  const loading = createDataLifecycleSnapshot({
-    operation: input.invocation.operation,
-    sequence: input.invocation.sequence,
-    status: 'loading',
-    invocationId: input.invocation.invocationId,
-    attempt: input.invocation.attempt,
-    startedAt: input.invocation.startedAt,
+  const publishLifecycle = (snapshot: DataLifecycleSnapshot): boolean => {
+    const published = lease.publish(snapshot);
+    if (published) input.publishLifecycle?.(snapshot);
+    return published;
+  };
+  let activeInvocation = input.invocation;
+  let resolvedEnvironment: ExecutionEnvironmentResolutionLease | undefined;
+  let optimisticPlan: DataOptimisticCrudPlan | undefined;
+  let optimisticMetadata: DataOptimisticResultMetadata = Object.freeze({
+    status: 'bypass',
   });
-  input.publishLifecycle?.(loading);
   try {
-    const result = await adapter.invoke({
-      invocation: input.invocation,
-      source: input.source,
-      operation: input.operation,
-      signal: input.signal,
-      publishNetworkTrace(trace) {
-        if (
-          JSON.stringify(trace.correlation) !==
-            JSON.stringify(expectedCorrelation) ||
-          trace.runtimeZone !== input.invocation.runtimeZone ||
-          trace.mode !== input.invocation.mode ||
-          trace.phase !== 'runtime' ||
-          trace.adapter !== input.source.adapterId ||
-          JSON.stringify(trace.sourceTrace ?? []) !==
-            JSON.stringify(input.invocation.sourceTrace ?? [])
-        )
-          throw new Error(
-            'Data adapter published a Network trace with correlation drift.'
-          );
-        networkTraces.push(trace);
-        input.publishNetworkTrace?.(trace);
-      },
-    });
-    const completedAt = Math.max(
-      input.invocation.startedAt,
-      (input.now ?? Date.now)()
+    const schemaValidator = input.schemaValidator ?? defaultDataSchemaValidator;
+    const effectiveInput = applyDataPaginationInput(
+      input.invocation.input,
+      operation.policies.pagination
     );
-    const lifecycle = createDataLifecycleSnapshot(
-      result.empty
-        ? {
-            operation: input.invocation.operation,
-            sequence: input.invocation.sequence,
-            status: 'empty' as const,
-            invocationId: input.invocation.invocationId,
-            attempt: input.invocation.attempt,
-            startedAt: input.invocation.startedAt,
-            completedAt,
-            ...(result.page ? { page: result.page } : {}),
-          }
-        : {
-            operation: input.invocation.operation,
-            sequence: input.invocation.sequence,
-            status: 'success' as const,
-            invocationId: input.invocation.invocationId,
-            attempt: input.invocation.attempt,
-            startedAt: input.invocation.startedAt,
-            completedAt,
-            value: result.value,
-            ...(result.page ? { page: result.page } : {}),
-          }
+    const runtimeInvocation =
+      effectiveInput === input.invocation.input
+        ? input.invocation
+        : createDataOperationInvocation({
+            ...input.invocation,
+            input: effectiveInput,
+          });
+    activeInvocation = runtimeInvocation;
+    if (operation.inputSchemaId)
+      validateOperationPayload({
+        document: input.document,
+        schemaId: operation.inputSchemaId,
+        value: runtimeInvocation.input,
+        phase: 'input',
+        validator: schemaValidator,
+      });
+    const retryPolicy = resolveDataRetryPolicy(
+      operation,
+      runtimeInvocation.attempt
     );
-    input.publishLifecycle?.(lifecycle);
-    return Object.freeze({
-      result,
-      lifecycle,
-      networkTraces: Object.freeze(networkTraces),
+    const maximumAttempt =
+      retryPolicy?.maxAttempts ?? runtimeInvocation.attempt;
+    const scheduler = input.scheduler ?? defaultDataOperationScheduler;
+    const adapter = input.registry.resolve(
+      source.adapterId,
+      runtimeInvocation,
+      operation
+    );
+    const environmentResolution = resolveDataOperationEnvironment({
+      invocation: runtimeInvocation,
+      source,
+      operation,
+      resolution: input.environmentResolution,
     });
+    resolvedEnvironment = environmentResolution
+      ? await environmentResolution
+      : undefined;
+    const cachePolicy = operation.policies.cache;
+    const cachePlan =
+      cachePolicy && cachePolicy.strategy !== 'no-store'
+        ? await createDataOperationCachePlan({
+            policy: cachePolicy,
+            ...(input.cache ? { runtime: input.cache } : {}),
+            invocation: runtimeInvocation,
+            effectiveInput: runtimeInvocation.input,
+            adapter: adapter.descriptor,
+            sourceAdapterId: source.adapterId,
+            sourceConfiguration: source.configurationByKey,
+            operationConfiguration: operation.configurationByKey,
+            now: (input.now ?? Date.now)(),
+          })
+        : undefined;
+    let cacheMetadata: DataOperationCacheResultMetadata =
+      cachePlan?.metadata ?? Object.freeze({ status: 'bypass' });
+    if (operation.policies.optimistic) {
+      optimisticPlan = await createDataOptimisticCrudPlan({
+        policy: operation.policies.optimistic,
+        ...(input.optimistic ? { runtime: input.optimistic } : {}),
+        invocation: runtimeInvocation,
+      });
+      optimisticMetadata = optimisticPlan.metadata;
+      input.publishOptimistic?.(optimisticPlan.applied);
+    }
+    for (
+      let attempt = runtimeInvocation.attempt;
+      attempt <= maximumAttempt;
+      attempt += 1
+    ) {
+      const attemptInvocation =
+        attempt === runtimeInvocation.attempt
+          ? runtimeInvocation
+          : createDataOperationInvocation({ ...runtimeInvocation, attempt });
+      activeInvocation = attemptInvocation;
+      const loading = createDataLifecycleSnapshot({
+        operation: attemptInvocation.operation,
+        sequence: attemptInvocation.sequence,
+        status: 'loading',
+        invocationId: attemptInvocation.invocationId,
+        attempt: attemptInvocation.attempt,
+        startedAt: attemptInvocation.startedAt,
+      });
+      if (!publishLifecycle(loading))
+        throw new DataInvocationError(DATA_INVOCATION_ERROR_CODES.superseded);
+      const expectedCorrelation =
+        createDataNetworkCorrelation(attemptInvocation);
+      let adapterResult: DataOperationAdapterResult;
+      let resultOrigin: 'cache' | 'network' | 'fallback' = 'network';
+      if (attempt === runtimeInvocation.attempt && cachePlan?.immediate) {
+        adapterResult = cachePlan.immediate;
+        cacheMetadata = cachePlan.metadata;
+        resultOrigin = 'cache';
+      } else {
+        try {
+          adapterResult = await adapter.invoke({
+            invocation: attemptInvocation,
+            source,
+            operation,
+            ...(resolvedEnvironment
+              ? { environment: resolvedEnvironment }
+              : {}),
+            signal: input.signal,
+            publishNetworkTrace(trace) {
+              if (
+                JSON.stringify(trace.correlation) !==
+                  JSON.stringify(expectedCorrelation) ||
+                trace.runtimeZone !== attemptInvocation.runtimeZone ||
+                trace.mode !== attemptInvocation.mode ||
+                trace.phase !== 'runtime' ||
+                trace.adapter !== source.adapterId ||
+                JSON.stringify(trace.sourceTrace ?? []) !==
+                  JSON.stringify(attemptInvocation.sourceTrace ?? [])
+              )
+                throw new Error(
+                  'Data adapter published a Network trace with correlation drift.'
+                );
+              networkTraces.push(trace);
+              input.publishNetworkTrace?.(trace);
+            },
+          });
+        } catch (error) {
+          const failure = safeRuntimeError(error);
+          if (input.signal.aborted || !lease.isCurrent()) throw error;
+          if (retryPolicy && failure.retryable && attempt < maximumAttempt) {
+            try {
+              await scheduler.wait(
+                calculateDataRetryDelay(retryPolicy, attempt),
+                input.signal
+              );
+            } catch (schedulerError) {
+              if (input.signal.aborted) throw schedulerError;
+              throw new DataRetryRuntimeError(
+                DATA_RETRY_RUNTIME_ERROR_CODES.schedulerFailed
+              );
+            }
+            if (!lease.isCurrent())
+              throw new DataInvocationError(
+                DATA_INVOCATION_ERROR_CODES.superseded
+              );
+            continue;
+          }
+          if (failure.retryable && cachePlan?.fallback) {
+            adapterResult = cachePlan.fallback;
+            cacheMetadata = Object.freeze({ status: 'network-fallback' });
+            resultOrigin = 'fallback';
+          } else throw error;
+        }
+      }
+      if (!lease.isCurrent())
+        throw new DataInvocationError(DATA_INVOCATION_ERROR_CODES.superseded);
+      if (typeof adapterResult.empty !== 'boolean')
+        throw new TypeError('Data adapter result empty must be a boolean.');
+      validateDataPaginationPage(
+        adapterResult.page,
+        operation.policies.pagination,
+        attemptInvocation.input
+      );
+      const value = cloneDataJsonValue(adapterResult.value);
+      validateOperationPayload({
+        document: input.document,
+        schemaId: operation.outputSchemaId,
+        value,
+        phase: 'output',
+        validator: schemaValidator,
+      });
+      const completedAt = Math.max(
+        attemptInvocation.startedAt,
+        (input.now ?? Date.now)()
+      );
+      const normalizedResult: DataOperationAdapterResult = Object.freeze({
+        value,
+        empty: adapterResult.empty,
+        ...(adapterResult.page ? { page: adapterResult.page } : {}),
+      });
+      if (optimisticPlan) {
+        const settlement = await optimisticPlan.commit(normalizedResult);
+        optimisticMetadata = settlement.metadata;
+        if (settlement.snapshot) input.publishOptimistic?.(settlement.snapshot);
+      }
+      if (
+        resultOrigin === 'network' &&
+        cachePlan &&
+        cachePlan.metadata.status !== 'bypass-private'
+      ) {
+        const stored = await cachePlan.write(normalizedResult, completedAt);
+        cacheMetadata = Object.freeze({
+          status: stored ? 'network' : 'network-uncached',
+        });
+        if (!lease.isCurrent())
+          throw new DataInvocationError(DATA_INVOCATION_ERROR_CODES.superseded);
+      }
+      const lifecycle = createDataLifecycleSnapshot(
+        adapterResult.empty
+          ? {
+              operation: attemptInvocation.operation,
+              sequence: attemptInvocation.sequence,
+              status: 'empty' as const,
+              invocationId: attemptInvocation.invocationId,
+              attempt: attemptInvocation.attempt,
+              startedAt: attemptInvocation.startedAt,
+              completedAt,
+              ...(adapterResult.page ? { page: adapterResult.page } : {}),
+            }
+          : {
+              operation: attemptInvocation.operation,
+              sequence: attemptInvocation.sequence,
+              status: 'success' as const,
+              invocationId: attemptInvocation.invocationId,
+              attempt: attemptInvocation.attempt,
+              startedAt: attemptInvocation.startedAt,
+              completedAt,
+              value,
+              ...(adapterResult.page ? { page: adapterResult.page } : {}),
+            }
+      );
+      if (!publishLifecycle(lifecycle))
+        throw new DataInvocationError(DATA_INVOCATION_ERROR_CODES.superseded);
+      const result = Object.freeze({
+        value,
+        empty: adapterResult.empty,
+        ...('page' in lifecycle && lifecycle.page
+          ? { page: lifecycle.page }
+          : {}),
+      });
+      return Object.freeze({
+        result,
+        lifecycle,
+        networkTraces: Object.freeze(networkTraces),
+        cache: cacheMetadata,
+        optimistic: optimisticMetadata,
+      });
+    }
+    throw new DataRetryRuntimeError(
+      DATA_RETRY_RUNTIME_ERROR_CODES.policyBudgetExceeded
+    );
   } catch (error) {
-    if (input.signal.aborted) throw error;
-    const candidate = error as {
-      code?: unknown;
-      retryable?: unknown;
-    };
+    if (optimisticPlan) {
+      const settlement = await optimisticPlan.rollback();
+      optimisticMetadata = settlement.metadata;
+      if (settlement.snapshot) input.publishOptimistic?.(settlement.snapshot);
+    }
+    if (input.signal.aborted || !lease.isCurrent()) throw error;
+    const failure = safeRuntimeError(error);
     const completedAt = Math.max(
-      input.invocation.startedAt,
+      activeInvocation.startedAt,
       (input.now ?? Date.now)()
     );
     const lifecycle = createDataLifecycleSnapshot({
-      operation: input.invocation.operation,
-      sequence: input.invocation.sequence,
+      operation: activeInvocation.operation,
+      sequence: activeInvocation.sequence,
       status: 'error',
-      invocationId: input.invocation.invocationId,
-      attempt: input.invocation.attempt,
-      startedAt: input.invocation.startedAt,
+      invocationId: activeInvocation.invocationId,
+      attempt: activeInvocation.attempt,
+      startedAt: activeInvocation.startedAt,
       completedAt,
       error: {
-        code:
-          typeof candidate.code === 'string'
-            ? candidate.code
-            : 'DATA_OPERATION_FAILED',
+        code: failure.code,
         message: 'Data operation failed.',
-        retryable: candidate.retryable === true,
+        retryable: failure.retryable,
       },
     });
-    input.publishLifecycle?.(lifecycle);
+    publishLifecycle(lifecycle);
     throw error;
+  } finally {
+    resolvedEnvironment?.revoke();
   }
 };

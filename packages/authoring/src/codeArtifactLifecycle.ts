@@ -16,6 +16,7 @@ const CODE_SLOT_KINDS = new Set<CodeSlotKind>([
   'animation-script',
   'shader',
   'external-adapter',
+  'data-input-transform',
   'mounted-css',
   'route-loader',
   'route-action',

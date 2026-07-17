@@ -106,6 +106,18 @@ const dataMockProvision: ExecutableProjectDataMockProvision = {
         empty: false,
       },
     },
+    {
+      id: 'create-product',
+      documentId: 'data-products',
+      operationId: 'create-product',
+      operationKind: 'mutation',
+      input: { product: { id: 'fixture-created' } },
+      behavior: {
+        kind: 'result',
+        value: { id: 'fixture-created' },
+        empty: false,
+      },
+    },
   ],
 };
 
@@ -143,6 +155,40 @@ const workspaceWithData = (): WorkspaceSnapshot => ({
             },
           },
         },
+        ui: {
+          graph: {
+            ...(
+              workspace.docsById.page!.content as ReturnType<
+                typeof createEmptyPirDocument
+              >
+            ).ui.graph,
+            nodesById: {
+              root: {
+                id: 'root',
+                kind: 'element',
+                type: 'container',
+                events: {
+                  onClick: {
+                    kind: 'dispatch-data-operation',
+                    operation: {
+                      documentId: 'data-products',
+                      operationId: 'create-product',
+                    },
+                    input: {
+                      kind: 'object',
+                      propertiesByKey: {
+                        product: {
+                          kind: 'trigger-payload',
+                          path: '/product',
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     },
     'data-products': {
@@ -173,6 +219,13 @@ const workspaceWithData = (): WorkspaceSnapshot => ({
           'list-products': {
             id: 'list-products',
             kind: 'query',
+            outputSchemaId: 'products',
+            configurationByKey: {},
+            policies: {},
+          },
+          'create-product': {
+            id: 'create-product',
+            kind: 'mutation',
             outputSchemaId: 'products',
             configurationByKey: {},
             policies: {},
@@ -275,8 +328,19 @@ describe('standalone domain export conformance', () => {
     if (result.status !== 'ready') return;
     expect(result.snapshot.dataMockProvision).toMatchObject({
       fixtureSetId: 'workspace-test',
-      fixtures: [{ documentId: 'data-products' }],
     });
+    expect(result.snapshot.dataMockProvision?.fixtures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          documentId: 'data-products',
+          operationKind: 'query',
+        }),
+        expect.objectContaining({
+          documentId: 'data-products',
+          operationKind: 'mutation',
+        }),
+      ])
+    );
     expect(JSON.stringify(result.snapshot.files)).not.toContain(
       'fixture-product'
     );
@@ -299,13 +363,45 @@ describe('standalone domain export conformance', () => {
     const page = result.snapshot.files.find(({ path }) =>
       path.includes('components/page')
     );
+    const entry = result.snapshot.files.find(
+      ({ path }) => path === 'src/App.tsx'
+    );
     expect(runtime?.contents).toContain('createWorkspaceDataRuntime');
     expect(runtime?.contents).toContain('list-products');
+    expect(runtime?.contents).toContain('invokeLiveHttp');
+    expect(runtime?.contents).toContain('prodivix.execution-network-bridge.v1');
+    expect(runtime?.contents).toContain('dispatchDataMutation');
     expect(page?.contents).toContain('subscribeDataLifecycle');
+    expect(page?.contents).toContain('activateDataBindings');
+    expect(page?.contents).toContain('dispatch-data-operation');
+    expect(page?.contents).toContain('runtimeValuesById');
+    expect(entry?.contents).toContain('workspaceDataRuntime');
+    expect(entry?.contents).toContain('__pdxRouteId={match.routeNodeId}');
     expect(
       projectExecutableProjectRuntimeFiles(result.snapshot).find(
         ({ path }) => path === 'public/.prodivix/data-mock-provision.json'
       )?.contents
     ).toContain('fixture-product');
+    expect(result.snapshot.capabilityRequirements.preview).not.toContain(
+      'network'
+    );
+    expect(
+      projectExecutableProjectRuntimeFiles(result.snapshot, 'preview').find(
+        ({ path }) => path === 'public/.prodivix/data-runtime.json'
+      )?.contents
+    ).toContain('"mode":"mock"');
+  });
+
+  it('declares live Data network capability and runtime mode without mock provisioning', () => {
+    const result =
+      generateWorkspaceReactViteExecutableProject(workspaceWithData());
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+    expect(result.snapshot.capabilityRequirements.preview).toContain('network');
+    expect(
+      projectExecutableProjectRuntimeFiles(result.snapshot, 'preview').find(
+        ({ path }) => path === 'public/.prodivix/data-runtime.json'
+      )?.contents
+    ).toContain('"mode":"live"');
   });
 });

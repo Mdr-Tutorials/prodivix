@@ -1,11 +1,16 @@
 import {
+  type DataOperationInputBinding,
+  type DataOperationKind,
   type DataOperationReference,
   createDataOperationReference,
+  normalizeDataOperationInputBinding,
 } from '@prodivix/data';
 import {
   type PIRCollectionDataLifecycleMapping,
   type PIRCollectionNode,
   type PIRDataOperationBinding,
+  type PIRDataOperationTriggerBinding,
+  type PIRDataQueryActivation,
   type PIRDocument,
   type PIRNode,
   type PIRTriggerBinding,
@@ -41,6 +46,9 @@ export const WORKSPACE_PIR_DATA_BINDING_PLAN_ISSUE_CODES = Object.freeze({
   bindingReferenced: 'WKS_PIR_DATA_BINDING_REFERENCED',
   collectionMissing: 'WKS_PIR_DATA_BINDING_COLLECTION_MISSING',
   collectionTypeInvalid: 'WKS_PIR_DATA_BINDING_COLLECTION_TYPE_INVALID',
+  triggerNodeMissing: 'WKS_PIR_DATA_TRIGGER_NODE_MISSING',
+  triggerNodeTypeInvalid: 'WKS_PIR_DATA_TRIGGER_NODE_TYPE_INVALID',
+  triggerConflict: 'WKS_PIR_DATA_TRIGGER_CONFLICT',
   resultInvalid: 'WKS_PIR_DATA_BINDING_RESULT_INVALID',
   transactionInvalid: 'WKS_PIR_DATA_BINDING_TRANSACTION_INVALID',
   unchanged: 'WKS_PIR_DATA_BINDING_UNCHANGED',
@@ -58,6 +66,8 @@ export type WorkspacePirDataBindingPlanIssue = Readonly<{
   operationDocumentId?: string;
   operationId?: string;
   collectionNodeId?: string;
+  nodeId?: string;
+  eventName?: string;
   causeCode?: string;
 }>;
 
@@ -84,6 +94,18 @@ export type CreateWorkspaceCollectionDataOperationBindingTransactionInput =
       operation: DataOperationReference;
       idle: PIRCollectionDataLifecycleMapping['idle'];
       path?: string;
+      input?: DataOperationInputBinding;
+      activations?: readonly PIRDataQueryActivation[];
+    }>;
+
+export type CreateWorkspacePirDataOperationTriggerTransactionInput =
+  WorkspacePirDataBindingPlanInputBase &
+    Readonly<{
+      nodeId: string;
+      eventName: string;
+      previousEventName?: string;
+      replaceExisting?: boolean;
+      trigger: PIRDataOperationTriggerBinding | null;
     }>;
 
 export type WorkspacePirDataOperationBindingTransactionPlan = Readonly<{
@@ -235,9 +257,10 @@ const readPirSource = (
   };
 };
 
-const resolveQueryOperation = (
+const resolveOperation = (
   workspace: WorkspaceSnapshot,
-  referenceInput: DataOperationReference
+  referenceInput: DataOperationReference,
+  expectedKind: DataOperationKind
 ):
   | Readonly<{ ok: true; reference: DataOperationReference }>
   | Readonly<{
@@ -318,14 +341,14 @@ const resolveQueryOperation = (
       ],
     };
   }
-  if (operation.kind !== 'query') {
+  if (operation.kind !== expectedKind) {
     return {
       ok: false,
       issues: [
         {
           code: WORKSPACE_PIR_DATA_BINDING_PLAN_ISSUE_CODES.operationKindInvalid,
           path: `/docsById/${escapePointerSegment(reference.documentId)}/content/operationsById/${escapePointerSegment(reference.operationId)}/kind`,
-          message: 'PIR data bindings currently require a query operation.',
+          message: `This PIR Data authoring surface requires a ${expectedKind} operation.`,
           operationDocumentId: reference.documentId,
           operationId: reference.operationId,
         },
@@ -335,6 +358,11 @@ const resolveQueryOperation = (
   return { ok: true, reference };
 };
 
+const resolveQueryOperation = (
+  workspace: WorkspaceSnapshot,
+  reference: DataOperationReference
+) => resolveOperation(workspace, reference, 'query');
+
 const sortedRecord = <Value>(
   value: Readonly<Record<string, Value>>
 ): Readonly<Record<string, Value>> =>
@@ -343,6 +371,40 @@ const sortedRecord = <Value>(
       Object.entries(value).sort(([left], [right]) => compareText(left, right))
     )
   );
+
+const normalizeQueryBinding = (
+  binding: PIRDataOperationBinding,
+  operation: DataOperationReference
+): PIRDataOperationBinding => {
+  const activations = binding.activations
+    ? Object.freeze(
+        binding.activations
+          .map((activation): PIRDataQueryActivation => {
+            if (activation.kind === 'document')
+              return Object.freeze({ kind: 'document' });
+            if (activation.kind === 'route')
+              return Object.freeze({
+                kind: 'route',
+                routeId: activation.routeId.trim(),
+              });
+            return Object.freeze({
+              kind: 'input-change',
+              dependencyId: activation.dependencyId.trim(),
+            });
+          })
+          .sort((left, right) =>
+            compareText(JSON.stringify(left), JSON.stringify(right))
+          )
+      )
+    : undefined;
+  return Object.freeze({
+    operation,
+    ...(binding.input
+      ? { input: normalizeDataOperationInputBinding(binding.input) }
+      : {}),
+    ...(activations ? { activations } : {}),
+  });
+};
 
 const replaceDataBinding = (
   document: PIRDocument,
@@ -483,7 +545,10 @@ const completePlan = (input: {
   envelope: WorkspacePirDataBindingPlanInputBase;
   before: PIRDocument;
   after: PIRDocument;
-  type: 'data-operation-binding.update' | 'collection.data-operation.bind';
+  type:
+    | 'data-operation-binding.update'
+    | 'collection.data-operation.bind'
+    | 'data-operation-trigger.update';
   label: string;
 }): WorkspacePirDataOperationBindingTransactionPlanResult => {
   if (JSON.stringify(input.before) === JSON.stringify(input.after)) {
@@ -570,12 +635,29 @@ export const createWorkspacePirDataOperationBindingTransactionPlan = (
   if (envelopeIssues.length > 0) return reject(envelopeIssues);
   const source = readPirSource(input.workspace, input.documentId);
   if (!source.ok) return reject(source.issues);
+  let normalizedBinding: PIRDataOperationBinding | null = null;
   if (input.binding) {
     const target = resolveQueryOperation(
       input.workspace,
       input.binding.operation
     );
     if (!target.ok) return reject(target.issues);
+    try {
+      normalizedBinding = normalizeQueryBinding(
+        input.binding,
+        target.reference
+      );
+    } catch {
+      return reject([
+        {
+          code: WORKSPACE_PIR_DATA_BINDING_PLAN_ISSUE_CODES.inputInvalid,
+          path: '/binding/input',
+          message: 'Data query input mapping is invalid.',
+          documentId: input.documentId,
+          dataId: input.dataId,
+        },
+      ]);
+    }
     const conflict = collectDataIdConflict(
       source.read.decodedContent,
       input.dataId
@@ -602,14 +684,145 @@ export const createWorkspacePirDataOperationBindingTransactionPlan = (
   const after = replaceDataBinding(
     source.read.decodedContent,
     input.dataId,
-    input.binding
+    normalizedBinding
   );
   return completePlan({
     envelope: input,
     before: source.read.decodedContent,
     after,
     type: 'data-operation-binding.update',
-    label: `${input.binding ? 'Bind' : 'Remove'} data ${input.dataId}`,
+    label: `${normalizedBinding ? 'Bind' : 'Remove'} data ${input.dataId}`,
+  });
+};
+
+/** Plans one Blueprint element event to mutation dispatch without overwriting other domain bindings. */
+export const createWorkspacePirDataOperationTriggerTransactionPlan = (
+  input: CreateWorkspacePirDataOperationTriggerTransactionInput
+): WorkspacePirDataOperationBindingTransactionPlanResult => {
+  const envelopeIssues = validateEnvelope(input, [
+    { path: '/nodeId', value: input.nodeId, label: 'Element node id' },
+    { path: '/eventName', value: input.eventName, label: 'Event name' },
+  ]);
+  if (
+    input.previousEventName !== undefined &&
+    !isCanonicalText(input.previousEventName)
+  ) {
+    envelopeIssues.push({
+      code: WORKSPACE_PIR_DATA_BINDING_PLAN_ISSUE_CODES.inputInvalid,
+      path: '/previousEventName',
+      message: 'Previous event name must be a non-empty canonical string.',
+      documentId: input.documentId,
+      nodeId: input.nodeId,
+      eventName: input.eventName,
+    });
+  }
+  if (envelopeIssues.length > 0) return reject(envelopeIssues);
+  const source = readPirSource(input.workspace, input.documentId);
+  if (!source.ok) return reject(source.issues);
+  const currentNode =
+    source.read.decodedContent.ui.graph.nodesById[input.nodeId];
+  if (!currentNode) {
+    return reject([
+      {
+        code: WORKSPACE_PIR_DATA_BINDING_PLAN_ISSUE_CODES.triggerNodeMissing,
+        path: `/docsById/${escapePointerSegment(input.documentId)}/content/ui/graph/nodesById/${escapePointerSegment(input.nodeId)}`,
+        message: 'Data mutation trigger owner does not exist.',
+        documentId: input.documentId,
+        nodeId: input.nodeId,
+        eventName: input.eventName,
+      },
+    ]);
+  }
+  if (currentNode.kind !== 'element') {
+    return reject([
+      {
+        code: WORKSPACE_PIR_DATA_BINDING_PLAN_ISSUE_CODES.triggerNodeTypeInvalid,
+        path: `/docsById/${escapePointerSegment(input.documentId)}/content/ui/graph/nodesById/${escapePointerSegment(input.nodeId)}/kind`,
+        message:
+          'Blueprint Data mutation triggers currently require an Element owner.',
+        documentId: input.documentId,
+        nodeId: input.nodeId,
+        eventName: input.eventName,
+      },
+    ]);
+  }
+  const previousEventName = input.previousEventName ?? input.eventName;
+  const currentTrigger = currentNode.events?.[previousEventName];
+  const destinationTrigger = currentNode.events?.[input.eventName];
+  if (
+    ((currentTrigger && currentTrigger.kind !== 'dispatch-data-operation') ||
+      (input.eventName !== previousEventName && destinationTrigger)) &&
+    !input.replaceExisting
+  ) {
+    return reject([
+      {
+        code: WORKSPACE_PIR_DATA_BINDING_PLAN_ISSUE_CODES.triggerConflict,
+        path: `/docsById/${escapePointerSegment(input.documentId)}/content/ui/graph/nodesById/${escapePointerSegment(input.nodeId)}/events/${escapePointerSegment(previousEventName)}`,
+        message:
+          'Data mutation authoring must not overwrite another domain-owned event binding.',
+        documentId: input.documentId,
+        nodeId: input.nodeId,
+        eventName: input.eventName,
+      },
+    ]);
+  }
+
+  let nextTrigger: PIRDataOperationTriggerBinding | undefined;
+  if (input.trigger) {
+    const target = resolveOperation(
+      input.workspace,
+      input.trigger.operation,
+      'mutation'
+    );
+    if (!target.ok) return reject(target.issues);
+    try {
+      nextTrigger = Object.freeze({
+        kind: 'dispatch-data-operation',
+        operation: target.reference,
+        input: normalizeDataOperationInputBinding(input.trigger.input),
+      });
+    } catch {
+      return reject([
+        {
+          code: WORKSPACE_PIR_DATA_BINDING_PLAN_ISSUE_CODES.inputInvalid,
+          path: '/trigger/input',
+          message: 'Data mutation input mapping is invalid.',
+          documentId: input.documentId,
+          nodeId: input.nodeId,
+          eventName: input.eventName,
+        },
+      ]);
+    }
+  }
+
+  const events = { ...(currentNode.events ?? {}) };
+  delete events[previousEventName];
+  if (nextTrigger) events[input.eventName] = nextTrigger;
+  else delete events[input.eventName];
+  const { events: _currentEvents, ...nodeWithoutEvents } = currentNode;
+  const nextNode = Object.freeze({
+    ...nodeWithoutEvents,
+    ...(Object.keys(events).length > 0 ? { events: sortedRecord(events) } : {}),
+  });
+  const after: PIRDocument = {
+    ...source.read.decodedContent,
+    ui: {
+      ...source.read.decodedContent.ui,
+      graph: {
+        ...source.read.decodedContent.ui.graph,
+        nodesById: {
+          ...source.read.decodedContent.ui.graph.nodesById,
+          [input.nodeId]: nextNode,
+        },
+      },
+    },
+  };
+  return completePlan({
+    envelope: input,
+    before: source.read.decodedContent,
+    after,
+    type: 'data-operation-trigger.update',
+    label: `${nextTrigger ? 'Bind' : 'Remove'} Data mutation ${input.eventName}`,
   });
 };
 
@@ -684,9 +897,27 @@ export const createWorkspaceCollectionDataOperationBindingTransactionPlan = (
     ]);
   }
 
-  const binding: PIRDataOperationBinding = Object.freeze({
-    operation: target.reference,
-  });
+  let binding: PIRDataOperationBinding;
+  try {
+    binding = normalizeQueryBinding(
+      {
+        operation: target.reference,
+        ...(input.input ? { input: input.input } : {}),
+        ...(input.activations ? { activations: input.activations } : {}),
+      },
+      target.reference
+    );
+  } catch {
+    return reject([
+      {
+        code: WORKSPACE_PIR_DATA_BINDING_PLAN_ISSUE_CODES.inputInvalid,
+        path: '/input',
+        message: 'Collection Data query input mapping is invalid.',
+        documentId: input.documentId,
+        collectionNodeId: input.collectionNodeId,
+      },
+    ]);
+  }
   const lifecycle: PIRCollectionDataLifecycleMapping = Object.freeze({
     kind: 'data-operation',
     dataId: input.dataId,

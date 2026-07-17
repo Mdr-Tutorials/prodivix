@@ -3,6 +3,16 @@ import type {
   PIRDocument,
   PIRJsonValue,
 } from '@prodivix/pir';
+import {
+  createComponentContractMemberSymbolId,
+  createComponentSlotPropSymbolId,
+  createPirCollectionErrorSymbolId,
+  createPirCollectionIndexSymbolId,
+  createPirCollectionItemSymbolId,
+  createPirDataSymbolId,
+  createPirParamSymbolId,
+  createPirStateSymbolId,
+} from '@prodivix/authoring';
 import type { WorkspacePirDocument } from '@prodivix/workspace';
 import type { TargetAdapter } from '#src/core/adapter';
 import type { CompileDiagnostic } from '#src/core/diagnostics';
@@ -29,6 +39,7 @@ import {
 } from '#src/react/sourceTrace';
 
 export type CompilePIRReactDocumentInput = Readonly<{
+  workspaceId: string;
   workspaceDocument: WorkspacePirDocument;
   documentsById: Readonly<Record<string, WorkspacePirDocument>>;
   moduleIdByDocumentId: Readonly<Record<string, string>>;
@@ -104,6 +115,174 @@ const compileStateValues = (document: PIRDocument): string =>
     .map(([stateId, state]) => `${toJson(stateId)}: ${toJson(state.initial)}`)
     .join(', ')} }`;
 
+const compileBaseDataRuntimeValues = (
+  workspaceId: string,
+  documentId: string,
+  document: PIRDocument
+): string => {
+  const entries = [
+    ...Object.keys(document.logic?.props ?? {}).map(
+      (paramId) =>
+        [
+          createPirParamSymbolId(workspaceId, documentId, paramId),
+          `__pdxParamsById[${toJson(paramId)}]`,
+        ] as const
+    ),
+    ...Object.keys(document.logic?.state ?? {}).map(
+      (stateId) =>
+        [
+          createPirStateSymbolId(workspaceId, documentId, stateId),
+          `__pdxStateById[${toJson(stateId)}]`,
+        ] as const
+    ),
+    ...Object.keys(document.componentContract?.propsById ?? {}).map(
+      (memberId) =>
+        [
+          createComponentContractMemberSymbolId(
+            workspaceId,
+            documentId,
+            'prop',
+            memberId
+          ),
+          `__pdxComponentPropsById[${toJson(memberId)}]`,
+        ] as const
+    ),
+    ...Object.keys(document.componentContract?.variantAxesById ?? {}).map(
+      (memberId) =>
+        [
+          createComponentContractMemberSymbolId(
+            workspaceId,
+            documentId,
+            'variant',
+            memberId
+          ),
+          `__pdxComponentVariantsById[${toJson(memberId)}]`,
+        ] as const
+    ),
+  ].sort(([left], [right]) => compareText(left, right));
+  return `{ ${entries
+    .map(([symbolId, expression]) => `${toJson(symbolId)}: ${expression}`)
+    .join(', ')} }`;
+};
+
+const compileDataRuntimeValues = (
+  workspaceId: string,
+  documentId: string,
+  document: PIRDocument
+): string =>
+  `{ ${Object.keys(document.logic?.dataById ?? {})
+    .sort(compareText)
+    .map(
+      (dataId) =>
+        `${toJson(createPirDataSymbolId(workspaceId, documentId, dataId))}: __pdxDataProjection.dataById[${toJson(dataId)}]`
+    )
+    .join(', ')} }`;
+
+const compileScopeDataRuntimeValues = (
+  workspaceId: string,
+  documentId: string,
+  document: PIRDocument
+): string => {
+  const entries: Array<readonly [string, string]> = [
+    ...Object.keys(document.logic?.props ?? {}).map(
+      (paramId) =>
+        [
+          createPirParamSymbolId(workspaceId, documentId, paramId),
+          `__pdxScope.paramsById[${toJson(paramId)}]`,
+        ] as const
+    ),
+    ...Object.keys(document.logic?.state ?? {}).map(
+      (stateId) =>
+        [
+          createPirStateSymbolId(workspaceId, documentId, stateId),
+          `__pdxScope.stateById[${toJson(stateId)}]`,
+        ] as const
+    ),
+    ...Object.keys(document.logic?.dataById ?? {}).map(
+      (dataId) =>
+        [
+          createPirDataSymbolId(workspaceId, documentId, dataId),
+          `__pdxScope.dataById[${toJson(dataId)}]`,
+        ] as const
+    ),
+    ...Object.keys(document.componentContract?.propsById ?? {}).map(
+      (memberId) =>
+        [
+          createComponentContractMemberSymbolId(
+            workspaceId,
+            documentId,
+            'prop',
+            memberId
+          ),
+          `__pdxScope.componentPropsById[${toJson(memberId)}]`,
+        ] as const
+    ),
+    ...Object.keys(document.componentContract?.variantAxesById ?? {}).map(
+      (memberId) =>
+        [
+          createComponentContractMemberSymbolId(
+            workspaceId,
+            documentId,
+            'variant',
+            memberId
+          ),
+          `__pdxScope.componentVariantsById[${toJson(memberId)}]`,
+        ] as const
+    ),
+  ];
+  for (const [nodeId, node] of Object.entries(document.ui.graph.nodesById)) {
+    if (node.kind !== 'collection') continue;
+    entries.push(
+      [
+        createPirCollectionItemSymbolId(
+          workspaceId,
+          documentId,
+          nodeId,
+          node.symbols.itemId
+        ),
+        `__pdxScope.collectionSymbolsById[${toJson(node.symbols.itemId)}]`,
+      ],
+      [
+        createPirCollectionIndexSymbolId(
+          workspaceId,
+          documentId,
+          nodeId,
+          node.symbols.indexId
+        ),
+        `__pdxScope.collectionSymbolsById[${toJson(node.symbols.indexId)}]`,
+      ]
+    );
+    if (node.symbols.errorId)
+      entries.push([
+        createPirCollectionErrorSymbolId(
+          workspaceId,
+          documentId,
+          nodeId,
+          node.symbols.errorId
+        ),
+        `__pdxScope.collectionSymbolsById[${toJson(node.symbols.errorId)}]`,
+      ]);
+  }
+  for (const [slotId, slot] of Object.entries(
+    document.componentContract?.slotsById ?? {}
+  )) {
+    for (const propId of Object.keys(slot.propsById ?? {}))
+      entries.push([
+        createComponentSlotPropSymbolId(
+          workspaceId,
+          documentId,
+          slotId,
+          propId
+        ),
+        `__pdxScope.slotPropsById[${toJson(propId)}]`,
+      ]);
+  }
+  return `{ ${entries
+    .sort(([left], [right]) => compareText(left, right))
+    .map(([symbolId, expression]) => `${toJson(symbolId)}: ${expression}`)
+    .join(', ')} }`;
+};
+
 const addContractSourceTraces = (
   contract: PIRComponentContract | undefined,
   traces: PIRReactSourceTraceCollector
@@ -157,10 +336,11 @@ type __PdxCodeReference = Readonly<{
 }>;
 
 type __PdxRuntimePort = Readonly<{
-  dispatchTrigger(input: Readonly<{ binding: unknown; payload: unknown; scope: __PdxScope; setStateById: __PdxStateUpdater }>): void;
+  dispatchTrigger(input: Readonly<{ binding: unknown; payload: unknown; scope: __PdxScope; runtimeValuesById: Readonly<Record<string, unknown>>; setStateById: __PdxStateUpdater; source: Readonly<{ documentId: string; nodeId: string; eventName: string; instancePath: string }> }>): void;
   resolveCollectionPreviewState?(location: __PdxCollectionLocation): __PdxCollectionPreviewInput | undefined;
   reportCollectionProjectionIssues?(input: Readonly<{ location: __PdxCollectionLocation; issues: readonly __PdxCollectionProjectionIssue[] }>): void;
   resolveDataLifecycleSnapshot(request: __PdxDataLifecycleSnapshotRequest): __PdxDataLifecycleSnapshot | undefined;
+  activateDataBindings?(request: __PdxDataBindingsActivationRequest): void | Promise<void>;
   subscribeDataLifecycle?(listener: () => void): () => void;
   resolveCodeValue(reference: __PdxCodeReference, scope: __PdxScope): unknown;
 }>;
@@ -175,6 +355,7 @@ type __PdxSlotRenderer = (
 type __PdxModuleProps = Readonly<{
   __pdxRuntime: __PdxRuntimePort;
   __pdxInstancePath?: string;
+  __pdxRouteId?: string;
   __pdxParamsById?: Readonly<Record<string, unknown>>;
   __pdxPropsById?: Readonly<Record<string, unknown>>;
   __pdxEventsById?: Readonly<Record<string, (payload: unknown) => void>>;
@@ -233,14 +414,44 @@ export const compilePirReactDocument = (
       input.dataOperationKindsByDocumentId[binding.operation.documentId]?.[
         binding.operation.operationId
       ];
-    if (operation) continue;
+    if (operation === 'query') continue;
     diagnostics.push({
-      code: PIR_REACT_COMPILE_DIAGNOSTIC_CODES.dataOperationUnresolved,
+      code: operation
+        ? PIR_REACT_COMPILE_DIAGNOSTIC_CODES.dataOperationKindMismatch
+        : PIR_REACT_COMPILE_DIAGNOSTIC_CODES.dataOperationUnresolved,
       severity: 'error',
       source: 'export',
-      message: `PIR data binding "${dataId}" references an unresolved Data operation for React export.`,
+      message: operation
+        ? `PIR data binding "${dataId}" must reference a query operation for React export.`
+        : `PIR data binding "${dataId}" references an unresolved Data operation for React export.`,
       path: `/docsById/${escapeJsonPointerToken(documentId)}/content/logic/dataById/${escapeJsonPointerToken(dataId)}`,
     });
+  }
+  for (const [nodeId, node] of Object.entries(document.ui.graph.nodesById).sort(
+    ([left], [right]) => compareText(left, right)
+  )) {
+    if (node.kind !== 'element') continue;
+    for (const [eventName, trigger] of Object.entries(node.events ?? {}).sort(
+      ([left], [right]) => compareText(left, right)
+    )) {
+      if (trigger.kind !== 'dispatch-data-operation') continue;
+      const operation =
+        input.dataOperationKindsByDocumentId[trigger.operation.documentId]?.[
+          trigger.operation.operationId
+        ];
+      if (operation === 'mutation') continue;
+      diagnostics.push({
+        code: operation
+          ? PIR_REACT_COMPILE_DIAGNOSTIC_CODES.dataOperationKindMismatch
+          : PIR_REACT_COMPILE_DIAGNOSTIC_CODES.dataOperationUnresolved,
+        severity: 'error',
+        source: 'export',
+        message: operation
+          ? `PIR event "${eventName}" on node "${nodeId}" must reference a mutation operation for React export.`
+          : `PIR event "${eventName}" on node "${nodeId}" references an unresolved Data operation for React export.`,
+        path: `/docsById/${escapeJsonPointerToken(documentId)}/content/ui/graph/nodesById/${escapeJsonPointerToken(nodeId)}/events/${escapeJsonPointerToken(eventName)}`,
+      });
+    }
   }
   const imports = new PIRReactImportRegistry({
     ...input.packageResolver,
@@ -280,11 +491,27 @@ export const compilePirReactDocument = (
   );
   const stateValues = compileStateValues(document);
   const dataOperationBindings = toJson(document.logic?.dataById ?? {});
+  const baseDataRuntimeValues = compileBaseDataRuntimeValues(
+    input.workspaceId,
+    documentId,
+    document
+  );
+  const dataRuntimeValues = compileDataRuntimeValues(
+    input.workspaceId,
+    documentId,
+    document
+  );
+  const scopeDataRuntimeValues = compileScopeDataRuntimeValues(
+    input.workspaceId,
+    documentId,
+    document
+  );
   const body = `${createGeneratedRuntimePrelude(useEffectLocal)}
 
 export default function ${moduleName}({
   __pdxRuntime,
   __pdxInstancePath = ${rootInstancePath},
+  __pdxRouteId,
   __pdxParamsById = {},
   __pdxPropsById = {},
   __pdxEventsById = {},
@@ -301,12 +528,28 @@ export default function ${moduleName}({
   }), [__pdxRuntime]);
   const __pdxComponentPropsById = ${componentProps};
   const __pdxComponentVariantsById = ${componentVariants};
+  const __pdxBaseDataRuntimeValuesById = ${baseDataRuntimeValues};
   const __pdxDataProjection = __pdxProjectDocumentDataLifecycle(
     __pdxRuntime,
     ${toJson(documentId)},
     __pdxInstancePath,
     ${dataOperationBindings}
   );
+  const __pdxDataRuntimeValuesById = {
+    ...__pdxBaseDataRuntimeValuesById,
+    ...${dataRuntimeValues},
+  };
+  const __pdxDataRuntimeValuesFromScope = (__pdxScope: __PdxScope): Readonly<Record<string, unknown>> => (${scopeDataRuntimeValues});
+  const __pdxDataRuntimeValuesDigest = JSON.stringify(__pdxDataRuntimeValuesById);
+  ${useEffectLocal}(() => {
+    void __pdxRuntime.activateDataBindings?.({
+      documentId: ${toJson(documentId)},
+      instancePath: __pdxInstancePath,
+      ...(__pdxRouteId ? { currentRouteId: __pdxRouteId } : {}),
+      bindingsByDataId: ${dataOperationBindings},
+      runtimeValuesById: __pdxDataRuntimeValuesById,
+    });
+  }, [__pdxRuntime, __pdxInstancePath, __pdxRouteId, __pdxDataRuntimeValuesDigest]);
   if (__pdxDataProjection.status === 'blocked') return null;
   const __pdxDefinitionScope: __PdxScope = {
     paramsById: __pdxParamsById,

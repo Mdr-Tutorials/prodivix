@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   CircleStop,
@@ -7,6 +7,8 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import type { BlueprintProjectRunnerState } from './useBlueprintProjectRunner';
+import { readBlueprintProjectNetworkBridgeMessage } from '@/editor/features/blueprint/editor/runner/blueprintProjectNetworkBridge';
+import { publishBlueprintProjectNetworkTrace } from '@/editor/features/blueprint/editor/runner/blueprintProjectRunnerClient';
 
 export type BlueprintProjectRunnerSurfaceController = Readonly<{
   state: BlueprintProjectRunnerState;
@@ -37,6 +39,7 @@ export function BlueprintProjectRunnerSurface({
 }: BlueprintProjectRunnerSurfaceProps) {
   const { t } = useTranslation('blueprint');
   const { state, frameRevision, onRetry } = runner;
+  const frameRef = useRef<HTMLIFrameElement>(null);
   const iframeUrl = useMemo(
     () =>
       state.previewUrl
@@ -48,10 +51,29 @@ export function BlueprintProjectRunnerSurface({
   const isFailure = state.status === 'failed' || state.status === 'blocked';
   const isStopped = ['idle', 'cancelled', 'timed-out'].includes(state.status);
 
+  useEffect(() => {
+    const previewUrl = state.previewUrl;
+    const provider = state.provider;
+    if (!previewUrl || !provider) return undefined;
+    const onMessage = (event: MessageEvent<unknown>) => {
+      if (event.source !== frameRef.current?.contentWindow) return;
+      const trace = readBlueprintProjectNetworkBridgeMessage({
+        provider,
+        previewUrl,
+        messageOrigin: event.origin,
+        value: event.data,
+      });
+      if (trace) publishBlueprintProjectNetworkTrace(trace);
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [state.previewUrl, state.provider]);
+
   return (
     <div className="relative h-full w-full overflow-hidden bg-white">
       {iframeUrl ? (
         <iframe
+          ref={frameRef}
           key={`${iframeUrl}:${frameRevision}`}
           className="h-full w-full border-0 bg-white"
           src={iframeUrl}

@@ -101,6 +101,41 @@ export type PIRWireTriggerBinding =
       kind: 'emit-component-event';
       memberId: string;
       payload?: PIRWireValueBinding;
+    }
+  | {
+      kind: 'dispatch-data-operation';
+      operation: PIRWireDataOperationReference;
+      input: PIRWireDataOperationInputBinding;
+    };
+export type PIRWireDataOperationInputBinding =
+  | {
+      kind: 'literal';
+      value: PIRWireJsonValue;
+    }
+  | {
+      kind: 'trigger-payload';
+      path?: string;
+    }
+  | {
+      kind: 'runtime-value';
+      valueId: string;
+      path?: string;
+    }
+  | {
+      kind: 'object';
+      propertiesByKey: {
+        [k: string]: PIRWireDataOperationInputBinding;
+      };
+    }
+  | {
+      kind: 'array';
+      items: PIRWireDataOperationInputBinding[];
+    }
+  | {
+      kind: 'code';
+      slotId: string;
+      reference: PIRWireCodeReference;
+      input: PIRWireDataOperationInputBinding;
     };
 export type PIRWireCollectionSourceBinding =
   | {
@@ -120,9 +155,21 @@ export type PIRWireCollectionKeyBinding =
       kind: 'index';
     };
 export type PIRWireNodeIdArray = string[];
+export type PIRWireDataQueryActivation =
+  | {
+      kind: 'document';
+    }
+  | {
+      kind: 'route';
+      routeId: string;
+    }
+  | {
+      kind: 'input-change';
+      dependencyId: string;
+    };
 
 export interface PIRWireDocument {
-  version: '1.5';
+  version: '1.6';
   metadata?: PIRWireMetadata;
   componentContract?: PIRWireComponentContract;
   ui: {
@@ -264,6 +311,10 @@ export interface PIRWireDataScope {
     [k: string]: PIRWireValueBinding;
   };
 }
+export interface PIRWireDataOperationReference {
+  documentId: string;
+  operationId: string;
+}
 export interface PIRWireComponentInstanceNode {
   id: string;
   kind: 'component-instance';
@@ -341,10 +392,8 @@ export interface PIRWireLogicStateDefinition {
 }
 export interface PIRWireDataOperationBinding {
   operation: PIRWireDataOperationReference;
-}
-export interface PIRWireDataOperationReference {
-  documentId: string;
-  operationId: string;
+  input?: PIRWireDataOperationInputBinding;
+  activations?: PIRWireDataQueryActivation[];
 }
 
-export const CURRENT_PIR_WIRE_VERSION = '1.5' as PIRWireDocument['version'];
+export const CURRENT_PIR_WIRE_VERSION = '1.6' as PIRWireDocument['version'];

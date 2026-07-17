@@ -321,7 +321,7 @@ export const createBrowserProjectTestRunner = (
         );
       }
       emitLog(controller, 'Preparing the project test snapshot.');
-      const preparation = await runtimeHost.prepare(ownerId, snapshot);
+      const preparation = await runtimeHost.prepare(ownerId, snapshot, 'test');
       if (!isJobRunnable(controller)) return;
 
       await runtimeHost.remove(

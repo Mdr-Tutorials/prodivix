@@ -71,8 +71,23 @@ type __PdxDataOperationReference = Readonly<{
   operationId: string;
 }>;
 
+type __PdxDataOperationInputBinding =
+  | Readonly<{ kind: 'literal'; value: unknown }>
+  | Readonly<{ kind: 'trigger-payload'; path?: string }>
+  | Readonly<{ kind: 'runtime-value'; valueId: string; path?: string }>
+  | Readonly<{ kind: 'object'; propertiesByKey: Readonly<Record<string, __PdxDataOperationInputBinding>> }>
+  | Readonly<{ kind: 'array'; items: readonly __PdxDataOperationInputBinding[] }>
+  | Readonly<{ kind: 'code'; slotId: string; reference: __PdxCodeReference; input: __PdxDataOperationInputBinding }>;
+
+type __PdxDataQueryActivation =
+  | Readonly<{ kind: 'document' }>
+  | Readonly<{ kind: 'route'; routeId: string }>
+  | Readonly<{ kind: 'input-change'; dependencyId: string }>;
+
 type __PdxDataOperationBinding = Readonly<{
   operation: __PdxDataOperationReference;
+  input?: __PdxDataOperationInputBinding;
+  activations?: readonly __PdxDataQueryActivation[];
 }>;
 
 type __PdxDataLifecycleSnapshot = Readonly<{

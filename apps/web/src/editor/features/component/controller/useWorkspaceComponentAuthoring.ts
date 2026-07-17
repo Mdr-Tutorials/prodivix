@@ -1,5 +1,8 @@
 import { useCallback, useMemo } from 'react';
-import type { DataOperationReference } from '@prodivix/data';
+import type {
+  DataOperationInputBinding,
+  DataOperationReference,
+} from '@prodivix/data';
 import {
   createEmptyPirComponentContract,
   type PIRCollectionNode,
@@ -8,6 +11,7 @@ import {
   type PIRComponentInstanceBindings,
   type PIRComponentInstanceNode,
   type PIRGraphPlacementTarget,
+  type PIRDataQueryActivation,
 } from '@prodivix/pir';
 import {
   createWorkspaceComponentContractUpdateTransactionPlan,
@@ -349,6 +353,8 @@ export const useWorkspaceComponentAuthoring = () => {
       operation: DataOperationReference;
       idle: 'loading' | 'empty';
       path?: string;
+      input?: DataOperationInputBinding;
+      activations?: readonly PIRDataQueryActivation[];
     }): Promise<WorkspaceComponentAuthoringOutcome> => {
       if (!workspace) {
         return { status: 'rejected', message: 'No Workspace is loaded.' };

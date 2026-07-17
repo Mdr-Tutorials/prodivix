@@ -33,6 +33,8 @@ export type {
   CodeSlotContract,
   CodeSlotKind,
   CodeSlotProvider,
+  DataOperationInputBinding,
+  DataOperationInputJsonValue,
   ShaderCompileProfile,
   ShaderCompileStage,
   ShaderCompileTarget,

@@ -5,6 +5,7 @@ import type {
 } from '@prodivix/authoring';
 import {
   createDataSourceScopeId,
+  type DataOperationInputBinding,
   type DataOperationReference,
 } from '@prodivix/data';
 import {
@@ -16,6 +17,7 @@ import {
   type PIRCollectionNode,
   type PIRCollectionSourceBinding,
   type PIRDocument,
+  type PIRDataQueryActivation,
   type PIRJsonValue,
   type PIRNode,
   type PIRValueBinding,
@@ -111,6 +113,8 @@ export type CollectionInspectorDataOperationView = Readonly<{
     operation: DataOperationReference;
     idle: 'loading' | 'empty';
     path?: string;
+    input?: DataOperationInputBinding;
+    activations?: readonly PIRDataQueryActivation[];
   }>;
   candidates: readonly CollectionInspectorDataOperationCandidate[];
 }>;
@@ -487,6 +491,12 @@ const projectDataOperationView = (
             operation: operationBinding.operation,
             idle: lifecycle.idle,
             ...(sourceBinding.path ? { path: sourceBinding.path } : {}),
+            ...(operationBinding.input
+              ? { input: operationBinding.input }
+              : {}),
+            ...(operationBinding.activations
+              ? { activations: operationBinding.activations }
+              : {}),
           }),
         }
       : {}),

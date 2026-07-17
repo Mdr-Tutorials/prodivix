@@ -5,6 +5,7 @@ import {
   createComponentSlotPropSymbolId,
   createComponentSymbolId,
   createComponentVariantOptionSymbolId,
+  createDataOperationSymbolId,
   createPirCollectionErrorScopeId,
   createPirCollectionErrorSymbolId,
   createPirCollectionIndexSymbolId,
@@ -17,6 +18,7 @@ import {
   createRouteSymbolId,
   createSemanticId,
   createWorkspaceDocumentSymbolId,
+  type DataOperationInputBinding,
   type WorkspaceReferenceFact,
 } from '@prodivix/authoring';
 import type {
@@ -260,6 +262,50 @@ const addTriggerReference = (
     trigger: PIRTriggerBinding;
   }
 ): void => {
+  const addDataInputReferences = (
+    binding: DataOperationInputBinding,
+    fieldPath: string
+  ): void => {
+    switch (binding.kind) {
+      case 'runtime-value':
+        addReference(contribution, {
+          ...input,
+          fieldPath,
+          role: 'data-input-runtime-value',
+          kind: 'binding',
+          target: { kind: 'symbol-id', symbolId: binding.valueId },
+        });
+        return;
+      case 'code':
+        addReference(contribution, {
+          ...input,
+          fieldPath: `${fieldPath}/reference`,
+          role:
+            binding.reference.symbolId || binding.reference.exportName
+              ? 'code-symbol'
+              : 'code-artifact',
+          kind: 'code-reference',
+          target: createCodeReferenceSemanticTarget(
+            input.context.workspaceId,
+            binding.reference
+          ),
+          ...(binding.reference.exportName && !binding.reference.symbolId
+            ? { resolutionMode: 'addressable' as const }
+            : {}),
+        });
+        addDataInputReferences(binding.input, `${fieldPath}/input`);
+        return;
+      case 'object':
+        Object.entries(binding.propertiesByKey).forEach(([key, child]) =>
+          addDataInputReferences(child, `${fieldPath}/propertiesByKey/${key}`)
+        );
+        return;
+      case 'array':
+        binding.items.forEach((child, index) =>
+          addDataInputReferences(child, `${fieldPath}/items/${index}`)
+        );
+    }
+  };
   switch (input.trigger.kind) {
     case 'open-url':
       return;
@@ -325,6 +371,24 @@ const addTriggerReference = (
         },
         diagnosticPolicy: 'report',
       });
+      return;
+    case 'dispatch-data-operation':
+      addReference(contribution, {
+        ...input,
+        fieldPath: `${input.fieldPath}/operation`,
+        role: 'data-operation-mutation',
+        kind: 'data-operation',
+        target: {
+          kind: 'symbol-id',
+          symbolId: createDataOperationSymbolId(
+            input.context.workspaceId,
+            input.trigger.operation.documentId,
+            input.trigger.operation.operationId
+          ),
+        },
+        resolutionMode: 'addressable',
+      });
+      addDataInputReferences(input.trigger.input, `${input.fieldPath}/input`);
       return;
     case 'emit-component-event':
       addReference(contribution, {

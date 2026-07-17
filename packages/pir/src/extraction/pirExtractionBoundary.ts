@@ -3,6 +3,7 @@ import type {
   PIRComponentPropContract,
   PIRDocument,
   PIRDataOperationBinding,
+  PIRDataOperationTriggerBinding,
   PIRTriggerBinding,
   PIRValueBinding,
 } from '../pir.types';
@@ -453,6 +454,50 @@ export const createPirExtractionBoundaryAnalyzer = (
           occurrence
         );
         return trigger;
+      case 'dispatch-data-operation': {
+        recordPreserved(
+          'data-operation',
+          `${trigger.operation.documentId}#${trigger.operation.operationId}`,
+          occurrence
+        );
+        const inspectInput = (
+          input: PIRDataOperationTriggerBinding['input'],
+          fieldPath: string
+        ): void => {
+          switch (input.kind) {
+            case 'runtime-value':
+              recordBlocked(
+                'opaque-data-runtime-input',
+                { ...occurrence, fieldPath },
+                'Data runtime-value input cannot be safely lifted during subtree extraction.',
+                PIR_SUBTREE_EXTRACTION_ISSUE_CODES.opaqueExternalBinding,
+                input.valueId
+              );
+              return;
+            case 'code':
+              recordPreserved(
+                'code-artifact',
+                input.reference.symbolId
+                  ? `${input.reference.artifactId}#${input.reference.symbolId}`
+                  : input.reference.artifactId,
+                { ...occurrence, fieldPath: `${fieldPath}/reference` }
+              );
+              inspectInput(input.input, `${fieldPath}/input`);
+              return;
+            case 'object':
+              Object.entries(input.propertiesByKey).forEach(([key, child]) =>
+                inspectInput(child, `${fieldPath}/propertiesByKey/${key}`)
+              );
+              return;
+            case 'array':
+              input.items.forEach((child, index) =>
+                inspectInput(child, `${fieldPath}/items/${index}`)
+              );
+          }
+        };
+        inspectInput(trigger.input, `${occurrence.fieldPath}/input`);
+        return trigger;
+      }
       case 'emit-component-event': {
         const sourceEvent =
           context.document.componentContract?.eventsById[trigger.memberId];

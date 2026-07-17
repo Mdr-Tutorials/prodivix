@@ -92,7 +92,8 @@ export type PIRBlockedBoundaryKind =
   | 'external-inbound-reference'
   | 'component-slot-outlet'
   | 'component-part-target'
-  | 'opaque-nodegraph-input-mapping';
+  | 'opaque-nodegraph-input-mapping'
+  | 'opaque-data-runtime-input';
 
 export type PIRBlockedBoundaryDependency = Readonly<{
   id: string;

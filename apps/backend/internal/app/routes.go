@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	backendauth "github.com/Prodivix/prodivix/apps/backend/internal/modules/auth"
+	backendenvironment "github.com/Prodivix/prodivix/apps/backend/internal/modules/environment"
 	backendgithub "github.com/Prodivix/prodivix/apps/backend/internal/modules/integrations/github"
 	backendproject "github.com/Prodivix/prodivix/apps/backend/internal/modules/project"
 	backendremoteexecution "github.com/Prodivix/prodivix/apps/backend/internal/modules/remoteexecution"
@@ -19,6 +20,7 @@ type Routes struct {
 	Project         backendproject.RouteHandlers
 	Workspace       backendworkspace.RouteHandlers
 	RemoteExecution backendremoteexecution.RouteHandlers
+	Environment     backendenvironment.RouteHandlers
 }
 
 func RegisterAPIRoutes(router *gin.Engine, routes Routes) {
@@ -29,6 +31,7 @@ func RegisterAPIRoutes(router *gin.Engine, routes Routes) {
 	backendproject.RegisterRoutes(api, routes.Project)
 	backendworkspace.RegisterRoutes(api, routes.Workspace)
 	backendremoteexecution.RegisterRoutes(api, routes.RemoteExecution)
+	backendenvironment.RegisterRoutes(api, routes.Environment)
 
 	if routes.Ping == nil {
 		api.GET("/ping", func(c *gin.Context) {

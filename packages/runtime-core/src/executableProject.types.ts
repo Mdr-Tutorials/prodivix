@@ -37,6 +37,13 @@ export const DEFAULT_EXECUTABLE_PROJECT_BUILD_OUTPUT_DIRECTORY = 'dist';
 export const DEFAULT_EXECUTABLE_PROJECT_PREVIEW_ENTRY_FILE = 'index.html';
 export const EXECUTABLE_PROJECT_DATA_MOCK_PROVISION_PATH =
   'public/.prodivix/data-mock-provision.json';
+export const EXECUTABLE_PROJECT_DATA_RUNTIME_MANIFEST_PATH =
+  'public/.prodivix/data-runtime.json';
+
+export type ExecutableProjectDataRuntimeManifest = Readonly<{
+  format: 'prodivix.executable-data-runtime.v1';
+  mode: 'mock' | 'live';
+}>;
 
 export type ExecutableProjectCommandName =
   (typeof EXECUTABLE_PROJECT_COMMANDS)[number];

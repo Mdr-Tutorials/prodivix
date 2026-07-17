@@ -224,10 +224,155 @@ const checkDataOperationReference: ValueChecker = (value, path, issues) => {
   checkString(object.operationId, `${path}.operationId`, issues);
 };
 
+const checkDataOperationInputBinding: ValueChecker = (value, path, issues) => {
+  if (!isRecord(value)) {
+    addIssue(issues, path, 'Expected a Data operation input binding object.');
+    return;
+  }
+  switch (value.kind) {
+    case 'literal': {
+      const object = checkObject(
+        value,
+        path,
+        ['kind', 'value'],
+        ['kind', 'value'],
+        issues
+      );
+      if (object) checkJsonValue(object.value, `${path}.value`, issues);
+      return;
+    }
+    case 'trigger-payload': {
+      const object = checkObject(
+        value,
+        path,
+        ['kind', 'path'],
+        ['kind'],
+        issues
+      );
+      if (object) checkOptional(object, 'path', path, issues, checkString);
+      return;
+    }
+    case 'runtime-value': {
+      const object = checkObject(
+        value,
+        path,
+        ['kind', 'valueId', 'path'],
+        ['kind', 'valueId'],
+        issues
+      );
+      if (!object) return;
+      checkString(object.valueId, `${path}.valueId`, issues);
+      checkOptional(object, 'path', path, issues, checkString);
+      return;
+    }
+    case 'object': {
+      const object = checkObject(
+        value,
+        path,
+        ['kind', 'propertiesByKey'],
+        ['kind', 'propertiesByKey'],
+        issues
+      );
+      if (object)
+        checkRecordValues(
+          object.propertiesByKey,
+          `${path}.propertiesByKey`,
+          issues,
+          checkDataOperationInputBinding
+        );
+      return;
+    }
+    case 'array': {
+      const object = checkObject(
+        value,
+        path,
+        ['kind', 'items'],
+        ['kind', 'items'],
+        issues
+      );
+      if (object)
+        checkArray(
+          object.items,
+          `${path}.items`,
+          issues,
+          checkDataOperationInputBinding
+        );
+      return;
+    }
+    case 'code': {
+      const object = checkObject(
+        value,
+        path,
+        ['kind', 'slotId', 'reference', 'input'],
+        ['kind', 'slotId', 'reference', 'input'],
+        issues
+      );
+      if (!object) return;
+      checkString(object.slotId, `${path}.slotId`, issues);
+      checkCodeReference(object.reference, `${path}.reference`, issues);
+      checkDataOperationInputBinding(object.input, `${path}.input`, issues);
+      return;
+    }
+    default:
+      addIssue(
+        issues,
+        `${path}.kind`,
+        'Unknown Data operation input binding kind.'
+      );
+  }
+};
+
+const checkDataQueryActivation: ValueChecker = (value, path, issues) => {
+  if (!isRecord(value)) {
+    addIssue(issues, path, 'Expected a Data query activation object.');
+    return;
+  }
+  switch (value.kind) {
+    case 'document':
+      checkObject(value, path, ['kind'], ['kind'], issues);
+      return;
+    case 'route': {
+      const object = checkObject(
+        value,
+        path,
+        ['kind', 'routeId'],
+        ['kind', 'routeId'],
+        issues
+      );
+      if (object) checkString(object.routeId, `${path}.routeId`, issues);
+      return;
+    }
+    case 'input-change': {
+      const object = checkObject(
+        value,
+        path,
+        ['kind', 'dependencyId'],
+        ['kind', 'dependencyId'],
+        issues
+      );
+      if (object)
+        checkString(object.dependencyId, `${path}.dependencyId`, issues);
+      return;
+    }
+    default:
+      addIssue(issues, `${path}.kind`, 'Unknown Data query activation kind.');
+  }
+};
+
 const checkDataOperationBinding: ValueChecker = (value, path, issues) => {
-  const object = checkObject(value, path, ['operation'], ['operation'], issues);
+  const object = checkObject(
+    value,
+    path,
+    ['operation', 'input', 'activations'],
+    ['operation'],
+    issues
+  );
   if (!object) return;
   checkDataOperationReference(object.operation, `${path}.operation`, issues);
+  checkOptional(object, 'input', path, issues, checkDataOperationInputBinding);
+  checkOptional(object, 'activations', path, issues, (candidate, field, out) =>
+    checkArray(candidate, field, out, checkDataQueryActivation)
+  );
 };
 
 const checkTriggerBinding: ValueChecker = (value, path, issues) => {
@@ -303,6 +448,23 @@ const checkTriggerBinding: ValueChecker = (value, path, issues) => {
       if (!object) return;
       checkString(object.slotId, `${path}.slotId`, issues);
       checkCodeReference(object.reference, `${path}.reference`, issues);
+      return;
+    }
+    case 'dispatch-data-operation': {
+      const object = checkObject(
+        value,
+        path,
+        ['kind', 'operation', 'input'],
+        ['kind', 'operation', 'input'],
+        issues
+      );
+      if (!object) return;
+      checkDataOperationReference(
+        object.operation,
+        `${path}.operation`,
+        issues
+      );
+      checkDataOperationInputBinding(object.input, `${path}.input`, issues);
       return;
     }
     case 'emit-component-event': {

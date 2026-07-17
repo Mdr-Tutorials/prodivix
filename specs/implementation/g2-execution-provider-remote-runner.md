@@ -293,13 +293,17 @@ content-addressed snapshot store、FIFO queue claim、lease renewal/expiry takeo
 
 ### E5：Environment、Secret 与 network policy
 
+- [x] Backend 在 create 转发前按 authenticated principal/session preflight exact Workspace/environment
+      revision/mode，并将 reference 作为 value-free durable execution authority 保存；environment-bound
+      status/cancel/events/artifact/Preview 访问按原 session partition，authority drift 幂等重试返回冲突且
+      不取消已有 execution。
 - [ ] resolver 仅在授权 runtime zone 将 reference 换为 execution-scoped lease。
 - [ ] process/operation 级 permission check 与 audit metadata。
 - [x] rootless Worker 将显式 install network 与默认断网 runtime 阶段硬分离，断网后 inspect 失败则
       fail closed。
 - [x] install egress hostname/443 allowlist proxy与 Remote install sanitized Network trace/产品视图。
 - [x] Browser fetch + Data HTTP adapter、operation correlation 与 safe status/size response metadata。
-- [ ] generated-project/Remote mock query runtime 与 provider asset projection已完成；mutation/live
+- [ ] generated-project/Remote mock query runtime 与 provider asset projection 已完成；mutation/live
       HTTP、server/edge adapter 与 policy correlation 待完成。
 - [ ] canary leak suite 覆盖 log、diagnostic、artifact、test report、cache 与 crash path。
 
