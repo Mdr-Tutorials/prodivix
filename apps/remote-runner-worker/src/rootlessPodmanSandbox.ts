@@ -1418,7 +1418,7 @@ export const createRootlessPodmanSandbox = (
       await captureTask;
       await terminalConnectionTask;
       await terminalDisconnect?.();
-      if (phaseIsolationFailure)
+      if (phaseIsolationFailure && !aborted && !timedOut)
         return Object.freeze({
           status: 'failed',
           exitCode: 125,

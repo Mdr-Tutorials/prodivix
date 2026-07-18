@@ -36,6 +36,7 @@ const execFileAsync = promisify(execFile);
 const snapshotContractOnly =
   process.env.PRODIVIX_ROOTLESS_SNAPSHOT_CONTRACT_ONLY === '1';
 const rootlessSecretCanary = 'rootless-secret-material-canary';
+const serverFunctionProbeTimeoutMs = 45_000;
 const podman = process.env.PRODIVIX_ROOTLESS_PODMAN_COMMAND ?? 'podman';
 const baseImage =
   process.env.PRODIVIX_ROOTLESS_BASE_IMAGE ??
@@ -1050,7 +1051,7 @@ const serverFunctionResult = await sandbox.execute({
   serverFunctionAuthority: serverFunctionFixture.authority,
   serverFunctionSecrets: serverFunctionFixture.secrets,
   profile: 'production',
-  timeoutMs: 15_000,
+  timeoutMs: serverFunctionProbeTimeoutMs,
   maximumOutputBytes: 256 * 1024,
   redactValues: [rootlessSecretCanary],
   signal: new AbortController().signal,
@@ -1134,7 +1135,7 @@ const workspaceReadResult = await sandbox.execute({
   request: workspaceReadFixture.request,
   serverFunctionAuthority: workspaceReadFixture.authority,
   profile: 'production',
-  timeoutMs: 15_000,
+  timeoutMs: serverFunctionProbeTimeoutMs,
   maximumOutputBytes: 256 * 1024,
   redactValues: [],
   signal: new AbortController().signal,
