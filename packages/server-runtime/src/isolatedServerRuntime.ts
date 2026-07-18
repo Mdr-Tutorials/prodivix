@@ -35,6 +35,12 @@ export const ISOLATED_SERVER_FUNCTION_AUTHORITY_MAX_TTL_MS = 5 * 60 * 1_000;
 export const ISOLATED_SERVER_FUNCTION_AUTHORITY_MAX_PERMISSIONS = 32;
 export const ISOLATED_SERVER_FUNCTION_WORKSPACE_OWNER_PERMISSION_ID =
   'workspace.owner' as const;
+export const ISOLATED_SERVER_FUNCTION_WORKSPACE_READ_PERMISSION_ID =
+  'workspace.read' as const;
+export const ISOLATED_SERVER_FUNCTION_PERMISSION_IDS = Object.freeze([
+  ISOLATED_SERVER_FUNCTION_WORKSPACE_OWNER_PERMISSION_ID,
+  ISOLATED_SERVER_FUNCTION_WORKSPACE_READ_PERMISSION_ID,
+] as const);
 
 const isolatedServerFunctionFailureCodes = new Set([
   'SVR_REQUEST_INVALID',
@@ -233,6 +239,27 @@ const sameFunction = (
 ): boolean =>
   left.artifactId === right.artifactId && left.exportName === right.exportName;
 
+/**
+ * Keeps Compiler and Worker policy on the same narrow isolated-production
+ * boundary. workspace.read is intentionally Secret-free in this first
+ * vertical; environment material remains limited to the previously audited
+ * public/authenticated/workspace.owner paths.
+ */
+export const isSupportedIsolatedServerFunctionDefinition = (
+  definition: ServerFunctionDefinition
+): boolean =>
+  definition.adapterId === ISOLATED_SERVER_FUNCTION_ADAPTER_ID &&
+  definition.effect === 'read' &&
+  definition.runtimeZone === 'server' &&
+  (definition.auth.kind === 'public' ||
+    definition.auth.kind === 'authenticated' ||
+    (definition.auth.kind === 'permission' &&
+      (definition.auth.permissionId ===
+        ISOLATED_SERVER_FUNCTION_WORKSPACE_OWNER_PERMISSION_ID ||
+        (definition.auth.permissionId ===
+          ISOLATED_SERVER_FUNCTION_WORKSPACE_READ_PERMISSION_ID &&
+          definition.environment === undefined))));
+
 /** Decodes the Server-owned part of a provider-neutral executable plan. */
 export const readIsolatedServerFunctionPlan = (
   plan: ExecutableProjectServerFunctionPlan | undefined
@@ -250,15 +277,7 @@ export const readIsolatedServerFunctionPlan = (
     plan.functionRef.artifactId,
     plan.functionRef.exportName
   );
-  return definition &&
-    definition.adapterId === ISOLATED_SERVER_FUNCTION_ADAPTER_ID &&
-    (definition.auth.kind === 'public' ||
-      definition.auth.kind === 'authenticated' ||
-      (definition.auth.kind === 'permission' &&
-        definition.auth.permissionId ===
-          ISOLATED_SERVER_FUNCTION_WORKSPACE_OWNER_PERMISSION_ID)) &&
-    definition.effect === 'read' &&
-    definition.runtimeZone === 'server'
+  return definition && isSupportedIsolatedServerFunctionDefinition(definition)
     ? Object.freeze({ plan, definition })
     : undefined;
 };

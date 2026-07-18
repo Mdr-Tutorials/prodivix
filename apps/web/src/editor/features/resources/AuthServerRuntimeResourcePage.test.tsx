@@ -10,6 +10,7 @@ import {
 import { createEmptyPirDocument } from '@prodivix/pir';
 import {
   applyWorkspaceCommand,
+  createWorkspaceServerRuntimeAuthConfigurationPlan,
   readWorkspaceServerRuntimeAuthConfiguration,
   type WorkspaceSnapshot,
 } from '@prodivix/workspace';
@@ -62,6 +63,24 @@ const workspace = (): WorkspaceSnapshot => ({
     root: { id: 'route-root', pageDocId: 'page-home' },
   },
 });
+
+const workspaceWithAuth = (): WorkspaceSnapshot => {
+  const current = workspace();
+  const plan = createWorkspaceServerRuntimeAuthConfigurationPlan({
+    workspace: current,
+    providerId: 'prodivix-product-session',
+    permissionIds: [],
+    documentId: 'auth-config',
+    operationId: 'auth-config-create',
+    issuedAt: '2026-07-19T00:00:00.000Z',
+  });
+  if (plan.status !== 'ready' || plan.operation.kind !== 'command')
+    throw new Error('Auth configuration fixture was not created.');
+  const applied = applyWorkspaceCommand(current, plan.operation.command);
+  if (!applied.ok)
+    throw new Error('Auth configuration fixture was not applied.');
+  return applied.snapshot;
+};
 
 afterEach(() => {
   cleanup();
@@ -128,8 +147,41 @@ describe('AuthServerRuntimeResourcePage', () => {
         }) as HTMLButtonElement
       ).disabled
     ).toBe(true);
-    expect((screen.getByRole('checkbox') as HTMLInputElement).disabled).toBe(
-      true
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
+    for (const checkbox of screen.getAllByRole('checkbox'))
+      expect((checkbox as HTMLInputElement).disabled).toBe(true);
+  });
+
+  it('authors workspace.read as a sorted reference-only permission declaration', async () => {
+    const current = workspaceWithAuth();
+    act(() =>
+      useEditorStore.setState({
+        workspace: current,
+        workspaceReadonly: false,
+      })
+    );
+    render(<AuthServerRuntimeResourcePage />);
+
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: /workspace\.read/iu })
+    );
+    await waitFor(() =>
+      expect(dispatchWorkspaceAuthoringOperation).toHaveBeenCalledTimes(1)
+    );
+    const call = dispatchWorkspaceAuthoringOperation.mock.calls[0]?.[0];
+    expect(call.operation.kind).toBe('command');
+    if (call.operation.kind !== 'command') return;
+    const applied = applyWorkspaceCommand(current, call.operation.command);
+    expect(applied.ok).toBe(true);
+    if (!applied.ok) return;
+    expect(
+      readWorkspaceServerRuntimeAuthConfiguration(applied.snapshot)
+    ).toMatchObject({
+      status: 'ready',
+      configuration: { permissionIds: ['workspace.read'] },
+    });
+    expect(JSON.stringify(call.operation)).not.toMatch(
+      /bearer|accessToken|sessionId|cookie|secretValue/iu
     );
   });
 });

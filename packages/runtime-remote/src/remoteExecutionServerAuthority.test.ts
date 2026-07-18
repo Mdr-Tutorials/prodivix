@@ -12,7 +12,7 @@ const authority = Object.freeze({
     providerId: 'prodivix-product-session',
     principalId: 'user-1',
   }),
-  permissions: Object.freeze(['workspace.owner']),
+  permissions: Object.freeze(['workspace.owner', 'workspace.read']),
   workspaceId: 'workspace-1',
   snapshotId: 'snapshot-1',
   expiresAt: 120_000,
@@ -30,7 +30,7 @@ describe('remote execution server authority codec', () => {
     expect(
       readRemoteExecutionServerAuthority({
         ...authority,
-        permissions: ['workspace.write', 'workspace.owner'],
+        permissions: ['workspace.read', 'workspace.owner'],
       })
     ).toBeUndefined();
     expect(

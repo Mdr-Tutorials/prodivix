@@ -37,6 +37,7 @@ import {
   createWorkspaceDocumentAtPathCommand,
   createWorkspacePIRCollectionUnwrapTransactionPlan,
   createWorkspaceOwnerGuardTransactionPlan,
+  createWorkspaceReadGuardTransactionPlan,
   createWorkspaceServerRuntimeBindingPlan,
   createWorkspacePIRElementBatchUpdateTransactionPlan,
   createWorkspacePIRElementUpdateTransactionPlan,
@@ -753,6 +754,37 @@ export const useBlueprintEditorInspectorController = ({
       workspaceReadonly,
     ]
   );
+  const createWorkspaceReadGuard = useCallback(() => {
+    if (!activeRouteDetails || workspaceReadonly) return;
+    const current = useEditorStore.getState().workspace;
+    const source = current?.id === workspace.id ? current : workspace;
+    const transactionId = createWorkspaceClientOperationId('server-read-guard');
+    const documentId = createWorkspaceClientOperationId(
+      'server-read-guard-artifact'
+    );
+    const result = createWorkspaceReadGuardTransactionPlan({
+      workspace: source,
+      routeNodeId: activeRouteDetails.id,
+      documentId,
+      path: `/server/isolated-read-${documentId.slice(0, 8)}.guard.server.ts`,
+      transactionId,
+      issuedAt: new Date().toISOString(),
+    });
+    if (result.status === 'rejected') {
+      report(result.message);
+      return;
+    }
+    void dispatchOperation({
+      kind: 'transaction',
+      transaction: result.plan.transaction,
+    });
+  }, [
+    activeRouteDetails,
+    dispatchOperation,
+    report,
+    workspace,
+    workspaceReadonly,
+  ]);
   const outletRouteNodeId =
     selectedNode?.type === 'PdxOutlet'
       ? findOutletRouteNodeId(composedRouteManifest.root, selectedNode.id)
@@ -1374,6 +1406,7 @@ export const useBlueprintEditorInspectorController = ({
       serverRuntimeWriteAvailable,
       setServerRuntimeBinding,
       createWorkspaceOwnerGuard,
+      createWorkspaceReadGuard,
       openServerRuntimeArtifact: (artifactId) => {
         navigateToCodeArtifact(artifactId);
       },
@@ -1393,6 +1426,7 @@ export const useBlueprintEditorInspectorController = ({
       graphOptions,
       dataMutationOptions,
       createWorkspaceOwnerGuard,
+      createWorkspaceReadGuard,
       hasAnimationDefinition,
       hasOnClickTrigger,
       isAnimationMounted,

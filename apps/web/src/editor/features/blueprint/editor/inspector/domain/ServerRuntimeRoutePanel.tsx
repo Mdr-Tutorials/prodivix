@@ -49,6 +49,7 @@ export function ServerRuntimeRoutePanel() {
     serverRuntimeWriteAvailable,
     setServerRuntimeBinding,
     createWorkspaceOwnerGuard,
+    createWorkspaceReadGuard,
     openServerRuntimeArtifact,
   } = useInspectorContext();
   if (!activeRouteDetails) return null;
@@ -178,6 +179,16 @@ export function ServerRuntimeRoutePanel() {
         >
           {t('inspector.serverRuntime.createIsolatedOwner', {
             defaultValue: 'Create isolated owner guard',
+          })}
+        </button>
+        <button
+          type="button"
+          className="col-span-2 rounded-md border border-(--border-default) px-2 py-1.5 text-[10px] text-(--text-secondary) hover:text-(--text-primary) disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={!serverRuntimeWriteAvailable}
+          onClick={createWorkspaceReadGuard}
+        >
+          {t('inspector.serverRuntime.createIsolatedRead', {
+            defaultValue: 'Create isolated read guard',
           })}
         </button>
       </div>

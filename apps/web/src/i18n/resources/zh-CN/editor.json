@@ -1512,6 +1512,7 @@
       "permissions": {
         "badge": "权限目录",
         "workspaceOwner": "允许受保护的 Workspace owner guard 请求精确的运行时权限判定。",
+        "workspaceRead": "允许不使用 Secret 的 isolated 只读函数请求有界的 workspace.read 运行时权限。",
         "referenceOnly": "声明不等于授权。可信运行时的 permission port 仍会逐次判定调用。"
       },
       "bindings": {
@@ -1952,6 +1953,7 @@
         "unavailable": "绑定无效或不可用",
         "createRemoteOwner": "创建 Remote 所有者守卫",
         "createIsolatedOwner": "创建隔离运行所有者守卫",
+        "createIsolatedRead": "创建隔离运行只读守卫",
         "readonly": "当前路由只读，或由已挂载的 Route 模块拥有。"
       },
       "track": {

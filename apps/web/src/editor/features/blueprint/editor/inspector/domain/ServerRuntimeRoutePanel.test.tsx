@@ -38,6 +38,7 @@ const createContext = (input: {
   writeAvailable?: boolean;
   setBinding: ReturnType<typeof vi.fn>;
   createGuard: ReturnType<typeof vi.fn>;
+  createReadGuard: ReturnType<typeof vi.fn>;
   openArtifact: ReturnType<typeof vi.fn>;
 }): InspectorContextValue =>
   ({
@@ -76,6 +77,7 @@ const createContext = (input: {
     serverRuntimeWriteAvailable: input.writeAvailable ?? true,
     setServerRuntimeBinding: input.setBinding,
     createWorkspaceOwnerGuard: input.createGuard,
+    createWorkspaceReadGuard: input.createReadGuard,
     openServerRuntimeArtifact: input.openArtifact,
   }) as unknown as InspectorContextValue;
 
@@ -83,10 +85,16 @@ describe('ServerRuntimeRoutePanel', () => {
   it('binds, unbinds, creates target presets, and opens canonical source', () => {
     const setBinding = vi.fn();
     const createGuard = vi.fn();
+    const createReadGuard = vi.fn();
     const openArtifact = vi.fn();
     render(
       <InspectorContext.Provider
-        value={createContext({ setBinding, createGuard, openArtifact })}
+        value={createContext({
+          setBinding,
+          createGuard,
+          createReadGuard,
+          openArtifact,
+        })}
       >
         <ServerRuntimeRoutePanel />
       </InspectorContext.Provider>
@@ -119,8 +127,12 @@ describe('ServerRuntimeRoutePanel', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Create isolated owner guard' })
     );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Create isolated read guard' })
+    );
     expect(createGuard).toHaveBeenNthCalledWith(1, 'remote-live');
     expect(createGuard).toHaveBeenNthCalledWith(2, 'isolated-production');
+    expect(createReadGuard).toHaveBeenCalledTimes(1);
   });
 
   it('disables authoring for read-only or mounted-module routes', () => {
@@ -130,6 +142,7 @@ describe('ServerRuntimeRoutePanel', () => {
           writeAvailable: false,
           setBinding: vi.fn(),
           createGuard: vi.fn(),
+          createReadGuard: vi.fn(),
           openArtifact: vi.fn(),
         })}
       >

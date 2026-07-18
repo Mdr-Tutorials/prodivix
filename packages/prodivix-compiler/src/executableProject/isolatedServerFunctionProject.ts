@@ -17,7 +17,7 @@ import {
   ISOLATED_SERVER_FUNCTION_SECRET_MATERIAL_PATH,
   ISOLATED_SERVER_FUNCTION_SECRET_MAX_FIELDS,
   ISOLATED_SERVER_FUNCTION_SECRET_MAX_MATERIAL_BYTES,
-  ISOLATED_SERVER_FUNCTION_WORKSPACE_OWNER_PERMISSION_ID,
+  isSupportedIsolatedServerFunctionDefinition,
   PRODIVIX_PRODUCT_SESSION_AUTH_PROVIDER_ID,
   resolveServerFunctionDefinition,
   type ServerFunctionProfileEntry,
@@ -386,24 +386,13 @@ export const generateWorkspaceIsolatedServerFunctionExecutableProject = (
         ),
       ]),
     });
-  if (
-    definition.adapterId !== ISOLATED_SERVER_FUNCTION_ADAPTER_ID ||
-    (definition.auth.kind !== 'public' &&
-      definition.auth.kind !== 'authenticated' &&
-      !(
-        definition.auth.kind === 'permission' &&
-        definition.auth.permissionId ===
-          ISOLATED_SERVER_FUNCTION_WORKSPACE_OWNER_PERMISSION_ID
-      )) ||
-    definition.effect !== 'read' ||
-    definition.runtimeZone !== 'server'
-  )
+  if (!isSupportedIsolatedServerFunctionDefinition(definition))
     return Object.freeze({
       status: 'blocked',
       diagnostics: Object.freeze([
         diagnostic(
           'WKS-EXPORT-SERVER-ISOLATED-POLICY-UNSUPPORTED',
-          'The isolated target accepts only public, authenticated, or workspace.owner permission read/server prodivix.code-export functions.',
+          'The isolated target accepts only public, authenticated, workspace.owner, or Secret-free workspace.read permission read/server prodivix.code-export functions.',
           path
         ),
       ]),

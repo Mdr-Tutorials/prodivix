@@ -1,13 +1,26 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyRound, Route, ShieldCheck, TriangleAlert } from 'lucide-react';
-import { PRODIVIX_PRODUCT_SESSION_AUTH_PROVIDER_ID } from '@prodivix/server-runtime';
+import {
+  ISOLATED_SERVER_FUNCTION_WORKSPACE_OWNER_PERMISSION_ID,
+  ISOLATED_SERVER_FUNCTION_WORKSPACE_READ_PERMISSION_ID,
+  PRODIVIX_PRODUCT_SESSION_AUTH_PROVIDER_ID,
+} from '@prodivix/server-runtime';
 import { createWorkspaceServerRuntimeAuthConfigurationPlan } from '@prodivix/workspace';
 import { useEditorStore } from '@/editor/store/useEditorStore';
 import { dispatchWorkspaceAuthoringOperation } from '@/editor/workspaceSync/workspaceAuthoringOperationDispatcher';
 import { buildWorkspaceAuthServerRuntimeModel } from './workspaceAuthServerRuntime';
 
-const WORKSPACE_OWNER_PERMISSION_ID = 'workspace.owner';
+const supportedPermissions = Object.freeze([
+  Object.freeze({
+    permissionId: ISOLATED_SERVER_FUNCTION_WORKSPACE_OWNER_PERMISSION_ID,
+    descriptionKey: 'resourceManager.auth.permissions.workspaceOwner' as const,
+  }),
+  Object.freeze({
+    permissionId: ISOLATED_SERVER_FUNCTION_WORKSPACE_READ_PERMISSION_ID,
+    descriptionKey: 'resourceManager.auth.permissions.workspaceRead' as const,
+  }),
+]);
 
 const createId = (prefix: string): string => {
   const suffix =
@@ -31,9 +44,6 @@ export function AuthServerRuntimeResourcePage() {
     model?.configuration.status === 'ready'
       ? model.configuration.permissionIds
       : [];
-  const ownerPermissionDeclared = permissionIds.includes(
-    WORKSPACE_OWNER_PERMISSION_ID
-  );
   const providerEnabled = model?.configuration.status === 'ready';
   const providerSupported =
     providerEnabled &&
@@ -75,12 +85,10 @@ export function AuthServerRuntimeResourcePage() {
     );
   };
 
-  const toggleWorkspaceOwner = () => {
-    const next = ownerPermissionDeclared
-      ? permissionIds.filter(
-          (permissionId) => permissionId !== WORKSPACE_OWNER_PERMISSION_ID
-        )
-      : [...permissionIds, WORKSPACE_OWNER_PERMISSION_ID];
+  const togglePermission = (permissionId: string) => {
+    const next = permissionIds.includes(permissionId)
+      ? permissionIds.filter((candidate) => candidate !== permissionId)
+      : [...permissionIds, permissionId];
     void persistConfiguration(next);
   };
 
@@ -157,23 +165,30 @@ export function AuthServerRuntimeResourcePage() {
             <p className="text-xs font-medium tracking-[0.1em] text-(--text-muted) uppercase">
               {t('resourceManager.auth.permissions.badge')}
             </p>
-            <label className="mt-3 flex items-start gap-3 rounded-xl border border-black/8 p-3">
-              <input
-                type="checkbox"
-                checked={ownerPermissionDeclared}
-                disabled={!providerSupported || workspaceReadonly || saving}
-                onChange={toggleWorkspaceOwner}
-                className="mt-0.5"
-              />
-              <span className="min-w-0">
-                <span className="block text-sm font-medium text-(--text-primary)">
-                  {WORKSPACE_OWNER_PERMISSION_ID}
-                </span>
-                <span className="mt-1 block text-xs text-(--text-secondary)">
-                  {t('resourceManager.auth.permissions.workspaceOwner')}
-                </span>
-              </span>
-            </label>
+            <div className="mt-3 grid gap-2">
+              {supportedPermissions.map(({ permissionId, descriptionKey }) => (
+                <label
+                  key={permissionId}
+                  className="flex items-start gap-3 rounded-xl border border-black/8 p-3"
+                >
+                  <input
+                    type="checkbox"
+                    checked={permissionIds.includes(permissionId)}
+                    disabled={!providerSupported || workspaceReadonly || saving}
+                    onChange={() => togglePermission(permissionId)}
+                    className="mt-0.5"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-(--text-primary)">
+                      {permissionId}
+                    </span>
+                    <span className="mt-1 block text-xs text-(--text-secondary)">
+                      {t(descriptionKey)}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
             <p className="mt-3 text-xs text-(--text-muted)">
               {t('resourceManager.auth.permissions.referenceOnly')}
             </p>

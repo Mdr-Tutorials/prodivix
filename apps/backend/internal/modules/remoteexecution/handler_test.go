@@ -268,7 +268,7 @@ func TestGatewayRecordsCreateGrantAndKeepsServiceTokenServerSide(t *testing.T) {
 			t.Fatalf("execution authority header is not canonical base64url: %v", err)
 		}
 		var authority executionServerAuthority
-		if json.Unmarshal(decodedAuthority, &authority) != nil || authority.Format != executionServerAuthorityFormat || authority.Principal.ProviderID != productSessionProviderID || authority.Principal.PrincipalID != "user-1" || len(authority.Permissions) != 1 || authority.Permissions[0] != workspaceOwnerPermissionID || authority.WorkspaceID != "workspace-1" || authority.SnapshotID != "snapshot-1" || authority.ExpiresAt != 1_120_000 {
+		if json.Unmarshal(decodedAuthority, &authority) != nil || authority.Format != executionServerAuthorityFormat || authority.Principal.ProviderID != productSessionProviderID || authority.Principal.PrincipalID != "user-1" || len(authority.Permissions) != 2 || authority.Permissions[0] != workspaceOwnerPermissionID || authority.Permissions[1] != workspaceReadPermissionID || authority.WorkspaceID != "workspace-1" || authority.SnapshotID != "snapshot-1" || authority.ExpiresAt != 1_120_000 {
 			t.Fatalf("execution authority projection drifted: %s", decodedAuthority)
 		}
 		for _, forbidden := range []string{"session-1", "user-session-token", "service-token"} {

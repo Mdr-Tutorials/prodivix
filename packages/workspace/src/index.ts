@@ -12,6 +12,7 @@ export {
 export { createWorkspacePirDocumentUpdateCommand } from './workspacePirDocument';
 export {
   createWorkspaceOwnerGuardTransactionPlan,
+  createWorkspaceReadGuardTransactionPlan,
   createWorkspaceServerRuntimeBindingPlan,
   createWorkspaceServerRuntimeCandidateKey,
   projectWorkspaceServerRuntimeAuthoring,
@@ -342,6 +343,7 @@ export type { CreateWorkspacePirDocumentUpdateCommandInput } from './workspacePi
 export type {
   WorkspaceOwnerGuardTarget,
   WorkspaceOwnerGuardTransactionPlanResult,
+  WorkspaceReadGuardTransactionPlanResult,
   WorkspaceServerRuntimeAuthoringCandidate,
   WorkspaceServerRuntimeAuthoringIssue,
   WorkspaceServerRuntimeAuthoringIssueCode,

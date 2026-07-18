@@ -294,7 +294,7 @@ describe('remote runner control-plane HTTP integration', () => {
         providerId: 'prodivix-product-session',
         principalId: 'product-user-1',
       },
-      permissions: ['workspace.owner'],
+      permissions: ['workspace.owner', 'workspace.read'],
       workspaceId: snapshot.workspace.workspaceId,
       snapshotId: snapshot.workspace.snapshotId,
       expiresAt: 1_100,

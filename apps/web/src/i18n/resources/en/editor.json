@@ -1512,6 +1512,7 @@
       "permissions": {
         "badge": "Permission catalog",
         "workspaceOwner": "Allows protected workspace-owner guards to request an exact runtime permission decision.",
+        "workspaceRead": "Allows Secret-free isolated read functions to require the bounded workspace.read runtime grant.",
         "referenceOnly": "A declaration is not a grant. The trusted runtime permission port still decides every invocation."
       },
       "bindings": {
@@ -1952,6 +1953,7 @@
         "unavailable": "Invalid or unavailable binding",
         "createRemoteOwner": "Create Remote owner guard",
         "createIsolatedOwner": "Create isolated owner guard",
+        "createIsolatedRead": "Create isolated read guard",
         "readonly": "This route is read-only or owned by a mounted Route module."
       },
       "track": {

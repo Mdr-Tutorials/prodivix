@@ -10,6 +10,7 @@ import {
 } from './workspaceCommand';
 import {
   createWorkspaceOwnerGuardTransactionPlan,
+  createWorkspaceReadGuardTransactionPlan,
   createWorkspaceServerRuntimeBindingPlan,
   projectWorkspaceServerRuntimeAuthoring,
 } from './workspaceServerRuntimeAuthoring';
@@ -411,4 +412,49 @@ describe('Workspace Server Runtime authoring', () => {
       expect(content.source).not.toMatch(/token|cookie|secret|sessionId/u);
     }
   );
+
+  it('creates and binds a Secret-free isolated workspace.read guard atomically', () => {
+    const workspace = createWorkspace({
+      includeCode: false,
+      permissionIds: ['workspace.read'],
+    });
+    const result = createWorkspaceReadGuardTransactionPlan({
+      workspace,
+      routeNodeId: 'route-home',
+      documentId: 'code-isolated-read',
+      path: '/server/isolated-read.guard.server.ts',
+      transactionId: 'create-isolated-read',
+      issuedAt: '2026-07-19T03:00:00.000Z',
+    });
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+    const applied = applyWorkspaceTransaction(
+      workspace,
+      result.plan.transaction
+    );
+    expect(applied.ok).toBe(true);
+    if (!applied.ok) return;
+    expect(
+      applied.snapshot.routeManifest.root.children?.[0]?.runtime?.guardRef
+    ).toEqual(result.plan.functionRef);
+    const document = applied.snapshot.docsById[result.plan.documentId];
+    if (document?.type !== 'code' || !document.content) return;
+    const content = document.content as Readonly<Record<string, unknown>>;
+    const decoded = decodeServerRuntimeProfile(
+      content.metadata as Readonly<Record<string, unknown>>,
+      'ts'
+    );
+    expect(decoded.status).toBe('valid');
+    if (decoded.status !== 'valid') return;
+    expect(
+      decoded.profile.functionsByExport.requireWorkspaceRead
+    ).toMatchObject({
+      kind: 'route-guard',
+      adapterId: 'prodivix.code-export',
+      effect: 'read',
+      auth: { kind: 'permission', permissionId: 'workspace.read' },
+    });
+    expect(content.source).toContain('WORKSPACE_READ_REQUIRED');
+    expect(content.source).not.toMatch(/token|cookie|secret|sessionId/u);
+  });
 });

@@ -219,6 +219,39 @@ fs.writeFileSync('/workspace/.prodivix/server-function-result.json', JSON.string
 }));
 `;
 
+const isolatedWorkspaceReadServerFunctionSource = String.raw`
+import fs from 'node:fs';
+import Ajv2020 from 'ajv/dist/2020.js';
+const request = JSON.parse(fs.readFileSync('/workspace/.prodivix/server-function-invocation.json', 'utf8'));
+const authorityPath = '/workspace/.prodivix/server-function-authority.json';
+const authority = JSON.parse(fs.readFileSync(authorityPath, 'utf8'));
+fs.rmSync(authorityPath);
+if (JSON.stringify(Object.keys(authority).sort()) !== JSON.stringify(['expiresAt', 'format', 'permissions', 'principal', 'snapshotId', 'workspaceId']) ||
+  JSON.stringify(Object.keys(authority.principal ?? {}).sort()) !== JSON.stringify(['principalId', 'providerId']) ||
+  authority.format !== 'prodivix.isolated-server-function-authority.v1' ||
+  authority.workspaceId !== 'workspace-gate-server-function-read' ||
+  authority.snapshotId !== 'snapshot-gate-server-function-read' ||
+  JSON.stringify(authority.permissions) !== JSON.stringify(['workspace.owner', 'workspace.read']) ||
+  !authority.permissions.includes('workspace.read') ||
+  authority.expiresAt <= Date.now())
+  throw new TypeError('workspace.read Server Function Gate authority is invalid.');
+if (fs.existsSync('/workspace/.prodivix/server-function-secrets.json'))
+  throw new TypeError('workspace.read unexpectedly received Secret material.');
+const validateInput = new Ajv2020({ strict: true }).compile({
+  type: 'object', required: ['name'], properties: { name: { type: 'string' } }, additionalProperties: false,
+});
+if (!validateInput(request.input)) throw new TypeError('workspace.read Server Function Gate input is invalid.');
+const { getWorkspaceLabel } = await import('./function.mjs');
+const result = await getWorkspaceLabel(request.input, Object.freeze({ principal: authority.principal }));
+fs.mkdirSync('/workspace/.prodivix', { recursive: true });
+fs.writeFileSync('/workspace/.prodivix/server-function-result.json', JSON.stringify({
+  type: 'prodivix.execution-server-function-gateway-response.v1',
+  requestId: request.requestId,
+  ok: true,
+  result,
+}));
+`;
+
 const isolatedServerFunctionInstallProbeSource = String.raw`
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -474,6 +507,145 @@ const isolatedServerFunctionFixture = () => {
       format: ISOLATED_SERVER_FUNCTION_SECRET_MATERIAL_FORMAT,
       fields: { signingKey: rootlessSecretCanary },
     },
+  });
+};
+
+const isolatedWorkspaceReadServerFunctionFixture = () => {
+  const base = isolatedServerFunctionFixture().snapshot;
+  const functionRef = Object.freeze({
+    artifactId: 'code-rootless-workspace-read',
+    exportName: 'getWorkspaceLabel',
+  });
+  const workspace = Object.freeze({
+    workspaceId: 'workspace-gate-server-function-read',
+    snapshotId: 'snapshot-gate-server-function-read',
+    partitionRevisions: Object.freeze({ workspace: '1' }),
+  });
+  const readSnapshot = createExecutableProjectSnapshot({
+    workspace,
+    target: base.target,
+    files: base.files.map((file) => {
+      if (file.path === 'src/.prodivix/server-runtime/invoke.mjs')
+        return {
+          ...file,
+          contents: isolatedWorkspaceReadServerFunctionSource,
+          sourceTrace: [
+            {
+              sourceRef: {
+                kind: 'code-artifact' as const,
+                artifactId: functionRef.artifactId,
+              },
+            },
+          ],
+        };
+      if (file.path === 'src/.prodivix/server-runtime/function.mjs')
+        return {
+          ...file,
+          contents:
+            "import { workspaceLabel } from './modules/module-001.mjs';\nexport const getWorkspaceLabel = async (input, context) => ({ kind: 'value', value: { label: workspaceLabel(input.name) + ' ' + context.principal.principalId } });\n",
+          sourceTrace: [
+            {
+              sourceRef: {
+                kind: 'code-artifact' as const,
+                artifactId: functionRef.artifactId,
+              },
+            },
+          ],
+        };
+      if (file.path === 'src/.prodivix/server-runtime/modules/module-001.mjs')
+        return {
+          ...file,
+          contents: "export const workspaceLabel = (name) => 'Read ' + name;\n",
+          sourceTrace: [
+            {
+              sourceRef: {
+                kind: 'code-artifact' as const,
+                artifactId: 'code-rootless-workspace-read-helper',
+              },
+            },
+          ],
+        };
+      return file;
+    }),
+    dependencyPlan: base.dependencyPlan,
+    entrypoints: base.entrypoints,
+    capabilityRequirements: {
+      ...base.capabilityRequirements,
+      production: base.capabilityRequirements.production.filter(
+        (capability) => capability !== 'environment-binding'
+      ),
+    },
+    publicBuildConfiguration: base.publicBuildConfiguration,
+    resourceHints: base.resourceHints,
+    cacheHints: base.cacheHints,
+    installCommand: base.installCommand,
+    previewCommand: base.previewCommand,
+    buildCommand: base.buildCommand,
+    previewPlan: base.previewPlan,
+    buildPlan: base.buildPlan,
+    testPlan: base.testPlan,
+    serverFunctionPlan: {
+      ...base.serverFunctionPlan!,
+      functionRef,
+      runtimeManifest: {
+        schemaVersion: '1.0',
+        functionsByExport: {
+          getWorkspaceLabel: {
+            kind: 'function',
+            runtimeZone: 'server',
+            adapterId: 'prodivix.code-export',
+            effect: 'read',
+            auth: { kind: 'permission', permissionId: 'workspace.read' },
+            inputSchema: {
+              type: 'object',
+              required: ['name'],
+              properties: { name: { type: 'string' } },
+              additionalProperties: false,
+            },
+            outputSchema: {
+              type: 'object',
+              required: ['label'],
+              properties: { label: { type: 'string' } },
+              additionalProperties: false,
+            },
+          },
+        },
+      },
+    },
+  });
+  const request = createExecutionRequest({
+    requestId: 'remote-gate-server-function-read',
+    profile: 'production',
+    runtimeZone: 'server',
+    workspace: readSnapshot.workspace,
+    invocation: {
+      kind: 'code',
+      targetRef: { kind: 'code-artifact', artifactId: functionRef.artifactId },
+      entrypoint: functionRef.exportName,
+      input: {
+        type: EXECUTION_SERVER_FUNCTION_BRIDGE_REQUEST_TYPE,
+        requestId: 'gate-server-function-read:1',
+        invocationId: 'gate-server-function-read',
+        attempt: 1,
+        functionRef,
+        input: { name: 'Workspace' },
+      },
+    },
+    requiredCapabilities: ['server-function'],
+  });
+  return Object.freeze({
+    snapshot: readSnapshot,
+    request,
+    authority: createIsolatedServerFunctionAuthority({
+      workspaceId: workspace.workspaceId,
+      snapshotId: workspace.snapshotId,
+      principal: {
+        providerId: 'prodivix-product-session',
+        principalId: 'user-1',
+      },
+      permissions: ['workspace.owner', 'workspace.read'],
+      expiresAt: Date.now() + 60_000,
+    }),
   });
 };
 
@@ -925,6 +1097,67 @@ if (
   throw new Error('Rootless Server Function result content is invalid.');
 await assertNoExecutionContainer('gate-server-function');
 
+const workspaceReadFixture = isolatedWorkspaceReadServerFunctionFixture();
+const workspaceReadResult = await sandbox.execute({
+  executionId: 'gate-server-function-read',
+  snapshot: workspaceReadFixture.snapshot,
+  request: workspaceReadFixture.request,
+  serverFunctionAuthority: workspaceReadFixture.authority,
+  profile: 'production',
+  timeoutMs: 15_000,
+  maximumOutputBytes: 256 * 1024,
+  redactValues: [],
+  signal: new AbortController().signal,
+});
+if (workspaceReadResult.status !== 'succeeded')
+  throw new Error(
+    `Rootless workspace.read Server Function probe failed: ${workspaceReadResult.stderr}`
+  );
+const workspaceReadArtifacts = requireExecutionArtifacts(
+  workspaceReadResult,
+  'Rootless workspace.read Server Function probe'
+);
+if (
+  workspaceReadArtifacts.filesystemDiff.changes.some(({ path }) =>
+    [
+      '.prodivix/server-function-invocation.json',
+      '.prodivix/server-function-result.json',
+      ISOLATED_SERVER_FUNCTION_AUTHORITY_PATH,
+      ISOLATED_SERVER_FUNCTION_SECRET_MATERIAL_PATH,
+    ].includes(path)
+  ) ||
+  workspaceReadArtifacts.primary.mediaType !==
+    ISOLATED_SERVER_FUNCTION_RESULT_MEDIA_TYPE ||
+  !workspaceReadArtifacts.primary.sourceTrace?.some(
+    (trace) =>
+      trace.sourceRef.kind === 'code-artifact' &&
+      trace.sourceRef.artifactId === 'code-rootless-workspace-read'
+  ) ||
+  !workspaceReadArtifacts.primary.sourceTrace?.some(
+    (trace) =>
+      trace.sourceRef.kind === 'code-artifact' &&
+      trace.sourceRef.artifactId === 'code-rootless-workspace-read-helper'
+  )
+)
+  throw new Error(
+    'Rootless workspace.read transport or SourceTrace boundary is invalid.'
+  );
+const workspaceReadResponse = readIsolatedServerFunctionExecutionResponse(
+  JSON.parse(
+    Buffer.from(workspaceReadArtifacts.primary.contents).toString('utf8')
+  ) as unknown,
+  workspaceReadFixture.request,
+  workspaceReadFixture.snapshot.serverFunctionPlan
+);
+if (
+  !workspaceReadResponse?.ok ||
+  workspaceReadResponse.result.kind !== 'value' ||
+  JSON.stringify(workspaceReadResponse.result.value) !==
+    JSON.stringify({ label: 'Read Workspace user-1' })
+)
+  throw new Error('Rootless workspace.read result content is invalid.');
+await assertNoExecutionContainer('gate-server-function-read');
+
 const goldenSnapshot = decodeRemoteExecutableProjectSnapshot(
   JSON.parse(
     await readFile(resolve(goldenSnapshotPath), { encoding: 'utf8' })
@@ -1174,6 +1407,16 @@ const evidence = Object.freeze({
     sourceTraceCount: serverFunctionArtifacts.primary.sourceTrace?.length ?? 0,
     result: serverFunctionResponse,
     installNetworkTraceCount: serverFunctionResult.networkTraces.length,
+    runtimeNetwork: 'none-verified',
+  },
+  workspaceReadServerFunctionArtifact: {
+    artifactId: workspaceReadArtifacts.primary.artifactId,
+    mediaType: workspaceReadArtifacts.primary.mediaType,
+    size: workspaceReadArtifacts.primary.contents.byteLength,
+    metadata: workspaceReadArtifacts.primary.metadata,
+    sourceTraceCount: workspaceReadArtifacts.primary.sourceTrace?.length ?? 0,
+    result: workspaceReadResponse,
+    secretMaterial: 'none-verified',
     runtimeNetwork: 'none-verified',
   },
   goldenJourney: {

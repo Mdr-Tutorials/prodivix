@@ -25,6 +25,7 @@ export const GOLDEN_G2_AUTH_SERVER_IDS = Object.freeze({
   remoteExport: 'requireRemoteOwner',
   remoteSecretExport: 'signRemotePayload',
   isolatedExport: 'requireIsolatedOwner',
+  isolatedReadExport: 'requireIsolatedRead',
   isolatedSecretExport: 'useIsolatedSecret',
 });
 
@@ -40,6 +41,12 @@ export const GOLDEN_G2_ISOLATED_OWNER_FUNCTION_REF: ServerFunctionReference =
     exportName: GOLDEN_G2_AUTH_SERVER_IDS.isolatedExport,
   });
 
+export const GOLDEN_G2_ISOLATED_READ_FUNCTION_REF: ServerFunctionReference =
+  Object.freeze({
+    artifactId: GOLDEN_G2_AUTH_SERVER_IDS.serverDocument,
+    exportName: GOLDEN_G2_AUTH_SERVER_IDS.isolatedReadExport,
+  });
+
 export const GOLDEN_G2_REMOTE_HMAC_FUNCTION_REF: ServerFunctionReference =
   Object.freeze({
     artifactId: GOLDEN_G2_AUTH_SERVER_IDS.serverDocument,
@@ -53,9 +60,13 @@ export const GOLDEN_G2_ISOLATED_SECRET_FUNCTION_REF: ServerFunctionReference =
   });
 
 export type GoldenG2AuthServerBinding =
-  'remote-live' | 'remote-secret' | 'isolated-production' | 'isolated-secret';
+  | 'remote-live'
+  | 'remote-secret'
+  | 'isolated-production'
+  | 'isolated-read'
+  | 'isolated-secret';
 
-const ownerGuardProfile = (adapterId: string) =>
+const permissionGuardProfile = (adapterId: string, permissionId: string) =>
   Object.freeze({
     kind: 'route-guard' as const,
     runtimeZone: 'server' as const,
@@ -63,7 +74,7 @@ const ownerGuardProfile = (adapterId: string) =>
     effect: 'read' as const,
     auth: Object.freeze({
       kind: 'permission' as const,
-      permissionId: 'workspace.owner',
+      permissionId,
     }),
     inputSchema: Object.freeze({
       type: 'object',
@@ -149,7 +160,9 @@ export const createGoldenG2AuthServerWorkspace = (
         ? GOLDEN_G2_REMOTE_HMAC_FUNCTION_REF
         : binding === 'isolated-secret'
           ? GOLDEN_G2_ISOLATED_SECRET_FUNCTION_REF
-          : GOLDEN_G2_ISOLATED_OWNER_FUNCTION_REF;
+          : binding === 'isolated-read'
+            ? GOLDEN_G2_ISOLATED_READ_FUNCTION_REF
+            : GOLDEN_G2_ISOLATED_OWNER_FUNCTION_REF;
   return {
     id: GOLDEN_G2_AUTH_SERVER_IDS.workspace,
     workspaceRev: 8,
@@ -250,6 +263,13 @@ export const requireIsolatedOwner = (
   ? ({ kind: 'allow' as const })
   : ({ kind: 'deny' as const, code: 'WORKSPACE_OWNER_REQUIRED' });
 
+export const requireIsolatedRead = (
+  _input: { routeId: string },
+  context: { principal?: { providerId: string; principalId: string } },
+) => isGoldenWorkspaceOwner(context.principal)
+  ? ({ kind: 'allow' as const })
+  : ({ kind: 'deny' as const, code: 'WORKSPACE_READ_REQUIRED' });
+
 export const useIsolatedSecret = async (
   _input: { routeId: string },
   context: { useSecret?: (field: string, consumer: (material: string) => void) => Promise<void> },
@@ -263,13 +283,22 @@ export const useIsolatedSecret = async (
             'prodivix.serverRuntime': {
               schemaVersion: '1.0',
               functionsByExport: {
-                [GOLDEN_G2_AUTH_SERVER_IDS.remoteExport]: ownerGuardProfile(
-                  'core.auth.require-workspace-owner'
-                ),
+                [GOLDEN_G2_AUTH_SERVER_IDS.remoteExport]:
+                  permissionGuardProfile(
+                    'core.auth.require-workspace-owner',
+                    'workspace.owner'
+                  ),
                 [GOLDEN_G2_AUTH_SERVER_IDS.remoteSecretExport]: hmacProfile(),
-                [GOLDEN_G2_AUTH_SERVER_IDS.isolatedExport]: ownerGuardProfile(
-                  'prodivix.code-export'
-                ),
+                [GOLDEN_G2_AUTH_SERVER_IDS.isolatedExport]:
+                  permissionGuardProfile(
+                    'prodivix.code-export',
+                    'workspace.owner'
+                  ),
+                [GOLDEN_G2_AUTH_SERVER_IDS.isolatedReadExport]:
+                  permissionGuardProfile(
+                    'prodivix.code-export',
+                    'workspace.read'
+                  ),
                 [GOLDEN_G2_AUTH_SERVER_IDS.isolatedSecretExport]:
                   isolatedSecretProfile(),
               },
@@ -303,7 +332,7 @@ export const useIsolatedSecret = async (
           value: {
             schemaVersion: '1.0',
             providerId: 'prodivix-product-session',
-            permissionIds: ['workspace.owner'],
+            permissionIds: ['workspace.owner', 'workspace.read'],
           },
         },
       },
@@ -341,6 +370,7 @@ export const createGoldenG2AuthServerTestProvision =
       }),
       permissions: Object.freeze([
         Object.freeze({ permissionId: 'workspace.owner', allowed: true }),
+        Object.freeze({ permissionId: 'workspace.read', allowed: true }),
       ]),
       fixtures: Object.freeze([
         Object.freeze({
@@ -354,6 +384,14 @@ export const createGoldenG2AuthServerTestProvision =
         Object.freeze({
           id: 'golden-isolated-owner-allow',
           functionRef: GOLDEN_G2_ISOLATED_OWNER_FUNCTION_REF,
+          behavior: Object.freeze({
+            kind: 'outcome' as const,
+            outcome: Object.freeze({ kind: 'allow' as const }),
+          }),
+        }),
+        Object.freeze({
+          id: 'golden-isolated-read-allow',
+          functionRef: GOLDEN_G2_ISOLATED_READ_FUNCTION_REF,
           behavior: Object.freeze({
             kind: 'outcome' as const,
             outcome: Object.freeze({ kind: 'allow' as const }),

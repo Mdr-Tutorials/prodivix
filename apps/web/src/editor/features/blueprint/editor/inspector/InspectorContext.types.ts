@@ -180,6 +180,7 @@ export type InspectorCodeContext = {
     candidateKey: string | undefined
   ) => void;
   createWorkspaceOwnerGuard: (target: WorkspaceOwnerGuardTarget) => void;
+  createWorkspaceReadGuard: () => void;
   openServerRuntimeArtifact: (artifactId: string) => void;
 };
 

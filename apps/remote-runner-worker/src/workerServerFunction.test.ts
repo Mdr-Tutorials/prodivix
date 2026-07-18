@@ -194,6 +194,10 @@ const permissionSnapshot = protectedSnapshot({
   kind: 'permission',
   permissionId: 'workspace.owner',
 });
+const workspaceReadSnapshot = protectedSnapshot({
+  kind: 'permission',
+  permissionId: 'workspace.read',
+});
 
 const authenticatedRequest = createExecutionRequest({
   ...request,
@@ -205,6 +209,12 @@ const permissionRequest = createExecutionRequest({
   ...request,
   workspace: permissionSnapshot.workspace,
   requestId: 'remote-permission-server-function-1',
+});
+
+const workspaceReadRequest = createExecutionRequest({
+  ...request,
+  workspace: workspaceReadSnapshot.workspace,
+  requestId: 'remote-workspace-read-server-function-1',
 });
 
 const secretCanary = 'worker-agent-secret-canary';
@@ -400,7 +410,7 @@ const authenticatedAuthority: NonNullable<
     providerId: 'prodivix-product-session',
     principalId: 'user-1',
   }),
-  permissions: Object.freeze(['workspace.owner']),
+  permissions: Object.freeze(['workspace.owner', 'workspace.read']),
   workspaceId: authenticatedSnapshot.workspace.workspaceId,
   snapshotId: authenticatedSnapshot.workspace.snapshotId,
   expiresAt: 100,
@@ -906,6 +916,11 @@ describe('remote worker isolated Server Function', () => {
       executionRequest: permissionRequest,
       executionSnapshot: permissionSnapshot,
     },
+    {
+      label: 'workspace.read permission',
+      executionRequest: workspaceReadRequest,
+      executionSnapshot: workspaceReadSnapshot,
+    },
   ])(
     'projects an exact principal for $label without session or lease material',
     async ({ executionRequest, executionSnapshot }) => {
@@ -1032,10 +1047,19 @@ describe('remote worker isolated Server Function', () => {
       executionSnapshot: permissionSnapshot,
     },
     {
+      label: 'missing workspace.read grant',
+      authority: {
+        ...authenticatedAuthority,
+        permissions: ['workspace.owner'],
+      },
+      executionRequest: workspaceReadRequest,
+      executionSnapshot: workspaceReadSnapshot,
+    },
+    {
       label: 'non-canonical permission grant order',
       authority: {
         ...authenticatedAuthority,
-        permissions: ['workspace.write', 'workspace.owner'],
+        permissions: ['workspace.read', 'workspace.owner'],
       },
       executionRequest: permissionRequest,
       executionSnapshot: permissionSnapshot,

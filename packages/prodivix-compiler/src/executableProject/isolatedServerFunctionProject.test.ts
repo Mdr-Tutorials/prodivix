@@ -471,6 +471,28 @@ describe('isolated Server Function executable project', () => {
     });
   });
 
+  it('compiles a declared Secret-free workspace.read function and requires the exact grant', () => {
+    const result = generateWorkspaceIsolatedServerFunctionExecutableProject(
+      workspace({
+        auth: { kind: 'permission', permissionId: 'workspace.read' },
+        permissionIds: ['workspace.read'],
+      }),
+      { functionRef }
+    );
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+    expect(result.snapshot.serverFunctionPlan?.runtimeManifest).toMatchObject({
+      functionsByExport: {
+        loadGreeting: {
+          auth: { kind: 'permission', permissionId: 'workspace.read' },
+        },
+      },
+    });
+    expect(result.snapshot.capabilityRequirements.production).not.toContain(
+      'environment-binding'
+    );
+  });
+
   it('runs a declared Secret through one-shot useSecret without projecting material', async () => {
     const secretCanary = 'isolated-secret-canary-value';
     const result = generateWorkspaceIsolatedServerFunctionExecutableProject(
@@ -621,6 +643,18 @@ describe('isolated Server Function executable project', () => {
       {
         candidate: workspace({
           auth: { kind: 'permission', permissionId: 'workspace.write' },
+        }),
+        code: 'WKS-EXPORT-SERVER-ISOLATED-POLICY-UNSUPPORTED',
+      },
+      {
+        candidate: workspace({
+          auth: { kind: 'permission', permissionId: 'workspace.read' },
+          permissionIds: ['workspace.read'],
+          environment: {
+            secretsByField: {
+              signingKey: { bindingId: 'webhook-signing-key' },
+            },
+          },
         }),
         code: 'WKS-EXPORT-SERVER-ISOLATED-POLICY-UNSUPPORTED',
       },

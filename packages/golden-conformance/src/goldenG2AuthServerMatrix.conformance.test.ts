@@ -7,6 +7,7 @@ import {
 import {
   applyWorkspaceTransaction,
   createWorkspaceOwnerGuardTransactionPlan,
+  createWorkspaceReadGuardTransactionPlan,
   decodeWorkspaceSnapshot,
   encodeWorkspaceSnapshot,
   projectWorkspaceServerRuntimeAuthoring,
@@ -36,24 +37,28 @@ describe('G2 Golden Auth/Server target contract matrix', () => {
         'audited-owner-adapter': 'blocked',
         'audited-secret-hmac': 'blocked',
         'isolated-code-export': 'blocked',
+        'isolated-workspace-read-code-export': 'blocked',
         'isolated-secret-code-export': 'blocked',
       },
       'deterministic-test': {
         'audited-owner-adapter': 'supported',
         'audited-secret-hmac': 'blocked',
         'isolated-code-export': 'supported',
+        'isolated-workspace-read-code-export': 'supported',
         'isolated-secret-code-export': 'blocked',
       },
       'remote-live': {
         'audited-owner-adapter': 'supported',
         'audited-secret-hmac': 'supported',
         'isolated-code-export': 'blocked',
+        'isolated-workspace-read-code-export': 'blocked',
         'isolated-secret-code-export': 'blocked',
       },
       'isolated-production': {
         'audited-owner-adapter': 'blocked',
         'audited-secret-hmac': 'blocked',
         'isolated-code-export': 'supported',
+        'isolated-workspace-read-code-export': 'supported',
         'isolated-secret-code-export': 'supported',
       },
     });
@@ -63,6 +68,9 @@ describe('G2 Golden Auth/Server target contract matrix', () => {
     expect(matrix.blockedDiagnostics.browserStaticCodeExport).toContain(
       'WKS-EXPORT-SERVER-GATEWAY-REQUIRED'
     );
+    expect(
+      matrix.blockedDiagnostics.browserStaticWorkspaceReadCodeExport
+    ).toContain('WKS-EXPORT-SERVER-GATEWAY-REQUIRED');
     expect(matrix.blockedDiagnostics.browserStaticSecretHmac).toContain(
       'WKS-EXPORT-SERVER-GATEWAY-REQUIRED'
     );
@@ -75,6 +83,9 @@ describe('G2 Golden Auth/Server target contract matrix', () => {
     expect(matrix.blockedDiagnostics.remoteLiveCodeExport).toContain(
       'WKS-EXPORT-SERVER-ADAPTER-UNSUPPORTED'
     );
+    expect(
+      matrix.blockedDiagnostics.remoteLiveWorkspaceReadCodeExport
+    ).toContain('WKS-EXPORT-SERVER-ADAPTER-UNSUPPORTED');
     expect(matrix.blockedDiagnostics.remoteLiveIsolatedSecret).toContain(
       'WKS-EXPORT-SERVER-ADAPTER-UNSUPPORTED'
     );
@@ -89,13 +100,20 @@ describe('G2 Golden Auth/Server target contract matrix', () => {
     );
   });
 
-  it('executes both owner-guard contracts in the deterministic Test session', () => {
-    expect(matrix.deterministicTest.outcomes).toEqual(['allow', 'allow']);
-    expect(matrix.deterministicTest.observationCount).toBe(2);
+  it('executes owner and workspace.read contracts in the deterministic Test session', () => {
+    expect(matrix.deterministicTest.outcomes).toEqual([
+      'allow',
+      'allow',
+      'allow',
+    ]);
+    expect(matrix.deterministicTest.observationCount).toBe(3);
     expect(matrix.deterministicTest.auditedAdapterSnapshotDigest).toMatch(
       /^sha256-[a-f0-9]{64}$/u
     );
     expect(matrix.deterministicTest.codeExportSnapshotDigest).toMatch(
+      /^sha256-[a-f0-9]{64}$/u
+    );
+    expect(matrix.deterministicTest.workspaceReadSnapshotDigest).toMatch(
       /^sha256-[a-f0-9]{64}$/u
     );
   });
@@ -182,6 +200,42 @@ describe('G2 Golden Auth/Server target contract matrix', () => {
     ]);
   });
 
+  it('executes Secret-free workspace.read with the same one-shot authority fence', () => {
+    expect(matrix.isolatedWorkspaceRead.snapshot).toMatchObject({
+      format: 'prodivix.executable-project.v6',
+      target: { presetId: 'isolated-server-function' },
+      serverFunctionPlan: {
+        functionRef: {
+          artifactId: GOLDEN_G2_AUTH_SERVER_IDS.serverDocument,
+          exportName: GOLDEN_G2_AUTH_SERVER_IDS.isolatedReadExport,
+        },
+        runtimeManifest: {
+          functionsByExport: {
+            [GOLDEN_G2_AUTH_SERVER_IDS.isolatedReadExport]: {
+              auth: {
+                kind: 'permission',
+                permissionId: 'workspace.read',
+              },
+            },
+          },
+        },
+      },
+    });
+    expect(
+      matrix.isolatedWorkspaceRead.snapshot.capabilityRequirements.production
+    ).not.toContain('environment-binding');
+    expect(matrix.isolatedWorkspaceRead.authorityConsumed).toBe(true);
+    expect(matrix.isolatedWorkspaceRead.response).toMatchObject({
+      requestId: 'golden-isolated-read:1',
+      ok: true,
+      result: { kind: 'allow' },
+    });
+    expect(matrix.isolatedWorkspaceRead.sourceArtifactIds).toEqual([
+      GOLDEN_G2_AUTH_SERVER_IDS.serverDocument,
+      GOLDEN_G2_AUTH_SERVER_IDS.helperDocument,
+    ]);
+  });
+
   it('executes the isolated Secret code export with one-shot material and no output leak', () => {
     expect(matrix.isolatedProductionSecret.snapshot).toMatchObject({
       format: 'prodivix.executable-project.v6',
@@ -256,7 +310,7 @@ describe('G2 Golden Auth/Server target contract matrix', () => {
         status: 'ready',
         configuration: {
           providerId: 'prodivix-product-session',
-          permissionIds: ['workspace.owner'],
+          permissionIds: ['workspace.owner', 'workspace.read'],
         },
       });
       expect(projection.bindings).toContainEqual(
@@ -311,6 +365,49 @@ describe('G2 Golden Auth/Server target contract matrix', () => {
         ({ path }) => path === 'src/.prodivix/server-runtime/function.mjs'
       )?.contents
     ).toContain('WORKSPACE_OWNER_REQUIRED');
+  });
+
+  it('authors, reloads, and compiles the isolated workspace.read preset', () => {
+    const workspace = createGoldenG2AuthServerWorkspace('isolated-read');
+    const plan = createWorkspaceReadGuardTransactionPlan({
+      workspace,
+      routeNodeId: GOLDEN_G2_AUTH_SERVER_IDS.route,
+      documentId: 'code-authored-isolated-read',
+      path: '/server/isolated-read.guard.server.ts',
+      transactionId: 'golden-author-isolated-read',
+      issuedAt: '2026-07-19T03:00:00.000Z',
+    });
+    expect(plan.status).toBe('ready');
+    if (plan.status !== 'ready') throw new Error(plan.message);
+    const applied = applyWorkspaceTransaction(workspace, plan.plan.transaction);
+    expect(applied.ok).toBe(true);
+    if (!applied.ok) throw new Error(JSON.stringify(applied.issues));
+    const reloaded = decodeWorkspaceSnapshot(
+      encodeWorkspaceSnapshot(applied.snapshot, {})
+    ).workspace;
+    expect(projectWorkspaceServerRuntimeAuthoring(reloaded).issues).toEqual([]);
+    const project = generateWorkspaceIsolatedServerFunctionExecutableProject(
+      reloaded,
+      { functionRef: plan.plan.functionRef }
+    );
+    if (project.status !== 'ready') {
+      throw new Error(
+        `Authored isolated workspace.read guard did not compile: ${JSON.stringify(project.diagnostics)}`
+      );
+    }
+    expect(project.snapshot.serverFunctionPlan).toMatchObject({
+      functionRef: plan.plan.functionRef,
+      runtimeManifest: {
+        functionsByExport: {
+          requireWorkspaceRead: {
+            auth: { kind: 'permission', permissionId: 'workspace.read' },
+          },
+        },
+      },
+    });
+    expect(JSON.stringify(project.snapshot)).not.toMatch(
+      /bearer|token|cookie|sessionId|secretValue/iu
+    );
   });
 
   it('fails Remote and isolated protected targets closed when Auth configuration is missing or incomplete', () => {

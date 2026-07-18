@@ -28,6 +28,14 @@
   1-256 bounded `FOR UPDATE ... SKIP LOCKED` maintenance 在单事务内只 rewrap data key，legacy direct-cipher row
   一次性迁移为 envelope，并只写 aggregate audit。并发 rotation、ciphertext byte-preservation、old-key-only denial
   与 active-key-only resolve 已通过本地及 GitHub 真实 PostgreSQL Gate；managed-cloud KMS adapter 与完整跨表面 leak Gate 继续建设。
+- Auth/Server A12 最新状态（覆盖上方“其他 permission 全部关闭”的历史描述）：isolated production 新增
+  Secret-free `workspace.read` permission first vertical。`@prodivix/server-runtime` 统一拥有 Compiler/Worker shared
+  policy，只允许 `read + server + prodivix.code-export` 且无 environment；Backend 在 exact owner preflight 后只投影
+  sorted `workspace.owner` + `workspace.read` 短期 authority，runner 仍要求 profile 的 exact read grant，owner grant不替代
+  read grant。Resources 可声明 reference-only permission，Blueprint 以单个可逆 Workspace Transaction 创建/绑定
+  isolated read guard；Living Golden 已固定 Browser/static blocked、deterministic Test supported、Remote live blocked、
+  isolated production supported，并实际执行 read authority。GitHub rootless Gate 已配置独立 networkless/Secret-free
+  read probe；`workspace.write`、其他 permission、read + Secret、collaborator role resolution与源码 mutation继续 fail closed。
 - Canonical Workspace VFS 是作者态唯一真相。PIR、NodeGraph、Animation、Data Source、Code、Design Token、Design Token Resolver、Assets、Config 与 RouteManifest 是 Workspace 内由各领域 owner 管理的文档或清单；PIR 不是整个项目的单一巨型 JSON。
 
 ```mermaid

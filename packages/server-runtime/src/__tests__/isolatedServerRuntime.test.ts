@@ -280,6 +280,64 @@ describe('isolated Server Function runtime boundary', () => {
         },
       })
     ).toBeUndefined();
+
+    const workspaceReadPlan = Object.freeze({
+      ...permissionPlan,
+      runtimeManifest: {
+        ...(permissionPlan.runtimeManifest as Record<string, unknown>),
+        functionsByExport: {
+          getGreeting: {
+            ...runtimeManifest.functionsByExport.getGreeting,
+            auth: { kind: 'permission', permissionId: 'workspace.read' },
+          },
+        },
+      },
+    }) as unknown as ExecutableProjectServerFunctionPlan;
+    expect(readIsolatedServerFunctionPlan(workspaceReadPlan)).toMatchObject({
+      definition: {
+        auth: { kind: 'permission', permissionId: 'workspace.read' },
+      },
+    });
+    expect(
+      readIsolatedServerFunctionExecutionContext(
+        request,
+        workspaceReadPlan,
+        {
+          ...authority,
+          permissions: ['workspace.owner', 'workspace.read'],
+        },
+        1_000
+      )
+    ).toMatchObject({
+      authority: { permissions: ['workspace.owner', 'workspace.read'] },
+    });
+    expect(
+      readIsolatedServerFunctionExecutionContext(
+        request,
+        workspaceReadPlan,
+        authority,
+        1_000
+      )
+    ).toBeUndefined();
+    expect(
+      readIsolatedServerFunctionPlan({
+        ...workspaceReadPlan,
+        runtimeManifest: {
+          ...(workspaceReadPlan.runtimeManifest as Record<string, unknown>),
+          functionsByExport: {
+            getGreeting: {
+              ...runtimeManifest.functionsByExport.getGreeting,
+              auth: { kind: 'permission', permissionId: 'workspace.read' },
+              environment: {
+                secretsByField: {
+                  signingKey: { bindingId: 'signing-key' },
+                },
+              },
+            },
+          },
+        },
+      })
+    ).toBeUndefined();
   });
 
   it('revalidates successful output against trusted snapshot schema', () => {

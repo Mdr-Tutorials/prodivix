@@ -106,6 +106,23 @@ export type WorkspaceOwnerGuardTransactionPlanResult =
       message: string;
     }>;
 
+export type WorkspaceReadGuardTransactionPlanResult =
+  WorkspaceOwnerGuardTransactionPlanResult;
+
+type WorkspacePermissionGuardId = 'workspace.owner' | 'workspace.read';
+
+type WorkspacePermissionGuardTransactionPlanInput = Readonly<{
+  workspace: WorkspaceSnapshot;
+  routeNodeId: string;
+  target: WorkspaceOwnerGuardTarget;
+  documentId: string;
+  path: string;
+  transactionId: string;
+  issuedAt: string;
+  exportName?: string;
+  permissionId: WorkspacePermissionGuardId;
+}>;
+
 const compareText = (left: string, right: string): number =>
   left < right ? -1 : left > right ? 1 : 0;
 
@@ -469,10 +486,12 @@ export const createWorkspaceServerRuntimeBindingPlan = (input: {
 };
 
 const OWNER_GUARD_EXPORT_NAME = 'requireWorkspaceOwner';
+const READ_GUARD_EXPORT_NAME = 'requireWorkspaceRead';
 
-const ownerGuardProfile = (
+const permissionGuardProfile = (
   target: WorkspaceOwnerGuardTarget,
-  exportName: string
+  exportName: string,
+  permissionId: WorkspacePermissionGuardId
 ): ServerRuntimeProfile =>
   Object.freeze({
     schemaVersion: '1.0',
@@ -487,7 +506,7 @@ const ownerGuardProfile = (
         effect: 'read' as const,
         auth: Object.freeze({
           kind: 'permission' as const,
-          permissionId: 'workspace.owner',
+          permissionId,
         }),
         inputSchema: Object.freeze({
           type: 'object',
@@ -502,25 +521,18 @@ const ownerGuardProfile = (
     }),
   });
 
-const ownerGuardSource = (
+const permissionGuardSource = (
   target: WorkspaceOwnerGuardTarget,
-  exportName: string
+  exportName: string,
+  permissionId: WorkspacePermissionGuardId
 ): string =>
   target === 'remote-live'
     ? `/** Executed only by the audited Prodivix Remote workspace-owner adapter. */\nexport const ${exportName} = () => {\n  throw new Error('Use the authenticated Prodivix Remote gateway.');\n};\n`
-    : `type OwnerGuardContext = Readonly<{\n  principal?: Readonly<{ providerId: string; principalId: string }>;\n}>;\n\nexport const ${exportName} = (\n  _input: Readonly<{ routeId: string }>,\n  context: OwnerGuardContext,\n) => context.principal\n  ? ({ kind: 'allow' as const })\n  : ({ kind: 'deny' as const, code: 'WORKSPACE_OWNER_REQUIRED' });\n`;
+    : `type PermissionGuardContext = Readonly<{\n  principal?: Readonly<{ providerId: string; principalId: string }>;\n}>;\n\nexport const ${exportName} = (\n  _input: Readonly<{ routeId: string }>,\n  context: PermissionGuardContext,\n) => context.principal\n  ? ({ kind: 'allow' as const })\n  : ({ kind: 'deny' as const, code: '${permissionId === 'workspace.owner' ? 'WORKSPACE_OWNER_REQUIRED' : 'WORKSPACE_READ_REQUIRED'}' });\n`;
 
-/** Creates one canonical workspace.owner guard artifact and Route binding atomically. */
-export const createWorkspaceOwnerGuardTransactionPlan = (input: {
-  workspace: WorkspaceSnapshot;
-  routeNodeId: string;
-  target: WorkspaceOwnerGuardTarget;
-  documentId: string;
-  path: string;
-  transactionId: string;
-  issuedAt: string;
-  exportName?: string;
-}): WorkspaceOwnerGuardTransactionPlanResult => {
+const createWorkspacePermissionGuardTransactionPlan = (
+  input: WorkspacePermissionGuardTransactionPlanInput
+): WorkspaceOwnerGuardTransactionPlanResult => {
   const routeNodeId = input.routeNodeId.trim();
   if (!findRouteNodeById(input.workspace.routeManifest.root, routeNodeId)) {
     return Object.freeze({
@@ -531,19 +543,23 @@ export const createWorkspaceOwnerGuardTransactionPlan = (input: {
   }
   const documentId = input.documentId.trim();
   const path = input.path.trim();
-  const exportName = input.exportName?.trim() || OWNER_GUARD_EXPORT_NAME;
+  const exportName =
+    input.exportName?.trim() ||
+    (input.permissionId === 'workspace.owner'
+      ? OWNER_GUARD_EXPORT_NAME
+      : READ_GUARD_EXPORT_NAME);
   if (!documentId || !path || !/^[A-Za-z_$][A-Za-z0-9_$]*$/u.test(exportName)) {
     return Object.freeze({
       status: 'rejected',
       code: 'WKS_SERVER_RUNTIME_PRESET_INVALID',
-      message: 'Owner guard identity, path, or export name is invalid.',
+      message: 'Permission guard identity, path, or export name is invalid.',
     });
   }
   let metadata: Readonly<Record<string, unknown>>;
   try {
     metadata = writeServerRuntimeProfile(
       undefined,
-      ownerGuardProfile(input.target, exportName),
+      permissionGuardProfile(input.target, exportName, input.permissionId),
       'ts'
     );
   } catch (error) {
@@ -553,7 +569,7 @@ export const createWorkspaceOwnerGuardTransactionPlan = (input: {
       message:
         error instanceof Error
           ? error.message
-          : 'Owner guard profile is invalid.',
+          : 'Permission guard profile is invalid.',
     });
   }
   let createArtifact;
@@ -569,13 +585,17 @@ export const createWorkspaceOwnerGuardTransactionPlan = (input: {
         metaRev: 1,
         content: {
           language: 'ts',
-          source: ownerGuardSource(input.target, exportName),
+          source: permissionGuardSource(
+            input.target,
+            exportName,
+            input.permissionId
+          ),
           metadata,
         },
       },
       commandId: `${input.transactionId}:artifact`,
       issuedAt: input.issuedAt,
-      label: `Create ${input.target} workspace owner guard`,
+      label: `Create ${input.target} ${input.permissionId} guard`,
     });
   } catch (error) {
     return Object.freeze({
@@ -584,7 +604,7 @@ export const createWorkspaceOwnerGuardTransactionPlan = (input: {
       message:
         error instanceof Error
           ? error.message
-          : 'Owner guard CodeArtifact could not be created.',
+          : 'Permission guard CodeArtifact could not be created.',
     });
   }
   const staged = applyWorkspaceCommand(input.workspace, createArtifact);
@@ -594,7 +614,7 @@ export const createWorkspaceOwnerGuardTransactionPlan = (input: {
       code: 'WKS_SERVER_RUNTIME_ARTIFACT_UNSUPPORTED',
       message:
         staged.issues[0]?.message ??
-        'Owner guard CodeArtifact failed Workspace validation.',
+        'Permission guard CodeArtifact failed Workspace validation.',
     });
   }
   const functionRef = Object.freeze({ artifactId: documentId, exportName });
@@ -613,7 +633,7 @@ export const createWorkspaceOwnerGuardTransactionPlan = (input: {
       message:
         binding.status === 'rejected'
           ? binding.message
-          : 'Owner guard Route binding could not be created.',
+          : 'Permission guard Route binding could not be created.',
     });
   }
   return Object.freeze({
@@ -623,7 +643,7 @@ export const createWorkspaceOwnerGuardTransactionPlan = (input: {
         id: input.transactionId,
         workspaceId: input.workspace.id,
         issuedAt: input.issuedAt,
-        label: `Create ${input.target} workspace owner guard`,
+        label: `Create ${input.target} ${input.permissionId} guard`,
         commands: [createArtifact, binding.plan.command],
       }),
       functionRef,
@@ -631,3 +651,25 @@ export const createWorkspaceOwnerGuardTransactionPlan = (input: {
     }),
   });
 };
+
+/** Creates one canonical workspace.owner guard artifact and Route binding atomically. */
+export const createWorkspaceOwnerGuardTransactionPlan = (
+  input: Omit<WorkspacePermissionGuardTransactionPlanInput, 'permissionId'>
+): WorkspaceOwnerGuardTransactionPlanResult =>
+  createWorkspacePermissionGuardTransactionPlan({
+    ...input,
+    permissionId: 'workspace.owner',
+  });
+
+/** Creates one Secret-free isolated workspace.read guard and Route binding atomically. */
+export const createWorkspaceReadGuardTransactionPlan = (
+  input: Omit<
+    WorkspacePermissionGuardTransactionPlanInput,
+    'permissionId' | 'target'
+  >
+): WorkspaceReadGuardTransactionPlanResult =>
+  createWorkspacePermissionGuardTransactionPlan({
+    ...input,
+    target: 'isolated-production',
+    permissionId: 'workspace.read',
+  });

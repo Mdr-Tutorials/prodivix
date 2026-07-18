@@ -27,6 +27,7 @@ import {
   resolveServerFunctionDefinition,
   type ExecutionServerFunctionBridgeResponse,
   type ServerFunctionDefinition,
+  type ServerFunctionReference,
 } from '@prodivix/server-runtime';
 import { isWorkspaceCodeDocumentContent } from '@prodivix/workspace';
 import {
@@ -36,6 +37,7 @@ import {
   GOLDEN_G2_AUTH_SERVER_IDS,
   GOLDEN_G2_AUTH_SERVER_SOURCE_CANARY,
   GOLDEN_G2_ISOLATED_OWNER_FUNCTION_REF,
+  GOLDEN_G2_ISOLATED_READ_FUNCTION_REF,
   GOLDEN_G2_ISOLATED_SECRET_FUNCTION_REF,
   GOLDEN_G2_REMOTE_HMAC_FUNCTION_REF,
   GOLDEN_G2_REMOTE_OWNER_FUNCTION_REF,
@@ -53,6 +55,7 @@ export type GoldenG2AuthServerFunction =
   | 'audited-owner-adapter'
   | 'audited-secret-hmac'
   | 'isolated-code-export'
+  | 'isolated-workspace-read-code-export'
   | 'isolated-secret-code-export';
 
 export type GoldenG2AuthServerTargetMatrix = Readonly<
@@ -68,10 +71,12 @@ export type GoldenG2AuthServerMatrixReport = Readonly<{
     browserStaticAuditedAdapter: readonly string[];
     browserStaticSecretHmac: readonly string[];
     browserStaticCodeExport: readonly string[];
+    browserStaticWorkspaceReadCodeExport: readonly string[];
     browserStaticIsolatedSecret: readonly string[];
     deterministicTestSecretHmac: readonly string[];
     deterministicTestIsolatedSecret: readonly string[];
     remoteLiveCodeExport: readonly string[];
+    remoteLiveWorkspaceReadCodeExport: readonly string[];
     remoteLiveIsolatedSecret: readonly string[];
     isolatedProductionAuditedAdapter: readonly string[];
     isolatedProductionSecretHmac: readonly string[];
@@ -79,7 +84,8 @@ export type GoldenG2AuthServerMatrixReport = Readonly<{
   deterministicTest: Readonly<{
     auditedAdapterSnapshotDigest: string;
     codeExportSnapshotDigest: string;
-    outcomes: readonly ['allow', 'allow'];
+    workspaceReadSnapshotDigest: string;
+    outcomes: readonly ['allow', 'allow', 'allow'];
     observationCount: number;
   }>;
   remoteLive: Readonly<{
@@ -94,6 +100,12 @@ export type GoldenG2AuthServerMatrixReport = Readonly<{
     requiresServerFunction: boolean;
   }>;
   isolatedProduction: Readonly<{
+    snapshot: ExecutableProjectSnapshot;
+    response: ExecutionServerFunctionBridgeResponse;
+    authorityConsumed: boolean;
+    sourceArtifactIds: readonly string[];
+  }>;
+  isolatedWorkspaceRead: Readonly<{
     snapshot: ExecutableProjectSnapshot;
     response: ExecutionServerFunctionBridgeResponse;
     authorityConsumed: boolean;
@@ -119,24 +131,28 @@ const targetMatrix: GoldenG2AuthServerTargetMatrix = Object.freeze({
     'audited-owner-adapter': 'blocked',
     'audited-secret-hmac': 'blocked',
     'isolated-code-export': 'blocked',
+    'isolated-workspace-read-code-export': 'blocked',
     'isolated-secret-code-export': 'blocked',
   }),
   'deterministic-test': Object.freeze({
     'audited-owner-adapter': 'supported',
     'audited-secret-hmac': 'blocked',
     'isolated-code-export': 'supported',
+    'isolated-workspace-read-code-export': 'supported',
     'isolated-secret-code-export': 'blocked',
   }),
   'remote-live': Object.freeze({
     'audited-owner-adapter': 'supported',
     'audited-secret-hmac': 'supported',
     'isolated-code-export': 'blocked',
+    'isolated-workspace-read-code-export': 'blocked',
     'isolated-secret-code-export': 'blocked',
   }),
   'isolated-production': Object.freeze({
     'audited-owner-adapter': 'blocked',
     'audited-secret-hmac': 'blocked',
     'isolated-code-export': 'supported',
+    'isolated-workspace-read-code-export': 'supported',
     'isolated-secret-code-export': 'supported',
   }),
 });
@@ -178,6 +194,7 @@ const snapshotText = (snapshot: ExecutableProjectSnapshot): string =>
 const definitions = (): readonly [
   ServerFunctionDefinition,
   ServerFunctionDefinition,
+  ServerFunctionDefinition,
 ] => {
   const workspace = createGoldenG2AuthServerWorkspace('remote-live');
   const document = workspace.docsById[GOLDEN_G2_AUTH_SERVER_IDS.serverDocument];
@@ -202,10 +219,15 @@ const definitions = (): readonly [
     GOLDEN_G2_ISOLATED_OWNER_FUNCTION_REF.artifactId,
     GOLDEN_G2_ISOLATED_OWNER_FUNCTION_REF.exportName
   );
-  if (!remote || !isolated) {
+  const isolatedRead = resolveServerFunctionDefinition(
+    decoded.profile,
+    GOLDEN_G2_ISOLATED_READ_FUNCTION_REF.artifactId,
+    GOLDEN_G2_ISOLATED_READ_FUNCTION_REF.exportName
+  );
+  if (!remote || !isolated || !isolatedRead) {
     throw new Error('Golden Auth/Server definitions are incomplete.');
   }
-  return Object.freeze([remote, isolated]);
+  return Object.freeze([remote, isolated, isolatedRead]);
 };
 
 const runDeterministicTest = async () => {
@@ -230,6 +252,16 @@ const runDeterministicTest = async () => {
     ),
     'Deterministic code-export target'
   );
+  const workspaceReadCodeExport = requireReady(
+    generateWorkspaceReactViteExecutableProject(
+      createGoldenG2AuthServerWorkspace('isolated-read'),
+      {
+        serverRuntimeTarget: DETERMINISTIC_TEST_SERVER_RUNTIME_TARGET,
+        serverRuntimeMockProvision: provision,
+      }
+    ),
+    'Deterministic workspace.read code-export target'
+  );
   const session = createServerRuntimeTestSession({
     workspaceId: GOLDEN_G2_AUTH_SERVER_IDS.workspace,
     definitions: definitions(),
@@ -249,13 +281,24 @@ const runDeterministicTest = async () => {
       attempt: 1,
       input,
     });
-    if (auditedOutcome.kind !== 'allow' || isolatedOutcome.kind !== 'allow') {
+    const workspaceReadOutcome = await session.invoke({
+      functionRef: GOLDEN_G2_ISOLATED_READ_FUNCTION_REF,
+      invocationId: 'golden-test-isolated-read',
+      attempt: 1,
+      input,
+    });
+    if (
+      auditedOutcome.kind !== 'allow' ||
+      isolatedOutcome.kind !== 'allow' ||
+      workspaceReadOutcome.kind !== 'allow'
+    ) {
       throw new Error('Golden deterministic owner guards did not allow.');
     }
     return Object.freeze({
       auditedAdapter,
       codeExport,
-      outcomes: Object.freeze(['allow', 'allow'] as const),
+      workspaceReadCodeExport,
+      outcomes: Object.freeze(['allow', 'allow', 'allow'] as const),
       observationCount: session.listObservations().length,
     });
   } finally {
@@ -263,13 +306,19 @@ const runDeterministicTest = async () => {
   }
 };
 
-const runIsolatedProduction = async () => {
+const runIsolatedProduction = async (input: {
+  binding: 'isolated-production' | 'isolated-read';
+  functionRef: ServerFunctionReference;
+  invocationId: string;
+  label: string;
+  permissions: readonly string[];
+}) => {
   const result = requireReady(
     generateWorkspaceIsolatedServerFunctionExecutableProject(
-      createGoldenG2AuthServerWorkspace('isolated-production'),
-      { functionRef: GOLDEN_G2_ISOLATED_OWNER_FUNCTION_REF }
+      createGoldenG2AuthServerWorkspace(input.binding),
+      { functionRef: input.functionRef }
     ),
-    'Isolated production code-export target'
+    input.label
   );
   const plan = result.snapshot.serverFunctionPlan;
   if (!plan) throw new Error('Golden isolated production plan is missing.');
@@ -285,10 +334,10 @@ const runIsolatedProduction = async () => {
     }
     const bridgeRequest = Object.freeze({
       type: EXECUTION_SERVER_FUNCTION_BRIDGE_REQUEST_TYPE,
-      requestId: 'golden-isolated-owner:1',
-      invocationId: 'golden-isolated-owner',
+      requestId: `${input.invocationId}:1`,
+      invocationId: input.invocationId,
       attempt: 1,
-      functionRef: GOLDEN_G2_ISOLATED_OWNER_FUNCTION_REF,
+      functionRef: input.functionRef,
       input: Object.freeze({ routeId: GOLDEN_G2_AUTH_SERVER_IDS.route }),
     });
     await mkdir(join(root, '.prodivix'), { recursive: true });
@@ -303,7 +352,7 @@ const runIsolatedProduction = async () => {
         providerId: 'prodivix-product-session',
         principalId: 'golden-owner',
       }),
-      permissions: Object.freeze(['workspace.owner']),
+      permissions: Object.freeze([...input.permissions]),
       expiresAt: Date.now() + 60_000,
     });
     const authorityPath = join(
@@ -327,7 +376,7 @@ const runIsolatedProduction = async () => {
     );
     const untrustedResponse = JSON.parse(serializedResponse) as unknown;
     const request = createExecutionRequest({
-      requestId: 'golden-isolated-production-request',
+      requestId: `${input.invocationId}-production-request`,
       profile: 'production',
       runtimeZone: 'server',
       workspace: result.snapshot.workspace,
@@ -335,9 +384,9 @@ const runIsolatedProduction = async () => {
         kind: 'code',
         targetRef: {
           kind: 'code-artifact',
-          artifactId: GOLDEN_G2_ISOLATED_OWNER_FUNCTION_REF.artifactId,
+          artifactId: input.functionRef.artifactId,
         },
-        entrypoint: GOLDEN_G2_ISOLATED_OWNER_FUNCTION_REF.exportName,
+        entrypoint: input.functionRef.exportName,
         input: bridgeRequest,
       },
       requiredCapabilities: ['server-function'],
@@ -490,6 +539,8 @@ export const runGoldenG2AuthServerMatrix =
     const isolatedWorkspace = createGoldenG2AuthServerWorkspace(
       'isolated-production'
     );
+    const isolatedWorkspaceRead =
+      createGoldenG2AuthServerWorkspace('isolated-read');
     const isolatedSecretWorkspace =
       createGoldenG2AuthServerWorkspace('isolated-secret');
     const browserStaticAuditedAdapter = requireBlockedCodes(
@@ -499,6 +550,10 @@ export const runGoldenG2AuthServerMatrix =
     const browserStaticCodeExport = requireBlockedCodes(
       generateWorkspaceReactViteExecutableProject(isolatedWorkspace),
       'Browser/static code-export target'
+    );
+    const browserStaticWorkspaceReadCodeExport = requireBlockedCodes(
+      generateWorkspaceReactViteExecutableProject(isolatedWorkspaceRead),
+      'Browser/static workspace.read code-export target'
     );
     const browserStaticSecretHmac = requireBlockedCodes(
       generateWorkspaceReactViteExecutableProject(remoteSecretWorkspace),
@@ -532,6 +587,12 @@ export const runGoldenG2AuthServerMatrix =
       }),
       'Remote live code-export target'
     );
+    const remoteLiveWorkspaceReadCodeExport = requireBlockedCodes(
+      generateWorkspaceReactViteExecutableProject(isolatedWorkspaceRead, {
+        serverRuntimeTarget: EXECUTION_PARENT_GATEWAY_SERVER_RUNTIME_TARGET,
+      }),
+      'Remote live workspace.read code-export target'
+    );
     const remoteLiveIsolatedSecret = requireBlockedCodes(
       generateWorkspaceReactViteExecutableProject(isolatedSecretWorkspace, {
         serverRuntimeTarget: EXECUTION_PARENT_GATEWAY_SERVER_RUNTIME_TARGET,
@@ -558,33 +619,56 @@ export const runGoldenG2AuthServerMatrix =
       ),
       'Isolated production Secret HMAC target'
     );
-    const [deterministicTest, isolatedProduction, isolatedProductionSecret] =
-      await Promise.all([
-        runDeterministicTest(),
-        runIsolatedProduction(),
-        runIsolatedSecretProduction(),
-      ]);
+    const [
+      deterministicTest,
+      isolatedProduction,
+      isolatedWorkspaceReadProduction,
+      isolatedProductionSecret,
+    ] = await Promise.all([
+      runDeterministicTest(),
+      runIsolatedProduction({
+        binding: 'isolated-production',
+        functionRef: GOLDEN_G2_ISOLATED_OWNER_FUNCTION_REF,
+        invocationId: 'golden-isolated-owner',
+        label: 'Isolated production owner code-export target',
+        permissions: ['workspace.owner', 'workspace.read'],
+      }),
+      runIsolatedProduction({
+        binding: 'isolated-read',
+        functionRef: GOLDEN_G2_ISOLATED_READ_FUNCTION_REF,
+        invocationId: 'golden-isolated-read',
+        label: 'Isolated production workspace.read code-export target',
+        permissions: ['workspace.owner', 'workspace.read'],
+      }),
+      runIsolatedSecretProduction(),
+    ]);
     const clientSnapshots = [
       remoteLive.snapshot,
       remoteLiveSecret.snapshot,
       deterministicTest.auditedAdapter.snapshot,
       deterministicTest.codeExport.snapshot,
+      deterministicTest.workspaceReadCodeExport.snapshot,
     ];
     const allSnapshots = [
       ...clientSnapshots,
       isolatedProduction.snapshot,
+      isolatedWorkspaceReadProduction.snapshot,
       isolatedProductionSecret.snapshot,
     ];
     const clientText = clientSnapshots.map(snapshotText).join('\n');
     const snapshotSerialization = JSON.stringify(allSnapshots);
     const responseSerialization = [
       isolatedProduction.serializedResponse,
+      isolatedWorkspaceReadProduction.serializedResponse,
       isolatedProductionSecret.serializedResponse,
     ].join('\n');
     const sourceTraceSerialization = JSON.stringify(
-      [isolatedProduction.snapshot, isolatedProductionSecret.snapshot].flatMap(
-        (snapshot) =>
-          snapshot.files.flatMap(({ sourceTrace }) => sourceTrace ?? [])
+      [
+        isolatedProduction.snapshot,
+        isolatedWorkspaceReadProduction.snapshot,
+        isolatedProductionSecret.snapshot,
+      ].flatMap((snapshot) =>
+        snapshot.files.flatMap(({ sourceTrace }) => sourceTrace ?? [])
       )
     );
     const strictInvocationRejectsCredentialField =
@@ -603,10 +687,12 @@ export const runGoldenG2AuthServerMatrix =
         browserStaticAuditedAdapter,
         browserStaticSecretHmac,
         browserStaticCodeExport,
+        browserStaticWorkspaceReadCodeExport,
         browserStaticIsolatedSecret,
         deterministicTestSecretHmac,
         deterministicTestIsolatedSecret,
         remoteLiveCodeExport,
+        remoteLiveWorkspaceReadCodeExport,
         remoteLiveIsolatedSecret,
         isolatedProductionAuditedAdapter,
         isolatedProductionSecretHmac,
@@ -616,6 +702,8 @@ export const runGoldenG2AuthServerMatrix =
           deterministicTest.auditedAdapter.snapshot.contentDigest,
         codeExportSnapshotDigest:
           deterministicTest.codeExport.snapshot.contentDigest,
+        workspaceReadSnapshotDigest:
+          deterministicTest.workspaceReadCodeExport.snapshot.contentDigest,
         outcomes: deterministicTest.outcomes,
         observationCount: deterministicTest.observationCount,
       }),
@@ -648,6 +736,12 @@ export const runGoldenG2AuthServerMatrix =
         response: isolatedProduction.response,
         authorityConsumed: isolatedProduction.authorityConsumed,
         sourceArtifactIds: isolatedProduction.sourceArtifactIds,
+      }),
+      isolatedWorkspaceRead: Object.freeze({
+        snapshot: isolatedWorkspaceReadProduction.snapshot,
+        response: isolatedWorkspaceReadProduction.response,
+        authorityConsumed: isolatedWorkspaceReadProduction.authorityConsumed,
+        sourceArtifactIds: isolatedWorkspaceReadProduction.sourceArtifactIds,
       }),
       isolatedProductionSecret: Object.freeze({
         snapshot: isolatedProductionSecret.snapshot,

@@ -31,6 +31,7 @@ const executionServerAuthorityHeader = "X-Prodivix-Execution-Server-Authority"
 const executionServerAuthorityFormat = "prodivix.remote-execution-server-authority.v1"
 const productSessionProviderID = "prodivix-product-session"
 const workspaceOwnerPermissionID = "workspace.owner"
+const workspaceReadPermissionID = "workspace.read"
 const defaultExecutionAuthorityTTL = 2 * time.Minute
 const maximumExecutionAuthorityTTL = 5 * time.Minute
 
@@ -443,8 +444,11 @@ func (handler *Handler) executionServerAuthority(userID string, session *backend
 		return nil, false
 	}
 	result := &executionServerAuthority{
-		Format:      executionServerAuthorityFormat,
-		Permissions: []string{workspaceOwnerPermissionID},
+		Format: executionServerAuthorityFormat,
+		// Remote execution is currently owner-only. Project only the two bounded
+		// permissions implied by that verified role; the isolated Worker still
+		// requires the exact permission named by the immutable function profile.
+		Permissions: []string{workspaceOwnerPermissionID, workspaceReadPermissionID},
 		WorkspaceID: authority.workspaceID,
 		SnapshotID:  authority.snapshotID,
 		ExpiresAt:   expiresAt,
