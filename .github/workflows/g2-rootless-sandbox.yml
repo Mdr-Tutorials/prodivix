@@ -58,6 +58,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build TypeScript project references
+        run: pnpm exec tsc -b --pretty false
+
       - name: Install rootless Podman
         shell: bash
         run: |
