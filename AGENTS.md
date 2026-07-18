@@ -27,7 +27,7 @@
   per-record data-key envelope、versioned static KMS key-ring、active-key-only 新写入、旧 key 保留读与 retirement fence；
   1-256 bounded `FOR UPDATE ... SKIP LOCKED` maintenance 在单事务内只 rewrap data key，legacy direct-cipher row
   一次性迁移为 envelope，并只写 aggregate audit。并发 rotation、ciphertext byte-preservation、old-key-only denial
-  与 active-key-only resolve 已通过本地真实 PostgreSQL Gate；managed-cloud KMS adapter 与完整跨表面 leak Gate 继续建设。
+  与 active-key-only resolve 已通过本地及 GitHub 真实 PostgreSQL Gate；managed-cloud KMS adapter 与完整跨表面 leak Gate 继续建设。
 - Canonical Workspace VFS 是作者态唯一真相。PIR、NodeGraph、Animation、Data Source、Code、Design Token、Design Token Resolver、Assets、Config 与 RouteManifest 是 Workspace 内由各领域 owner 管理的文档或清单；PIR 不是整个项目的单一巨型 JSON。
 
 ```mermaid
