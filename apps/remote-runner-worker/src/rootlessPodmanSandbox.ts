@@ -1,6 +1,6 @@
 import { execFile, spawn } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { promisify } from 'node:util';
+import { isDeepStrictEqual, promisify } from 'node:util';
 import type {
   ExecutableProjectCommand,
   ExecutableProjectSnapshot,
@@ -902,6 +902,11 @@ const serverFunctionTestSourceTrace = (
         trace.sourceRef.kind === 'code-artifact' &&
         trace.sourceRef.artifactId === artifactId &&
         (!trace.sourceSpan || trace.sourceSpan.artifactId === artifactId)
+    )
+    .filter(
+      (trace, index, traces) =>
+        traces.findIndex((candidate) => isDeepStrictEqual(candidate, trace)) ===
+        index
     );
   if (matching.length !== 1)
     throw new TypeError(

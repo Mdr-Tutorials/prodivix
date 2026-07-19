@@ -1659,10 +1659,26 @@ const executeRootlessSnapshot = async (
   profile: 'preview' | 'test' | 'build'
 ) => {
   const executionId = `${executionPrefix}-${profile}`;
+  const request = createExecutionRequest({
+    requestId: `${executionId}-request`,
+    profile,
+    runtimeZone:
+      profile === 'preview' ? 'client' : profile === 'test' ? 'test' : 'build',
+    workspace: snapshot.workspace,
+    invocation: {
+      kind: profile === 'preview' ? 'workspace' : profile,
+      targetRef: {
+        kind: 'workspace',
+        workspaceId: snapshot.workspace.workspaceId,
+      },
+    },
+    requiredCapabilities: snapshot.capabilityRequirements[profile],
+  });
   const result = await sandbox.execute({
     executionId,
     snapshot,
     profile,
+    request,
     timeoutMs: 4 * 60_000,
     maximumOutputBytes: 16 * 1024 * 1024,
     redactValues: [],

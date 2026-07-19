@@ -83,7 +83,7 @@
 
 ### B5：Transform 与 delivery
 
-状态：PNG/JPEG full-raster + ClamAV/YARA-X required-engine + isolated delivery locally implemented；新增 real-engine CI evidence pending。
+状态：PNG/JPEG full-raster + ClamAV/YARA-X required-engine + isolated delivery Implemented；双引擎 rootless real-engine CI evidence 已取得。
 
 - `@prodivix/assets` 已实现 strict recipe decoder、transformer/scanner/cache port，以及 transformer ->
   exact-byte verification -> dimension policy -> scan attestation -> cache 的 fail-closed coordinator。
@@ -122,8 +122,11 @@
   stale/future rules、symlink/binary drift与 command failure均有正负向 Gate。
 - GitHub-only `g2-binary-asset-malware.yml` 已配置 pinned YARA-X archive/digest、official ClamAV
   preloaded-database image、rootless capability-dropped FreshClam updater、exact updated-image snapshot、internal-network daemon
-  与 clean/quarantine required-engine canary；updater 有界联网，真实扫描阶段保持断网。旧 ClamAV-only evidence已通过，
-  新 ClamAV + YARA-X workflow尚未随本轮修改推送，不能宣称新增 Gate已通过。
+  与 clean/quarantine required-engine canary；updater 有界联网，真实扫描阶段保持断网。
+  [run 29705674661](https://github.com/prodivix/prodivix/actions/runs/29705674661) 已由 rootless Podman 真实执行
+  ClamAV 1.4.5 + YARA-X 1.15.0，artifact `8447820146` 的 ZIP digest 为
+  `sha256:f559eb19d3af23976f6dc25e4ede5682dbe3ca92535e9ce0c959137bb37702f5`，clean 与双引擎
+  quarantine canary均通过。
 - bounded LRU derived cache 以 recipe digest 定位，命中后重新验证 output bytes、media、dimensions 与 clean
   attestation；同 recipe 的不同输出 hard conflict。
 - 独立 `apps/asset-delivery-host` 只接收 Backend internal-token 请求，保存短期 bytes 与 capability hash，按
@@ -178,7 +181,7 @@
 
 ### B7：G2 Golden 与 closure
 
-状态：Contract Matrix + Browser Product Journey + React/Vue Cross-target Closure locally implemented / CI evidence pending。
+状态：Contract Matrix + Browser Product Journey + React/Vue Cross-target Closure Implemented；GitHub matrix evidence 已取得。
 
 - Browser Catalog JPEG 已覆盖 bytes-first upload、Workspace durable reference commit、page reload 后按 canonical
   reference 重新 materialize exact source bytes、`jpeg-raster-reencode` request 与 capability-origin isolated preview。
@@ -219,6 +222,7 @@ static Export fail-close。
       isolated capability delivery通过本地 Gate。
 - [x] Browser JPEG 产品旅程按 exact bytes 完成 upload、durable reference commit、reload materialization、sanitized
       delivery request 与 capability-origin image decode，并由独立 Playwright Gate/Smoke CI 固定。
-- [ ] 新 ClamAV + YARA-X rootless real-engine workflow取得首次远端通过证据；本地 contract/negative corpus已通过。
+- [x] 新 ClamAV + YARA-X rootless real-engine workflow取得首次远端通过证据；本地 contract/negative corpus与
+      GitHub [run 29705674661](https://github.com/prodivix/prodivix/actions/runs/29705674661) 均通过。
 - [x] Golden product image在 Browser/Test、Remote Preview/Test/Build、unprotected Export与 React/Vue target matrix中
       exact-byte通过；protected standalone Export显式 fail closed，Browser JPEG full-raster与 Vue Chrome decode产品 Gate通过。

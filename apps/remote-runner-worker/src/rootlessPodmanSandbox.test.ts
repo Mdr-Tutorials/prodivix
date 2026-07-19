@@ -876,6 +876,18 @@ describe('rootless Podman sandbox contract', () => {
             },
           ],
         },
+        {
+          path: 'src/auth.generated.ts',
+          contents: 'export { loadPrincipal } from "./auth.server";',
+          sourceTrace: [
+            {
+              sourceRef: {
+                kind: 'code-artifact',
+                artifactId: 'code-auth',
+              },
+            },
+          ],
+        },
       ],
       dependencyPlan: { manifestFilePath: 'package.json' },
       entrypoints: [{ kind: 'test', path: 'src/App.test.tsx' }],

@@ -9,7 +9,7 @@
 | ---------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | G0 Truth & Change Kernel           | Passed       | Canonical Workspace、可逆 change、唯一生产写入链、conflict/outbox/local replica 与 Issues closure 已验证。                                  |
 | G1 Semantic Hybrid Authoring       | Passed       | PIR-current、Semantic Index、Code/Shader、Component/Collection、controlled round-trip、Asset semantic surface 与 React/Vite Golden 已验证。 |
-| G2 Executable Full-stack Workspace | In Progress  | current G2 scope 已完成本地 implementation/product/security closure；等待当前 worktree CI 和明确延后的 AWS/真实云 evidence。                |
+| G2 Executable Full-stack Workspace | In Progress  | current G2 scope 已完成本地与 GitHub non-cloud implementation/product/security closure；只等待明确延后的 AWS/真实云 evidence。              |
 | G3 Behavior & Verification Closure | Blocked      | 等待 G2 退出 Gate；当前 Test/trace 是运行态证据基础，不提前等同于 `VerificationEvidence`。                                                  |
 | G4 Verified Agentic Development    | Blocked      | 等待 G3。                                                                                                                                   |
 | G5 Collaborative Production Loop   | Blocked      | 等待前置阶段。                                                                                                                              |
@@ -22,15 +22,16 @@ G2 可重复证据与外部 pending：[`g2-closure-evidence.md`](./g2-closure-ev
 ## G2 当前完成面
 
 2026-07-20，统一 `pnpm run verify:g2` 已在本机 PostgreSQL 18 下完整通过（596.1s），Runner/DR、Data、
-Auth/Server 与 Binary Asset 四个 aggregate 全部闭合；monorepo test、lint 与 build 也通过。`In Progress`
-不再表示已知本地 G2 功能缺口。
+Auth/Server 与 Binary Asset 四个 aggregate 全部闭合；monorepo test、lint 与 build 也通过。随后 current-scope
+GitHub PostgreSQL、authenticated Catalog rootless Preview/Test/Build、ClamAV + YARA-X real-engine 与相关 matrix
+全部取得通过证据。`In Progress`不再表示已知本地或 non-cloud CI 功能缺口。
 
-| 主线                  | current G2 local closure                                                                                                                                                                                                                                              | 未取得的外部证据                                                                                      |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Execution             | neutral Request/Provider/Job/Session/Snapshot；Browser/Remote Preview/Test/Build/production；rootless contract；Console/Terminal/Network/Files/Test/SourceTrace；bounded reconnect/artifact/quota/worker-loss；NodeGraph/Animation G2 slice；regional DR local Gate。 | 当前 worktree authenticated Catalog rootless CI；真实云 regional RPO/RTO；AWS KMS/MRK live evidence。 |
-| Data                  | typed authoring、HTTP/OpenAPI、GraphQL、受限 AsyncAPI、mock/live policy、CRUD/retry/pagination/cache/optimistic lifecycle、same-execution stream recovery、React/Vue target matrix、authenticated Remote Catalog 与 D8 security matrix。                              | 无本地 G2 缺口。                                                                                      |
-| Auth / Server Runtime | A0-A13/A15-A17 current-scope local closure；A13/A15/A16 既有 GitHub evidence；A17 sharing/editor 本机 PostgreSQL/product Gate；A14 official AWS adapter、本地/PostgreSQL Gate 与 OIDC workflow 配置；完整 current-surface canary/Golden matrix。                      | A17 current-worktree GitHub CI；A14 真实 AWS OIDC/KMS run。                                           |
-| Binary Asset          | B0-B7 exact-byte local/cloud store、full-raster PNG/JPEG、required ClamAV/YARA-X、delivery、retention、Git/LFS、runtime import/replace、Browser JPEG 与 React/Vue cross-target matrix。                                                                               | 当前 worktree ClamAV + YARA-X rootless real-engine Actions evidence。                                 |
+| 主线                  | current G2 closure                                                                                                                                                                                                                                                              | 未取得的外部证据                                     |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Execution             | neutral Request/Provider/Job/Session/Snapshot；Browser/Remote Preview/Test/Build/production；rootless contract/real Gate；Console/Terminal/Network/Files/Test/SourceTrace；bounded reconnect/artifact/quota/worker-loss；NodeGraph/Animation G2 slice；regional DR local Gate。 | 真实云 regional RPO/RTO；AWS KMS/MRK live evidence。 |
+| Data                  | typed authoring、HTTP/OpenAPI、GraphQL、受限 AsyncAPI、mock/live policy、CRUD/retry/pagination/cache/optimistic lifecycle、same-execution stream recovery、React/Vue target matrix、authenticated Remote Catalog 与 D8 security matrix。                                        | 无 current G2 external evidence 缺口。               |
+| Auth / Server Runtime | A0-A13/A15-A17 current-scope closure；A17 sharing/editor 已有 GitHub PostgreSQL、product 与 rootless evidence；A14 official AWS adapter、本地/PostgreSQL Gate 与 OIDC workflow 配置；完整 current-surface canary/Golden matrix。                                                | A14 真实 AWS OIDC/KMS run。                          |
+| Binary Asset          | B0-B7 exact-byte local/cloud store、full-raster PNG/JPEG、required ClamAV/YARA-X、delivery、retention、Git/LFS、runtime import/replace、Browser JPEG 与 React/Vue cross-target matrix；双引擎 rootless real Gate 已通过。                                                       | 无 current G2 external evidence 缺口。               |
 
 Auth/Server milestone：[`g2-auth-server-runtime-milestones.md`](./g2-auth-server-runtime-milestones.md)。
 Binary Asset milestone：[`g2-binary-asset-milestones.md`](./g2-binary-asset-milestones.md)。

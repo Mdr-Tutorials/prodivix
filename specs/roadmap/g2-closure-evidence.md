@@ -112,8 +112,11 @@ GitHub workflow `G2 Data and Second Target Closure / Vue Vite product surface an
 已在 commit `b9e83a00185a6fa9a4ab2a3e653c9e8579e6f1a2` 通过：
 [Actions run 29692691096](https://github.com/prodivix/prodivix/actions/runs/29692691096)。
 
-新增 Remote Chrome Gate 已加入同一 `verify:g2:vue-product` 聚合；authenticated PostgreSQL Golden 已加入
-`.github/workflows/g2-postgres.yml`。由于本轮按要求未提交推送，这两项新增 Gate 的首次 GitHub Actions 证据尚未产生。
+新增 Remote Chrome Gate 与 authenticated PostgreSQL Golden 的首次 GitHub Actions 证据已取得：
+[G2 Data and Second Target Closure run 29706186184](https://github.com/prodivix/prodivix/actions/runs/29706186184)
+通过 `verify:g2:vue-product`，
+[G2 PostgreSQL Gates run 29705222564](https://github.com/prodivix/prodivix/actions/runs/29705222564)
+通过 `TestAuthenticatedCatalogRemotePostgreSQLGolden`。
 
 ## Server/Edge GraphQL/AsyncAPI stream 与 SourceTrace debugger
 
@@ -150,9 +153,10 @@ pnpm run verify:g2:data-stream-debugger
 5. `keyed-event-v1` collection只接受 exact replace/upsert/delete envelope并生成execution-local immutable snapshot；不写Workspace/Outbox。
 
 GitHub workflow `G2 Data and Second Target Closure / Verify server and edge streams with SourceTrace debugging`
-已在 commit `b9e83a00185a6fa9a4ab2a3e653c9e8579e6f1a2` 通过：
-[Actions run 29692691096](https://github.com/prodivix/prodivix/actions/runs/29692691096)。
-该历史 run 只证明 ADR 49 first vertical；ADR 55 新增 Gate 的首次远端证据要等后续显式提交推送后产生。
+的 ADR 49 first vertical 已在 commit `b9e83a00185a6fa9a4ab2a3e653c9e8579e6f1a2` 通过：
+[Actions run 29692691096](https://github.com/prodivix/prodivix/actions/runs/29692691096)。ADR 55 后续 Gate
+也已在 commit `e70f9473c22e5448a53668e851897d07de809bd0` 的
+[Actions run 29706186184](https://github.com/prodivix/prodivix/actions/runs/29706186184) 通过。
 
 ## Console/Artifact/Test/Files unified SourceTrace debugger
 
@@ -339,9 +343,9 @@ Rootless evidence artifact id 为 `8444116156`，上传 ZIP SHA-256 为
 `ac303a42f9c79e31622b6ab5d1e12f1591e0d99349387b900fcb1e81d1af6561`。A13/A15/A16 因而从
 `Configured / Evidence pending` 提升为 `Implemented`；A14 不受该证据替代。
 
-## Remote Test invocation、runtime Issues debugger 与 A17 local Gate
+## Remote Test invocation、runtime Issues debugger 与 A17 closure
 
-2026-07-20 本地结果：通过；本轮尚未提交推送，因此以下证据不冒充 GitHub Actions 远端证据。
+2026-07-20 本地结果通过；随后取得对应 GitHub Actions 远端证据。
 
 | Gate                        | 本地证据                                                                                                                                                                                                                                                                                                                                                                                                                |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -349,11 +353,26 @@ Rootless evidence artifact id 为 `8444116156`，上传 ZIP SHA-256 为
 | Execution Source debugger   | `pnpm run verify:g2:execution-source-debugger` 通过：Runtime Core 3 files / 8 tests、Authoring 9 files / 24 tests、Web 10 files / 44 tests，并通过相关 typecheck。runtime diagnostic 只按 exact Workspace snapshot进入 Issues；private metadata被丢弃，Issues 打开 exact Session Console/error filter后仍使用同一 SourceTrace opener。                                                                                  |
 | A17 Workspace collaboration | `pnpm run verify:g2:workspace-collaboration` 通过：Worker 1 file / 20 tests、rootless snapshot contract、Web typecheck + 2 files / 22 tests、Backend remoteexecution/database。另以本机 PostgreSQL 18 运行 `TestWorkspaceExecutionCollaboratorRolesPostgreSQLGate`，真实通过 viewer -> editor upgrade、durable permission、Control Plane create、invalid-role constraint 与 revoke。                                    |
 
-对应 GitHub PostgreSQL workflow 已改为调用
-`TestWorkspaceExecutionCollaboratorRolesPostgreSQLGate`；只有后续实际 Actions run通过后，A17 才可从
-`Implemented locally / CI pending` 提升为完整 `Implemented`。
+远端证据：
 
-## Binary Asset full-raster、required engines 与 cross-target local Gate
+- commit `a993ed11b7550dfa4405807c62fc18fcad0332cb` 的
+  [G2 PostgreSQL Gates run 29705222564](https://github.com/prodivix/prodivix/actions/runs/29705222564)
+  真实启动 PostgreSQL 16，并由 `TestWorkspaceExecutionCollaboratorRolesPostgreSQLGate` 通过 viewer -> editor、
+  durable permission、Control Plane create、constraint 与 revoke Gate；
+- commit `e70f9473c22e5448a53668e851897d07de809bd0` 的
+  [Tests run 29706186186](https://github.com/prodivix/prodivix/actions/runs/29706186186) 与
+  [G2 Data and Second Target Closure run 29706186184](https://github.com/prodivix/prodivix/actions/runs/29706186184)
+  通过 Web product、Vue authenticated Catalog 与相关 target matrix；
+- 同 commit 的 [G2 Rootless Sandbox run 29706186180](https://github.com/prodivix/prodivix/actions/runs/29706186180)
+  通过真实 rootless Podman isolation。artifact `8448024581` 的 ZIP digest 为
+  `sha256:1350d335d09b9687a61fbeb60ec534c2faadf1db778a06dd3d6bee4073fe473c`；其中 authenticated
+  Vue Catalog Preview/Build/Test全部绑定 snapshot
+  `sha256-2fc502ce32ced39232ed915cd505ac38feb17fe523a52391bde03a7bdfb7a74d`，3/3 Test case通过，
+  runtime network-none、exact PNG digest与SourceTrace均通过。
+
+A17 因而提升为完整 `Implemented`；该证据不替代 A14 真实 AWS Gate。
+
+## Binary Asset full-raster、required engines 与 cross-target closure
 
 2026-07-20，`pnpm run verify:g2:binary-assets` 完整通过，用时 113.3 秒：
 
@@ -366,8 +385,12 @@ Rootless evidence artifact id 为 `8444116156`，上传 ZIP SHA-256 为
 | Product journey            | Web 89 files / 327 tests；Chromium Browser JPEG upload、durable reload、full-raster request与 capability-origin decode 1 test通过。                                                                     |
 | Boundaries/Backend         | Core package boundaries通过；Backend config/database/workspace/app Go Gate通过。                                                                                                                        |
 
-旧 ClamAV rootless real-daemon远端证据仍有效；本轮新增 workflow已升级为 pinned YARA-X + ClamAV required-engine
-Gate，但因用户要求暂不提交推送，尚无对应 Actions run，不把本地 mock/contract测试冒充真实双引擎远端证据。
+ClamAV + YARA-X required-engine 远端证据已由 commit `720a788b4635f9c3aa88aba755df57745024d58a` 的
+[G2 Binary Asset Malware run 29705674661](https://github.com/prodivix/prodivix/actions/runs/29705674661) 取得。
+artifact `8447820146` 的 ZIP digest 为
+`sha256:f559eb19d3af23976f6dc25e4ede5682dbe3ca92535e9ce0c959137bb37702f5`；rootless Podman 中
+ClamAV 1.4.5/database 28065 与 pinned YARA-X 1.15.0均真实运行，clean verdict、EICAR 与 YARA-X
+quarantine finding分别通过，扫描网络为internal-only。
 
 ## Current-worktree G2 local aggregate closure
 
@@ -403,12 +426,13 @@ Vue deterministic generated runtime另外修复了共享客户端图静态导入
 filesystem capability，Node Test只通过`process.getBuiltinModule`受限port写bounded JSONL；独立Vue产品Gate与
 Auth/Server invocation Gate复跑均通过。该修复保持Worker trace evidence，同时不把Node类型或模块带进Preview/Build。
 
-## 尚未形成远端 closure 与明确 post-G2 边界
+以上 current-worktree non-cloud closure在 commit `e70f9473c22e5448a53668e851897d07de809bd0` 形成6/6
+GitHub workflow全绿证据：CodeQL、G0/G1、G2 Data/Second Target、G2 Rootless、Security与Tests全部通过。
+
+## 尚未形成的真实云 closure 与明确 post-G2 边界
 
 当前 G2 evidence pending：
 
-- A17 collaborator editor/sharing、authenticated Catalog rootless Preview/Test/Build 与新增 ClamAV + YARA-X Gate
-  尚未随本轮修改推送，缺当前 worktree的 GitHub Actions证据；
 - regional DR首次真实云端 RPO/RTO、AWS KMS/MRK/OIDC/受保护 Environment与 Secrets证据按用户决定延后。
 
 以下是明确的 post-G2 adapter/product expansion，不再作为 G2 Passed 的伪阻塞项：

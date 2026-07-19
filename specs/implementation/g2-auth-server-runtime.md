@@ -435,8 +435,8 @@ effect recheck、GitHub PostgreSQL viewer Gate 与 read-only rootless real probe
 
 ### A17：Workspace collaborator editor 与 sharing surface
 
-状态：Implemented locally / CI evidence pending；canonical role/API、isolated execution policy、Project Settings 产品面与
-本机 PostgreSQL Gate 已完成，本轮修改尚未提交推送，因此不记录 GitHub 通过证据。
+状态：Implemented；canonical role/API、isolated execution policy、Project Settings 产品面、本机与 GitHub PostgreSQL、
+product/rootless Gate 已完成。
 
 - Backend migration v11 将 role constraint 从唯一 `viewer` 扩展为 exact `viewer|editor`。owner-only
   `GET|PUT|DELETE /workspaces/:workspaceId/execution-roles` 对已存在用户执行 normalized-email grant、bounded list 与
@@ -601,10 +601,10 @@ Secret ciphertext byte stability、aggregate-only audit 和 old-provider retirem
 - [x] A16 canonical viewer role、owner/read exact resolver、durable principal/permission grant、Data/Server/Secret
       effect recheck、PostgreSQL Gate 与 read-only rootless contract/real probe 配置完成。
 - [x] A13/A15/A16 真实 GitHub rootless/PostgreSQL evidence 已取得。
-- [x] A17 canonical editor role、sharing API、Secret-free write policy、Project Settings UI 与本机 PostgreSQL Gate完成；
-      GitHub CI evidence 待提交推送后取得。
+- [x] A17 canonical editor role、sharing API、Secret-free write policy、Project Settings UI、本机 PostgreSQL Gate与
+      GitHub PostgreSQL/product/rootless evidence完成。
 - [x] Auth/Server current G2 Golden、loader/Data composition、target/security/canary matrix与本地 Product Gate closure完成。
-- [ ] A14 新增真实 AWS OIDC/KMS run；A17 current-worktree CI evidence待取得。
+- [ ] A14 新增真实 AWS OIDC/KMS run。
 
 其他 managed KMS/Auth provider、更高 organization permission/role与未来 producer/adapter surface是 post-G2扩展，
 不再作为本地 G2 closure的伪阻塞项。

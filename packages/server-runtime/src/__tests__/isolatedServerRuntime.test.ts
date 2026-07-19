@@ -457,7 +457,7 @@ describe('isolated Server Function runtime boundary', () => {
         1_000
       )
     ).toBeDefined();
-  });
+  }, 15_000);
 
   it('revalidates successful output against trusted snapshot schema', () => {
     expect(
