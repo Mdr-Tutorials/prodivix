@@ -1049,6 +1049,7 @@ describe('standalone Data runtime projection', () => {
       },
     };
     const generated = createWorkspaceStandaloneDataRuntimeModule(liveWorkspace);
+    expect(generated.body).not.toContain('mappedPath.replaceAll');
     const transformed = await transformWithEsbuild(
       generated.body,
       'prodivix-data-runtime.ts',

@@ -115,9 +115,9 @@
 - Host 在读取 upload 前取得 snapshot，并在 session 签发前二次验证 exact generation。新 generation 被观察时会
   撤销全部旧 capability session；旧 generation 的 in-flight scan 不能签发。derived cache 保留 exact bytes，因
   scanner policy version 改变而强制重新扫描并更新 attestation，不重新执行确定性 transform。
-- GitHub-only `g2-binary-asset-malware.yml` 已配置 official preloaded-database image、rootless Podman、internal
-  network、capability drop 与 clean/quarantine real-daemon canary；首次远端执行证据仍待阶段性提交推送后确认，
-  当前不能宣称该 workflow 已通过。
+- GitHub-only `g2-binary-asset-malware.yml` 已配置 official preloaded-database image、rootless capability-dropped
+  FreshClam updater、exact updated-image snapshot、internal-network daemon 与 clean/quarantine real-daemon canary；
+  updater 有界联网，真实扫描阶段保持断网，首次远端执行证据仍待阶段性提交推送后确认，当前不能宣称该 workflow 已通过。
 - bounded LRU derived cache 以 recipe digest 定位，命中后重新验证 output bytes、media、dimensions 与 clean
   attestation；同 recipe 的不同输出 hard conflict。
 - 独立 `apps/asset-delivery-host` 只接收 Backend internal-token 请求，保存短期 bytes 与 capability hash，按

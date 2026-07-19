@@ -100,10 +100,13 @@ fresh updates and session revocation are observed promptly.
 
 The adapter never returns daemon signature names: malware maps only to
 `AST-SCAN-MALWARE-DETECTED`. The GitHub-only
-`g2-binary-asset-malware.yml` workflow starts the official preloaded-database
-image as a rootless, capability-dropped Podman container and checks clean and
-quarantine paths against the real daemon. Normal local unit/contract Gates do
-not require Podman, Docker, nerdctl, WSL, or a local ClamAV installation.
+`g2-binary-asset-malware.yml` workflow refreshes the official preloaded
+database in a temporary rootless, capability-dropped updater, snapshots the
+exact updated image, and then starts the real scanning daemon on an internal
+network with FreshClam disabled. It checks clean and quarantine paths only
+after the bounded database-freshness probe succeeds. Normal local
+unit/contract Gates do not require Podman, Docker, nerdctl, WSL, or a local
+ClamAV installation.
 
 The host does not hold Workspace, Backend, database, object-store, or Control
 Plane credentials.

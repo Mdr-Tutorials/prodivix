@@ -564,7 +564,7 @@ const mapRuntimeHttpRequest = (
     const token = '{' + wireName + '}';
     if (!mappedPath.includes(token))
       throw new DataRuntimeFailure('DATA_HTTP_CONFIGURATION_INVALID');
-    mappedPath = mappedPath.replaceAll(token, encodeURIComponent(value));
+    mappedPath = mappedPath.split(token).join(encodeURIComponent(value));
   }
   if (/[{}]/u.test(mappedPath)) throw new DataRuntimeFailure('DATA_HTTP_INPUT_INVALID');
   for (const [wireName, pointer] of Object.entries(mappings?.query ?? {})) {

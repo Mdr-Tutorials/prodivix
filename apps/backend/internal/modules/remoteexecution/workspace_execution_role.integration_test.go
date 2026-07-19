@@ -79,7 +79,7 @@ func TestWorkspaceExecutionViewerRolePostgreSQLGate(t *testing.T) {
 				t.Fatalf("PostgreSQL-resolved viewer authority drifted: %s", decoded)
 			}
 			response.Header().Set("Content-Type", "application/json")
-			_, _ = io.WriteString(response, `{"protocol":"prodivix.remote-execution","version":1,"messageId":"message-1","operation":"create","ok":true,"payload":{"execution":{"executionId":"viewer-gate-execution"}}}`)
+			_, _ = io.WriteString(response, `{"protocol":"prodivix.remote-execution","version":1,"messageId":"message-1","operation":"create","ok":true,"payload":{"execution":{"executionId":"viewer-gate-execution","provider":{"id":"prodivix.remote.preview"}}}}`)
 			return
 		}
 		response.Header().Set("Content-Type", "application/json")
