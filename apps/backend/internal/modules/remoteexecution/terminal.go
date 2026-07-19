@@ -232,7 +232,7 @@ func (handler *Handler) terminalExecution(c *gin.Context) (string, bool) {
 		return "", false
 	}
 	executionID := strings.TrimSpace(c.Param("executionId"))
-	if executionID == "" || handler.store.VerifyExecutionOwner(c.Request.Context(), user.ID, session.ID, executionID) != nil {
+	if executionID == "" || handler.store.VerifyExecutionPrincipalSession(c.Request.Context(), user.ID, session.ID, executionID) != nil {
 		backendresponse.Error(c, http.StatusNotFound, "EXE-4004", "Remote Terminal execution was not found.")
 		return "", false
 	}

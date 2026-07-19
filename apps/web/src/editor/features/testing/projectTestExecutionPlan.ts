@@ -1,6 +1,7 @@
 import {
   DETERMINISTIC_TEST_SERVER_RUNTIME_TARGET,
   generateWorkspaceReactViteExecutableProject,
+  generateWorkspaceVueViteExecutableProject,
   PROVIDER_MOCK_DATA_RUNTIME_TARGET,
   type CompileDiagnostic,
 } from '@prodivix/prodivix-compiler';
@@ -31,6 +32,7 @@ export type ProjectTestExecutionPlan =
 export type ProjectTestExecutionPlanOptions = Readonly<{
   serverRuntimeMockProvision?: ServerRuntimeTestProvision;
   assetMaterializations?: readonly BinaryAssetMaterialization[];
+  target?: 'react-vite' | 'vue-vite';
 }>;
 
 const createDefaultAuthTestProvision = (
@@ -170,7 +172,11 @@ export const createProjectTestExecutionPlan = (
   const serverRuntimeMockProvision =
     options.serverRuntimeMockProvision ??
     createDefaultAuthTestProvision(workspace);
-  const project = generateWorkspaceReactViteExecutableProject(workspace, {
+  const generateProject =
+    options.target === 'vue-vite'
+      ? generateWorkspaceVueViteExecutableProject
+      : generateWorkspaceReactViteExecutableProject;
+  const project = generateProject(workspace, {
     dataRuntimeTarget: PROVIDER_MOCK_DATA_RUNTIME_TARGET,
     serverRuntimeTarget: DETERMINISTIC_TEST_SERVER_RUNTIME_TARGET,
     assetMaterializations: options.assetMaterializations ?? [],

@@ -134,6 +134,118 @@ const createDataWorkspace = (
   };
 };
 
+const createProtocolWorkspace = (
+  adapterId: 'core.graphql' | 'core.asyncapi',
+  runtimeZone: RuntimeZone = 'client'
+): WorkspaceSnapshot => {
+  const workspace = createDataWorkspace(runtimeZone);
+  const document = workspace.docsById['data-products'];
+  if (!document || document.type !== 'data-source')
+    throw new Error('Expected the Data protocol target document.');
+  return {
+    ...workspace,
+    id: `data-target-${adapterId.replace('.', '-')}-${runtimeZone}`,
+    docsById: {
+      ...workspace.docsById,
+      'data-products': {
+        ...document,
+        content: {
+          ...document.content,
+          source: {
+            ...document.content.source,
+            adapterId,
+            configurationByKey:
+              adapterId === 'core.graphql'
+                ? {
+                    endpoint: {
+                      kind: 'literal',
+                      value: 'https://api.example.test/graphql',
+                    },
+                  }
+                : {
+                    endpoint: {
+                      kind: 'literal',
+                      value: 'https://events.example.test/v1/',
+                    },
+                  },
+          },
+          operationsById: {
+            'list-products': {
+              ...document.content.operationsById['list-products']!,
+              configurationByKey:
+                adapterId === 'core.graphql'
+                  ? {
+                      document: {
+                        kind: 'literal',
+                        value: 'query Products { products { id } }',
+                      },
+                      operationName: { kind: 'literal', value: 'Products' },
+                      resultPath: { kind: 'literal', value: '/products' },
+                    }
+                  : {
+                      action: { kind: 'literal', value: 'request-reply' },
+                      path: { kind: 'literal', value: '/commands/products' },
+                      responseBodyPath: {
+                        kind: 'literal',
+                        value: '/payload',
+                      },
+                    },
+            },
+          },
+        },
+      },
+    },
+  };
+};
+
+const createStreamWorkspace = (
+  adapterId: 'core.graphql' | 'core.asyncapi',
+  runtimeZone: RuntimeZone
+): WorkspaceSnapshot => {
+  const workspace = createProtocolWorkspace(adapterId, runtimeZone);
+  const document = workspace.docsById['data-products'];
+  if (!document || document.type !== 'data-source')
+    throw new Error('Expected the Data stream target document.');
+  return {
+    ...workspace,
+    docsById: {
+      ...workspace.docsById,
+      'data-products': {
+        ...document,
+        content: {
+          ...document.content,
+          operationsById: {
+            watch: {
+              id: 'watch',
+              kind: 'subscription',
+              outputSchemaId: 'products',
+              configurationByKey:
+                adapterId === 'core.graphql'
+                  ? {
+                      document: {
+                        kind: 'literal',
+                        value: 'subscription Watch { products { id } }',
+                      },
+                      operationName: { kind: 'literal', value: 'Watch' },
+                      resultPath: { kind: 'literal', value: '/products' },
+                    }
+                  : {
+                      action: { kind: 'literal', value: 'receive' },
+                      path: { kind: 'literal', value: '/events/products' },
+                      responseBodyPath: {
+                        kind: 'literal',
+                        value: '/payload',
+                      },
+                    },
+              policies: {},
+            },
+          },
+        },
+      },
+    },
+  };
+};
+
 describe('Workspace Data runtime target Gate', () => {
   it('blocks server Data from the default static client target', () => {
     const workspace = createDataWorkspace('server');
@@ -228,6 +340,174 @@ describe('Workspace Data runtime target Gate', () => {
     expect(runtime?.contents).toContain('"runtimeMode":"mock-only"');
     expect(runtime?.contents).toContain('DATA_RUNTIME_TARGET_MODE_INVALID');
   });
+
+  it.each(['core.graphql', 'core.asyncapi'] as const)(
+    'compiles finite %s client live runtime with network capability',
+    (adapterId) => {
+      const result = generateWorkspaceReactViteExecutableProject(
+        createProtocolWorkspace(adapterId)
+      );
+
+      expect(
+        result.status,
+        result.status === 'blocked' ? JSON.stringify(result.diagnostics) : ''
+      ).toBe('ready');
+      if (result.status !== 'ready') return;
+      expect(result.snapshot.capabilityRequirements.preview).toContain(
+        'network'
+      );
+      expect(result.snapshot.capabilityRequirements.preview).not.toContain(
+        'environment-binding'
+      );
+      expect(
+        result.snapshot.files.find(
+          ({ path }) => path === 'src/prodivix-data-runtime.ts'
+        )?.contents
+      ).toContain(adapterId);
+    }
+  );
+
+  it.each(['core.graphql', 'core.asyncapi'] as const)(
+    'requires the Remote data-stream capability for bounded %s subscription',
+    (adapterId) => {
+      const result = generateWorkspaceReactViteExecutableProject(
+        createStreamWorkspace(adapterId, 'edge'),
+        { dataRuntimeTarget: EXECUTION_PARENT_GATEWAY_DATA_RUNTIME_TARGET }
+      );
+      expect(
+        result.status,
+        result.status === 'blocked' ? JSON.stringify(result.diagnostics) : ''
+      ).toBe('ready');
+      if (result.status !== 'ready') return;
+      expect(result.snapshot.capabilityRequirements.preview).toEqual(
+        expect.arrayContaining([
+          'data-stream',
+          'environment-binding',
+          'network',
+        ])
+      );
+      expect(
+        result.snapshot.files.find(
+          ({ path }) => path === 'src/prodivix-data-runtime.ts'
+        )?.contents
+      ).toContain('prodivix.execution-data-stream-pull.v1');
+    }
+  );
+
+  it('keeps client and any authorization-bearing subscription target fail closed', () => {
+    const client = generateWorkspaceReactViteExecutableProject(
+      createStreamWorkspace('core.graphql', 'client')
+    );
+    expect(client.status).toBe('blocked');
+    if (client.status === 'blocked')
+      expect(client.diagnostics).toContainEqual(
+        expect.objectContaining({
+          code: 'WKS-EXPORT-DATA-STREAM-GATEWAY-REQUIRED',
+        })
+      );
+
+    const secretWorkspace = createStreamWorkspace('core.asyncapi', 'server');
+    const document = secretWorkspace.docsById['data-products'];
+    if (!document || document.type !== 'data-source')
+      throw new Error('Expected the Secret stream document.');
+    const secret = generateWorkspaceReactViteExecutableProject(
+      {
+        ...secretWorkspace,
+        docsById: {
+          ...secretWorkspace.docsById,
+          'data-products': {
+            ...document,
+            content: {
+              ...document.content,
+              source: {
+                ...document.content.source,
+                configurationByKey: {
+                  ...document.content.source.configurationByKey,
+                  authorization: {
+                    kind: 'secret-ref',
+                    reference: { bindingId: SECRET_BINDING_CANARY },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      { dataRuntimeTarget: EXECUTION_PARENT_GATEWAY_DATA_RUNTIME_TARGET }
+    );
+    expect(secret.status).toBe('blocked');
+    if (secret.status === 'blocked')
+      expect(secret.diagnostics).toContainEqual(
+        expect.objectContaining({
+          code: 'WKS-EXPORT-DATA-STREAM-SECRET-UNAVAILABLE',
+        })
+      );
+
+    const literalAuthorization = generateWorkspaceReactViteExecutableProject(
+      {
+        ...secretWorkspace,
+        docsById: {
+          ...secretWorkspace.docsById,
+          'data-products': {
+            ...document,
+            content: {
+              ...document.content,
+              operationsById: {
+                ...document.content.operationsById,
+                watch: {
+                  ...document.content.operationsById.watch!,
+                  configurationByKey: {
+                    ...document.content.operationsById.watch!
+                      .configurationByKey,
+                    authorization: {
+                      kind: 'literal',
+                      value: 'unsafe-inline-credential',
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      { dataRuntimeTarget: EXECUTION_PARENT_GATEWAY_DATA_RUNTIME_TARGET }
+    );
+    expect(literalAuthorization.status).toBe('blocked');
+    if (literalAuthorization.status === 'blocked')
+      expect(literalAuthorization.diagnostics).toContainEqual(
+        expect.objectContaining({
+          code: 'WKS-EXPORT-DATA-STREAM-SECRET-UNAVAILABLE',
+        })
+      );
+  });
+
+  it.each(['core.graphql', 'core.asyncapi'] as const)(
+    'projects %s server/edge live through the audited execution parent gateway',
+    (adapterId) => {
+      const result = generateWorkspaceReactViteExecutableProject(
+        createProtocolWorkspace(adapterId, 'server'),
+        { dataRuntimeTarget: EXECUTION_PARENT_GATEWAY_DATA_RUNTIME_TARGET }
+      );
+
+      expect(
+        result.status,
+        result.status === 'blocked' ? JSON.stringify(result.diagnostics) : ''
+      ).toBe('ready');
+      if (result.status !== 'ready') return;
+      expect(result.snapshot.capabilityRequirements.preview).toEqual(
+        expect.arrayContaining(['network', 'environment-binding'])
+      );
+      const runtime = result.snapshot.files.find(
+        ({ path }) => path === 'src/prodivix-data-runtime.ts'
+      );
+      expect(runtime?.contents).toContain(
+        'prodivix.execution-data-gateway-request.v1'
+      );
+      expect(runtime?.contents).toContain(
+        'adapterId: input.document.source.adapterId'
+      );
+    }
+  );
 
   it('blocks runtime zones outside the standalone client/server/edge contract', () => {
     const result = generateWorkspaceReactViteExecutableProject(

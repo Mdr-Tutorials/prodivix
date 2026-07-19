@@ -6,6 +6,12 @@
     "empty": "No React code yet (generate PIR first)",
     "error": "Failed to generate React code"
   },
+  "vue": {
+    "title": "Vue",
+    "description": "Vue project generated from the current PIR, Route, Auth, Server Runtime, Data and Asset contracts",
+    "empty": "No Vue project yet (author a PIR route first)",
+    "error": "Failed to generate Vue code"
+  },
   "vfs": {
     "title": "VFS",
     "description": "Complete Workspace VFS file tree",

@@ -4,12 +4,17 @@ import type {
   RuntimeZone,
 } from './execution.types';
 import { RUNTIME_ZONES } from './execution.types';
+import { cloneExecutableProjectSourceTrace } from './executableProjectNormalization';
 
 export const EXECUTION_NETWORK_TRACE_NAME = 'network.request' as const;
 export const EXECUTION_NETWORK_TRACE_FORMAT =
   'prodivix.execution-network-trace.v1' as const;
 export const EXECUTION_NETWORK_BRIDGE_MESSAGE_TYPE =
   'prodivix.execution-network-bridge.v1' as const;
+
+export const EXECUTION_NETWORK_TRACE_LIMITS = Object.freeze({
+  maxSourceTraces: 16,
+} as const);
 
 export type ExecutionNetworkTraceOutcome = 'allowed' | 'denied' | 'failed';
 
@@ -88,6 +93,26 @@ const correlation = (
   });
 };
 
+export const normalizeExecutionSourceTraces = (
+  value: readonly ExecutionSourceTrace[] | undefined
+): readonly ExecutionSourceTrace[] | undefined => {
+  if (!value) return undefined;
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.length > EXECUTION_NETWORK_TRACE_LIMITS.maxSourceTraces
+  )
+    throw new TypeError('Network trace sourceTrace exceeds its budget.');
+  return Object.freeze(
+    value.map((trace, index) =>
+      cloneExecutableProjectSourceTrace(
+        trace,
+        `Network trace sourceTrace[${index}]`
+      )
+    )
+  );
+};
+
 const sanitizeUrl = (value: unknown): string => {
   const source = normalized(value, 'Execution network sanitizedUrl');
   let url: Readonly<{
@@ -148,6 +173,7 @@ export const createExecutionNetworkTrace = (
     throw new TypeError('Network trace outcome is unsupported.');
   if (input.status !== undefined && (input.status < 100 || input.status > 599))
     throw new TypeError('Network trace status is invalid.');
+  const sourceTrace = normalizeExecutionSourceTraces(input.sourceTrace);
   return Object.freeze({
     format: EXECUTION_NETWORK_TRACE_FORMAT,
     requestId: normalized(input.requestId, 'Network trace requestId'),
@@ -188,9 +214,7 @@ export const createExecutionNetworkTrace = (
     ...(input.truncated === undefined
       ? {}
       : { truncated: input.truncated === true }),
-    ...(input.sourceTrace
-      ? { sourceTrace: Object.freeze([...input.sourceTrace]) }
-      : {}),
+    ...(sourceTrace ? { sourceTrace } : {}),
   });
 };
 
@@ -231,6 +255,17 @@ export const toExecutionNetworkTraceValue = (
     : {}),
   redacted: true,
   ...(trace.truncated === undefined ? {} : { truncated: trace.truncated }),
+  ...(trace.sourceTrace
+    ? {
+        sourceTrace: trace.sourceTrace.map((entry) => ({
+          sourceRef: entry.sourceRef as ExecutionValue,
+          ...(entry.sourceSpan
+            ? { sourceSpan: entry.sourceSpan as ExecutionValue }
+            : {}),
+          ...(entry.label ? { label: entry.label } : {}),
+        })),
+      }
+    : {}),
 });
 
 /** Reads a Network trace from an untrusted transport value and rejects field or redaction drift. */
@@ -260,6 +295,7 @@ export const readExecutionNetworkTraceValue = (
     'correlation',
     'redacted',
     'truncated',
+    'sourceTrace',
   ]);
   if (
     Object.keys(record).some((key) => !allowed.has(key)) ||
@@ -324,6 +360,11 @@ export const readExecutionNetworkTraceValue = (
       ...(record.truncated === undefined
         ? {}
         : { truncated: record.truncated as boolean }),
+      ...(record.sourceTrace === undefined
+        ? {}
+        : {
+            sourceTrace: record.sourceTrace as readonly ExecutionSourceTrace[],
+          }),
     });
     return record.durationMs === trace.durationMs ? trace : undefined;
   } catch {

@@ -3,6 +3,10 @@ import type {
   ExecutableProjectSnapshot,
   ExecutionDataGatewayBridgeRequest,
   ExecutionDataGatewayBridgeResponse,
+  ExecutionDataStreamBridgeMessage,
+  ExecutionDataStreamCancellation,
+  ExecutionDataStreamOpenRequest,
+  ExecutionDataStreamPull,
   ExecutionCancellationResult,
   ExecutionJob,
   ExecutionLogRecord,
@@ -19,6 +23,7 @@ import {
   browserProjectRuntimeHost,
   createBrowserDataExecutionEnvironment,
   createRemoteDataGatewayRunCoordinator,
+  createRemoteDataStreamRunCoordinator,
   createRemoteServerFunctionRunCoordinator,
   executionSessionCoordinator,
   createRemoteProjectExecutionEnvironment,
@@ -71,6 +76,9 @@ const cancellationTerminalWaitMs = 15_000;
 const remoteDataGatewayRuns = createRemoteDataGatewayRunCoordinator({
   publishTrace: (input) => executionSessionCoordinator.publishTrace(input),
 });
+const remoteDataStreamRuns = createRemoteDataStreamRunCoordinator({
+  publishTrace: (input) => executionSessionCoordinator.publishTrace(input),
+});
 const remoteServerFunctionRuns = createRemoteServerFunctionRunCoordinator({
   publishTrace: (input) => executionSessionCoordinator.publishTrace(input),
 });
@@ -92,6 +100,19 @@ export const executeBlueprintProjectRemoteDataBridge = async (
   request: ExecutionDataGatewayBridgeRequest
 ): Promise<ExecutionDataGatewayBridgeResponse> =>
   remoteDataGatewayRuns.execute(request);
+
+export const openBlueprintProjectRemoteDataStream = (
+  request: ExecutionDataStreamOpenRequest,
+  publish: (message: ExecutionDataStreamBridgeMessage) => void
+): Promise<void> => remoteDataStreamRuns.open(request, publish);
+
+export const cancelBlueprintProjectRemoteDataStream = (
+  cancellation: ExecutionDataStreamCancellation
+): boolean => remoteDataStreamRuns.cancel(cancellation);
+
+export const pullBlueprintProjectRemoteDataStream = (
+  request: ExecutionDataStreamPull
+): Promise<boolean> => remoteDataStreamRuns.pull(request);
 
 export const executeBlueprintProjectRemoteServerFunctionBridge = async (
   request: ExecutionServerFunctionBridgeRequest
@@ -153,6 +174,11 @@ export const startBlueprintProject = async (
         typeof createRemoteProjectExecutionEnvironment
       >['dataGateway']['invoke']
     | undefined;
+  let remoteDataStreamOpen:
+    | ReturnType<
+        typeof createRemoteProjectExecutionEnvironment
+      >['dataStreams']['open']
+    | undefined;
   let remoteServerFunctionInvoke:
     | ReturnType<
         typeof createRemoteProjectExecutionEnvironment
@@ -168,6 +194,7 @@ export const startBlueprintProject = async (
       );
   }
   remoteDataGatewayRuns.deactivate();
+  remoteDataStreamRuns.deactivate();
   remoteServerFunctionRuns.deactivate();
   activeTerminalClient = undefined;
   activeArtifactResolver = undefined;
@@ -187,6 +214,7 @@ export const startBlueprintProject = async (
     });
     job = await environment.provider.start(request);
     remoteDataGatewayInvoke = environment.dataGateway.invoke;
+    remoteDataStreamOpen = environment.dataStreams.open;
     remoteServerFunctionInvoke = environment.serverFunctions.invoke;
     activeTerminalClient = environment.terminal;
     activeArtifactResolver = environment.artifacts;
@@ -217,6 +245,13 @@ export const startBlueprintProject = async (
       sessionId,
       invoke: remoteDataGatewayInvoke,
     });
+  if (remoteDataStreamOpen)
+    remoteDataStreamRuns.activate({
+      executionId: job.id,
+      jobId: job.id,
+      sessionId,
+      open: remoteDataStreamOpen,
+    });
   if (remoteServerFunctionInvoke)
     remoteServerFunctionRuns.activate({
       executionId: job.id,
@@ -234,6 +269,7 @@ export const startBlueprintProject = async (
     )
       return;
     remoteDataGatewayRuns.deactivate(job.id);
+    remoteDataStreamRuns.deactivate(job.id);
     remoteServerFunctionRuns.deactivate(job.id);
     activeJob = undefined;
     activeProvider = undefined;
@@ -246,6 +282,7 @@ export const stopBlueprintProject = async (
   options: Readonly<{ waitForTerminal?: boolean }> = {}
 ): Promise<ExecutionCancellationResult | undefined> => {
   remoteDataGatewayRuns.deactivate();
+  remoteDataStreamRuns.deactivate();
   remoteServerFunctionRuns.deactivate();
   const job = activeJob;
   if (!job) {

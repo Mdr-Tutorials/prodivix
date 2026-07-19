@@ -37,9 +37,15 @@ export const ISOLATED_SERVER_FUNCTION_WORKSPACE_OWNER_PERMISSION_ID =
   'workspace.owner' as const;
 export const ISOLATED_SERVER_FUNCTION_WORKSPACE_READ_PERMISSION_ID =
   'workspace.read' as const;
+export const ISOLATED_SERVER_FUNCTION_WORKSPACE_WRITE_PERMISSION_ID =
+  'workspace.write' as const;
+export const ISOLATED_SERVER_FUNCTION_SOURCE_MUTATION_DIRECTORY =
+  'src/.prodivix-project-source' as const;
+export const ISOLATED_SERVER_FUNCTION_SOURCE_MUTATION_MAX_BYTES = 1024 * 1024;
 export const ISOLATED_SERVER_FUNCTION_PERMISSION_IDS = Object.freeze([
   ISOLATED_SERVER_FUNCTION_WORKSPACE_OWNER_PERMISSION_ID,
   ISOLATED_SERVER_FUNCTION_WORKSPACE_READ_PERMISSION_ID,
+  ISOLATED_SERVER_FUNCTION_WORKSPACE_WRITE_PERMISSION_ID,
 ] as const);
 
 const isolatedServerFunctionFailureCodes = new Set([
@@ -52,6 +58,8 @@ const isolatedServerFunctionFailureCodes = new Set([
   'SVR_ENVIRONMENT_LEASE_MISSING',
   'SVR_SECRET_BINDING_MISSING',
   'SVR_SECRET_OUTPUT_LEAK',
+  'SVR_SOURCE_MUTATION_INVALID',
+  'SVR_SOURCE_MUTATION_REQUIRED',
   'SVR_ISOLATED_EXECUTION_FAILED',
 ]);
 
@@ -239,26 +247,40 @@ const sameFunction = (
 ): boolean =>
   left.artifactId === right.artifactId && left.exportName === right.exportName;
 
+/** The only project-authored isolated mutation admitted by the first vertical. */
+export const isIsolatedServerFunctionProjectSourceMutationDefinition = (
+  definition: ServerFunctionDefinition
+): boolean =>
+  definition.adapterId === ISOLATED_SERVER_FUNCTION_ADAPTER_ID &&
+  (definition.kind === 'function' || definition.kind === 'route-action') &&
+  definition.runtimeZone === 'server' &&
+  definition.effect === 'mutation' &&
+  definition.auth.kind === 'permission' &&
+  definition.auth.permissionId ===
+    ISOLATED_SERVER_FUNCTION_WORKSPACE_WRITE_PERMISSION_ID &&
+  definition.idempotency?.kind === 'invocation-key' &&
+  definition.environment === undefined;
+
 /**
  * Keeps Compiler and Worker policy on the same narrow isolated-production
- * boundary. workspace.read is intentionally Secret-free in this first
- * vertical; environment material remains limited to the previously audited
- * public/authenticated/workspace.owner paths.
+ * boundary. workspace.read may use the same one-shot Secret channel as the
+ * previously audited read-only paths, but still requires its own exact runtime
+ * permission grant. workspace.write remains Secret-free.
  */
 export const isSupportedIsolatedServerFunctionDefinition = (
   definition: ServerFunctionDefinition
 ): boolean =>
   definition.adapterId === ISOLATED_SERVER_FUNCTION_ADAPTER_ID &&
-  definition.effect === 'read' &&
   definition.runtimeZone === 'server' &&
-  (definition.auth.kind === 'public' ||
-    definition.auth.kind === 'authenticated' ||
-    (definition.auth.kind === 'permission' &&
-      (definition.auth.permissionId ===
-        ISOLATED_SERVER_FUNCTION_WORKSPACE_OWNER_PERMISSION_ID ||
+  ((definition.effect === 'read' &&
+    (definition.auth.kind === 'public' ||
+      definition.auth.kind === 'authenticated' ||
+      (definition.auth.kind === 'permission' &&
         (definition.auth.permissionId ===
-          ISOLATED_SERVER_FUNCTION_WORKSPACE_READ_PERMISSION_ID &&
-          definition.environment === undefined))));
+          ISOLATED_SERVER_FUNCTION_WORKSPACE_OWNER_PERMISSION_ID ||
+          definition.auth.permissionId ===
+            ISOLATED_SERVER_FUNCTION_WORKSPACE_READ_PERMISSION_ID)))) ||
+    isIsolatedServerFunctionProjectSourceMutationDefinition(definition));
 
 /** Decodes the Server-owned part of a provider-neutral executable plan. */
 export const readIsolatedServerFunctionPlan = (

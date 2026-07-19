@@ -890,6 +890,7 @@ export const decodeRootlessPodmanSandboxResult = (
   value: string,
   snapshot: ExecutableProjectSnapshot,
   profile: 'preview' | 'test' | 'build' | 'production',
+  executionId: string,
   request: ExecutionRequest | undefined,
   completedAt: number,
   maximumOutputBytes: number,
@@ -1092,7 +1093,7 @@ export const decodeRootlessPodmanSandboxResult = (
         const fallback = testFallbackSourceTrace(snapshot);
         const report = parseVitestExecutionTestReport({
           source: contents,
-          reportId: `test-report:${snapshot.contentDigest}`,
+          reportId: `test-report:${executionId}`,
           completedAt,
           sourceTrace: fallback,
           resolveSourceTrace: (reportedPath) =>
@@ -1113,7 +1114,7 @@ export const decodeRootlessPodmanSandboxResult = (
           throw new TypeError(
             'Canonical Test report exceeds the configured artifact limit.'
           );
-        publishedArtifactId = `test-report:${snapshot.contentDigest}`;
+        publishedArtifactId = `test-report:${executionId}`;
         publishedKind = 'report';
         publishedLabel = 'Remote project test report';
         publishedMediaType = EXECUTION_TEST_REPORT_MEDIA_TYPE;
@@ -1459,6 +1460,7 @@ export const createRootlessPodmanSandbox = (
             output.stdout,
             input.snapshot,
             input.profile,
+            input.executionId,
             input.request,
             now(),
             input.maximumOutputBytes,

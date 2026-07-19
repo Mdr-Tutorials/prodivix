@@ -14,6 +14,8 @@ import {
   createWorkspaceServerRuntimeBindingPlan,
   projectWorkspaceServerRuntimeAuthoring,
 } from './workspaceServerRuntimeAuthoring';
+import { createWorkspaceSourceMutationTransactionPlan } from './workspaceServerRuntimeSourceMutationAuthoring';
+import { createWorkspaceReadSecretLoaderTransactionPlan } from './workspaceServerRuntimeReadSecretAuthoring';
 import type { WorkspaceSnapshot } from './types';
 
 const profile = Object.freeze({
@@ -456,5 +458,160 @@ describe('Workspace Server Runtime authoring', () => {
     });
     expect(content.source).toContain('WORKSPACE_READ_REQUIRED');
     expect(content.source).not.toMatch(/token|cookie|secret|sessionId/u);
+  });
+
+  it('creates a reference-only workspace.read Secret loader and binds it atomically', () => {
+    const workspace = createWorkspace({
+      includeCode: false,
+      permissionIds: ['workspace.read'],
+    });
+    const result = createWorkspaceReadSecretLoaderTransactionPlan({
+      workspace,
+      routeNodeId: 'route-home',
+      documentId: 'code-isolated-read-secret',
+      path: '/server/isolated-read-secret.loader.server.ts',
+      secretBindingId: 'production-webhook-signing-key',
+      transactionId: 'create-isolated-read-secret',
+      issuedAt: '2026-07-19T04:00:00.000Z',
+    });
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+    const applied = applyWorkspaceTransaction(
+      workspace,
+      result.plan.transaction
+    );
+    expect(applied.ok).toBe(true);
+    if (!applied.ok) return;
+    expect(
+      applied.snapshot.routeManifest.root.children?.[0]?.runtime?.loaderRef
+    ).toEqual(result.plan.functionRef);
+    const document = applied.snapshot.docsById[result.plan.documentId];
+    if (document?.type !== 'code' || !document.content) return;
+    const content = document.content as Readonly<Record<string, unknown>>;
+    const decoded = decodeServerRuntimeProfile(
+      content.metadata as Readonly<Record<string, unknown>>,
+      'ts'
+    );
+    expect(decoded.status).toBe('valid');
+    if (decoded.status !== 'valid') return;
+    expect(
+      decoded.profile.functionsByExport.loadWorkspaceReadSecret
+    ).toMatchObject({
+      kind: 'route-loader',
+      adapterId: 'prodivix.code-export',
+      effect: 'read',
+      auth: { kind: 'permission', permissionId: 'workspace.read' },
+      environment: {
+        secretsByField: {
+          signingKey: { bindingId: 'production-webhook-signing-key' },
+        },
+      },
+    });
+    expect(content.source).toContain("context.useSecret('signingKey'");
+    expect(content.source).not.toContain('production-webhook-signing-key');
+  });
+
+  it('rejects workspace.read Secret authoring without a canonical reference', () => {
+    expect(
+      createWorkspaceReadSecretLoaderTransactionPlan({
+        workspace: createWorkspace({
+          includeCode: false,
+          permissionIds: ['workspace.read'],
+        }),
+        routeNodeId: 'route-home',
+        documentId: 'code-isolated-read-secret',
+        path: '/server/isolated-read-secret.loader.server.ts',
+        secretBindingId: ' credential-material ',
+        transactionId: 'create-isolated-read-secret-invalid',
+        issuedAt: '2026-07-19T04:01:00.000Z',
+      })
+    ).toMatchObject({
+      status: 'rejected',
+      code: 'WKS_SERVER_RUNTIME_PRESET_INVALID',
+    });
+  });
+
+  it('creates one workspace.write target and isolated route action as one transaction', () => {
+    const workspace = createWorkspace({
+      includeCode: false,
+      permissionIds: ['workspace.write'],
+    });
+    const result = createWorkspaceSourceMutationTransactionPlan({
+      workspace,
+      routeNodeId: 'route-home',
+      actionDocumentId: 'code-source-mutation-action',
+      actionPath: '/server/source-mutation.action.server.ts',
+      targetDocumentId: 'code-source-mutation-target',
+      targetPath: '/project/source-mutation-target.ts',
+      transactionId: 'create-source-mutation',
+      issuedAt: '2026-07-19T08:00:00.000Z',
+    });
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+    expect(result.plan.transaction.commands).toHaveLength(3);
+    const applied = applyWorkspaceTransaction(
+      workspace,
+      result.plan.transaction
+    );
+    expect(applied.ok).toBe(true);
+    if (!applied.ok) return;
+    expect(
+      applied.snapshot.routeManifest.root.children?.[0]?.runtime?.actionRef
+    ).toEqual(result.plan.functionRef);
+    const action = applied.snapshot.docsById[result.plan.actionDocumentId];
+    const target = applied.snapshot.docsById[result.plan.targetDocumentId];
+    expect(action).toMatchObject({
+      type: 'code',
+      path: '/server/source-mutation.action.server.ts',
+    });
+    expect(target).toMatchObject({
+      type: 'code',
+      path: '/project/source-mutation-target.ts',
+    });
+    if (action?.type !== 'code' || !action.content) return;
+    const content = action.content as Readonly<Record<string, unknown>>;
+    const decoded = decodeServerRuntimeProfile(
+      content.metadata as Readonly<Record<string, unknown>>,
+      'ts'
+    );
+    expect(decoded.status).toBe('valid');
+    if (decoded.status !== 'valid') return;
+    expect(
+      decoded.profile.functionsByExport.replaceProjectSource
+    ).toMatchObject({
+      kind: 'route-action',
+      adapterId: 'prodivix.code-export',
+      effect: 'mutation',
+      auth: { kind: 'permission', permissionId: 'workspace.write' },
+      idempotency: { kind: 'invocation-key' },
+    });
+    expect(content.source).toContain(
+      'import "../project/source-mutation-target.ts";'
+    );
+    expect(content.source).toContain(
+      'artifactId: "code-source-mutation-target"'
+    );
+    expect(content.source).not.toMatch(/token|cookie|secret|sessionId/u);
+    expect(
+      projectWorkspaceServerRuntimeAuthoring(applied.snapshot).issues
+    ).toEqual([]);
+  });
+
+  it('rejects a source mutation preset without two distinct artifact identities', () => {
+    expect(
+      createWorkspaceSourceMutationTransactionPlan({
+        workspace: createWorkspace({ includeCode: false }),
+        routeNodeId: 'route-home',
+        actionDocumentId: 'same-artifact',
+        actionPath: '/server/source-mutation.action.server.ts',
+        targetDocumentId: 'same-artifact',
+        targetPath: '/server/source-mutation-target.ts',
+        transactionId: 'invalid-source-mutation',
+        issuedAt: '2026-07-19T08:00:01.000Z',
+      })
+    ).toMatchObject({
+      status: 'rejected',
+      code: 'WKS_SERVER_RUNTIME_PRESET_INVALID',
+    });
   });
 });

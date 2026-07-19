@@ -13,6 +13,12 @@ var ErrDataSourceValidationFailed = errors.New("Data source validation failed")
 
 const dataSourceWireVersion = 1
 
+const (
+	maxDataImportProvenanceEntries = 4
+	maxDataImportMappings          = 512
+	maxDataExternalIdentityLength  = 1024
+)
+
 var dataRuntimeZones = map[string]struct{}{
 	"client": {},
 	"worker": {},
@@ -31,7 +37,7 @@ func validateDataSourceDocument(payload json.RawMessage, documentID string) erro
 		payload,
 		"/",
 		[]string{"wireVersion", "source", "schemasById", "operationsById"},
-		nil,
+		[]string{"importProvenanceById"},
 	)
 	if err != nil {
 		return err
@@ -73,7 +79,126 @@ func validateDataSourceDocument(payload json.RawMessage, documentID string) erro
 			return err
 		}
 	}
+	if provenance, exists := fields["importProvenanceById"]; exists {
+		if err := validateDataImportProvenance(provenance, schemasByID, operationsByID); err != nil {
+			return err
+		}
+	}
 	return validateDataOperationRelations(documentID, operationsByID)
+}
+
+func validateDataImportProvenance(payload json.RawMessage, schemasByID map[string]json.RawMessage, operationsByID map[string]json.RawMessage) error {
+	importsByID, err := decodeDataObjectMap(payload, "/importProvenanceById")
+	if err != nil {
+		return err
+	}
+	if len(importsByID) > maxDataImportProvenanceEntries {
+		return dataSourceValidationError("/importProvenanceById exceeds the import provenance budget")
+	}
+	for _, importID := range sortedDataKeys(importsByID) {
+		if err := validateDataMapKey(importID, "/importProvenanceById"); err != nil {
+			return err
+		}
+		path := "/importProvenanceById/" + escapeDataPointer(importID)
+		fields, err := decodeDataObject(
+			importsByID[importID],
+			path,
+			[]string{"id", "kind", "externalDocumentId", "sourceDigest", "sourceImportedDigest", "schemasByExternalId", "operationsByExternalId"},
+			nil,
+		)
+		if err != nil {
+			return err
+		}
+		id, err := decodeDataCanonicalString(fields["id"], path+"/id")
+		if err != nil {
+			return err
+		}
+		if id != importID {
+			return dataSourceValidationError("%s/id must match its importProvenanceById key", path)
+		}
+		kind, err := decodeDataCanonicalString(fields["kind"], path+"/kind")
+		if err != nil {
+			return err
+		}
+		if kind != "openapi-3.1" && kind != "graphql-sdl" && kind != "asyncapi-3.0" {
+			return dataSourceValidationError("%s/kind is unsupported", path)
+		}
+		externalDocumentID, err := decodeDataCanonicalString(fields["externalDocumentId"], path+"/externalDocumentId")
+		if err != nil {
+			return err
+		}
+		if len(externalDocumentID) > maxDataExternalIdentityLength {
+			return dataSourceValidationError("%s/externalDocumentId exceeds the identity budget", path)
+		}
+		if _, err := decodeDataImportDigest(fields["sourceDigest"], path+"/sourceDigest"); err != nil {
+			return err
+		}
+		if _, err := decodeDataImportDigest(fields["sourceImportedDigest"], path+"/sourceImportedDigest"); err != nil {
+			return err
+		}
+		if err := validateDataImportMappings(fields["schemasByExternalId"], path+"/schemasByExternalId", schemasByID); err != nil {
+			return err
+		}
+		if err := validateDataImportMappings(fields["operationsByExternalId"], path+"/operationsByExternalId", operationsByID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateDataImportMappings(payload json.RawMessage, path string, targets map[string]json.RawMessage) error {
+	mappings, err := decodeDataObjectMap(payload, path)
+	if err != nil {
+		return err
+	}
+	if len(mappings) > maxDataImportMappings {
+		return dataSourceValidationError("%s exceeds the import mapping budget", path)
+	}
+	usedTargets := make(map[string]struct{}, len(mappings))
+	for _, externalID := range sortedDataKeys(mappings) {
+		if err := validateDataMapKey(externalID, path); err != nil {
+			return err
+		}
+		if len(externalID) > maxDataExternalIdentityLength {
+			return dataSourceValidationError("%s/%s exceeds the external identity budget", path, escapeDataPointer(externalID))
+		}
+		mappingPath := path + "/" + escapeDataPointer(externalID)
+		fields, err := decodeDataObject(mappings[externalID], mappingPath, []string{"targetId", "importedDigest"}, nil)
+		if err != nil {
+			return err
+		}
+		targetID, err := decodeDataCanonicalString(fields["targetId"], mappingPath+"/targetId")
+		if err != nil {
+			return err
+		}
+		if _, exists := targets[targetID]; !exists {
+			return dataSourceValidationError("%s/targetId references unknown canonical target %q", mappingPath, targetID)
+		}
+		if _, duplicate := usedTargets[targetID]; duplicate {
+			return dataSourceValidationError("%s/targetId maps canonical target %q more than once", mappingPath, targetID)
+		}
+		usedTargets[targetID] = struct{}{}
+		if _, err := decodeDataImportDigest(fields["importedDigest"], mappingPath+"/importedDigest"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func decodeDataImportDigest(payload json.RawMessage, path string) (string, error) {
+	digest, err := decodeDataCanonicalString(payload, path)
+	if err != nil {
+		return "", err
+	}
+	if len(digest) != len("sha256-")+64 || !strings.HasPrefix(digest, "sha256-") {
+		return "", dataSourceValidationError("%s must be a lowercase SHA-256 content digest", path)
+	}
+	for _, character := range digest[len("sha256-"):] {
+		if (character < '0' || character > '9') && (character < 'a' || character > 'f') {
+			return "", dataSourceValidationError("%s must be a lowercase SHA-256 content digest", path)
+		}
+	}
+	return digest, nil
 }
 
 func validateDataOperationRelations(documentID string, operationsByID map[string]json.RawMessage) error {
@@ -91,7 +216,7 @@ func validateDataOperationRelations(documentID string, operationsByID map[string
 		if err != nil {
 			return err
 		}
-		policies, err := decodeDataObject(operationFields["policies"], operationPath+"/policies", nil, []string{"cache", "retry", "pagination", "optimistic"})
+		policies, err := decodeDataObject(operationFields["policies"], operationPath+"/policies", nil, []string{"cache", "retry", "idempotency", "pagination", "optimistic"})
 		if err != nil {
 			return err
 		}
@@ -274,8 +399,8 @@ func validateDataOperation(operationID string, payload json.RawMessage, schemasB
 	if err != nil {
 		return err
 	}
-	if kind != "query" && kind != "mutation" {
-		return dataSourceValidationError("%s/kind must be query or mutation", path)
+	if kind != "query" && kind != "mutation" && kind != "subscription" {
+		return dataSourceValidationError("%s/kind must be query, mutation, or subscription", path)
 	}
 	inputSchemaID, err := decodeDataOptionalCanonicalString(fields, "inputSchemaId", path+"/inputSchemaId")
 	if err != nil {
@@ -296,7 +421,7 @@ func validateDataOperation(operationID string, payload json.RawMessage, schemasB
 	if err := validateDataConfigurationMap(fields["configurationByKey"], path+"/configurationByKey", context); err != nil {
 		return err
 	}
-	policies, err := decodeDataObject(fields["policies"], path+"/policies", nil, []string{"cache", "retry", "pagination", "optimistic"})
+	policies, err := decodeDataObject(fields["policies"], path+"/policies", nil, []string{"cache", "retry", "idempotency", "pagination", "optimistic"})
 	if err != nil {
 		return err
 	}

@@ -355,4 +355,59 @@ describe('workspace issue providers', () => {
       ],
     });
   });
+
+  it('projects invalid canonical Data operations to exact Issues targets', () => {
+    const workspace = createWorkspace();
+    const candidate: WorkspaceSnapshot = {
+      ...workspace,
+      docsById: {
+        ...workspace.docsById,
+        'data-catalog': {
+          id: 'data-catalog',
+          type: 'data-source',
+          path: '/data/catalog.data.json',
+          contentRev: 1,
+          metaRev: 1,
+          content: {
+            source: {
+              id: 'catalog',
+              adapterId: 'core.http',
+              runtimeZone: 'server',
+              bindingsById: {},
+              configurationByKey: {},
+            },
+            schemasById: {},
+            operationsById: {
+              broken: {
+                id: 'broken',
+                kind: 'query',
+                outputSchemaId: 'missing-schema',
+                configurationByKey: {},
+                policies: {},
+              },
+            },
+          },
+        },
+      },
+    };
+    const provider = collectWorkspaceModelIssueSnapshots({
+      workspace: candidate,
+      revision: { key: '2:1:4', sequence: 1 },
+      collectedAt: 14,
+    }).find(({ providerId }) => providerId === 'workspace-data-contract');
+
+    expect(provider).toMatchObject({
+      diagnostics: expect.arrayContaining([
+        expect.objectContaining({
+          code: 'DAT-1001',
+          domain: 'data',
+          targetRef: {
+            kind: 'data-operation',
+            documentId: 'data-catalog',
+            operationId: 'broken',
+          },
+        }),
+      ]),
+    });
+  });
 });

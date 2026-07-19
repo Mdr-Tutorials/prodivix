@@ -25,6 +25,7 @@ const request: ExecutionDataGatewayBridgeRequest = Object.freeze({
   requestId: 'invocation-1:1',
   documentId: 'data-products',
   operationId: 'list-products',
+  adapterId: 'core.http',
   invocationId: 'invocation-1',
   sequence: 2,
   attempt: 1,

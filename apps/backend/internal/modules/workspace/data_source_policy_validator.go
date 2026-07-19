@@ -11,11 +11,15 @@ const (
 )
 
 func validateDataOperationPolicies(kind string, policies map[string]json.RawMessage, path string) error {
-	if kind == "query" {
+	switch kind {
+	case "query":
 		if _, exists := policies["optimistic"]; exists {
 			return dataSourceValidationError("%s/optimistic is available only to mutations", path)
 		}
-	} else {
+		if _, exists := policies["idempotency"]; exists {
+			return dataSourceValidationError("%s/idempotency is available only to mutations", path)
+		}
+	case "mutation":
 		if _, exists := policies["cache"]; exists {
 			return dataSourceValidationError("%s/cache is available only to queries", path)
 		}
@@ -31,9 +35,13 @@ func validateDataOperationPolicies(kind string, policies map[string]json.RawMess
 			if err != nil {
 				return err
 			}
-			if maxAttempts > 1 {
+			if _, idempotent := policies["idempotency"]; maxAttempts > 1 && !idempotent {
 				return dataSourceValidationError("%s/retry requires an explicit mutation idempotency contract", path)
 			}
+		}
+	case "subscription":
+		if len(policies) != 0 {
+			return dataSourceValidationError("%s subscription cannot declare finite invocation policies", path)
 		}
 	}
 	if cache, exists := policies["cache"]; exists {
@@ -46,6 +54,11 @@ func validateDataOperationPolicies(kind string, policies map[string]json.RawMess
 			return err
 		}
 	}
+	if idempotency, exists := policies["idempotency"]; exists {
+		if err := validateDataIdempotencyPolicy(idempotency, path+"/idempotency"); err != nil {
+			return err
+		}
+	}
 	if pagination, exists := policies["pagination"]; exists {
 		if err := validateDataPaginationPolicy(pagination, path+"/pagination"); err != nil {
 			return err
@@ -55,6 +68,21 @@ func validateDataOperationPolicies(kind string, policies map[string]json.RawMess
 		if err := validateDataOptimisticPolicy(optimistic, path+"/optimistic"); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func validateDataIdempotencyPolicy(payload json.RawMessage, path string) error {
+	fields, err := decodeDataObject(payload, path, []string{"kind"}, nil)
+	if err != nil {
+		return err
+	}
+	kind, err := decodeDataCanonicalString(fields["kind"], path+"/kind")
+	if err != nil {
+		return err
+	}
+	if kind != "invocation-key" {
+		return dataSourceValidationError("%s/kind must equal invocation-key", path)
 	}
 	return nil
 }

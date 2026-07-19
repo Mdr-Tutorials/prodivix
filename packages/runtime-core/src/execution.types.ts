@@ -50,6 +50,7 @@ export const EXECUTION_PROVIDER_CAPABILITIES = Object.freeze([
   'hmr',
   'console',
   'network',
+  'data-stream',
   'environment-binding',
   'server-function',
   'terminal',

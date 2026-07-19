@@ -2,6 +2,7 @@ import {
   EXECUTION_PARENT_GATEWAY_DATA_RUNTIME_TARGET,
   EXECUTION_PARENT_GATEWAY_SERVER_RUNTIME_TARGET,
   generateWorkspaceReactViteExecutableProject,
+  generateWorkspaceVueViteExecutableProject,
   type CompileDiagnostic,
 } from '@prodivix/prodivix-compiler';
 import type { BinaryAssetMaterialization } from '@prodivix/assets';
@@ -25,13 +26,20 @@ export type BlueprintProjectRunPlan =
       diagnostics: readonly CompileDiagnostic[];
     }>;
 
+export type BlueprintProjectRunTarget = 'react-vite' | 'vue-vite';
+
 /** Compiles one canonical Workspace revision into a standalone runner input. */
 export const createBlueprintProjectRunPlan = (
   workspace: WorkspaceSnapshot,
   provider: 'browser' | 'remote' = 'browser',
-  assetMaterializations: readonly BinaryAssetMaterialization[] = []
+  assetMaterializations: readonly BinaryAssetMaterialization[] = [],
+  target: BlueprintProjectRunTarget = 'react-vite'
 ): BlueprintProjectRunPlan => {
-  const project = generateWorkspaceReactViteExecutableProject(
+  const generateExecutableProject =
+    target === 'vue-vite'
+      ? generateWorkspaceVueViteExecutableProject
+      : generateWorkspaceReactViteExecutableProject;
+  const project = generateExecutableProject(
     workspace,
     provider === 'remote'
       ? {

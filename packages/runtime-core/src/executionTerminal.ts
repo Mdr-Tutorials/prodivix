@@ -24,6 +24,9 @@ export const EXECUTION_TERMINAL_CLOSE_REASONS = Object.freeze([
   'transport-lost',
 ] as const);
 export const EXECUTION_TERMINAL_TRUNCATION_MARKER = '[TRUNCATED]' as const;
+export const EXECUTION_TERMINAL_CHECKPOINT_FORMAT =
+  'prodivix.execution-terminal-checkpoint' as const;
+export const EXECUTION_TERMINAL_CHECKPOINT_VERSION = 1 as const;
 
 export const EXECUTION_TERMINAL_LIMITS = Object.freeze({
   minimumColumns: 2,
@@ -209,6 +212,7 @@ export type CreateExecutionTerminalControllerInput = Readonly<{
   requestResize: ExecutionTerminalResizeHandler;
   requestSignal: ExecutionTerminalSignalHandler;
   requestClose: ExecutionTerminalCloseHandler;
+  checkpoint?: ExecutionTerminalCheckpoint;
   secretLeakGuard?: ExecutionSecretLeakGuard;
   maximumOutputRecords?: number;
   maximumRetainedOutputBytes?: number;
@@ -219,6 +223,7 @@ export type CreateExecutionTerminalControllerInput = Readonly<{
 
 export type ExecutionTerminalController = Readonly<{
   session: ExecutionTerminalSession;
+  createCheckpoint(): ExecutionTerminalCheckpoint;
   renewGrant(grant: ExecutionTerminalGrant): ExecutionTerminalSnapshot;
   emitOutput(
     output: Readonly<{
@@ -266,6 +271,25 @@ export type ExecutionTerminalAvailability =
 export type InputFingerprint = Readonly<{
   clientSequence: number;
   digest: string;
+}>;
+
+/**
+ * Bounded, transport-safe state required to continue one Terminal session
+ * after its owning coordinator process disappears. Adapters must encrypt this
+ * value before durable storage because the fingerprint salt is sensitive.
+ */
+export type ExecutionTerminalCheckpoint = Readonly<{
+  format: typeof EXECUTION_TERMINAL_CHECKPOINT_FORMAT;
+  version: typeof EXECUTION_TERMINAL_CHECKPOINT_VERSION;
+  limits: Readonly<{
+    maximumOutputRecords: number;
+    maximumRetainedOutputBytes: number;
+    maximumInputFingerprints: number;
+  }>;
+  snapshot: ExecutionTerminalSnapshot;
+  retainedOutputs: readonly ExecutionTerminalOutputRecord[];
+  inputFingerprints: readonly InputFingerprint[];
+  fingerprintSalt: string;
 }>;
 
 export const terminalCapabilities = new Set<ExecutionTerminalCapability>(

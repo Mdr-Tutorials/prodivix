@@ -18,9 +18,11 @@ func TestRecordExecutionPersistsExactEnvironmentAuthority(t *testing.T) {
 	}
 	defer database.Close()
 	store := NewStore(database)
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO remote_execution_grants")).WithArgs("execution-1", "workspace-1", "principal-1", "session-1", "snapshot-1", []byte(`{"document:data-1:content":"3","workspace":"7"}`), "environment-1", "revision-7", "live").WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO remote_execution_grants")).WithArgs("execution-1", "workspace-1", "principal-1", "session-1", []byte(`["workspace.owner","workspace.read","workspace.write"]`), "prodivix.remote.preview", "preview", "client", "snapshot-1", []byte(`{"document:data-1:content":"3","workspace":"7"}`), "environment-1", "revision-7", "live").WillReturnResult(sqlmock.NewResult(1, 1))
 	err = store.RecordExecution(t.Context(), ExecutionAuthority{
-		ExecutionID: "execution-1", WorkspaceID: "workspace-1", OwnerID: "principal-1", SessionID: "session-1",
+		ExecutionID: "execution-1", WorkspaceID: "workspace-1", PrincipalID: "principal-1", SessionID: "session-1",
+		Permissions: cloneExecutionPermissions(workspaceOwnerExecutionPermissions),
+		ProviderID:  "prodivix.remote.preview", Profile: "preview", RuntimeZone: "client",
 		SnapshotID: "snapshot-1", PartitionRevisions: map[string]string{"workspace": "7", "document:data-1:content": "3"},
 		Environment: &EnvironmentReference{EnvironmentID: "environment-1", Revision: "revision-7", Mode: "live"},
 	})
@@ -40,13 +42,17 @@ func TestRecordExecutionAlwaysBindsProductSessionWithoutEnvironment(t *testing.T
 	defer database.Close()
 	store := NewStore(database)
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO remote_execution_grants")).
-		WithArgs("execution-auth", "workspace-1", "principal-1", "session-auth", "snapshot-1", []byte(`{"workspace":"7"}`), nil, nil, nil).
+		WithArgs("execution-auth", "workspace-1", "principal-1", "session-auth", []byte(`["workspace.owner","workspace.read","workspace.write"]`), "prodivix.remote.server-function", "production", "server", "snapshot-1", []byte(`{"workspace":"7"}`), nil, nil, nil).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	err = store.RecordExecution(t.Context(), ExecutionAuthority{
 		ExecutionID:        "execution-auth",
 		WorkspaceID:        "workspace-1",
-		OwnerID:            "principal-1",
+		PrincipalID:        "principal-1",
 		SessionID:          "session-auth",
+		Permissions:        cloneExecutionPermissions(workspaceOwnerExecutionPermissions),
+		ProviderID:         "prodivix.remote.server-function",
+		Profile:            "production",
+		RuntimeZone:        "server",
 		SnapshotID:         "snapshot-1",
 		PartitionRevisions: map[string]string{"workspace": "7"},
 	})
@@ -56,11 +62,28 @@ func TestRecordExecutionAlwaysBindsProductSessionWithoutEnvironment(t *testing.T
 	if err := store.RecordExecution(t.Context(), ExecutionAuthority{
 		ExecutionID:        "execution-without-session",
 		WorkspaceID:        "workspace-1",
-		OwnerID:            "principal-1",
+		PrincipalID:        "principal-1",
+		Permissions:        cloneExecutionPermissions(workspaceOwnerExecutionPermissions),
+		ProviderID:         "prodivix.remote.server-function",
+		Profile:            "production",
+		RuntimeZone:        "server",
 		SnapshotID:         "snapshot-1",
 		PartitionRevisions: map[string]string{"workspace": "7"},
 	}); !errors.Is(err, ErrExecutionAuthorityConflict) {
 		t.Fatalf("expected empty session authority conflict, got %v", err)
+	}
+	if err := store.RecordExecution(t.Context(), ExecutionAuthority{
+		ExecutionID:        "execution-without-permissions",
+		WorkspaceID:        "workspace-1",
+		PrincipalID:        "principal-1",
+		SessionID:          "session-auth",
+		ProviderID:         "prodivix.remote.server-function",
+		Profile:            "production",
+		RuntimeZone:        "server",
+		SnapshotID:         "snapshot-1",
+		PartitionRevisions: map[string]string{"workspace": "7"},
+	}); !errors.Is(err, ErrExecutionAuthorityConflict) {
+		t.Fatalf("expected missing permissions authority conflict, got %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
@@ -311,9 +334,11 @@ func TestRecordExecutionRejectsIdempotencyAuthorityDriftWithoutMutation(t *testi
 	}
 	defer database.Close()
 	store := NewStore(database)
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO remote_execution_grants")).WithArgs("execution-1", "workspace-1", "principal-1", "session-2", "snapshot-2", []byte(`{"workspace":"8"}`), "environment-1", "revision-8", "live").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO remote_execution_grants")).WithArgs("execution-1", "workspace-1", "principal-1", "session-2", []byte(`["workspace.owner","workspace.read","workspace.write"]`), "prodivix.remote.preview", "preview", "client", "snapshot-2", []byte(`{"workspace":"8"}`), "environment-1", "revision-8", "live").WillReturnResult(sqlmock.NewResult(0, 0))
 	err = store.RecordExecution(t.Context(), ExecutionAuthority{
-		ExecutionID: "execution-1", WorkspaceID: "workspace-1", OwnerID: "principal-1", SessionID: "session-2",
+		ExecutionID: "execution-1", WorkspaceID: "workspace-1", PrincipalID: "principal-1", SessionID: "session-2",
+		Permissions: cloneExecutionPermissions(workspaceOwnerExecutionPermissions),
+		ProviderID:  "prodivix.remote.preview", Profile: "preview", RuntimeZone: "client",
 		SnapshotID: "snapshot-2", PartitionRevisions: map[string]string{"workspace": "8"},
 		Environment: &EnvironmentReference{EnvironmentID: "environment-1", Revision: "revision-8", Mode: "live"},
 	})
@@ -325,20 +350,20 @@ func TestRecordExecutionRejectsIdempotencyAuthorityDriftWithoutMutation(t *testi
 	}
 }
 
-func TestVerifyExecutionOwnerPartitionsEnvironmentExecutionBySession(t *testing.T) {
+func TestVerifyExecutionPrincipalSessionPartitionsEnvironmentExecution(t *testing.T) {
 	database, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer database.Close()
 	store := NewStore(database)
-	query := regexp.QuoteMeta("SELECT 1 FROM remote_execution_grants WHERE execution_id = $1 AND owner_id = $2 AND (session_id IS NULL OR session_id = $3)")
+	query := regexp.QuoteMeta("SELECT 1 FROM remote_execution_grants WHERE execution_id = $1 AND principal_id = $2 AND (session_id IS NULL OR session_id = $3)")
 	mock.ExpectQuery(query).WithArgs("execution-1", "principal-1", "session-1").WillReturnRows(sqlmock.NewRows([]string{"marker"}).AddRow(1))
-	if err := store.VerifyExecutionOwner(t.Context(), "principal-1", "session-1", "execution-1"); err != nil {
+	if err := store.VerifyExecutionPrincipalSession(t.Context(), "principal-1", "session-1", "execution-1"); err != nil {
 		t.Fatalf("verify exact session: %v", err)
 	}
 	mock.ExpectQuery(query).WithArgs("execution-1", "principal-1", "session-2").WillReturnError(sql.ErrNoRows)
-	if err := store.VerifyExecutionOwner(t.Context(), "principal-1", "session-2", "execution-1"); !errors.Is(err, ErrExecutionNotFound) {
+	if err := store.VerifyExecutionPrincipalSession(t.Context(), "principal-1", "session-2", "execution-1"); !errors.Is(err, ErrExecutionNotFound) {
 		t.Fatalf("expected cross-session denial, got %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -353,13 +378,13 @@ func TestGetExecutionAuthorityAndDataDocumentRequireExactSnapshotPartitions(t *t
 	}
 	defer database.Close()
 	store := NewStore(database)
-	authorityQuery := regexp.QuoteMeta("SELECT execution_id, workspace_id, owner_id, session_id, snapshot_id, partition_revisions_json, environment_id, environment_revision, environment_mode")
+	authorityQuery := regexp.QuoteMeta("SELECT execution_id, workspace_id, principal_id, session_id, permissions_json, provider_id, profile, runtime_zone, snapshot_id, partition_revisions_json, environment_id, environment_revision, environment_mode")
 	mock.ExpectQuery(authorityQuery).
 		WithArgs("execution-1", "principal-1", "session-1").
-		WillReturnRows(sqlmock.NewRows([]string{"execution_id", "workspace_id", "owner_id", "session_id", "snapshot_id", "partition_revisions_json", "environment_id", "environment_revision", "environment_mode"}).
-			AddRow("execution-1", "workspace-1", "principal-1", "session-1", "snapshot-1", []byte(`{"workspace":"7","document:data-1:content":"3","document:code-auth:content":"9"}`), "environment-1", "revision-7", "live"))
+		WillReturnRows(sqlmock.NewRows([]string{"execution_id", "workspace_id", "principal_id", "session_id", "permissions_json", "provider_id", "profile", "runtime_zone", "snapshot_id", "partition_revisions_json", "environment_id", "environment_revision", "environment_mode"}).
+			AddRow("execution-1", "workspace-1", "principal-1", "session-1", []byte(`["workspace.owner","workspace.read","workspace.write"]`), "prodivix.remote.preview", "preview", "client", "snapshot-1", []byte(`{"workspace":"7","document:data-1:content":"3","document:code-auth:content":"9"}`), "environment-1", "revision-7", "live"))
 	authority, err := store.GetExecutionAuthority(t.Context(), "principal-1", "session-1", "execution-1")
-	if err != nil || authority.SnapshotID != "snapshot-1" || authority.PartitionRevisions["document:data-1:content"] != "3" || authority.Environment == nil || authority.Environment.Revision != "revision-7" {
+	if err != nil || authority.ProviderID != "prodivix.remote.preview" || authority.Profile != "preview" || authority.RuntimeZone != "client" || authority.SnapshotID != "snapshot-1" || len(authority.Permissions) != 3 || authority.Permissions[1] != workspaceReadPermissionID || authority.PartitionRevisions["document:data-1:content"] != "3" || authority.Environment == nil || authority.Environment.Revision != "revision-7" {
 		t.Fatalf("load exact authority: authority=%#v err=%v", authority, err)
 	}
 	documentQuery := regexp.QuoteMeta("SELECT content_json\nFROM workspace_documents\nWHERE workspace_id = $1 AND id = $2 AND doc_type = 'data-source' AND content_rev::text = $3")

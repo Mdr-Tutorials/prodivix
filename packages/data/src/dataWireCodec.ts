@@ -42,9 +42,10 @@ export const decodeDataSourceDocument = (
     'schemasById',
     'operationsById',
   ]);
+  const optionalKeys = new Set(['importProvenanceById']);
   const issues: DataDocumentIssue[] = [];
   for (const key of Object.keys(input)) {
-    if (!expectedKeys.has(key)) {
+    if (!expectedKeys.has(key) && !optionalKeys.has(key)) {
       issues.push(issue(`/${key}`, `Unknown wire field "${key}".`));
     }
   }
@@ -67,6 +68,9 @@ export const decodeDataSourceDocument = (
       source: input.source,
       schemasById: input.schemasById,
       operationsById: input.operationsById,
+      ...(input.importProvenanceById === undefined
+        ? {}
+        : { importProvenanceById: input.importProvenanceById }),
     },
     options
   );
@@ -89,6 +93,9 @@ export const encodeDataSourceDocument = (
     source: normalized.value.source,
     schemasById: normalized.value.schemasById,
     operationsById: normalized.value.operationsById,
+    ...(normalized.value.importProvenanceById === undefined
+      ? {}
+      : { importProvenanceById: normalized.value.importProvenanceById }),
   });
 };
 

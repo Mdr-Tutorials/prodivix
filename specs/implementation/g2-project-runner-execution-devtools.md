@@ -3,7 +3,7 @@
 ## 状态
 
 - DecisionStatus：Accepted
-- ImplementationStatus：Browser/Remote Runner + Network/Test/Structured Console + Remote PTY + Runtime FS Proposal + Manual Recovery Implemented / Full Recovery UX In Progress
+- ImplementationStatus：Browser/Remote Runner + Network/Test/Structured Console + Remote PTY + Runtime FS Proposal + Unified SourceTrace Navigation + Manual Recovery Implemented / Full Recovery UX In Progress
 - ProductGateStatus：G2 In Progress
 - Global Phase：G2 Executable Full-stack Workspace
 - 日期：2026-07-17
@@ -43,6 +43,11 @@ capability、真实 network、server/edge Secret、完整 bundler 或独立 proc
 - runtime host 已按 owner 管理 filesystem、install、process 与 dispose。
 - Structured Console 已将 state/log/diagnostic/artifact/trace/application observation 投影为共享、
   有界且带 execution correlation 的产品记录；Test report 与 Issues 继续消费共享 contract。
+- Console（含 artifact）、Workspace Test file/case 与 Runtime Files change 已统一保留 producing
+  Job/provider/snapshot identity，并通过同一 exact-snapshot SourceTrace opener 返回 CodeArtifact、Data operation、
+  NodeGraph/Animation 或其他 canonical semantic target。只有单一 owner 可跳转；root/helper 多义、跨
+  CodeArtifact span、stale snapshot 与不存在的作者态目标均 fail closed。Blueprint、NodeGraph、Animation
+  和 Test 产品面复用同一 composition，不再各自解释 trace。
 - Compiler 已直接产出 provider-neutral Executable Project Snapshot，Browser Project Runner 只消费。
 - Blueprint Run Mode 已显式选择 Browser/Remote Preview；Remote artifact 经短期 capability origin
   materialize，Browser/Remote Test 与 Remote Build 使用同一 neutral snapshot contract。
@@ -51,9 +56,11 @@ capability、真实 network、server/edge Secret、完整 bundler 或独立 proc
   Secret/credential redaction 与 bounded copy；Execution Center 从 active Job capability 与 permission 投影
   `unavailable / unsupported / permission-required / denied / available`。Remote Preview 已通过独立短期 token、
   polling transport 与 rootless inner PTY 接入，Browser provider 继续显式 unsupported，不伪造 fallback。
-- Backend 只用 product session 验证 execution owner；Control Plane service credential 仅用于 open/resume，
-  Web 收到的短期 Terminal token 通过独立 header 转发且不进入 React state。Control Plane 只保存 token digest，
-  worker stdin 只在有界、未确认 command mailbox 中短暂存在，ack 后立即删除。
+- Backend 只用 product session 验证 execution initiating principal/session grant；Control Plane service credential 仅用于 open/resume，
+  Web 收到的短期 Terminal token 通过独立 header 转发且不进入 React state。Control Plane 只保存 token/worker
+  lease digest；Core/redactor checkpoint 与有界未确认 stdin mailbox 经 AES-GCM seal 后进入 PostgreSQL，ack 后在
+  下一 revision 删除。生产 PRT2 每 revision 使用新 data key 并由 AWS KMS 包装；任意副本都必须重新校验 exact
+  lease 并通过 CAS 才能推进状态，retryable KMS outage 不改变 authority revision。
 - Worker 在 install network 断开并重新 inspect 后才连接 inner PTY；command cursor 只在本地 PTY effect 成功后
   ack，output id 可幂等重试，stdout/stderr 分流执行跨 chunk Secret redaction。execution/lease/session 终止会
   关闭 PTY、清空 mailbox、revoke token，cursor reconnect 不重放已确认输入。
@@ -69,23 +76,27 @@ capability、真实 network、server/edge Secret、完整 bundler 或独立 proc
   dry-apply 的可逆 Workspace Transaction，再进入 controlled round-trip Gate、Durable Outbox 和 Atomic Commit；
   runtime FS 从不直接覆盖 Workspace。
 
-### 未实现
+### 后续边界
 
-- Terminal/Files 尚缺完整 SourceTrace 导航与终端仿真器；Network 已建立 metadata-only strict current contract、
+- Terminal 已由 ADR 53 建立 DOM-free 有界 emulator、ANSI/alternate-screen/resize/scrollback、rendered copy、
+  可访问键盘/粘贴产品面与 exact unacknowledged-input retry queue；仍不把任意终端文本伪装成可定位 SourceTrace。
+  完整 ECMA-48、graphics、host clipboard 与 shell completion 是显式 non-goal。跨副本 resume continuity 已由 ADR 50
+  的 encrypted checkpoint/revision CAS Gate 关闭。Files 已建立 exact diff-owner SourceTrace 导航。Network 已建立 metadata-only strict current contract、
   Remote install proxy、Browser fetch、Data HTTP adapter、operation/invocation correlation 与基础产品视图，
   generated-project mock/public-live runtime、Browser/Remote runtime asset projection 与 Remote server/edge
   gateway 已接入。finite Remote Preview 后续 Data trace 通过 exact active-job Session observation 进入同一
   Execution Center，旧 generation/stop 后的响应被拒绝。
-- Browser/Remote provider 基础切换及 manual cancel/restart 已实现；重连、artifact expiry、quota 与
-  permission UX 未完成。
-- 当前 Remote Terminal broker 是 Control Plane 进程内、可丢弃短期态；第一纵切要求单副本或
-  terminal session 粘性路由。跨 Control Plane 副本共享 broker、故障接管与 resume continuity
-  属于完整 Remote recovery，尚未完成。
+- Browser/Remote provider 基础切换、manual cancel/restart、same-execution cursor reconnect、artifact expiry、
+  quota、worker-loss、authorization/permission/network denial UX 已实现；Terminal 已支持跨 Control Plane 副本，
+  PRT2 managed KMS、PRT1 migration 与 related MRK regional broker continuation 已完成本地 Gate；regional PostgreSQL/
+  Worker/traffic 已通过 exact checkpoint、shared drain/exclusive epoch、双 HTTP Plane、same-lease continuation、attempt+1
+  reclaim 与 Terminal generation replacement drill。首次真实云端 regional RPO/RTO、首次 live MRK 证据与更多 provider
+  recovery producer 仍未完成。
 - Remote 当前 durable 输出的 Secret canary Gate 已覆盖 log/diagnostic/trace/artifact/test-report/cache/crash；
   Structured Console 已增加 generated serializer、父窗口 strict decoder、runtime-core normalization 与 copy
   boundary 四层常见 credential 脱敏。Remote Terminal 已在 Worker 出站、Control Plane 入站和 copy projection
-  逐层执行已知 Secret/常见 credential 脱敏，并以跨任意 chunk 与 stdout/stderr 分流 canary 覆盖；Console/Issues/Data 的完整可导航
-  correlation 与 Golden CRUD 调试旅程未完成。
+  逐层执行已知 Secret/常见 credential 脱敏，并以跨任意 chunk 与 stdout/stderr 分流 canary 覆盖；Console/
+  Artifact/Test/Files/Data 已形成统一 exact-snapshot 导航，剩余 diagnostic producer 与 Golden CRUD 调试旅程未完成。
 
 ## 不变量
 
@@ -138,6 +149,11 @@ Remote Preview terminal 后的 exact-job Console observation，以及 event/obse
 React/Vite 生成工程只在 iframe embed 模式包装 application Console 与 window error；顶层 standalone
 运行不改变原 Console。Browser exact origin、Remote opaque capability origin 与 exact `message.source`
 共同构成接收 fence。父窗口不信任应用上报的 `redacted` 标记，copy 动作也只消费再次脱敏后的有界投影。
+
+Web 投影继续保留 Core record 的完整 correlation。Source 按钮只在 `sourceTrace.length === 1` 且
+CodeArtifact span identity 一致时出现；点击时把 record 的 exact Job/provider/snapshot 与 trace 一并交给共享
+Workspace opener。Console 的 artifact record 因此与普通 log/diagnostic/trace 使用同一规则，不增加 artifact
+私有导航 payload。
 
 ## Terminal contract
 
@@ -207,7 +223,8 @@ GraphQL 子请求作为相关 span 呈现，不覆盖成一条含糊记录。
 
 - [x] 定义 Console record/strict bridge/Session observation 与条数、字节、深度、节点预算。
 - [x] Browser/Remote process、runtime error 和 generated application Console adapter。
-- [ ] source map/source trace、Issues 和 Data correlation。
+- [x] Console/Artifact exact correlation、单一 SourceTrace 与 Workspace/Data/NodeGraph/Animation 作者态导航。
+- [ ] 其余 diagnostic producer 与 Issues 的完整双向 source map closure。
 - [x] all/error/application/system filter、bounded clear、copy-safe-payload 与 redaction/truncation UX。
 - [ ] pause 与不清除 Session history 的纯 view clear。
 
@@ -217,10 +234,19 @@ GraphQL 子请求作为相关 span 呈现，不覆盖成一条含糊记录。
 
 - [x] transport-neutral Terminal session/controller、lease fence、cursor replay、stdin 幂等、resize/signal/close 与双预算 contract。
 - [x] Remote PTY transport adapter、短期 token、disconnect/reconnect 与 execution cleanup。
+- [x] Core/redactor checkpoint、AES-GCM key ring、PostgreSQL opaque state/revision CAS、双副本 client/worker
+      continuation、lease renewal 与 worker-loss sweep。
+- [x] PRT2 per-revision data key、AWS KMS exact ARN/hashed context、PRT1 decrypt-only migration、retryable outage
+      revision preservation 与 related MRK regional broker continuation；GitHub live OIDC/MRK Gate 已配置。
 - [x] capability/permission/unsupported product state；Remote Preview 显式 available，Browser 显式 unsupported，不提供 fallback。
 - [x] execution FS diff artifact、revision-fenced whole-file CodeArtifact add/modify/delete VFS proposal 与显式原子采纳；不提供直接 Workspace 写入。
+- [x] DOM-free bounded emulator：跨 record ANSI、cursor/erase、SGR、alternate screen、scrollback/resize、gap 与
+      redaction/truncation hard boundary，以及 conceal-safe rendered copy。
+- [x] Execution Center keyboard/paste/accessibility 产品面、application cursor/bracketed-paste mode、256 chunks/32 KiB
+      local queue 与 reconnect 后 exact bytes/clientSequence retry；identity/cursor/byte drift fail closed。
 
-完成条件：disconnect/reconnect 不乱序；终止 execution 会关闭 terminal 和 revoke token。
+完成条件：disconnect/reconnect 不乱序且不重复不同输入；终止 execution 会关闭 terminal、清本地队列并 revoke token；
+产品面不渲染 raw ANSI/PTY payload。
 
 ### R4：Network
 
@@ -253,7 +279,7 @@ GraphQL 子请求作为相关 span 呈现，不覆盖成一条含糊记录。
 
 - [ ] CRUD 页面从 Collection 触发 query/mutation。
 - [ ] loading/empty/error/retry/pagination/optimistic 在 Preview 可观察。
-- [ ] Console、Network 与 Test report 使用同一 correlation/source trace。
+- [x] Console/Artifact、Network、Test report 与 Files 使用同一 correlation/source trace 和 exact-snapshot opener。
 - [x] Remote Terminal 执行真实 PTY 命令、resize 与 execution-local FS 写入；rootless Gate 验证无 host Workspace 回写并清理 orphan。
 - [ ] Browser/Remote 切换保持相同 revision 与 snapshot digest。
 
@@ -283,7 +309,7 @@ GraphQL 子请求作为相关 span 呈现，不覆盖成一条含糊记录。
 - [ ] 三种 mode 具有稳定、可测试的 capability 边界。
 - [x] Project Runner 可在 Browser/Remote 间切换且运行 exact revision。
 - [x] Console、Network 与 Test 使用 transport-neutral contract。
-- [x] Terminal 使用 transport-neutral contract；Remote PTY/token/reconnect/cleanup 已接入产品路径。
+- [x] Terminal 使用 transport-neutral contract；Remote PTY/token、跨副本 reconnect/cleanup 已接入产品路径。
 - [ ] 所有运行诊断都能回到稳定作者态目标或明确说明不可定位。
 - [x] Secret 不进入 runtime FS artifact；runtime FS 只有经用户显式确认的可逆 Transaction 才能进入作者态。
 - [ ] Golden CRUD 调试旅程通过。

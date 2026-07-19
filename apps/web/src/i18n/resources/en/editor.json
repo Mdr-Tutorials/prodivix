@@ -8,7 +8,8 @@
     "stop": "Stop execution",
     "reloadPreview": "Reload preview",
     "openPreview": "Open preview in a new tab",
-    "openSource": "Open Server Function source",
+    "openSource": "Open exact execution source",
+    "openDataInspector": "Open Data operation inspector",
     "clear": "Clear console",
     "copy": "Copy safe console output",
     "copyFailed": "Copy failed",
@@ -19,8 +20,8 @@
     "networkEmpty": "No sanitized network traces yet.",
     "serverEmpty": "No sanitized Server Function invocations yet.",
     "sourceNavigation": {
-      "snapshotStale": "The invocation belongs to an older Workspace snapshot. Run it again before opening source.",
-      "sourceUnavailable": "The exact Server Function source is unavailable in this Workspace."
+      "snapshotStale": "This result belongs to an older Workspace snapshot. Run it again before opening source.",
+      "sourceUnavailable": "The exact execution source is unavailable or ambiguous in this Workspace."
     },
     "eventCount": "{{count}} events",
     "surface": {
@@ -97,7 +98,12 @@
       "opening": "Opening the execution-scoped terminal…",
       "noOutput": "The terminal is connected. No output yet.",
       "outputGap": "Older terminal output is no longer retained.",
+      "protectedOutput": "Protected output: {{redacted}} redacted, {{truncated}} truncated.",
       "inputPlaceholder": "Enter a shell command",
+      "inputLabel": "Terminal keyboard input",
+      "keyboardHelp": "Type directly into the terminal. Enter, arrows, function keys, Control keys, and bounded paste are forwarded to the execution-scoped PTY. Control+C interrupts; Control+Shift+C remains available to the browser.",
+      "keyboardHint": "Click the terminal and type",
+      "pasteTooLarge": "Paste was rejected because it exceeds the bounded terminal input budget.",
       "send": "Send",
       "interrupt": "Interrupt",
       "close": "Close",
@@ -113,9 +119,10 @@
         "reconnect-rejected": "The execution rejected the terminal reconnect request.",
         "transport-disconnected": "The terminal transport disconnected; cursor-based reconnect is in progress.",
         "open-rejected": "The execution could not open a terminal session.",
-        "input-pending": "Retry the previous unacknowledged input before editing it.",
+        "input-pending": "The bounded terminal input queue is full; wait for acknowledgement before typing more.",
         "input-unacknowledged": "Terminal input was not acknowledged; reconnect before retrying the exact input.",
-        "resize-unacknowledged": "The terminal resize was not acknowledged; reconnect is in progress."
+        "resize-unacknowledged": "The terminal resize was not acknowledged; reconnect is in progress.",
+        "output-invalid": "Terminal output failed its identity, cursor, or byte-length contract and was not rendered."
       },
       "status": {
         "unavailable": "Unavailable",
@@ -134,6 +141,14 @@
     "recovery": {
       "waiting": "Waiting for the execution provider to confirm termination; no new request will be created yet.",
       "identityConflict": "Terminal execution identity drifted, so recovery was blocked. Preserve the logs and reopen the run surface.",
+      "quota": "Remote capacity is full. Wait for capacity, then start a new request; the previous request and its mutations are never replayed automatically.",
+      "workerExhausted": "The Job exhausted its bounded worker recovery attempts. Start a new request; the old Job and events remain preserved.",
+      "artifactUnavailable": "The durable artifact expired or is unavailable. Start a new request to generate a new artifact; the old execution is not replayed.",
+      "authorizationRequired": "Remote authorization expired or is missing. Sign in again, then resume the same execution from its confirmed cursor; no mutation is replayed.",
+      "permissionDenied": "Remote execution permission was denied. Ask an owner to update the required permission, then start a new request; the denied run remains preserved.",
+      "networkPolicyDenied": "The Remote network policy denied a required host or could not enforce runtime isolation. Review the sanitized Network entry and allowlist before starting a new request.",
+      "cancelled": "Cancellation is terminal. Start a new request explicitly if needed; the cancelled request and its events remain preserved.",
+      "timedOut": "The execution reached its terminal timeout. Review the timeout and logs, then start a new request; the timed-out request is not replayed.",
       "requiresChange": "The previous run ended with non-retryable error {{code}}. Change the configuration or code before starting a new request.",
       "newRequest": "Recovery creates a new request and preserves old events; mutations from the old run are never replayed automatically.",
       "compileBlocked": "Resolve the compile diagnostics before starting a new execution request.",
@@ -155,7 +170,18 @@
   },
   "testing": {
     "title": "Workspace tests",
-    "subtitle": "Run the current canonical revision as the same standalone React/Vite project that Prodivix exports.",
+    "subtitle": "Run the current canonical revision through the selected React/Vite or Vue/Vite product target.",
+    "target": {
+      "label": "Framework",
+      "react": "React/Vite",
+      "vue": "Vue/Vite"
+    },
+    "provider": {
+      "label": "Provider",
+      "browser": "Browser",
+      "remote": "Remote",
+      "remoteSignIn": "Sign in to run the same mock-only tests in the Remote sandbox."
+    },
     "actions": {
       "run": "Run tests",
       "rerun": "Run again",
@@ -332,7 +358,8 @@
     "filters": {
       "search": "Search code, message, target, or provider",
       "status": "Issue status",
-      "severity": "Issue severity"
+      "severity": "Issue severity",
+      "dataTarget": "Data target: {{target}}"
     },
     "status": {
       "open": "Open",
@@ -1338,6 +1365,7 @@
       "overview": "Overview",
       "components": "Components",
       "tokens": "Tokens",
+      "data": "Data & APIs",
       "auth": "Auth & Server",
       "public": "Public",
       "code": "Code files",
@@ -1361,6 +1389,9 @@
         "tokens": {
           "description": "DTCG token documents, themes, variants, and design-system resolution."
         },
+        "data": {
+          "description": "Canonical Data sources, OpenAPI import proposals, operation contracts, and runtime correlation."
+        },
         "i18n": {
           "description": "Matrix editor for locales and translation keys."
         },
@@ -1378,6 +1409,9 @@
         "scriptsStyles": "scripts/styles",
         "tokens": "tokens",
         "contexts": "contexts",
+        "sources": "sources",
+        "operations": "operations",
+        "invalid": "invalid",
         "locales": "locales",
         "namespaces": "namespaces",
         "missingValues": "missing values",
@@ -1498,6 +1532,146 @@
         "createFailed": "Could not create the token document."
       }
     },
+    "data": {
+      "header": {
+        "badge": "Data contract",
+        "title": "Data & APIs",
+        "description": "Inspect canonical Data sources and operations, preview bounded OpenAPI 3.1 imports, and navigate the same operation identity across Inspector, Issues, and Network."
+      },
+      "summary": {
+        "sources": "{{count}} sources",
+        "operations": "{{count}} operations",
+        "invalid": "{{count}} invalid"
+      },
+      "status": {
+        "ready": "Ready",
+        "invalid": "Invalid"
+      },
+      "documents": {
+        "title": "Data sources",
+        "empty": "No canonical Data source exists yet. Preview an OpenAPI document to create one."
+      },
+      "inspector": {
+        "badge": "Operation Inspector",
+        "empty": "Select a Data source to inspect its operation contract.",
+        "invalid": "This Data source is not canonical. Repair it through Issues before reimporting.",
+        "input": "Input schema",
+        "output": "Output schema",
+        "mappings": "Wire mappings",
+        "policies": "Policies",
+        "authorization": "Authorization is reference-only and resolves through: {{bindings}}.",
+        "provenance": "Import provenance",
+        "noOperation": "This Data source has no operation to inspect."
+      },
+      "actions": {
+        "openIssues": "Open in Issues",
+        "openNetwork": "Open correlated Network"
+      },
+      "import": {
+        "badge": "OpenAPI 3.1",
+        "title": "Import preview",
+        "description": "Paste JSON to compile a local proposal. The external identity URL is provenance only and is never fetched automatically.",
+        "referenceOnly": "credentials stay references",
+        "target": "Import target",
+        "newTarget": "New Data source",
+        "documentId": "Document id",
+        "documentPath": "Workspace path",
+        "runtimeZone": "Runtime zone",
+        "importId": "Import id",
+        "externalDocumentId": "External document identity",
+        "sourceId": "Source id",
+        "baseUrl": "Explicit base URL override",
+        "baseUrlPlaceholder": "Optional; otherwise use the first OpenAPI server",
+        "specification": "OpenAPI JSON",
+        "preview": "Generate preview",
+        "saving": "Adopting…",
+        "adopt": "Adopt reversible Workspace change",
+        "previewResults": "OpenAPI import preview results",
+        "status": {
+          "ready": "Ready to adopt",
+          "invalid": "Invalid",
+          "conflict": "Reimport conflict",
+          "impact-required": "Impact approval required"
+        },
+        "changeCount": "{{count}} changes",
+        "impactCount": "{{count}} impacted contracts",
+        "confirmImpact": "I reviewed the exact impact. Schemas: {{schemas}}. Operations: {{operations}}.",
+        "approveImpact": "Approve exact impact and rebuild",
+        "diff": "Managed import diff",
+        "invalidTarget": "The selected target cannot be reimported until its canonical validation issues are repaired.",
+        "feedback": {
+          "adopted": "The Workspace accepted the OpenAPI proposal.",
+          "noChange": "The proposal does not change canonical Workspace state.",
+          "proposal-not-ready": "The proposal is not ready for adoption.",
+          "proposal-target-mismatch": "The proposal target no longer matches the selected document.",
+          "target-type-mismatch": "Another document type owns the target identity.",
+          "revision-drift": "The Data source changed after preview. Generate a fresh preview.",
+          "workspace-conflict": "The target path or identity conflicts with current Workspace state."
+        }
+      },
+      "authoring": {
+        "badge": "Manual contract authoring",
+        "title": "Schema and policy editor",
+        "description": "Author JSON Schema 2020-12 and complete operation policy objects through a validated, reversible Workspace proposal.",
+        "canonical": "canonical proposal only",
+        "mode": {
+          "schema": "Schema",
+          "policy": "Operation policies"
+        },
+        "noTarget": "Select a canonical Data source before authoring its contract.",
+        "schemaTarget": "Schema target",
+        "newSchema": "New Schema",
+        "schemaId": "Schema id",
+        "operationTarget": "Operation target",
+        "schemaJson": "JSON Schema 2020-12",
+        "policyJson": "Complete policy object",
+        "preview": "Validate proposal",
+        "approveImpact": "Approve exact impact",
+        "saving": "Applying…",
+        "apply": "Apply reversible change",
+        "impact": "Schemas: {{schemas}}. Operations: {{operations}}.",
+        "status": {
+          "ready": "Ready to apply",
+          "no-change": "No canonical change",
+          "invalid": "Invalid",
+          "impact-required": "Impact approval required"
+        },
+        "feedback": {
+          "invalidJson": "The authoring draft is not valid JSON.",
+          "revisionDrift": "The Data source changed after preview. Validate a fresh proposal.",
+          "noChange": "The proposal does not change canonical Workspace state.",
+          "applied": "The Workspace accepted the manual Data authoring proposal."
+        }
+      },
+      "test": {
+        "badge": "Test Operation",
+        "title": "Deterministic operation test",
+        "description": "Run one schema-checked mock-only invocation. Fixture state and reports are disposable runtime data and never write the Workspace.",
+        "noTarget": "Select a canonical Data operation to test it.",
+        "input": "Operation input JSON",
+        "fixtureKind": "Mock fixture outcome",
+        "fixtureValue": "Mock result JSON",
+        "fixtureError": "Mock error code",
+        "fixtureDraft": "Mock fixture value or error code",
+        "fixtureEmpty": "Fixture result is empty",
+        "expectedKind": "Expected outcome",
+        "expectedValue": "Expected result JSON",
+        "expectedError": "Expected error code",
+        "expectedDraft": "Expected value or error code",
+        "expectedEmpty": "Expected result is empty",
+        "run": "Run mock-only test",
+        "running": "Running…",
+        "report": "Data operation test report",
+        "status": {
+          "passed": "Passed",
+          "failed": "Failed"
+        },
+        "feedback": {
+          "invalidJson": "Input, fixture, and expected result must contain valid JSON.",
+          "errorCodeRequired": "Error fixtures and expectations require a canonical error code."
+        }
+      }
+    },
     "auth": {
       "header": {
         "badge": "Server authority",
@@ -1512,7 +1686,8 @@
       "permissions": {
         "badge": "Permission catalog",
         "workspaceOwner": "Allows protected workspace-owner guards to request an exact runtime permission decision.",
-        "workspaceRead": "Allows Secret-free isolated read functions to require the bounded workspace.read runtime grant.",
+        "workspaceRead": "Allows isolated read functions to require the bounded workspace.read runtime grant. Secret use still requires a separately declared reference and one-shot environment lease.",
+        "workspaceWrite": "Allows an isolated invocation to propose one bounded whole-file project-source replacement for explicit review and adoption.",
         "referenceOnly": "A declaration is not a grant. The trusted runtime permission port still decides every invocation."
       },
       "bindings": {
@@ -1954,6 +2129,10 @@
         "createRemoteOwner": "Create Remote owner guard",
         "createIsolatedOwner": "Create isolated owner guard",
         "createIsolatedRead": "Create isolated read guard",
+        "createIsolatedReadSecret": "Create isolated read + Secret loader",
+        "secretBindingId": "Secret binding ID (reference only)",
+        "secretBindingPlaceholder": "production-webhook-signing-key",
+        "createIsolatedSourceMutation": "Create isolated source mutation action",
         "readonly": "This route is read-only or owned by a mounted Route module."
       },
       "track": {

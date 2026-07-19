@@ -45,6 +45,7 @@ export type WorkspaceDataRuntimeRequirements = Readonly<{
   requiresNetwork: boolean;
   requiresServerGateway: boolean;
   requiresEnvironmentBinding: boolean;
+  requiresDataStream: boolean;
 }>;
 
 export type WorkspaceDataRuntimeTargetAnalysis = Readonly<{
@@ -55,6 +56,20 @@ export type WorkspaceDataRuntimeTargetAnalysis = Readonly<{
 
 const compareText = (left: string, right: string): number =>
   left < right ? -1 : left > right ? 1 : 0;
+
+const STATIC_CLIENT_LIVE_DATA_ADAPTER_IDS = new Set([
+  'core.asyncapi',
+  'core.graphql',
+  'core.http',
+]);
+
+// Every server/edge protocol must pass the same execution-bound Backend
+// authority, Secret, replay, response-budget, and sanitized trace boundary.
+const EXECUTION_GATEWAY_LIVE_DATA_ADAPTER_IDS = new Set([
+  'core.asyncapi',
+  'core.graphql',
+  'core.http',
+]);
 
 const normalizeTarget = (
   value: WorkspaceDataRuntimeTarget | undefined
@@ -113,6 +128,7 @@ export const analyzeWorkspaceDataRuntimeTarget = (
   let dataDocumentCount = 0;
   let requiresServerGateway = false;
   let requiresEnvironmentBinding = false;
+  let requiresDataStream = false;
 
   Object.values(workspace.docsById)
     .filter((document) => document.type === 'data-source')
@@ -135,17 +151,71 @@ export const analyzeWorkspaceDataRuntimeTarget = (
       if (mockOnly) return;
       requiresEnvironmentBinding ||= configurationUsesEnvironment;
 
-      if (data.source.adapterId !== 'core.http') {
+      const supportedLiveAdapter =
+        zone === 'client'
+          ? STATIC_CLIENT_LIVE_DATA_ADAPTER_IDS.has(data.source.adapterId)
+          : (zone === 'server' || zone === 'edge') &&
+            EXECUTION_GATEWAY_LIVE_DATA_ADAPTER_IDS.has(data.source.adapterId);
+      if (!supportedLiveAdapter) {
         diagnostics.push({
           code: 'WKS-EXPORT-DATA-ADAPTER-UNSUPPORTED',
           severity: 'error',
           source: 'export',
-          message:
-            'The React/Vite standalone target does not support this Data adapter.',
+          message: `The standalone ${zone} target does not support live Data adapter ${data.source.adapterId}.`,
           path: document.path,
           suggestion:
-            'Use the core.http adapter or a target that declares this adapter runtime.',
+            zone === 'client'
+              ? 'Use a finite core.http, core.graphql, or core.asyncapi client adapter, or select mock execution.'
+              : 'Use the audited finite HTTP, GraphQL, or AsyncAPI execution gateway, or select mock execution.',
         });
+      }
+
+      const subscriptions = Object.values(data.operationsById).filter(
+        (operation) => operation.kind === 'subscription'
+      );
+      if (subscriptions.length) {
+        requiresDataStream = true;
+        if (
+          data.source.adapterId !== 'core.graphql' &&
+          data.source.adapterId !== 'core.asyncapi'
+        ) {
+          diagnostics.push({
+            code: 'WKS-EXPORT-DATA-STREAM-ADAPTER-UNSUPPORTED',
+            severity: 'error',
+            source: 'export',
+            message: `Data subscription requires the GraphQL or AsyncAPI stream gateway; ${data.source.adapterId} is finite-only.`,
+            path: document.path,
+          });
+        }
+        if (zone !== 'server' && zone !== 'edge') {
+          diagnostics.push({
+            code: 'WKS-EXPORT-DATA-STREAM-GATEWAY-REQUIRED',
+            severity: 'error',
+            source: 'export',
+            message:
+              'Data subscription currently requires an explicit server/edge execution gateway.',
+            path: document.path,
+            suggestion:
+              'Move the source to server or edge and run it through Remote Preview.',
+          });
+        }
+        const streamUsesAuthorization =
+          subscriptions.some(
+            (operation) =>
+              operation.configurationByKey.authorization !== undefined
+          ) || data.source.configurationByKey.authorization !== undefined;
+        if (streamUsesAuthorization) {
+          diagnostics.push({
+            code: 'WKS-EXPORT-DATA-STREAM-SECRET-UNAVAILABLE',
+            severity: 'error',
+            source: 'export',
+            message:
+              'Long-lived Data streams cannot retain callback-only Secret material.',
+            path: document.path,
+            suggestion:
+              'Use a public bounded stream or a future credential-renewal stream adapter.',
+          });
+        }
       }
 
       if (zone === 'server' || zone === 'edge') {
@@ -185,7 +255,7 @@ export const analyzeWorkspaceDataRuntimeTarget = (
         code: 'WKS-EXPORT-DATA-RUNTIME-ZONE-UNSUPPORTED',
         severity: 'error',
         source: 'export',
-        message: `Data runtime zone ${zone} is not supported by the React/Vite standalone runtime.`,
+        message: `Data runtime zone ${zone} is not supported by the standalone runtime.`,
         path: document.path,
         suggestion: 'Use client, server, or edge with a compatible target.',
       });
@@ -200,6 +270,7 @@ export const analyzeWorkspaceDataRuntimeTarget = (
       requiresNetwork: dataDocumentCount > 0 && !mockOnly,
       requiresServerGateway,
       requiresEnvironmentBinding,
+      requiresDataStream,
     }),
     diagnostics: Object.freeze(diagnostics),
   });

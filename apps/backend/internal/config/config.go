@@ -38,14 +38,27 @@ type WorkspaceAssetBlobRetentionConfig struct {
 }
 
 type EnvironmentSecretStoreConfig struct {
-	MasterKey         string
-	ActiveKeyID       string
-	Keys              map[string]string
-	RotationInterval  time.Duration
-	RotationBatchSize int
+	MasterKey           string
+	KMSProvider         string
+	ActiveKeyID         string
+	Keys                map[string]string
+	AWSRegion           string
+	AWSKeyARNs          map[string]string
+	KMSOperationTimeout time.Duration
+	RotationInterval    time.Duration
+	RotationBatchSize   int
 }
 
-var environmentSecretKeyIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$`)
+const (
+	EnvironmentSecretKMSProviderStaticKeyRing = "static-keyring"
+	EnvironmentSecretKMSProviderAWS           = "aws-kms"
+)
+
+var (
+	environmentSecretKeyIDPattern     = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$`)
+	environmentSecretAWSRegionPattern = regexp.MustCompile(`^[a-z]{2}-[a-z0-9-]+-[0-9]+$`)
+	environmentSecretAWSKeyARNPattern = regexp.MustCompile(`^arn:(aws|aws-us-gov|aws-cn):kms:([a-z]{2}-[a-z0-9-]+-[0-9]+):[0-9]{12}:key/[A-Za-z0-9-]{1,128}$`)
+)
 
 func validEnvironmentSecretKey(encoded string) bool {
 	for _, encoding := range []*base64.Encoding{base64.StdEncoding, base64.RawStdEncoding, base64.URLEncoding, base64.RawURLEncoding} {
@@ -104,6 +117,51 @@ func parseEnvironmentSecretKeyRing(raw string) (map[string]string, error) {
 		return nil, errors.New("BACKEND_ENVIRONMENT_SECRET_KMS_KEYS must contain exactly one JSON object")
 	}
 	return keys, nil
+}
+
+func parseEnvironmentSecretAWSKeyARNs(raw string) (map[string]string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return map[string]string{}, nil
+	}
+	if len(raw) > 64*1024 {
+		return nil, errors.New("BACKEND_ENVIRONMENT_SECRET_KMS_AWS_KEY_ARNS exceeds its configuration budget")
+	}
+	decoder := json.NewDecoder(strings.NewReader(raw))
+	opening, err := decoder.Token()
+	if err != nil || opening != json.Delim('{') {
+		return nil, errors.New("BACKEND_ENVIRONMENT_SECRET_KMS_AWS_KEY_ARNS must be a JSON object with 1 to 16 key ARNs")
+	}
+	keyARNs := map[string]string{}
+	for decoder.More() {
+		rawKeyID, err := decoder.Token()
+		keyID, ok := rawKeyID.(string)
+		if err != nil || !ok {
+			return nil, errors.New("BACKEND_ENVIRONMENT_SECRET_KMS_AWS_KEY_ARNS must contain only string key ARNs")
+		}
+		if _, duplicate := keyARNs[keyID]; duplicate {
+			return nil, errors.New("BACKEND_ENVIRONMENT_SECRET_KMS_AWS_KEY_ARNS contains a duplicate key id")
+		}
+		var keyARN string
+		if err := decoder.Decode(&keyARN); err != nil {
+			return nil, errors.New("BACKEND_ENVIRONMENT_SECRET_KMS_AWS_KEY_ARNS must contain only string key ARNs")
+		}
+		if !environmentSecretKeyIDPattern.MatchString(keyID) || !environmentSecretAWSKeyARNPattern.MatchString(keyARN) {
+			return nil, errors.New("BACKEND_ENVIRONMENT_SECRET_KMS_AWS_KEY_ARNS contains an invalid key id or exact key ARN")
+		}
+		keyARNs[keyID] = keyARN
+		if len(keyARNs) > 16 {
+			return nil, errors.New("BACKEND_ENVIRONMENT_SECRET_KMS_AWS_KEY_ARNS must be a JSON object with 1 to 16 key ARNs")
+		}
+	}
+	closing, err := decoder.Token()
+	if err != nil || closing != json.Delim('}') || len(keyARNs) == 0 {
+		return nil, errors.New("BACKEND_ENVIRONMENT_SECRET_KMS_AWS_KEY_ARNS must be a JSON object with 1 to 16 key ARNs")
+	}
+	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
+		return nil, errors.New("BACKEND_ENVIRONMENT_SECRET_KMS_AWS_KEY_ARNS must contain exactly one JSON object")
+	}
+	return keyARNs, nil
 }
 
 type RemoteRunnerConfig struct {
@@ -186,6 +244,10 @@ func LoadConfig() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	environmentSecretKMSOperationTimeout, err := getEnvPositiveDuration("BACKEND_ENVIRONMENT_SECRET_KMS_TIMEOUT", 5*time.Second)
+	if err != nil || environmentSecretKMSOperationTimeout > 30*time.Second {
+		return Config{}, errors.New("BACKEND_ENVIRONMENT_SECRET_KMS_TIMEOUT must be positive and at most 30s")
+	}
 	environmentSecretMasterKey := strings.TrimSpace(getEnv("BACKEND_ENVIRONMENT_SECRET_KEY", ""))
 	if environmentSecretMasterKey != "" && !validEnvironmentSecretKey(environmentSecretMasterKey) {
 		return Config{}, errors.New("BACKEND_ENVIRONMENT_SECRET_KEY must be base64-encoded 256-bit material")
@@ -194,20 +256,56 @@ func LoadConfig() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	environmentSecretActiveKeyID := strings.TrimSpace(os.Getenv("BACKEND_ENVIRONMENT_SECRET_KMS_ACTIVE_KEY_ID"))
-	if len(environmentSecretKeys) == 0 && environmentSecretMasterKey != "" {
-		environmentSecretKeys["legacy-v1"] = environmentSecretMasterKey
-		environmentSecretActiveKeyID = "legacy-v1"
+	environmentSecretAWSKeyARNs, err := parseEnvironmentSecretAWSKeyARNs(os.Getenv("BACKEND_ENVIRONMENT_SECRET_KMS_AWS_KEY_ARNS"))
+	if err != nil {
+		return Config{}, err
 	}
-	if len(environmentSecretKeys) > 0 {
+	environmentSecretKMSProvider := strings.ToLower(strings.TrimSpace(os.Getenv("BACKEND_ENVIRONMENT_SECRET_KMS_PROVIDER")))
+	environmentSecretAWSRegion := strings.TrimSpace(os.Getenv("BACKEND_ENVIRONMENT_SECRET_KMS_AWS_REGION"))
+	environmentSecretActiveKeyID := strings.TrimSpace(os.Getenv("BACKEND_ENVIRONMENT_SECRET_KMS_ACTIVE_KEY_ID"))
+	if environmentSecretKMSProvider == "" && (len(environmentSecretKeys) > 0 || environmentSecretMasterKey != "") {
+		environmentSecretKMSProvider = EnvironmentSecretKMSProviderStaticKeyRing
+	}
+	switch environmentSecretKMSProvider {
+	case "":
+		if environmentSecretActiveKeyID != "" || environmentSecretAWSRegion != "" || len(environmentSecretAWSKeyARNs) != 0 {
+			return Config{}, errors.New("BACKEND_ENVIRONMENT_SECRET_KMS_PROVIDER is required for managed KMS configuration")
+		}
+	case EnvironmentSecretKMSProviderStaticKeyRing:
+		if environmentSecretAWSRegion != "" || len(environmentSecretAWSKeyARNs) != 0 {
+			return Config{}, errors.New("static Environment Secret KMS cannot be mixed with AWS KMS configuration")
+		}
+		if len(environmentSecretKeys) == 0 && environmentSecretMasterKey != "" {
+			environmentSecretKeys["legacy-v1"] = environmentSecretMasterKey
+			environmentSecretActiveKeyID = "legacy-v1"
+		}
+		if len(environmentSecretKeys) == 0 {
+			return Config{}, errors.New("BACKEND_ENVIRONMENT_SECRET_KMS_KEYS is required for static-keyring provider")
+		}
 		if !environmentSecretKeyIDPattern.MatchString(environmentSecretActiveKeyID) {
 			return Config{}, errors.New("BACKEND_ENVIRONMENT_SECRET_KMS_ACTIVE_KEY_ID is required and must be canonical")
 		}
 		if _, ok := environmentSecretKeys[environmentSecretActiveKeyID]; !ok {
 			return Config{}, errors.New("BACKEND_ENVIRONMENT_SECRET_KMS_ACTIVE_KEY_ID is not present in BACKEND_ENVIRONMENT_SECRET_KMS_KEYS")
 		}
-	} else if environmentSecretActiveKeyID != "" {
-		return Config{}, errors.New("BACKEND_ENVIRONMENT_SECRET_KMS_KEYS is required when an active key id is configured")
+	case EnvironmentSecretKMSProviderAWS:
+		if !environmentSecretAWSRegionPattern.MatchString(environmentSecretAWSRegion) || len(environmentSecretAWSKeyARNs) == 0 {
+			return Config{}, errors.New("AWS Environment Secret KMS requires a canonical region and exact key ARN map")
+		}
+		if !environmentSecretKeyIDPattern.MatchString(environmentSecretActiveKeyID) {
+			return Config{}, errors.New("BACKEND_ENVIRONMENT_SECRET_KMS_ACTIVE_KEY_ID is required and must be canonical")
+		}
+		if _, ok := environmentSecretAWSKeyARNs[environmentSecretActiveKeyID]; !ok {
+			return Config{}, errors.New("BACKEND_ENVIRONMENT_SECRET_KMS_ACTIVE_KEY_ID is not present in BACKEND_ENVIRONMENT_SECRET_KMS_AWS_KEY_ARNS")
+		}
+		for _, keyARN := range environmentSecretAWSKeyARNs {
+			matches := environmentSecretAWSKeyARNPattern.FindStringSubmatch(keyARN)
+			if len(matches) != 3 || matches[2] != environmentSecretAWSRegion {
+				return Config{}, errors.New("AWS Environment Secret KMS key ARN region does not match BACKEND_ENVIRONMENT_SECRET_KMS_AWS_REGION")
+			}
+		}
+	default:
+		return Config{}, errors.New("BACKEND_ENVIRONMENT_SECRET_KMS_PROVIDER must be static-keyring or aws-kms")
 	}
 	config := Config{
 		Address:        address,
@@ -255,11 +353,15 @@ func LoadConfig() (Config, error) {
 			BlobLimit:       assetBlobSweepBlobLimit,
 		},
 		EnvironmentSecrets: EnvironmentSecretStoreConfig{
-			MasterKey:         environmentSecretMasterKey,
-			ActiveKeyID:       environmentSecretActiveKeyID,
-			Keys:              environmentSecretKeys,
-			RotationInterval:  environmentSecretRotationInterval,
-			RotationBatchSize: environmentSecretRotationBatchSize,
+			MasterKey:           environmentSecretMasterKey,
+			KMSProvider:         environmentSecretKMSProvider,
+			ActiveKeyID:         environmentSecretActiveKeyID,
+			Keys:                environmentSecretKeys,
+			AWSRegion:           environmentSecretAWSRegion,
+			AWSKeyARNs:          environmentSecretAWSKeyARNs,
+			KMSOperationTimeout: environmentSecretKMSOperationTimeout,
+			RotationInterval:    environmentSecretRotationInterval,
+			RotationBatchSize:   environmentSecretRotationBatchSize,
 		},
 	}
 	if err := validateOptionalCapabilities(config); err != nil {

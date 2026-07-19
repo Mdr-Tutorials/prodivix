@@ -39,6 +39,8 @@ const createContext = (input: {
   setBinding: ReturnType<typeof vi.fn>;
   createGuard: ReturnType<typeof vi.fn>;
   createReadGuard: ReturnType<typeof vi.fn>;
+  createReadSecret: ReturnType<typeof vi.fn>;
+  createSourceMutation: ReturnType<typeof vi.fn>;
   openArtifact: ReturnType<typeof vi.fn>;
 }): InspectorContextValue =>
   ({
@@ -78,6 +80,8 @@ const createContext = (input: {
     setServerRuntimeBinding: input.setBinding,
     createWorkspaceOwnerGuard: input.createGuard,
     createWorkspaceReadGuard: input.createReadGuard,
+    createWorkspaceReadSecretLoader: input.createReadSecret,
+    createWorkspaceSourceMutation: input.createSourceMutation,
     openServerRuntimeArtifact: input.openArtifact,
   }) as unknown as InspectorContextValue;
 
@@ -86,6 +90,8 @@ describe('ServerRuntimeRoutePanel', () => {
     const setBinding = vi.fn();
     const createGuard = vi.fn();
     const createReadGuard = vi.fn();
+    const createReadSecret = vi.fn();
+    const createSourceMutation = vi.fn();
     const openArtifact = vi.fn();
     render(
       <InspectorContext.Provider
@@ -93,6 +99,8 @@ describe('ServerRuntimeRoutePanel', () => {
           setBinding,
           createGuard,
           createReadGuard,
+          createReadSecret,
+          createSourceMutation,
           openArtifact,
         })}
       >
@@ -130,9 +138,25 @@ describe('ServerRuntimeRoutePanel', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Create isolated read guard' })
     );
+    const readSecretButton = screen.getByRole('button', {
+      name: 'Create isolated read + Secret loader',
+    }) as HTMLButtonElement;
+    expect(readSecretButton.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText('Secret binding ID'), {
+      target: { value: '  production-signing-key  ' },
+    });
+    expect(readSecretButton.disabled).toBe(false);
+    fireEvent.click(readSecretButton);
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Create isolated source mutation action',
+      })
+    );
     expect(createGuard).toHaveBeenNthCalledWith(1, 'remote-live');
     expect(createGuard).toHaveBeenNthCalledWith(2, 'isolated-production');
     expect(createReadGuard).toHaveBeenCalledTimes(1);
+    expect(createReadSecret).toHaveBeenCalledWith('production-signing-key');
+    expect(createSourceMutation).toHaveBeenCalledTimes(1);
   });
 
   it('disables authoring for read-only or mounted-module routes', () => {
@@ -143,6 +167,8 @@ describe('ServerRuntimeRoutePanel', () => {
           setBinding: vi.fn(),
           createGuard: vi.fn(),
           createReadGuard: vi.fn(),
+          createReadSecret: vi.fn(),
+          createSourceMutation: vi.fn(),
           openArtifact: vi.fn(),
         })}
       >
@@ -159,6 +185,9 @@ describe('ServerRuntimeRoutePanel', () => {
           name: 'Create Remote owner guard',
         }) as HTMLButtonElement
       ).disabled
+    ).toBe(true);
+    expect(
+      (screen.getByLabelText('Secret binding ID') as HTMLInputElement).disabled
     ).toBe(true);
     expect(
       screen.getByText(

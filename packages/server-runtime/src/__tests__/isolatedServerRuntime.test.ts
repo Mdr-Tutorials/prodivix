@@ -12,6 +12,7 @@ import {
   readIsolatedServerFunctionExecutionRequest,
   readIsolatedServerFunctionExecutionResponse,
   readIsolatedServerFunctionPlan,
+  isIsolatedServerFunctionProjectSourceMutationDefinition,
 } from '../index';
 
 const functionRef = Object.freeze({
@@ -281,6 +282,95 @@ describe('isolated Server Function runtime boundary', () => {
       })
     ).toBeUndefined();
 
+    const workspaceWriteMutationPlan = Object.freeze({
+      ...permissionPlan,
+      runtimeManifest: {
+        ...(permissionPlan.runtimeManifest as Record<string, unknown>),
+        functionsByExport: {
+          getGreeting: {
+            ...runtimeManifest.functionsByExport.getGreeting,
+            kind: 'function',
+            effect: 'mutation',
+            auth: { kind: 'permission', permissionId: 'workspace.write' },
+            idempotency: { kind: 'invocation-key' },
+          },
+        },
+      },
+    }) as unknown as ExecutableProjectServerFunctionPlan;
+    const writeMutation = readIsolatedServerFunctionPlan(
+      workspaceWriteMutationPlan
+    );
+    expect(writeMutation).toMatchObject({
+      definition: {
+        kind: 'function',
+        effect: 'mutation',
+        auth: { kind: 'permission', permissionId: 'workspace.write' },
+        idempotency: { kind: 'invocation-key' },
+      },
+    });
+    expect(
+      writeMutation &&
+        isIsolatedServerFunctionProjectSourceMutationDefinition(
+          writeMutation.definition
+        )
+    ).toBe(true);
+    const writeAuthority = createIsolatedServerFunctionAuthority({
+      ...authority,
+      permissions: ['workspace.owner', 'workspace.read', 'workspace.write'],
+    });
+    expect(
+      readIsolatedServerFunctionExecutionContext(
+        request,
+        workspaceWriteMutationPlan,
+        writeAuthority,
+        1_000
+      )
+    ).toMatchObject({
+      authority: {
+        permissions: ['workspace.owner', 'workspace.read', 'workspace.write'],
+      },
+    });
+    expect(
+      readIsolatedServerFunctionExecutionContext(
+        request,
+        workspaceWriteMutationPlan,
+        authority,
+        1_000
+      )
+    ).toBeUndefined();
+    const validWriteEntry = (
+      workspaceWriteMutationPlan.runtimeManifest as {
+        functionsByExport: Record<string, Record<string, unknown>>;
+      }
+    ).functionsByExport.getGreeting!;
+    const { idempotency: _idempotency, ...withoutIdempotency } =
+      validWriteEntry;
+    for (const invalidEntry of [
+      withoutIdempotency,
+      { ...validWriteEntry, effect: 'read' },
+      {
+        ...validWriteEntry,
+        environment: {
+          secretsByField: { key: { bindingId: 'source-mutation-key' } },
+        },
+      },
+    ]) {
+      expect(
+        readIsolatedServerFunctionPlan({
+          ...workspaceWriteMutationPlan,
+          runtimeManifest: {
+            ...(workspaceWriteMutationPlan.runtimeManifest as Record<
+              string,
+              unknown
+            >),
+            functionsByExport: {
+              getGreeting: invalidEntry,
+            },
+          },
+        } as unknown as ExecutableProjectServerFunctionPlan)
+      ).toBeUndefined();
+    }
+
     const workspaceReadPlan = Object.freeze({
       ...permissionPlan,
       runtimeManifest: {
@@ -319,25 +409,54 @@ describe('isolated Server Function runtime boundary', () => {
         1_000
       )
     ).toBeUndefined();
-    expect(
-      readIsolatedServerFunctionPlan({
-        ...workspaceReadPlan,
-        runtimeManifest: {
-          ...(workspaceReadPlan.runtimeManifest as Record<string, unknown>),
-          functionsByExport: {
-            getGreeting: {
-              ...runtimeManifest.functionsByExport.getGreeting,
-              auth: { kind: 'permission', permissionId: 'workspace.read' },
-              environment: {
-                secretsByField: {
-                  signingKey: { bindingId: 'signing-key' },
-                },
+    const workspaceReadSecretPlan = {
+      ...workspaceReadPlan,
+      runtimeManifest: {
+        ...(workspaceReadPlan.runtimeManifest as Record<string, unknown>),
+        functionsByExport: {
+          getGreeting: {
+            ...runtimeManifest.functionsByExport.getGreeting,
+            auth: { kind: 'permission', permissionId: 'workspace.read' },
+            environment: {
+              secretsByField: {
+                signingKey: { bindingId: 'signing-key' },
               },
             },
           },
         },
-      })
+      },
+    } as unknown as ExecutableProjectServerFunctionPlan;
+    expect(
+      readIsolatedServerFunctionPlan(workspaceReadSecretPlan)
+    ).toMatchObject({
+      definition: {
+        auth: { kind: 'permission', permissionId: 'workspace.read' },
+        environment: {
+          secretsByField: {
+            signingKey: { bindingId: 'signing-key' },
+          },
+        },
+      },
+    });
+    expect(
+      readIsolatedServerFunctionExecutionContext(
+        request,
+        workspaceReadSecretPlan,
+        authority,
+        1_000
+      )
     ).toBeUndefined();
+    expect(
+      readIsolatedServerFunctionExecutionContext(
+        request,
+        workspaceReadSecretPlan,
+        {
+          ...authority,
+          permissions: ['workspace.owner', 'workspace.read'],
+        },
+        1_000
+      )
+    ).toBeDefined();
   });
 
   it('revalidates successful output against trusted snapshot schema', () => {

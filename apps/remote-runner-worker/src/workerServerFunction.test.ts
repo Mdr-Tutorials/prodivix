@@ -9,7 +9,11 @@ import {
   createExecutableProjectSnapshot,
   createExecutionProviderDescriptor,
   createExecutionRequest,
+  createExecutionFilesystemDiff,
+  encodeExecutionFilesystemDiff,
   EXECUTABLE_PROJECT_SERVER_FUNCTION_PLAN_FORMAT,
+  EXECUTION_FILESYSTEM_DIFF_FORMAT,
+  EXECUTION_FILESYSTEM_DIFF_MEDIA_TYPE,
 } from '@prodivix/runtime-core';
 import {
   REMOTE_EXECUTION_SERVER_AUTHORITY_LEASE_FORMAT,
@@ -217,11 +221,46 @@ const workspaceReadRequest = createExecutionRequest({
   requestId: 'remote-workspace-read-server-function-1',
 });
 
-const secretCanary = 'worker-agent-secret-canary';
-const secretSnapshot = createExecutableProjectSnapshot({
+const mutationTargetPath =
+  'src/.prodivix-project-source/module-002.ts' as const;
+const mutationBaseline = new TextEncoder().encode(
+  `export const value = 'before';\n`
+);
+const mutationReplacement = new TextEncoder().encode(
+  `export const value = 'after';\n`
+);
+const mutationTargetTrace = Object.freeze([
+  Object.freeze({
+    sourceRef: Object.freeze({
+      kind: 'code-artifact' as const,
+      artifactId: 'code-project-helper',
+    }),
+    label: '/project-helper.ts',
+  }),
+]);
+const mutationSnapshot = createExecutableProjectSnapshot({
   workspace: snapshot.workspace,
   target: snapshot.target,
-  files: snapshot.files,
+  files: [
+    ...snapshot.files,
+    {
+      path: 'src/.prodivix-project-source/module-001.ts',
+      contents: 'export const root = true;\n',
+      sourceTrace: [
+        {
+          sourceRef: {
+            kind: 'code-artifact',
+            artifactId: functionRef.artifactId,
+          },
+        },
+      ],
+    },
+    {
+      path: mutationTargetPath,
+      contents: mutationBaseline,
+      sourceTrace: mutationTargetTrace,
+    },
+  ],
   dependencyPlan: {
     manifestFilePath: snapshot.dependencyPlan.manifestFilePath,
     ...(snapshot.dependencyPlan.lockFilePath
@@ -229,13 +268,7 @@ const secretSnapshot = createExecutableProjectSnapshot({
       : {}),
   },
   entrypoints: snapshot.entrypoints,
-  capabilityRequirements: {
-    ...snapshot.capabilityRequirements,
-    production: [
-      ...snapshot.capabilityRequirements.production,
-      'environment-binding',
-    ],
-  },
+  capabilityRequirements: snapshot.capabilityRequirements,
   publicBuildConfiguration: snapshot.publicBuildConfiguration,
   resourceHints: snapshot.resourceHints,
   cacheHints: snapshot.cacheHints,
@@ -254,24 +287,145 @@ const secretSnapshot = createExecutableProjectSnapshot({
           kind: 'function',
           runtimeZone: 'server',
           adapterId: 'prodivix.code-export',
-          effect: 'read',
-          auth: { kind: 'public' },
+          effect: 'mutation',
+          auth: { kind: 'permission', permissionId: 'workspace.write' },
+          idempotency: { kind: 'invocation-key' },
           inputSchema: true,
           outputSchema: true,
-          environment: {
-            secretsByField: {
-              signingKey: { bindingId: 'webhook-signing-key' },
-            },
-          },
         },
       },
     },
   },
 });
+const mutationRequest = createExecutionRequest({
+  ...request,
+  requestId: 'remote-project-source-mutation-1',
+  workspace: mutationSnapshot.workspace,
+});
+const mutationAuthority: NonNullable<RemoteExecutionClaimResult['authority']> =
+  Object.freeze({
+    format: REMOTE_EXECUTION_SERVER_AUTHORITY_LEASE_FORMAT,
+    executionId: 'execution-server-function',
+    workerId: 'worker-server-function',
+    workerAttempt: 1,
+    principal: Object.freeze({
+      providerId: 'prodivix-product-session',
+      principalId: 'owner-1',
+    }),
+    permissions: Object.freeze([
+      'workspace.owner',
+      'workspace.read',
+      'workspace.write',
+    ]),
+    workspaceId: mutationSnapshot.workspace.workspaceId,
+    snapshotId: mutationSnapshot.workspace.snapshotId,
+    expiresAt: 100,
+  });
+
+const mutationFilesystemArtifact = () => {
+  const diff = createExecutionFilesystemDiff({
+    snapshotDigest: mutationSnapshot.contentDigest,
+    workspace: mutationSnapshot.workspace,
+    capturedAt: 9,
+    complete: true,
+    changes: [
+      {
+        kind: 'modified',
+        path: mutationTargetPath,
+        baseline: { contents: mutationBaseline },
+        runtime: { contents: mutationReplacement },
+        sourceTrace: mutationTargetTrace,
+      },
+    ],
+  });
+  return Object.freeze({
+    artifactId: `filesystem-diff:${mutationSnapshot.contentDigest}`,
+    kind: 'report' as const,
+    label: 'Remote runtime filesystem changes',
+    mediaType: EXECUTION_FILESYSTEM_DIFF_MEDIA_TYPE,
+    sourceTrace: mutationTargetTrace,
+    metadata: Object.freeze({
+      format: EXECUTION_FILESYSTEM_DIFF_FORMAT,
+      snapshotDigest: mutationSnapshot.contentDigest,
+      workspaceSnapshotId: mutationSnapshot.workspace.snapshotId,
+      changeCount: '1',
+      complete: 'true',
+    }),
+    contents: encodeExecutionFilesystemDiff(diff),
+  });
+};
+
+const secretCanary = 'worker-agent-secret-canary';
+const secretSnapshotForAuth = (
+  auth:
+    | Readonly<{ kind: 'public' }>
+    | Readonly<{ kind: 'permission'; permissionId: 'workspace.read' }>
+) =>
+  createExecutableProjectSnapshot({
+    workspace: snapshot.workspace,
+    target: snapshot.target,
+    files: snapshot.files,
+    dependencyPlan: {
+      manifestFilePath: snapshot.dependencyPlan.manifestFilePath,
+      ...(snapshot.dependencyPlan.lockFilePath
+        ? { lockFilePath: snapshot.dependencyPlan.lockFilePath }
+        : {}),
+    },
+    entrypoints: snapshot.entrypoints,
+    capabilityRequirements: {
+      ...snapshot.capabilityRequirements,
+      production: [
+        ...snapshot.capabilityRequirements.production,
+        'environment-binding',
+      ],
+    },
+    publicBuildConfiguration: snapshot.publicBuildConfiguration,
+    resourceHints: snapshot.resourceHints,
+    cacheHints: snapshot.cacheHints,
+    installCommand: snapshot.installCommand,
+    previewCommand: snapshot.previewCommand,
+    buildCommand: snapshot.buildCommand,
+    previewPlan: snapshot.previewPlan,
+    buildPlan: snapshot.buildPlan,
+    testPlan: snapshot.testPlan,
+    serverFunctionPlan: {
+      ...snapshot.serverFunctionPlan!,
+      runtimeManifest: {
+        schemaVersion: '1.0',
+        functionsByExport: {
+          getGreeting: {
+            kind: 'function',
+            runtimeZone: 'server',
+            adapterId: 'prodivix.code-export',
+            effect: 'read',
+            auth,
+            inputSchema: true,
+            outputSchema: true,
+            environment: {
+              secretsByField: {
+                signingKey: { bindingId: 'webhook-signing-key' },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+const secretSnapshot = secretSnapshotForAuth({ kind: 'public' });
+const workspaceReadSecretSnapshot = secretSnapshotForAuth({
+  kind: 'permission',
+  permissionId: 'workspace.read',
+});
 const secretRequest = createExecutionRequest({
   ...request,
   requestId: 'remote-secret-server-function-1',
   workspace: secretSnapshot.workspace,
+  requiredCapabilities: ['environment-binding', 'server-function'],
+});
+const workspaceReadSecretRequest = createExecutionRequest({
+  ...request,
+  requestId: 'remote-workspace-read-secret-server-function-1',
+  workspace: workspaceReadSecretSnapshot.workspace,
   requiredCapabilities: ['environment-binding', 'server-function'],
 });
 
@@ -416,8 +570,176 @@ const authenticatedAuthority: NonNullable<
   expiresAt: 100,
 });
 
+const workspaceReadOnlyAuthority: NonNullable<
+  RemoteExecutionClaimResult['authority']
+> = Object.freeze({
+  ...authenticatedAuthority,
+  permissions: Object.freeze(['workspace.read']),
+});
+
 describe('remote worker isolated Server Function', () => {
-  it('resolves a lease-fenced encrypted Secret before sandbox execution and clears it afterward', async () => {
+  it('uploads a source mutation only after exact result and filesystem correlation', async () => {
+    const transitions: string[] = [];
+    const uploads: Array<Readonly<{ descriptor: { artifactId: string } }>> = [];
+    const events: unknown[] = [];
+    let claimed = false;
+    const client: RemoteWorkerControlPlaneClient = {
+      async claim() {
+        if (claimed) return undefined;
+        claimed = true;
+        return claim(mutationRequest, mutationSnapshot, mutationAuthority);
+      },
+      async renew() {
+        return {
+          lease: claim(mutationRequest, mutationSnapshot, mutationAuthority)
+            .lease,
+          cancellationRequested: false,
+        };
+      },
+      async snapshot() {
+        return mutationSnapshot;
+      },
+      async transition(input) {
+        transitions.push(input.status);
+        return true;
+      },
+      async appendEvent(input) {
+        events.push(input.event);
+        return 'stored';
+      },
+      async uploadArtifact(input) {
+        uploads.push(input);
+        return 'stored';
+      },
+    };
+    const sandbox: RemoteWorkerSandbox = {
+      async execute(input) {
+        expect(input.serverFunctionAuthority?.permissions).toEqual([
+          'workspace.owner',
+          'workspace.read',
+          'workspace.write',
+        ]);
+        return {
+          status: 'succeeded',
+          stdout: '',
+          stderr: '',
+          outputTruncated: false,
+          artifacts: [
+            createRemoteWorkerServerFunctionArtifact({
+              snapshot: mutationSnapshot,
+              request: mutationRequest,
+              contents: new TextEncoder().encode(
+                JSON.stringify({
+                  type: EXECUTION_SERVER_FUNCTION_BRIDGE_RESPONSE_TYPE,
+                  requestId: 'invocation-1:1',
+                  ok: true,
+                  result: { kind: 'value', value: true },
+                })
+              ),
+            }),
+            mutationFilesystemArtifact(),
+          ],
+        };
+      },
+    };
+    const agent = createRemoteWorkerAgent({
+      workerId: 'worker-server-function',
+      providerId: provider.id,
+      client,
+      sandbox,
+      leaseDurationMs: 100,
+      heartbeatIntervalMs: 20,
+      defaultTimeoutMs: 1_000,
+      defaultMaximumOutputBytes: 2 * 1024 * 1024,
+      now: () => 10,
+    });
+
+    await expect(agent.pollOnce()).resolves.toBe(true);
+    expect(transitions).toEqual(['running', 'succeeded']);
+    expect(uploads.map(({ descriptor }) => descriptor.artifactId)).toEqual([
+      `server-function-result:${mutationSnapshot.contentDigest}:invocation-1:1`,
+      `filesystem-diff:${mutationSnapshot.contentDigest}`,
+    ]);
+    expect(JSON.stringify(events)).not.toContain(
+      new TextDecoder().decode(mutationReplacement)
+    );
+  });
+
+  it('rejects a successful mutation result without its exact diff before upload', async () => {
+    const transitions: Array<Readonly<{ status: string; reason?: string }>> =
+      [];
+    const uploadArtifact = vi.fn(async () => 'stored' as const);
+    let claimed = false;
+    const client: RemoteWorkerControlPlaneClient = {
+      async claim() {
+        if (claimed) return undefined;
+        claimed = true;
+        return claim(mutationRequest, mutationSnapshot, mutationAuthority);
+      },
+      async renew() {
+        return {
+          lease: claim(mutationRequest, mutationSnapshot, mutationAuthority)
+            .lease,
+          cancellationRequested: false,
+        };
+      },
+      async snapshot() {
+        return mutationSnapshot;
+      },
+      async transition(input) {
+        transitions.push({ status: input.status, reason: input.reason });
+        return true;
+      },
+      async appendEvent() {
+        return 'stored';
+      },
+      uploadArtifact,
+    };
+    const sandbox: RemoteWorkerSandbox = {
+      async execute() {
+        return {
+          status: 'succeeded',
+          stdout: '',
+          stderr: '',
+          outputTruncated: false,
+          artifacts: [
+            createRemoteWorkerServerFunctionArtifact({
+              snapshot: mutationSnapshot,
+              request: mutationRequest,
+              contents: new TextEncoder().encode(
+                JSON.stringify({
+                  type: EXECUTION_SERVER_FUNCTION_BRIDGE_RESPONSE_TYPE,
+                  requestId: 'invocation-1:1',
+                  ok: true,
+                  result: { kind: 'value', value: true },
+                })
+              ),
+            }),
+          ],
+        };
+      },
+    };
+    const agent = createRemoteWorkerAgent({
+      workerId: 'worker-server-function',
+      providerId: provider.id,
+      client,
+      sandbox,
+      leaseDurationMs: 100,
+      heartbeatIntervalMs: 20,
+      defaultTimeoutMs: 1_000,
+      defaultMaximumOutputBytes: 2 * 1024 * 1024,
+      now: () => 10,
+    });
+
+    await expect(agent.pollOnce()).resolves.toBe(true);
+    expect(transitions).toEqual([
+      { status: 'running', reason: undefined },
+      { status: 'failed', reason: 'invalid-project-source-mutation' },
+    ]);
+    expect(uploadArtifact).not.toHaveBeenCalled();
+  });
+
+  it('requires workspace.read authority before resolving its lease-fenced Secret', async () => {
     const transitions: { status: string; reason?: string }[] = [];
     let claimed = false;
     let projectedFields: Readonly<Record<string, string>> | undefined;
@@ -425,16 +747,24 @@ describe('remote worker isolated Server Function', () => {
       async claim() {
         if (claimed) return undefined;
         claimed = true;
-        return claim(secretRequest, secretSnapshot);
+        return claim(
+          workspaceReadSecretRequest,
+          workspaceReadSecretSnapshot,
+          authenticatedAuthority
+        );
       },
       async renew() {
         return {
-          lease: claim(secretRequest, secretSnapshot).lease,
+          lease: claim(
+            workspaceReadSecretRequest,
+            workspaceReadSecretSnapshot,
+            authenticatedAuthority
+          ).lease,
           cancellationRequested: false,
         };
       },
       async snapshot() {
-        return secretSnapshot;
+        return workspaceReadSecretSnapshot;
       },
       async resolveServerFunctionSecrets(input) {
         expect(input).toMatchObject({
@@ -457,6 +787,9 @@ describe('remote worker isolated Server Function', () => {
     };
     const sandbox: RemoteWorkerSandbox = {
       async execute(input) {
+        expect(input.serverFunctionAuthority?.permissions).toContain(
+          'workspace.read'
+        );
         projectedFields = input.serverFunctionSecrets?.fields;
         expect(projectedFields).toEqual({ signingKey: secretCanary });
         expect(input.redactValues).toContain(secretCanary);
@@ -467,8 +800,8 @@ describe('remote worker isolated Server Function', () => {
           outputTruncated: false,
           artifacts: [
             createRemoteWorkerServerFunctionArtifact({
-              snapshot: secretSnapshot,
-              request: secretRequest,
+              snapshot: workspaceReadSecretSnapshot,
+              request: workspaceReadSecretRequest,
               contents: new TextEncoder().encode(
                 JSON.stringify({
                   type: EXECUTION_SERVER_FUNCTION_BRIDGE_RESPONSE_TYPE,
@@ -910,31 +1243,30 @@ describe('remote worker isolated Server Function', () => {
       label: 'authenticated',
       executionRequest: authenticatedRequest,
       executionSnapshot: authenticatedSnapshot,
+      authority: authenticatedAuthority,
     },
     {
       label: 'workspace.owner permission',
       executionRequest: permissionRequest,
       executionSnapshot: permissionSnapshot,
+      authority: authenticatedAuthority,
     },
     {
       label: 'workspace.read permission',
       executionRequest: workspaceReadRequest,
       executionSnapshot: workspaceReadSnapshot,
+      authority: workspaceReadOnlyAuthority,
     },
   ])(
     'projects an exact principal for $label without session or lease material',
-    async ({ executionRequest, executionSnapshot }) => {
+    async ({ executionRequest, executionSnapshot, authority }) => {
       const transitions: string[] = [];
       let claimed = false;
       const client: RemoteWorkerControlPlaneClient = {
         async claim() {
           if (claimed) return undefined;
           claimed = true;
-          return claim(
-            executionRequest,
-            executionSnapshot,
-            authenticatedAuthority
-          );
+          return claim(executionRequest, executionSnapshot, authority);
         },
         async renew() {
           return {
@@ -961,9 +1293,9 @@ describe('remote worker isolated Server Function', () => {
           expect(input.serverFunctionAuthority).toMatchObject({
             workspaceId: executionSnapshot.workspace.workspaceId,
             snapshotId: executionSnapshot.workspace.snapshotId,
-            principal: authenticatedAuthority.principal,
-            permissions: authenticatedAuthority.permissions,
-            expiresAt: authenticatedAuthority.expiresAt,
+            principal: authority.principal,
+            permissions: authority.permissions,
+            expiresAt: authority.expiresAt,
           });
           const serialized = JSON.stringify(input.serverFunctionAuthority);
           expect(serialized).not.toContain('lease-server-function');
@@ -1054,6 +1386,15 @@ describe('remote worker isolated Server Function', () => {
       },
       executionRequest: workspaceReadRequest,
       executionSnapshot: workspaceReadSnapshot,
+    },
+    {
+      label: 'workspace.read Secret path with only workspace.owner grant',
+      authority: {
+        ...authenticatedAuthority,
+        permissions: ['workspace.owner'],
+      },
+      executionRequest: workspaceReadSecretRequest,
+      executionSnapshot: workspaceReadSecretSnapshot,
     },
     {
       label: 'non-canonical permission grant order',

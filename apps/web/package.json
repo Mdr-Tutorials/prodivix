@@ -39,6 +39,8 @@
     "@prodivix/authoring": "workspace:*",
     "@prodivix/code-language": "workspace:*",
     "@prodivix/data": "workspace:*",
+    "@prodivix/data-asyncapi": "workspace:*",
+    "@prodivix/data-graphql": "workspace:*",
     "@prodivix/data-http": "workspace:*",
     "@prodivix/data-mock": "workspace:*",
     "@prodivix/diagnostics": "workspace:*",

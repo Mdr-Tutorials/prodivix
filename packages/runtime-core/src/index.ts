@@ -14,10 +14,32 @@ export type {
   ExecutionDataGatewayResult,
 } from './executionDataGatewayBridge';
 export {
+  EXECUTION_DATA_STREAM_BRIDGE_LIMITS,
+  EXECUTION_DATA_STREAM_CANCEL_TYPE,
+  EXECUTION_DATA_STREAM_MESSAGE_TYPE,
+  EXECUTION_DATA_STREAM_OPEN_TYPE,
+  EXECUTION_DATA_STREAM_PULL_TYPE,
+  readExecutionDataStreamBridgeMessage,
+  readExecutionDataStreamCancellation,
+  readExecutionDataStreamOpenRequest,
+  readExecutionDataStreamPull,
+  toExecutionDataStreamEventMessage,
+  toExecutionDataStreamOpenMessage,
+  toExecutionDataStreamTerminalMessage,
+} from './executionDataStreamBridge';
+export type {
+  ExecutionDataStreamBridgeMessage,
+  ExecutionDataStreamCancellation,
+  ExecutionDataStreamInvocation,
+  ExecutionDataStreamOpenRequest,
+  ExecutionDataStreamPull,
+} from './executionDataStreamBridge';
+export {
   createExecutionNetworkTrace,
   EXECUTION_NETWORK_BRIDGE_MESSAGE_TYPE,
   EXECUTION_NETWORK_TRACE_FORMAT,
   EXECUTION_NETWORK_TRACE_NAME,
+  normalizeExecutionSourceTraces,
   readExecutionNetworkBridgeMessage,
   readExecutionNetworkTraceValue,
   toExecutionNetworkBridgeMessage,
@@ -85,8 +107,15 @@ export {
 export { createExecutionSessionRecoveryPlan } from './executionRecovery';
 export { createExecutionTerminalController } from './executionTerminalController';
 export {
+  createExecutionTerminalEmulator,
+  createExecutionTerminalEmulatorCopyText,
+  EXECUTION_TERMINAL_EMULATOR_LIMITS,
+} from './executionTerminalEmulator';
+export {
   createExecutionTerminalCopyText,
   EXECUTION_TERMINAL_CAPABILITIES,
+  EXECUTION_TERMINAL_CHECKPOINT_FORMAT,
+  EXECUTION_TERMINAL_CHECKPOINT_VERSION,
   EXECUTION_TERMINAL_CLOSE_REASONS,
   EXECUTION_TERMINAL_LIMITS,
   EXECUTION_TERMINAL_SIGNALS,
@@ -125,6 +154,8 @@ export {
   EXECUTION_SECRET_LEAK_REASON,
   EXECUTION_SECRET_LEAK_SURFACES,
   EXECUTION_SECRET_REDACTION_MARKER,
+  EXECUTION_SECRET_STREAM_CHECKPOINT_FORMAT,
+  EXECUTION_SECRET_STREAM_CHECKPOINT_VERSION,
 } from './executionSecretLeakGuard';
 export {
   assertExecutableProjectCapabilitySupport,
@@ -218,6 +249,7 @@ export type {
   CreateExecutionTerminalControllerInput,
   ExecutionTerminalAvailability,
   ExecutionTerminalCapability,
+  ExecutionTerminalCheckpoint,
   ExecutionTerminalCloseHandler,
   ExecutionTerminalCloseReason,
   ExecutionTerminalCloseResult,
@@ -240,6 +272,14 @@ export type {
   ExecutionTerminalStatus,
   ExecutionTerminalWriteResult,
 } from './executionTerminal';
+export type {
+  ExecutionTerminalEmulator,
+  ExecutionTerminalEmulatorColor,
+  ExecutionTerminalEmulatorLine,
+  ExecutionTerminalEmulatorRun,
+  ExecutionTerminalEmulatorSnapshot,
+  ExecutionTerminalEmulatorStyle,
+} from './executionTerminalEmulator';
 export type {
   EnvironmentBindingReference,
   ExecutionEnvironmentMode,
@@ -278,10 +318,12 @@ export type {
 } from './executionTestReport';
 export type {
   CreateExecutionSecretLeakGuardInput,
+  CreateExecutionSecretTextStreamRedactorInput,
   ExecutionSecretLeakGuard,
   ExecutionSecretLeakInspection,
   ExecutionSecretLeakSurface,
   ExecutionSecretRedaction,
+  ExecutionSecretTextStreamCheckpoint,
   ExecutionSecretTextStreamRedactor,
 } from './executionSecretLeakGuard';
 export type {

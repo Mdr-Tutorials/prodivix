@@ -1,5 +1,6 @@
 import {
   decodeServerRuntimeProfile,
+  isIsolatedServerFunctionProjectSourceMutationDefinition,
   normalizeServerRuntimeTestProvision,
   PRODIVIX_PRODUCT_SESSION_AUTH_PROVIDER_ID,
   resolveServerFunctionDefinition,
@@ -418,6 +419,21 @@ export const analyzeWorkspaceServerRuntimeTarget = (
           path: document.path,
           suggestion:
             'Use the product Auth first-vertical adapters or a future full-stack server target.',
+        });
+      }
+      if (
+        target.kind === 'deterministic-test' &&
+        isIsolatedServerFunctionProjectSourceMutationDefinition(definition)
+      ) {
+        diagnostics.push({
+          code: 'WKS-EXPORT-SERVER-TEST-SOURCE-MUTATION-UNSUPPORTED',
+          severity: 'error',
+          source: 'export',
+          message:
+            'Deterministic Test cannot simulate or adopt isolated project-source mutation.',
+          path: document.path,
+          suggestion:
+            'Run the function through the isolated production provider and explicitly review its Runtime Files diff.',
         });
       }
       if (target.kind === 'deterministic-test' && testProvision) {

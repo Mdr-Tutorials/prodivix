@@ -8,6 +8,7 @@ import {
   type ExecutionTestStatus,
 } from '@prodivix/runtime-core';
 import { createProjectTestReportPresentation } from './projectTestReportModel';
+import { resolveProjectTestPrimarySourceTrace } from './projectTestReportModel';
 
 const statuses: readonly ExecutionTestStatus[] = [
   'passed',
@@ -91,11 +92,32 @@ describe('project test report presentation', () => {
 
           expect(presentation?.report).toBe(reports.at(-1));
           expect(presentation?.jobId).toBe(`job-${reports.length - 1}`);
+          expect(presentation?.providerId).toBe(
+            'prodivix.browser.web-container.test'
+          );
           expect(presentation?.snapshotId).toBe(
             `snapshot-${reports.length - 1}`
           );
         }
       )
     );
+  });
+
+  it('exposes only an unambiguous exact test source owner', () => {
+    const source = {
+      sourceRef: { kind: 'code-artifact' as const, artifactId: 'test-code' },
+    };
+    expect(resolveProjectTestPrimarySourceTrace([source])).toBe(source);
+    expect(
+      resolveProjectTestPrimarySourceTrace([
+        source,
+        {
+          sourceRef: {
+            kind: 'code-artifact',
+            artifactId: 'test-helper',
+          },
+        },
+      ])
+    ).toBeUndefined();
   });
 });

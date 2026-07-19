@@ -21,8 +21,12 @@ func TestIsolatedSecretResolutionPostgreSQLAttemptRecoveryGate(t *testing.T) {
 	if err := store.RecordExecution(ctx, ExecutionAuthority{
 		ExecutionID:        executionID,
 		WorkspaceID:        "postgres-replay-workspace",
-		OwnerID:            "postgres-replay-owner",
+		PrincipalID:        "postgres-replay-owner",
 		SessionID:          "postgres-secret-recovery-session",
+		Permissions:        cloneExecutionPermissions(workspaceOwnerExecutionPermissions),
+		ProviderID:         "prodivix.remote.server-function",
+		Profile:            "production",
+		RuntimeZone:        "server",
 		SnapshotID:         "snapshot-isolated-secret-recovery",
 		PartitionRevisions: map[string]string{"workspace": "1", "document:code-secret:content": "7"},
 		Environment:        &EnvironmentReference{EnvironmentID: "environment-production", Revision: "revision-1", Mode: "live"},

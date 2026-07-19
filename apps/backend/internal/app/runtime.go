@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	backendconfig "github.com/Prodivix/prodivix/apps/backend/internal/config"
@@ -46,7 +47,7 @@ type RuntimeModules struct {
 	}
 }
 
-func NewRuntimeModules(db *sql.DB, tokenTTL time.Duration, cfg backendconfig.Config) RuntimeModules {
+func NewRuntimeModules(db *sql.DB, tokenTTL time.Duration, cfg backendconfig.Config) (RuntimeModules, error) {
 	modules := RuntimeModules{}
 	modules.Auth.Users = backendauth.NewUserStore(db)
 	modules.Auth.Sessions = backendauth.NewSessionStore(db)
@@ -61,11 +62,33 @@ func NewRuntimeModules(db *sql.DB, tokenTTL time.Duration, cfg backendconfig.Con
 	modules.Project.Handler = backendproject.NewHandler(modules.Project.Store, modules.Workspace.Module)
 	modules.GitHub.Handler = backendgithub.NewHandler(modules.GitHub.Store, modules.Project.Store, cfg.GitHub, cfg.Environment)
 	modules.RemoteExecution.Store = backendremoteexecution.NewStore(db)
-	modules.Environment.Store = backendenvironment.NewStoreWithKeyRing(db, cfg.EnvironmentSecrets.MasterKey, cfg.EnvironmentSecrets.ActiveKeyID, cfg.EnvironmentSecrets.Keys)
+	switch cfg.EnvironmentSecrets.KMSProvider {
+	case "", backendconfig.EnvironmentSecretKMSProviderStaticKeyRing:
+		modules.Environment.Store = backendenvironment.NewStoreWithKeyRing(db, cfg.EnvironmentSecrets.MasterKey, cfg.EnvironmentSecrets.ActiveKeyID, cfg.EnvironmentSecrets.Keys)
+	case backendconfig.EnvironmentSecretKMSProviderAWS:
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.EnvironmentSecrets.KMSOperationTimeout)
+		defer cancel()
+		store, err := backendenvironment.NewStoreWithAWSKMS(
+			ctx,
+			db,
+			cfg.EnvironmentSecrets.MasterKey,
+			cfg.EnvironmentSecrets.AWSRegion,
+			cfg.EnvironmentSecrets.ActiveKeyID,
+			cfg.EnvironmentSecrets.AWSKeyARNs,
+			cfg.EnvironmentSecrets.Keys,
+			cfg.EnvironmentSecrets.KMSOperationTimeout,
+		)
+		if err != nil {
+			return RuntimeModules{}, fmt.Errorf("initialize managed Environment Secret KMS: %w", err)
+		}
+		modules.Environment.Store = store
+	default:
+		return RuntimeModules{}, fmt.Errorf("unsupported Environment Secret KMS provider %q", cfg.EnvironmentSecrets.KMSProvider)
+	}
 	modules.Environment.Handler = backendenvironment.NewHandler(modules.Environment.Store)
 	modules.Environment.Maintenance = NewEnvironmentSecretKeyRotationMaintenance(modules.Environment.Store, cfg.EnvironmentSecrets)
 	modules.RemoteExecution.Handler = backendremoteexecution.NewHandler(modules.RemoteExecution.Store, cfg.RemoteRunner, cfg.RemotePreview, modules.Environment.Store)
-	return modules
+	return modules, nil
 }
 
 func (modules RuntimeModules) StartMaintenance(ctx context.Context) {

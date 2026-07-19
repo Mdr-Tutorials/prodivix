@@ -2,6 +2,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type {
   RemoteExecutionControlPlane,
   RemoteExecutionPrincipal,
+  RemoteExecutionRegionalTrafficGate,
+  RemoteExecutionRegionalTrafficPermit,
   RemoteExecutionRequestEnvelope,
   RemoteExecutionTerminalBroker,
 } from '@prodivix/runtime-remote';
@@ -27,6 +29,8 @@ export type RemoteExecutionHttpAuthenticator = Readonly<{
 export type CreateRemoteExecutionHttpHandlerOptions = Readonly<{
   controlPlane: RemoteExecutionControlPlane;
   terminalBroker?: RemoteExecutionTerminalBroker;
+  /** Standby regions remain healthy but reject every public/internal operation. */
+  regionalTrafficGate?: RemoteExecutionRegionalTrafficGate;
   authenticator: RemoteExecutionHttpAuthenticator;
   resolveClaimedSnapshot(
     input: Readonly<{
@@ -264,11 +268,40 @@ export const createRemoteExecutionHttpHandler = (
     request: IncomingMessage,
     response: ServerResponse
   ): Promise<void> => {
+    let regionalPermit: RemoteExecutionRegionalTrafficPermit | undefined;
     try {
       const url = new URL(request.url ?? '/', 'http://control-plane.invalid');
       if (request.method === 'GET' && url.pathname === '/healthz') {
         json(response, 200, { status: 'ok' });
         return;
+      }
+      if (request.method === 'GET' && url.pathname === '/readyz') {
+        if (options.regionalTrafficGate) {
+          try {
+            regionalPermit = await options.regionalTrafficGate.acquire();
+          } catch {
+            error(response, 503, 'region-unavailable');
+            return;
+          }
+          if (!regionalPermit) {
+            error(response, 503, 'region-standby');
+            return;
+          }
+        }
+        json(response, 200, { status: 'ready' });
+        return;
+      }
+      if (options.regionalTrafficGate) {
+        try {
+          regionalPermit = await options.regionalTrafficGate.acquire();
+        } catch {
+          error(response, 503, 'region-unavailable');
+          return;
+        }
+        if (!regionalPermit) {
+          error(response, 503, 'region-standby');
+          return;
+        }
       }
       const artifactDownloadMatch =
         /^\/v1\/executions\/([^/]+)\/artifacts\/([^/]+)\/content$/u.exec(
@@ -524,7 +557,7 @@ export const createRemoteExecutionHttpHandler = (
             execution.record.status
           )
         )
-          options.terminalBroker?.closeExecution(
+          await options.terminalBroker?.closeExecution(
             execution.record.executionId,
             'execution-ended'
           );
@@ -884,6 +917,15 @@ export const createRemoteExecutionHttpHandler = (
             ? 'invalid-request'
             : 'internal'
       );
+    } finally {
+      if (regionalPermit) {
+        try {
+          await regionalPermit.release();
+        } catch {
+          // Releasing a PostgreSQL transaction also releases its advisory lock
+          // when the connection is discarded. Never expose regional internals.
+        }
+      }
     }
   };
 };

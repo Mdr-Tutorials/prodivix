@@ -13,6 +13,7 @@ import {
   getRemoteExecutionTerminalCommandSize as commandSize,
   normalizeRemoteExecutionTerminalIdentifier as identifier,
   normalizeRemoteExecutionTerminalPositiveInteger as boundedPositiveInteger,
+  remoteExecutionTerminalDigestEqual as digestEqual,
   RemoteExecutionTerminalBrokerError,
   type StoredRemoteExecutionTerminal,
 } from './remoteExecutionTerminalBrokerSupport';
@@ -50,7 +51,10 @@ export const createRemoteExecutionTerminalWorkerBroker = (
       const resolved = await options.validateCurrentLease(stored);
       if (
         resolved.lease.workerId !== input.workerId ||
-        resolved.lease.token !== input.leaseToken
+        !digestEqual(
+          tokenDigest(resolved.lease.token),
+          tokenDigest(input.leaseToken)
+        )
       )
         return undefined;
       if (
@@ -102,7 +106,10 @@ export const createRemoteExecutionTerminalWorkerBroker = (
       }
       if (
         resolved.lease.workerId !== input.workerId ||
-        resolved.lease.token !== input.leaseToken
+        !digestEqual(
+          tokenDigest(resolved.lease.token),
+          tokenDigest(input.leaseToken)
+        )
       )
         return 'lease-rejected';
       if (stored.controller.session.getSnapshot().status === 'closed')
@@ -111,6 +118,14 @@ export const createRemoteExecutionTerminalWorkerBroker = (
         input.workerOutputId,
         'Remote Terminal worker output id'
       );
+      if (
+        workerOutputId.length >
+        REMOTE_EXECUTION_TERMINAL_LIMITS.maximumWorkerOutputIdLength
+      )
+        throw new RemoteExecutionTerminalBrokerError(
+          'invalid-request',
+          'Remote Terminal worker output id exceeds its budget.'
+        );
       const digest = tokenDigest(
         `${input.stream}\0${input.redacted ? '1' : '0'}\0${input.data}`
       );
@@ -159,7 +174,10 @@ export const createRemoteExecutionTerminalWorkerBroker = (
       }
       if (
         resolved.lease.workerId !== input.workerId ||
-        resolved.lease.token !== input.leaseToken
+        !digestEqual(
+          tokenDigest(resolved.lease.token),
+          tokenDigest(input.leaseToken)
+        )
       )
         return false;
       options.closeStored(stored, input.reason, input.exitCode);

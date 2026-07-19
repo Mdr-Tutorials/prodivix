@@ -13,7 +13,8 @@ import (
 )
 
 type remoteDataHTTPTransport struct {
-	client *http.Client
+	client       *http.Client
+	streamClient *http.Client
 }
 
 func publicAddress(address net.IP) bool {
@@ -67,13 +68,14 @@ func newRemoteDataHTTPTransport() DataGatewayTransport {
 		TLSHandshakeTimeout:   5 * time.Second,
 		ResponseHeaderTimeout: 15 * time.Second,
 	}
+	redirectPolicy := func(_ *http.Request, _ []*http.Request) error {
+		return errors.New("remote Data gateway redirects are disabled")
+	}
 	return &remoteDataHTTPTransport{client: &http.Client{
-		Transport: transport,
-		Timeout:   30 * time.Second,
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return errors.New("remote Data gateway redirects are disabled")
-		},
-	}}
+		Transport:     transport,
+		Timeout:       30 * time.Second,
+		CheckRedirect: redirectPolicy,
+	}, streamClient: &http.Client{Transport: transport, CheckRedirect: redirectPolicy}}
 }
 
 func (transport *remoteDataHTTPTransport) Execute(ctx context.Context, input DataGatewayTransportRequest) (*DataGatewayTransportResponse, error) {
@@ -88,7 +90,9 @@ func (transport *remoteDataHTTPTransport) Execute(ctx context.Context, input Dat
 	for name, value := range input.Headers {
 		request.Header.Set(name, value)
 	}
-	request.Header.Set("Accept", "application/json")
+	if request.Header.Get("Accept") == "" {
+		request.Header.Set("Accept", "application/json")
+	}
 	request.Header.Set("User-Agent", "Prodivix-Remote-Data-Gateway/1")
 	response, err := transport.client.Do(request)
 	if err != nil {
@@ -103,4 +107,30 @@ func (transport *remoteDataHTTPTransport) Execute(ctx context.Context, input Dat
 		return nil, ErrDataGatewayUpstream
 	}
 	return &DataGatewayTransportResponse{Status: response.StatusCode, Body: body}, nil
+}
+
+func (transport *remoteDataHTTPTransport) OpenStream(ctx context.Context, input DataGatewayTransportRequest) (*DataGatewayStreamTransportResponse, error) {
+	endpoint, err := url.Parse(input.URL)
+	if err != nil || endpoint.Scheme != "https" || endpoint.Host == "" {
+		return nil, ErrDataGatewayDenied
+	}
+	request, err := http.NewRequestWithContext(ctx, input.Method, input.URL, bytes.NewReader(input.Body))
+	if err != nil {
+		return nil, ErrDataGatewayInvalidRequest
+	}
+	for name, value := range input.Headers {
+		request.Header.Set(name, value)
+	}
+	request.Header.Set("User-Agent", "Prodivix-Remote-Data-Stream-Gateway/1")
+	response, err := transport.streamClient.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode < 100 || response.StatusCode > 599 {
+		response.Body.Close()
+		return nil, ErrDataGatewayUpstream
+	}
+	return &DataGatewayStreamTransportResponse{
+		Status: response.StatusCode, ContentType: response.Header.Get("Content-Type"), Body: response.Body,
+	}, nil
 }

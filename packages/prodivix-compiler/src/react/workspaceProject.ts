@@ -72,6 +72,7 @@ import {
 } from '#src/react/standaloneExecutionConsoleRuntime';
 import {
   analyzeWorkspaceDataRuntimeTarget,
+  PROVIDER_MOCK_DATA_RUNTIME_TARGET,
   type WorkspaceDataRuntimeTarget,
 } from '#src/react/workspaceDataRuntimeTarget';
 import {
@@ -302,7 +303,8 @@ const compileWorkspacePirDocuments = (input: {
   };
 };
 
-const createCodeContributions = (input: {
+/** Projects client-owned Workspace code while keeping Server Runtime source out of client bundles. */
+export const createWorkspaceCodeContribution = (input: {
   documents: readonly WorkspaceDocument[];
 }): {
   contribution: ExportProgramContribution;
@@ -398,7 +400,7 @@ const binaryAssetReferencesEqual = (
   left.byteLength === right.byteLength &&
   left.mediaType === right.mediaType;
 
-const createWorkspaceResourceContribution = (
+export const createWorkspaceResourceContribution = (
   documents: readonly WorkspaceDocument[],
   materializations: readonly BinaryAssetMaterialization[] = []
 ): ExportProgramContribution => {
@@ -1124,7 +1126,10 @@ export const compileWorkspaceToExportProgram = (
   const preset = createReactViteExportPreset();
   const dataRuntime = analyzeWorkspaceDataRuntimeTarget(
     workspace,
-    options.dataRuntimeTarget
+    options.dataRuntimeTarget ??
+      (options.dataMockProvision
+        ? PROVIDER_MOCK_DATA_RUNTIME_TARGET
+        : undefined)
   );
   const workspaceValidation = validateWorkspaceSnapshot(workspace);
   const validationDiagnostics: CompileDiagnostic[] =
@@ -1187,7 +1192,7 @@ export const compileWorkspaceToExportProgram = (
     options,
   });
   const compiledDocuments = pirCompilation.documents;
-  const code = createCodeContributions({
+  const code = createWorkspaceCodeContribution({
     documents: codeDocuments,
   });
   const routeContribution = createRouteExportContribution({

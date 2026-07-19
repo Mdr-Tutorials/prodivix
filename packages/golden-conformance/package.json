@@ -9,6 +9,10 @@
     "test": "pnpm run typecheck && vitest --config vitest.config.ts --run",
     "test:g2-auth-server-matrix": "pnpm exec tsc -b ../workspace ../prodivix-compiler --pretty false && pnpm run typecheck && vitest --config vitest.config.ts --run src/goldenG2AuthServerMatrix.conformance.test.ts",
     "test:g2-execution-matrix": "pnpm run typecheck && vitest --config vitest.config.ts --run src/goldenG2ExecutionMatrix.conformance.test.ts",
+    "test:g2-data-target-matrix": "pnpm exec tsc -b ../workspace ../prodivix-compiler --pretty false && pnpm run typecheck && vitest --config vitest.config.ts --run src/goldenG2DataTargetMatrix.conformance.test.ts src/goldenG2VueTarget.conformance.test.ts",
+    "test:g2-data-security-matrix": "pnpm exec tsc -b ../workspace ../prodivix-compiler --pretty false && pnpm run typecheck && vitest --config vitest.config.ts --run src/goldenG2DataSecurityMatrix.conformance.test.ts",
+    "test:g2-vue-target": "pnpm run test:g2-data-target-matrix && cross-env PRODIVIX_VERIFY_G2_VUE_TARGET=1 vitest --config vitest.config.ts --run src/goldenG2VueTarget.browser.test.ts",
+    "test:g2-vue-product": "pnpm exec tsc -b ../workspace ../prodivix-compiler --pretty false && pnpm run typecheck && vitest --config vitest.config.ts --run src/goldenG2VueCatalog.conformance.test.ts && cross-env PRODIVIX_VERIFY_G2_VUE_PRODUCT=1 vitest --config vitest.config.ts --run src/goldenG2VueCatalog.browser.test.ts",
     "test:watch": "vitest --config vitest.config.ts",
     "typecheck": "tsc -p tsconfig.json --pretty false"
   },
@@ -31,6 +35,7 @@
     "@types/node": "^26.1.0",
     "ajv": "^8.20.0",
     "fast-check": "^4.9.0",
+    "cross-env": "^10.1.0",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "vite": "^8.1.3",

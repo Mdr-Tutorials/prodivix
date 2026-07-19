@@ -599,6 +599,11 @@
       "remote": "Remote isolated",
       "remoteSignIn": "Remote (sign in)"
     },
+    "runTarget": {
+      "label": "Framework",
+      "react": "React / Vite",
+      "vue": "Vue / Vite"
+    },
     "modes": {
       "design": "Design",
       "designTitle": "Design mode (Ctrl+Alt+I)",

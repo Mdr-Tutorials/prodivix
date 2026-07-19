@@ -19,7 +19,7 @@ const workspace: WorkspaceSnapshot = {
       kind: 'dir',
       name: '/',
       parentId: null,
-      children: ['code-node'],
+      children: ['code-node', 'data-node'],
     },
     'code-node': {
       id: 'code-node',
@@ -27,6 +27,13 @@ const workspace: WorkspaceSnapshot = {
       name: 'auth.ts',
       parentId: 'root',
       docId: 'code-auth',
+    },
+    'data-node': {
+      id: 'data-node',
+      kind: 'doc',
+      name: 'catalog.data.json',
+      parentId: 'root',
+      docId: 'data-catalog',
     },
   },
   docsById: {
@@ -39,6 +46,34 @@ const workspace: WorkspaceSnapshot = {
       content: {
         language: 'ts',
         source: 'export const loadPrincipal = () => true;\n',
+      },
+    },
+    'data-catalog': {
+      id: 'data-catalog',
+      type: 'data-source',
+      path: '/catalog.data.json',
+      contentRev: 1,
+      metaRev: 1,
+      content: {
+        source: {
+          id: 'catalog',
+          adapterId: 'core.graphql',
+          runtimeZone: 'edge',
+          bindingsById: {},
+          configurationByKey: {},
+        },
+        schemasById: {
+          output: { id: 'output', schema: true },
+        },
+        operationsById: {
+          watch: {
+            id: 'watch',
+            kind: 'subscription',
+            outputSchemaId: 'output',
+            configurationByKey: {},
+            policies: {},
+          },
+        },
       },
     },
   },
@@ -94,6 +129,81 @@ describe('Workspace execution source navigation', () => {
       })
     ).toEqual({ status: 'unavailable', reason: 'snapshot-stale' });
     expect(useCodeAuthoringOverlayStore.getState().request).toBeNull();
+  });
+
+  it('opens an exact Data operation owner only after the snapshot fence passes', () => {
+    const opened: unknown[] = [];
+    const sourceTrace = {
+      sourceRef: {
+        kind: 'data-operation' as const,
+        documentId: 'data-catalog',
+        operationId: 'watch',
+      },
+      label: 'GraphQL subscription',
+    };
+    expect(
+      openWorkspaceExecutionSourceTrace({
+        workspace,
+        snapshotId: createWorkspaceExecutionSnapshotId(workspace),
+        sourceTrace,
+        originSurface: 'blueprint-canvas',
+        openDataOperation: (target) => {
+          opened.push(target);
+          return true;
+        },
+      })
+    ).toEqual({ status: 'opened' });
+    expect(opened).toEqual([
+      { documentId: 'data-catalog', operationId: 'watch' },
+    ]);
+
+    expect(
+      openWorkspaceExecutionSourceTrace({
+        workspace,
+        snapshotId: 'stale-snapshot',
+        sourceTrace,
+        originSurface: 'blueprint-canvas',
+        openDataOperation: () => {
+          throw new Error('Stale trace must not navigate.');
+        },
+      })
+    ).toEqual({ status: 'unavailable', reason: 'snapshot-stale' });
+  });
+
+  it('delegates non-code execution owners only after the same snapshot fence', () => {
+    const opened: unknown[] = [];
+    const sourceTrace = {
+      sourceRef: {
+        kind: 'nodegraph-node' as const,
+        documentId: 'graph-main',
+        nodeId: 'node-request',
+      },
+    };
+    expect(
+      openWorkspaceExecutionSourceTrace({
+        workspace,
+        snapshotId: createWorkspaceExecutionSnapshotId(workspace),
+        sourceTrace,
+        originSurface: 'nodegraph',
+        openSemanticTarget: (trace) => {
+          opened.push(trace);
+          return true;
+        },
+      })
+    ).toEqual({ status: 'opened' });
+    expect(opened).toEqual([sourceTrace]);
+
+    expect(
+      openWorkspaceExecutionSourceTrace({
+        workspace,
+        snapshotId: 'stale-snapshot',
+        sourceTrace,
+        originSurface: 'nodegraph',
+        openSemanticTarget: () => {
+          throw new Error('Stale trace must not navigate.');
+        },
+      })
+    ).toEqual({ status: 'unavailable', reason: 'snapshot-stale' });
   });
 
   it('rejects non-CodeArtifact and unavailable source targets', () => {

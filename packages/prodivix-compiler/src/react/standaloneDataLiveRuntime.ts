@@ -94,7 +94,7 @@ type DataRuntimeCachePolicy = Readonly<{
 
 type DataRuntimeOperation = Readonly<{
   id: string;
-  kind: 'query' | 'mutation';
+  kind: 'query' | 'mutation' | 'subscription';
   inputSchemaId?: string;
   outputSchemaId: string;
   configurationByKey: Readonly<Record<string, DataRuntimeConfigurationValue>>;
@@ -127,15 +127,21 @@ type DataRuntimeDocument = Readonly<{
   operationsById: Readonly<Record<string, DataRuntimeOperation>>;
 }>;
 
-type DataRuntimeResult = Readonly<{ value: unknown; empty: boolean; page?: unknown }>;
+type DataRuntimeResult = Readonly<{
+  value: unknown;
+  empty: boolean;
+  page?: unknown;
+  attempt?: number;
+}>;
 type DataRuntimeManifest = Readonly<{ format: 'prodivix.executable-data-runtime.v1'; mode: 'mock' | 'live' }>;
+type DataRuntimeLiveAdapter = 'core.http' | 'core.graphql' | 'core.asyncapi';
 type DataRuntimeNetworkTrace = Readonly<{
   format: 'prodivix.execution-network-trace.v1';
   requestId: string;
   phase: 'runtime';
   runtimeZone: 'client' | 'server' | 'edge';
   mode: 'live';
-  adapter: 'core.http';
+  adapter: DataRuntimeLiveAdapter;
   method: string;
   sanitizedUrl: string;
   protocol: 'http' | 'https';
@@ -154,6 +160,14 @@ type DataRuntimeNetworkTrace = Readonly<{
     sequence: number;
     attempt: number;
   }>;
+  sourceTrace?: readonly Readonly<{
+    sourceRef: Readonly<{
+      kind: 'data-operation';
+      documentId: string;
+      operationId: string;
+    }>;
+    label?: string;
+  }>[];
   redacted: true;
   truncated?: boolean;
 }>;
@@ -166,15 +180,56 @@ type DataGatewayBridgeResponse = Readonly<{
   error?: Readonly<{ code: string; retryable: boolean }>;
 }>;
 
+type DataStreamBridgeMessage =
+  | Readonly<{
+      type: 'prodivix.execution-data-stream.v1';
+      requestId: string;
+      phase: 'open';
+      network: DataRuntimeNetworkTrace;
+    }>
+  | Readonly<{
+      type: 'prodivix.execution-data-stream.v1';
+      requestId: string;
+      phase: 'event';
+      cursor: number;
+      value: unknown;
+    }>
+  | Readonly<{
+      type: 'prodivix.execution-data-stream.v1';
+      requestId: string;
+      phase: 'complete';
+      cursor: number;
+    }>
+  | Readonly<{
+      type: 'prodivix.execution-data-stream.v1';
+      requestId: string;
+      phase: 'error';
+      code: string;
+      retryable: boolean;
+    }>;
+
+type DataRuntimeStreamEvent = Readonly<{
+  cursor: number;
+  value: unknown;
+}>;
+
+type DataRuntimeStreamSession = Readonly<{
+  network: DataRuntimeNetworkTrace;
+  next(): Promise<DataRuntimeStreamEvent | undefined>;
+  close(): void;
+}>;
+
 class DataRuntimeFailure extends Error {
   readonly code: string;
   readonly retryable: boolean;
+  readonly attempt: number;
 
-  constructor(code: string, retryable = false) {
+  constructor(code: string, retryable = false, attempt = 1) {
     super(code);
     this.name = 'DataRuntimeFailure';
     this.code = code;
     this.retryable = retryable;
+    this.attempt = attempt;
   }
 }
 
@@ -182,10 +237,15 @@ const remoteGatewaySafeErrorCodes = new Set([
   'DATA_REMOTE_GATEWAY_UNAVAILABLE',
   'DATA_REMOTE_GATEWAY_DENIED',
   'DATA_REMOTE_GATEWAY_INVALID',
+  'DATA_REMOTE_GATEWAY_STALE',
   'DATA_HTTP_REQUEST_FAILED',
+  'DATA_GRAPHQL_REQUEST_FAILED',
+  'DATA_ASYNCAPI_REQUEST_FAILED',
   'DATA_MUTATION_REPLAY_CONFLICT',
   'DATA_MUTATION_REPLAY_UNSAFE',
   'DATA_MUTATION_REPLAY_CAPACITY',
+  'DATA_STREAM_CONFLICT',
+  'DATA_STREAM_CAPACITY',
 ]);
 
 const runtimeFailureCode = (error: unknown): string => {
@@ -237,11 +297,12 @@ const literalConfiguration = (
 };
 
 const literalConfigurationString = (
-  value: DataRuntimeConfigurationValue | undefined
+  value: DataRuntimeConfigurationValue | undefined,
+  code = 'DATA_HTTP_CONFIGURATION_INVALID'
 ): string => {
-  const resolved = literalConfiguration(value);
+  const resolved = literalConfiguration(value, code);
   if (typeof resolved !== 'string' || !resolved || resolved !== resolved.trim())
-    throw new DataRuntimeFailure('DATA_HTTP_CONFIGURATION_INVALID');
+    throw new DataRuntimeFailure(code);
   return resolved;
 };
 
@@ -382,15 +443,19 @@ const privateHostname = (hostname: string): boolean => {
     (first === 192 && second === 168) || first! >= 224;
 };
 
-const httpEndpoint = (baseUrl: string, path: string): URL => {
+const httpEndpoint = (
+  baseUrl: string,
+  path: string,
+  code = 'DATA_HTTP_CONFIGURATION_INVALID'
+): URL => {
   let base: URL;
   try { base = new URL(baseUrl); }
-  catch { throw new DataRuntimeFailure('DATA_HTTP_CONFIGURATION_INVALID'); }
+  catch { throw new DataRuntimeFailure(code); }
   if (
     !['http:', 'https:'].includes(base.protocol) || base.username || base.password ||
     base.search || base.hash || privateHostname(base.hostname) ||
     !path.startsWith('/') || path.startsWith('//')
-  ) throw new DataRuntimeFailure('DATA_HTTP_CONFIGURATION_INVALID');
+  ) throw new DataRuntimeFailure(code);
   return new URL(path, base);
 };
 
@@ -405,7 +470,122 @@ const appendHttpQuery = (url: URL, input: unknown): void => {
   }
 };
 
+type DataRuntimeHttpParameterLocation = 'path' | 'query' | 'header';
+type DataRuntimeHttpParameterMappings = Readonly<
+  Record<DataRuntimeHttpParameterLocation, Readonly<Record<string, string>>>
+>;
+
+const runtimeHttpRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const runtimeHttpPointer = (value: unknown): string => {
+  if (
+    typeof value !== 'string' || !value.startsWith('/') ||
+    /~(?:[^01]|$)/u.test(value)
+  ) throw new DataRuntimeFailure('DATA_HTTP_CONFIGURATION_INVALID');
+  return value;
+};
+
+const readRuntimeHttpParameterMappings = (
+  value: DataRuntimeConfigurationValue | undefined
+): DataRuntimeHttpParameterMappings | undefined => {
+  if (!value) return undefined;
+  const raw = literalConfiguration(value);
+  if (!runtimeHttpRecord(raw))
+    throw new DataRuntimeFailure('DATA_HTTP_CONFIGURATION_INVALID');
+  const allowed = new Set<DataRuntimeHttpParameterLocation>(['path', 'query', 'header']);
+  const result: Record<DataRuntimeHttpParameterLocation, Readonly<Record<string, string>>> = {
+    path: Object.freeze({}), query: Object.freeze({}), header: Object.freeze({}),
+  };
+  for (const [location, rawMappings] of Object.entries(raw)) {
+    if (!allowed.has(location as DataRuntimeHttpParameterLocation) || !runtimeHttpRecord(rawMappings))
+      throw new DataRuntimeFailure('DATA_HTTP_CONFIGURATION_INVALID');
+    const mappings: Record<string, string> = {};
+    for (const [wireName, pointer] of Object.entries(rawMappings)) {
+      if (!wireName || wireName !== wireName.trim())
+        throw new DataRuntimeFailure('DATA_HTTP_CONFIGURATION_INVALID');
+      if (
+        location === 'header' &&
+        (wireName !== wireName.toLowerCase() || wireName.length > 128 ||
+          !/^[!#$%&'*+.^_|~0-9a-z-]+$/u.test(wireName) ||
+          ['authorization', 'connection', 'content-length', 'content-type', 'cookie', 'host', 'proxy-authorization', 'set-cookie', 'transfer-encoding'].includes(wireName))
+      ) throw new DataRuntimeFailure('DATA_HTTP_CONFIGURATION_INVALID');
+      mappings[wireName] = runtimeHttpPointer(pointer);
+    }
+    result[location as DataRuntimeHttpParameterLocation] = Object.freeze(mappings);
+  }
+  return Object.freeze(result);
+};
+
+const runtimeHttpScalar = (
+  input: unknown,
+  pointer: string,
+  required: boolean
+): string | undefined => {
+  const value = optionalPointer(input, pointer);
+  if (value === undefined || value === null) {
+    if (required) throw new DataRuntimeFailure('DATA_HTTP_INPUT_INVALID');
+    return undefined;
+  }
+  if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean')
+    throw new DataRuntimeFailure('DATA_HTTP_INPUT_INVALID');
+  const result = String(value);
+  if (result.includes('\r') || result.includes('\n'))
+    throw new DataRuntimeFailure('DATA_HTTP_INPUT_INVALID');
+  return result;
+};
+
+const mapRuntimeHttpRequest = (
+  path: string,
+  input: unknown,
+  operationKind: 'query' | 'mutation',
+  mappings: DataRuntimeHttpParameterMappings | undefined,
+  bodyInputPath: string | undefined
+): Readonly<{
+  path: string;
+  query: Readonly<Record<string, string>>;
+  headers: Readonly<Record<string, string>>;
+  body?: unknown;
+  legacyQuery?: unknown;
+}> => {
+  if (!mappings && !bodyInputPath) {
+    return Object.freeze({
+      path,
+      query: Object.freeze({}),
+      headers: Object.freeze({}),
+      ...(operationKind === 'query' ? { legacyQuery: input } : { body: input }),
+    });
+  }
+  let mappedPath = path;
+  const query: Record<string, string> = {};
+  const headers: Record<string, string> = {};
+  for (const [wireName, pointer] of Object.entries(mappings?.path ?? {})) {
+    const value = runtimeHttpScalar(input, pointer, true)!;
+    const token = '{' + wireName + '}';
+    if (!mappedPath.includes(token))
+      throw new DataRuntimeFailure('DATA_HTTP_CONFIGURATION_INVALID');
+    mappedPath = mappedPath.replaceAll(token, encodeURIComponent(value));
+  }
+  if (/[{}]/u.test(mappedPath)) throw new DataRuntimeFailure('DATA_HTTP_INPUT_INVALID');
+  for (const [wireName, pointer] of Object.entries(mappings?.query ?? {})) {
+    const value = runtimeHttpScalar(input, pointer, false);
+    if (value !== undefined) query[wireName] = value;
+  }
+  for (const [wireName, pointer] of Object.entries(mappings?.header ?? {})) {
+    const value = runtimeHttpScalar(input, pointer, false);
+    if (value !== undefined) headers[wireName] = value;
+  }
+  const body = bodyInputPath ? optionalPointer(input, bodyInputPath) : undefined;
+  return Object.freeze({
+    path: mappedPath,
+    query: Object.freeze(query),
+    headers: Object.freeze(headers),
+    ...(body === undefined ? {} : { body }),
+  });
+};
+
 const createNetworkTrace = (input: Readonly<{
+  adapter?: DataRuntimeLiveAdapter;
   requestId: string;
   documentId: string;
   operationId: string;
@@ -427,7 +607,7 @@ const createNetworkTrace = (input: Readonly<{
   phase: 'runtime',
   runtimeZone: 'client',
   mode: 'live',
-  adapter: 'core.http',
+  adapter: input.adapter ?? 'core.http',
   method: input.method,
   sanitizedUrl: input.url.origin + '/',
   protocol: input.url.protocol === 'https:' ? 'https' : 'http',
@@ -450,6 +630,234 @@ const createNetworkTrace = (input: Readonly<{
   ...(input.truncated ? { truncated: true } : {}),
 });
 
+const protocolEndpoint = (value: string, code: string): URL => {
+  let url: URL;
+  try { url = new URL(value); }
+  catch { throw new DataRuntimeFailure(code); }
+  if (
+    !['http:', 'https:'].includes(url.protocol) || url.username || url.password ||
+    url.search || url.hash || privateHostname(url.hostname)
+  ) throw new DataRuntimeFailure(code);
+  return url;
+};
+
+const protocolHeader = (value: string, code: string): string => {
+  if (
+    value !== value.toLowerCase() || value.length > 128 ||
+    !/^[!#$%&'*+.^_|~0-9a-z-]+$/u.test(value) ||
+    ['authorization', 'connection', 'content-length', 'content-type', 'cookie', 'host',
+      'proxy-authorization', 'set-cookie', 'transfer-encoding'].includes(value)
+  ) throw new DataRuntimeFailure(code);
+  return value;
+};
+
+const protocolPointer = (value: string, code: string): string => {
+  if ((value !== '' && !value.startsWith('/')) || /~(?:[^01]|$)/u.test(value))
+    throw new DataRuntimeFailure(code);
+  return value;
+};
+
+const selectProtocolPointer = (
+  value: unknown,
+  pointer: string,
+  code: string
+): unknown => {
+  if (pointer === '') return cloneJson(value);
+  try { return selectPointer(value, pointer); }
+  catch (error) {
+    if (runtimeFailureCode(error) === 'DATA_INPUT_VALUE_MISSING') return undefined;
+    throw new DataRuntimeFailure(code);
+  }
+};
+
+const executeClientJsonRequest = async (input: Readonly<{
+  adapter: DataRuntimeLiveAdapter;
+  url: URL;
+  headers: Readonly<Record<string, string>>;
+  body: string;
+  requestId: string;
+  documentId: string;
+  operationId: string;
+  invocationId: string;
+  sequence: number;
+  attempt: number;
+  requestFailureCode: string;
+  statusFailureCode: string;
+  responseLimitCode: string;
+  publishNetworkTrace(trace: DataRuntimeNetworkTrace): void;
+}>): Promise<Uint8Array> => {
+  const requestBytes = new TextEncoder().encode(input.body).byteLength;
+  if (requestBytes > 4 * 1024 * 1024)
+    throw new DataRuntimeFailure(input.responseLimitCode);
+  const startedAt = Date.now();
+  let response: Response;
+  try {
+    response = await fetch(input.url, {
+      method: 'POST',
+      headers: input.headers,
+      body: input.body,
+      credentials: 'omit',
+      redirect: 'error',
+      referrerPolicy: 'no-referrer',
+      cache: 'no-store',
+    });
+  } catch {
+    const completedAt = Date.now();
+    publishProtocolTrace(input, startedAt, completedAt, 'failed', requestBytes);
+    throw new DataRuntimeFailure(input.requestFailureCode, true);
+  }
+  let contents: Uint8Array;
+  try { contents = new Uint8Array(await response.arrayBuffer()); }
+  catch {
+    const completedAt = Date.now();
+    publishProtocolTrace(input, startedAt, completedAt, 'failed', requestBytes);
+    throw new DataRuntimeFailure(input.requestFailureCode, true);
+  }
+  const completedAt = Date.now();
+  const truncated = contents.byteLength > 4 * 1024 * 1024;
+  publishProtocolTrace(
+    input,
+    startedAt,
+    completedAt,
+    'allowed',
+    requestBytes,
+    response.status,
+    contents.byteLength,
+    truncated
+  );
+  if (truncated) throw new DataRuntimeFailure(input.responseLimitCode);
+  if (!response.ok)
+    throw new DataRuntimeFailure(
+      input.statusFailureCode,
+      response.status === 408 || response.status === 429 || response.status >= 500
+    );
+  return contents;
+};
+
+const publishProtocolTrace = (
+  input: Readonly<{
+    adapter: DataRuntimeLiveAdapter;
+    url: URL;
+    requestId: string;
+    documentId: string;
+    operationId: string;
+    invocationId: string;
+    sequence: number;
+    attempt: number;
+    publishNetworkTrace(trace: DataRuntimeNetworkTrace): void;
+  }>,
+  startedAt: number,
+  completedAt: number,
+  outcome: 'allowed' | 'failed',
+  requestBytes: number,
+  status?: number,
+  responseBytes?: number,
+  truncated = false
+): void => input.publishNetworkTrace(createNetworkTrace({
+  adapter: input.adapter,
+  requestId: input.requestId,
+  documentId: input.documentId,
+  operationId: input.operationId,
+  invocationId: input.invocationId,
+  sequence: input.sequence,
+  attempt: input.attempt,
+  method: 'POST',
+  url: input.url,
+  startedAt,
+  completedAt,
+  outcome,
+  ...(status === undefined ? {} : { status }),
+  requestBytes,
+  ...(responseBytes === undefined ? {} : { responseBytes }),
+  ...(truncated ? { truncated: true } : {}),
+}));
+
+const decodeBoundedProtocolJson = (
+  contents: Uint8Array,
+  invalidCode: string,
+  limitCode: string
+): unknown => {
+  let value: unknown;
+  try {
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(contents);
+    value = JSON.parse(text);
+  } catch { throw new DataRuntimeFailure(invalidCode); }
+  let nodes = 0;
+  const visit = (candidate: unknown, depth: number): unknown => {
+    nodes += 1;
+    if (nodes > 100000 || depth > 64) throw new DataRuntimeFailure(limitCode);
+    if (
+      candidate === null || typeof candidate === 'string' ||
+      typeof candidate === 'boolean'
+    ) return candidate;
+    if (typeof candidate === 'number') {
+      if (!Number.isFinite(candidate)) throw new DataRuntimeFailure(invalidCode);
+      return candidate;
+    }
+    if (Array.isArray(candidate))
+      return Object.freeze(candidate.map((entry) => visit(entry, depth + 1)));
+    if (!runtimeHttpRecord(candidate)) throw new DataRuntimeFailure(invalidCode);
+    return Object.freeze(Object.fromEntries(
+      Object.entries(candidate)
+        .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+        .map(([key, entry]) => [key, visit(entry, depth + 1)])
+    ));
+  };
+  return visit(value, 0);
+};
+
+const finiteGraphqlOperation = (
+  document: string,
+  operationName: string | undefined,
+  expectedKind: 'query' | 'mutation'
+): void => {
+  if (new TextEncoder().encode(document).byteLength > 128 * 1024)
+    throw new DataRuntimeFailure('DATA_GRAPHQL_DOCUMENT_LIMIT_EXCEEDED');
+  const withoutComments = document.replace(/#[^\r\n]*/gu, ' ');
+  const declarations = [...withoutComments.matchAll(
+    /\b(query|mutation|subscription)\s+([_A-Za-z][_0-9A-Za-z]*)/gu
+  )];
+  if (
+    declarations.length !== 1 || declarations[0]?.[1] !== expectedKind ||
+    (operationName !== undefined && declarations[0]?.[2] !== operationName)
+  ) throw new DataRuntimeFailure('DATA_GRAPHQL_OPERATION_UNSUPPORTED');
+};
+
+const protocolIdempotency = async (input: Readonly<{
+  documentId: string;
+  document: DataRuntimeDocument;
+  operation: DataRuntimeOperation;
+  operationInput: unknown;
+  invocationId: string;
+  sequence: number;
+  code: string;
+}>): Promise<Readonly<{ header: string; key: string }> | undefined> => {
+  const configured = input.operation.configurationByKey.idempotencyHeader;
+  const policy = input.operation.policies.idempotency;
+  if (!policy) {
+    if (configured) throw new DataRuntimeFailure(input.code);
+    return undefined;
+  }
+  if (input.operation.kind !== 'mutation' || policy.kind !== 'invocation-key')
+    throw new DataRuntimeFailure(input.code);
+  const header = protocolHeader(
+    literalConfigurationString(configured, input.code),
+    input.code
+  );
+  return Object.freeze({
+    header,
+    key: await dataIdempotencyKey({
+      documentId: input.documentId,
+      operationId: input.operation.id,
+      invocationId: input.invocationId,
+      sequence: input.sequence,
+      documentRevision: input.document.revision,
+      runtimeZone: input.document.source.runtimeZone,
+      operationInput: input.operationInput,
+    }),
+  });
+};
+
 const exactBridgeRecord = (
   value: unknown,
   required: readonly string[],
@@ -464,11 +872,43 @@ const exactBridgeRecord = (
     : undefined;
 };
 
+const readGatewaySourceTrace = (
+  value: unknown,
+  documentId: string,
+  operationId: string
+): DataRuntimeNetworkTrace['sourceTrace'] | undefined => {
+  if (value === undefined) return Object.freeze([]);
+  if (!Array.isArray(value) || value.length < 1 || value.length > 16)
+    return undefined;
+  const traces = value.map((entry) => {
+    const record = exactBridgeRecord(entry, ['sourceRef'], ['label']);
+    const sourceRef = exactBridgeRecord(record?.sourceRef, [
+      'kind', 'documentId', 'operationId',
+    ]);
+    if (
+      !record || !sourceRef || sourceRef.kind !== 'data-operation' ||
+      sourceRef.documentId !== documentId || sourceRef.operationId !== operationId ||
+      (record.label !== undefined &&
+        (typeof record.label !== 'string' || !record.label || record.label.length > 512))
+    ) throw new DataRuntimeFailure('DATA_REMOTE_GATEWAY_INVALID');
+    return Object.freeze({
+      sourceRef: Object.freeze({
+        kind: 'data-operation' as const,
+        documentId,
+        operationId,
+      }),
+      ...(record.label ? { label: record.label as string } : {}),
+    });
+  });
+  return Object.freeze(traces);
+};
+
 const readGatewayNetworkTrace = (
   value: unknown,
   input: Readonly<{
     documentId: string;
     operationId: string;
+    adapterId: DataRuntimeLiveAdapter;
     invocationId: string;
     sequence: number;
     attempt: number;
@@ -478,18 +918,26 @@ const readGatewayNetworkTrace = (
     'format', 'requestId', 'phase', 'runtimeZone', 'mode', 'adapter', 'method',
     'sanitizedUrl', 'protocol', 'startedAt', 'completedAt', 'durationMs',
     'outcome', 'correlation', 'redacted',
-  ], ['status', 'requestBytes', 'responseBytes', 'truncated']);
+  ], ['status', 'requestBytes', 'responseBytes', 'sourceTrace', 'truncated']);
   const correlation = exactBridgeRecord(record?.correlation, [
     'kind', 'documentId', 'operationId', 'invocationId', 'sequence', 'attempt',
   ]);
   let sanitizedUrl: URL;
   try { sanitizedUrl = new URL(String(record?.sanitizedUrl)); }
   catch { return undefined; }
+  let sourceTrace: DataRuntimeNetworkTrace['sourceTrace'];
+  try {
+    sourceTrace = readGatewaySourceTrace(
+      record?.sourceTrace,
+      input.documentId,
+      input.operationId
+    );
+  } catch { return undefined; }
   if (
     !record || !correlation ||
     record.format !== 'prodivix.execution-network-trace.v1' ||
     record.phase !== 'runtime' || !['server', 'edge'].includes(String(record.runtimeZone)) ||
-    record.mode !== 'live' || record.adapter !== 'core.http' || record.redacted !== true ||
+    record.mode !== 'live' || record.adapter !== input.adapterId || record.redacted !== true ||
     !['https:'].includes(sanitizedUrl.protocol) || sanitizedUrl.pathname !== '/' ||
     sanitizedUrl.username || sanitizedUrl.password || sanitizedUrl.search || sanitizedUrl.hash ||
     correlation.kind !== 'data-operation' || correlation.documentId !== input.documentId ||
@@ -504,9 +952,13 @@ const readGatewayNetworkTrace = (
     (record.status !== undefined && (!Number.isSafeInteger(record.status) || Number(record.status) < 100 || Number(record.status) > 599)) ||
     (record.requestBytes !== undefined && (!Number.isSafeInteger(record.requestBytes) || Number(record.requestBytes) < 0)) ||
     (record.responseBytes !== undefined && (!Number.isSafeInteger(record.responseBytes) || Number(record.responseBytes) < 0)) ||
-    (record.truncated !== undefined && typeof record.truncated !== 'boolean')
+    (record.truncated !== undefined && typeof record.truncated !== 'boolean') ||
+    sourceTrace === undefined
   ) return undefined;
-  return Object.freeze(cloneJson(record)) as DataRuntimeNetworkTrace;
+  return Object.freeze({
+    ...cloneJson(record),
+    ...(sourceTrace.length ? { sourceTrace } : {}),
+  }) as DataRuntimeNetworkTrace;
 };
 
 const invokeRemoteDataGateway = async (input: Readonly<{
@@ -550,6 +1002,7 @@ const invokeRemoteDataGateway = async (input: Readonly<{
       requestId,
       documentId: input.documentId,
       operationId: input.operation.id,
+      adapterId: input.document.source.adapterId,
       invocationId: input.invocationId,
       sequence: input.sequence,
       attempt: input.attempt,
@@ -568,6 +1021,7 @@ const invokeRemoteDataGateway = async (input: Readonly<{
   const network = readGatewayNetworkTrace(result?.network, {
     documentId: input.documentId,
     operationId: input.operation.id,
+    adapterId: input.document.source.adapterId as DataRuntimeLiveAdapter,
     invocationId: input.invocationId,
     sequence: input.sequence,
     attempt: input.attempt,
@@ -584,6 +1038,215 @@ const invokeRemoteDataGateway = async (input: Readonly<{
   });
 };
 
+const openRemoteDataStream = async (input: Readonly<{
+  documentId: string;
+  document: DataRuntimeDocument;
+  operation: DataRuntimeOperation;
+  operationInput: unknown;
+  invocationId: string;
+  sequence: number;
+  publishNetworkTrace(trace: DataRuntimeNetworkTrace): void;
+}>): Promise<DataRuntimeStreamSession> => {
+  if (
+    input.operation.kind !== 'subscription' ||
+    !['server', 'edge'].includes(input.document.source.runtimeZone) ||
+    !['core.graphql', 'core.asyncapi'].includes(input.document.source.adapterId)
+  ) throw new DataRuntimeFailure('DATA_STREAM_OPERATION_UNAVAILABLE');
+  if (dataRuntimeTarget.serverGateway !== 'execution-data-gateway-message-v1')
+    throw new DataRuntimeFailure('DATA_REMOTE_GATEWAY_UNAVAILABLE');
+  const runtimeWindow = globalThis as unknown as Window;
+  const parent = runtimeWindow.parent;
+  if (!parent || parent === runtimeWindow)
+    throw new DataRuntimeFailure('DATA_REMOTE_GATEWAY_UNAVAILABLE', true);
+  const requestId = input.invocationId + ':stream';
+  let cursor = 0;
+  let eventCount = 0;
+  let totalBytes = 0;
+  let pending = false;
+  let terminal = false;
+  let cancelPending: (() => void) | undefined;
+
+  const readMessage = (value: unknown): DataStreamBridgeMessage | undefined => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+    const phase = (value as Record<string, unknown>).phase;
+    if (phase === 'open') {
+      const record = exactBridgeRecord(value, ['type', 'requestId', 'phase', 'network']);
+      const network = readGatewayNetworkTrace(record?.network, {
+        documentId: input.documentId,
+        operationId: input.operation.id,
+        adapterId: input.document.source.adapterId as DataRuntimeLiveAdapter,
+        invocationId: input.invocationId,
+        sequence: input.sequence,
+        attempt: 1,
+      });
+      return record?.type === 'prodivix.execution-data-stream.v1' &&
+        record.requestId === requestId && network
+        ? Object.freeze({ type: record.type, requestId, phase: 'open', network })
+        : undefined;
+    }
+    if (phase === 'event') {
+      const record = exactBridgeRecord(value, ['type', 'requestId', 'phase', 'cursor', 'value']);
+      if (
+        record?.type !== 'prodivix.execution-data-stream.v1' ||
+        record.requestId !== requestId || record.cursor !== cursor + 1 ||
+        !Number.isSafeInteger(record.cursor) || Number(record.cursor) > 256
+      ) return undefined;
+      let cloned: unknown;
+      try {
+        cloned = cloneJson(record.value);
+        if (new TextEncoder().encode(canonicalJson(cloned)).byteLength > 256 * 1024)
+          return undefined;
+      } catch { return undefined; }
+      return Object.freeze({
+        type: record.type,
+        requestId,
+        phase: 'event',
+        cursor: record.cursor as number,
+        value: cloned,
+      });
+    }
+    if (phase === 'complete') {
+      const record = exactBridgeRecord(value, ['type', 'requestId', 'phase', 'cursor']);
+      return record?.type === 'prodivix.execution-data-stream.v1' &&
+        record.requestId === requestId && record.cursor === cursor
+        ? Object.freeze({ type: record.type, requestId, phase: 'complete', cursor })
+        : undefined;
+    }
+    if (phase === 'error') {
+      const record = exactBridgeRecord(value, ['type', 'requestId', 'phase', 'code', 'retryable']);
+      return record?.type === 'prodivix.execution-data-stream.v1' &&
+        record.requestId === requestId && typeof record.code === 'string' &&
+        remoteGatewaySafeErrorCodes.has(record.code) && typeof record.retryable === 'boolean'
+        ? Object.freeze({
+            type: record.type,
+            requestId,
+            phase: 'error',
+            code: record.code,
+            retryable: record.retryable,
+          })
+        : undefined;
+    }
+    return undefined;
+  };
+
+  const waitForMessage = (): Promise<DataStreamBridgeMessage> =>
+    new Promise((resolve, reject) => {
+      const cleanup = (): void => {
+        globalThis.clearTimeout(timeout);
+        globalThis.removeEventListener('message', onMessage);
+        if (cancelPending === cancel) cancelPending = undefined;
+      };
+      const cancel = (): void => {
+        cleanup();
+        reject(new DataRuntimeFailure('DATA_STREAM_CLOSED'));
+      };
+      const timeout = globalThis.setTimeout(() => {
+        cleanup();
+        reject(new DataRuntimeFailure('DATA_REMOTE_GATEWAY_TIMEOUT', true));
+      }, 30_000);
+      const onMessage = (event: MessageEvent<unknown>): void => {
+        if (event.source !== parent) return;
+        const candidate = event.data as Readonly<Record<string, unknown>> | undefined;
+        if (
+          !candidate || candidate.type !== 'prodivix.execution-data-stream.v1' ||
+          candidate.requestId !== requestId
+        ) return;
+        const message = readMessage(event.data);
+        cleanup();
+        if (!message) {
+          reject(new DataRuntimeFailure('DATA_REMOTE_GATEWAY_INVALID'));
+          return;
+        }
+        resolve(message);
+      };
+      cancelPending = cancel;
+      globalThis.addEventListener('message', onMessage);
+    });
+
+  const opening = waitForMessage();
+  parent.postMessage(Object.freeze({
+    type: 'prodivix.execution-data-stream-open.v1',
+    requestId,
+    documentId: input.documentId,
+    operationId: input.operation.id,
+    adapterId: input.document.source.adapterId,
+    invocationId: input.invocationId,
+    sequence: input.sequence,
+    attempt: 1,
+    input: cloneJson(input.operationInput),
+  }), '*');
+  let opened: DataStreamBridgeMessage;
+  try { opened = await opening; }
+  catch (error) {
+    parent.postMessage(Object.freeze({
+      type: 'prodivix.execution-data-stream-cancel.v1', requestId,
+    }), '*');
+    throw error;
+  }
+  if (opened.phase === 'error')
+    throw new DataRuntimeFailure(opened.code, opened.retryable);
+  if (opened.phase !== 'open')
+    throw new DataRuntimeFailure('DATA_REMOTE_GATEWAY_INVALID');
+  input.publishNetworkTrace(opened.network);
+  return Object.freeze({
+    network: opened.network,
+    async next() {
+      if (terminal) return undefined;
+      if (pending) throw new DataRuntimeFailure('DATA_STREAM_CONFLICT');
+      pending = true;
+      try {
+        const response = waitForMessage();
+        parent.postMessage(Object.freeze({
+          type: 'prodivix.execution-data-stream-pull.v1', requestId, cursor,
+        }), '*');
+        const message = await response;
+        if (message.phase === 'event') {
+          validateRuntimePayload(
+            input.documentId,
+            input.document,
+            input.operation.outputSchemaId,
+            message.value,
+            'output'
+          );
+          const bytes = new TextEncoder().encode(canonicalJson(message.value)).byteLength;
+          eventCount += 1;
+          totalBytes += bytes;
+          if (eventCount > 256 || totalBytes > 4 * 1024 * 1024) {
+            terminal = true;
+            parent.postMessage(Object.freeze({
+              type: 'prodivix.execution-data-stream-cancel.v1', requestId,
+            }), '*');
+            throw new DataRuntimeFailure('DATA_STREAM_CAPACITY');
+          }
+          cursor = message.cursor;
+          return Object.freeze({ cursor, value: message.value });
+        }
+        terminal = true;
+        if (message.phase === 'complete') return undefined;
+        if (message.phase === 'error')
+          throw new DataRuntimeFailure(message.code, message.retryable);
+        throw new DataRuntimeFailure('DATA_REMOTE_GATEWAY_INVALID');
+      } catch (error) {
+        if (!terminal) {
+          terminal = true;
+          parent.postMessage(Object.freeze({
+            type: 'prodivix.execution-data-stream-cancel.v1', requestId,
+          }), '*');
+        }
+        throw error;
+      } finally { pending = false; }
+    },
+    close() {
+      if (terminal) return;
+      terminal = true;
+      cancelPending?.();
+      parent.postMessage(Object.freeze({
+        type: 'prodivix.execution-data-stream-cancel.v1', requestId,
+      }), '*');
+    },
+  });
+};
+
 const invokeLiveHttp = async (input: Readonly<{
   documentId: string;
   document: DataRuntimeDocument;
@@ -596,12 +1259,16 @@ const invokeLiveHttp = async (input: Readonly<{
 }>): Promise<DataRuntimeResult> => {
   if (input.document.source.adapterId !== 'core.http')
     throw new DataRuntimeFailure('DATA_ADAPTER_UNAVAILABLE');
+  if (input.operation.kind === 'subscription')
+    throw new DataRuntimeFailure('DATA_STREAM_OPERATION_UNAVAILABLE');
   if (['server', 'edge'].includes(input.document.source.runtimeZone))
     return invokeRemoteDataGateway(input);
   if (input.document.source.runtimeZone !== 'client')
     throw new DataRuntimeFailure('DATA_STANDALONE_RUNTIME_ZONE_UNAVAILABLE');
   if (input.document.source.configurationByKey.authorization)
     literalConfiguration(input.document.source.configurationByKey.authorization);
+  if (input.operation.configurationByKey.authorization)
+    literalConfiguration(input.operation.configurationByKey.authorization);
   const baseUrl = literalConfigurationString(input.document.source.configurationByKey.baseUrl);
   const method = literalConfigurationString(input.operation.configurationByKey.method).toUpperCase();
   const path = literalConfigurationString(input.operation.configurationByKey.path);
@@ -614,9 +1281,25 @@ const invokeLiveHttp = async (input: Readonly<{
     : 'never';
   if (!['never', 'status-204'].includes(emptyWhen))
     throw new DataRuntimeFailure('DATA_HTTP_CONFIGURATION_INVALID');
-  const url = httpEndpoint(baseUrl, path);
-  if (input.operation.kind === 'query') appendHttpQuery(url, input.operationInput);
-  const body = input.operation.kind === 'mutation' ? canonicalJson(input.operationInput) : undefined;
+  const parameterMappings = readRuntimeHttpParameterMappings(
+    input.operation.configurationByKey.parameterMappings
+  );
+  const bodyInputPath = input.operation.configurationByKey.bodyInputPath
+    ? runtimeHttpPointer(literalConfigurationString(input.operation.configurationByKey.bodyInputPath))
+    : undefined;
+  const mappedRequest = mapRuntimeHttpRequest(
+    path,
+    input.operationInput,
+    input.operation.kind,
+    parameterMappings,
+    bodyInputPath
+  );
+  const url = httpEndpoint(baseUrl, mappedRequest.path);
+  if (mappedRequest.legacyQuery !== undefined)
+    appendHttpQuery(url, mappedRequest.legacyQuery);
+  for (const [key, value] of Object.entries(mappedRequest.query).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0))
+    url.searchParams.append(key, value);
+  const body = mappedRequest.body === undefined ? undefined : canonicalJson(mappedRequest.body);
   if (input.operation.configurationByKey.idempotencyHeader && !input.operation.policies.idempotency)
     throw new DataRuntimeFailure('DATA_HTTP_CONFIGURATION_INVALID');
   let upstreamIdempotency: Readonly<{ header: string; key: string }> | undefined;
@@ -642,6 +1325,11 @@ const invokeLiveHttp = async (input: Readonly<{
       }),
     });
   }
+  const requestHeaders = {
+    ...mappedRequest.headers,
+    ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+    ...(upstreamIdempotency ? { [upstreamIdempotency.header]: upstreamIdempotency.key } : {}),
+  };
   const requestBytes = body ? new TextEncoder().encode(body).byteLength : 0;
   const requestId = input.invocationId + ':' + input.attempt;
   const startedAt = Date.now();
@@ -649,13 +1337,8 @@ const invokeLiveHttp = async (input: Readonly<{
   try {
     response = await fetch(url, {
       method,
-      ...(body === undefined && !upstreamIdempotency ? {} : {
-        headers: {
-          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-          ...(upstreamIdempotency ? { [upstreamIdempotency.header]: upstreamIdempotency.key } : {}),
-        },
-        ...(body === undefined ? {} : { body }),
-      }),
+      ...(Object.keys(requestHeaders).length === 0 ? {} : { headers: requestHeaders }),
+      ...(body === undefined ? {} : { body }),
       credentials: 'omit',
       redirect: 'error',
       referrerPolicy: 'no-referrer',
@@ -703,12 +1386,290 @@ const invokeLiveHttp = async (input: Readonly<{
       value = cloneJson(JSON.parse(text));
     } catch { throw new DataRuntimeFailure('DATA_HTTP_RESPONSE_INVALID'); }
   }
+  const responseBodyPath = input.operation.configurationByKey.responseBodyPath
+    ? runtimeHttpPointer(literalConfigurationString(input.operation.configurationByKey.responseBodyPath))
+    : undefined;
+  if (responseBodyPath) {
+    const projected = optionalPointer(value, responseBodyPath);
+    if (projected === undefined) throw new DataRuntimeFailure('DATA_HTTP_RESPONSE_INVALID');
+    value = projected;
+  }
   const page = projectHttpPage(input.operation, input.operationInput, value);
   return Object.freeze({
     value,
     empty: emptyWhen === 'status-204' && response.status === 204,
     ...(page === undefined ? {} : { page }),
   });
+};
+
+const invokeLiveGraphql = async (input: Readonly<{
+  documentId: string;
+  document: DataRuntimeDocument;
+  operation: DataRuntimeOperation;
+  operationInput: unknown;
+  invocationId: string;
+  sequence: number;
+  attempt: number;
+  publishNetworkTrace(trace: DataRuntimeNetworkTrace): void;
+}>): Promise<DataRuntimeResult> => {
+  const code = 'DATA_GRAPHQL_CONFIGURATION_INVALID';
+  if (input.document.source.adapterId !== 'core.graphql')
+    throw new DataRuntimeFailure('DATA_ADAPTER_UNAVAILABLE');
+  if (input.operation.kind === 'subscription')
+    throw new DataRuntimeFailure('DATA_STREAM_OPERATION_UNAVAILABLE');
+  if (['server', 'edge'].includes(input.document.source.runtimeZone))
+    return invokeRemoteDataGateway(input);
+  if (input.document.source.runtimeZone !== 'client')
+    throw new DataRuntimeFailure('DATA_STANDALONE_RUNTIME_ZONE_UNAVAILABLE');
+  const authorization = input.operation.configurationByKey.authorization ??
+    input.document.source.configurationByKey.authorization;
+  if (authorization)
+    throw new DataRuntimeFailure(
+      authorization.kind === 'environment-ref' || authorization.kind === 'secret-ref'
+        ? 'DATA_STANDALONE_ENVIRONMENT_UNAVAILABLE'
+        : code
+    );
+  const url = protocolEndpoint(
+    literalConfigurationString(input.document.source.configurationByKey.endpoint, code),
+    code
+  );
+  const document = literalConfigurationString(
+    input.operation.configurationByKey.document,
+    code
+  );
+  const operationName = input.operation.configurationByKey.operationName
+    ? literalConfigurationString(input.operation.configurationByKey.operationName, code)
+    : undefined;
+  finiteGraphqlOperation(document, operationName, input.operation.kind);
+  const variablesPointer = input.operation.configurationByKey.variablesInputPath
+    ? protocolPointer(
+        literalConfigurationString(input.operation.configurationByKey.variablesInputPath, code),
+        code
+      )
+    : undefined;
+  const variables = variablesPointer === undefined
+    ? cloneJson(input.operationInput)
+    : selectProtocolPointer(input.operationInput, variablesPointer, code);
+  if (!runtimeHttpRecord(variables))
+    throw new DataRuntimeFailure('DATA_GRAPHQL_INPUT_INVALID');
+  const partialErrorPolicy = input.operation.configurationByKey.partialErrorPolicy
+    ? literalConfigurationString(input.operation.configurationByKey.partialErrorPolicy, code)
+    : 'reject';
+  if (!['reject', 'allow-partial'].includes(partialErrorPolicy))
+    throw new DataRuntimeFailure(code);
+  const emptyWhen = input.operation.configurationByKey.emptyWhen
+    ? literalConfigurationString(input.operation.configurationByKey.emptyWhen, code)
+    : 'never';
+  if (!['never', 'null', 'empty-array'].includes(emptyWhen))
+    throw new DataRuntimeFailure(code);
+  const idempotency = await protocolIdempotency({
+    documentId: input.documentId,
+    document: input.document,
+    operation: input.operation,
+    operationInput: input.operationInput,
+    invocationId: input.invocationId,
+    sequence: input.sequence,
+    code,
+  });
+  const body = canonicalJson({
+    query: document,
+    variables,
+    ...(operationName ? { operationName } : {}),
+  });
+  const contents = await executeClientJsonRequest({
+    adapter: 'core.graphql',
+    url,
+    headers: Object.freeze({
+      accept: 'application/graphql-response+json, application/json',
+      'content-type': 'application/json',
+      ...(idempotency ? { [idempotency.header]: idempotency.key } : {}),
+    }),
+    body,
+    requestId: input.invocationId + ':' + input.attempt,
+    documentId: input.documentId,
+    operationId: input.operation.id,
+    invocationId: input.invocationId,
+    sequence: input.sequence,
+    attempt: input.attempt,
+    requestFailureCode: 'DATA_GRAPHQL_REQUEST_FAILED',
+    statusFailureCode: 'DATA_GRAPHQL_STATUS_FAILED',
+    responseLimitCode: 'DATA_GRAPHQL_RESPONSE_LIMIT_EXCEEDED',
+    publishNetworkTrace: input.publishNetworkTrace,
+  });
+  const envelope = decodeBoundedProtocolJson(
+    contents,
+    'DATA_GRAPHQL_RESPONSE_INVALID',
+    'DATA_GRAPHQL_RESPONSE_LIMIT_EXCEEDED'
+  );
+  if (!runtimeHttpRecord(envelope))
+    throw new DataRuntimeFailure('DATA_GRAPHQL_RESPONSE_INVALID');
+  const errors = envelope.errors;
+  if (
+    errors !== undefined &&
+    (!Array.isArray(errors) || errors.length > 64 || errors.some((entry) =>
+      !runtimeHttpRecord(entry) || typeof entry.message !== 'string' || !entry.message
+    ))
+  ) throw new DataRuntimeFailure('DATA_GRAPHQL_RESPONSE_INVALID');
+  if (Array.isArray(errors) && errors.length && partialErrorPolicy === 'reject')
+    throw new DataRuntimeFailure('DATA_GRAPHQL_RESPONSE_ERRORS');
+  if (!Object.prototype.hasOwnProperty.call(envelope, 'data') || envelope.data === undefined)
+    throw new DataRuntimeFailure('DATA_GRAPHQL_RESPONSE_INVALID');
+  let value: unknown = cloneJson(envelope.data);
+  const resultPath = input.operation.configurationByKey.resultPath
+    ? protocolPointer(
+        literalConfigurationString(input.operation.configurationByKey.resultPath, code),
+        code
+      )
+    : undefined;
+  if (resultPath !== undefined) {
+    const projected = selectProtocolPointer(value, resultPath, code);
+    if (projected === undefined)
+      throw new DataRuntimeFailure('DATA_GRAPHQL_RESPONSE_INVALID');
+    value = projected;
+  }
+  const page = projectHttpPage(input.operation, input.operationInput, value);
+  return Object.freeze({
+    value,
+    empty:
+      (emptyWhen === 'null' && value === null) ||
+      (emptyWhen === 'empty-array' && Array.isArray(value) && value.length === 0),
+    ...(page === undefined ? {} : { page }),
+  });
+};
+
+const invokeLiveAsyncApi = async (input: Readonly<{
+  documentId: string;
+  document: DataRuntimeDocument;
+  operation: DataRuntimeOperation;
+  operationInput: unknown;
+  invocationId: string;
+  sequence: number;
+  attempt: number;
+  publishNetworkTrace(trace: DataRuntimeNetworkTrace): void;
+}>): Promise<DataRuntimeResult> => {
+  const code = 'DATA_ASYNCAPI_CONFIGURATION_INVALID';
+  if (input.document.source.adapterId !== 'core.asyncapi')
+    throw new DataRuntimeFailure('DATA_ADAPTER_UNAVAILABLE');
+  if (input.operation.kind === 'subscription')
+    throw new DataRuntimeFailure('DATA_STREAM_OPERATION_UNAVAILABLE');
+  if (['server', 'edge'].includes(input.document.source.runtimeZone))
+    return invokeRemoteDataGateway(input);
+  if (input.document.source.runtimeZone !== 'client')
+    throw new DataRuntimeFailure('DATA_STANDALONE_RUNTIME_ZONE_UNAVAILABLE');
+  const authorization = input.operation.configurationByKey.authorization ??
+    input.document.source.configurationByKey.authorization;
+  if (authorization)
+    throw new DataRuntimeFailure(
+      authorization.kind === 'environment-ref' || authorization.kind === 'secret-ref'
+        ? 'DATA_STANDALONE_ENVIRONMENT_UNAVAILABLE'
+        : code
+    );
+  const action = literalConfigurationString(
+    input.operation.configurationByKey.action,
+    code
+  );
+  if (!['publish', 'request-reply'].includes(action))
+    throw new DataRuntimeFailure('DATA_ASYNCAPI_ACTION_UNSUPPORTED');
+  if (action === 'publish' && input.operation.kind !== 'mutation')
+    throw new DataRuntimeFailure(code);
+  const url = httpEndpoint(
+    literalConfigurationString(input.document.source.configurationByKey.endpoint, code),
+    literalConfigurationString(input.operation.configurationByKey.path, code),
+    code
+  );
+  const bodyInputPath = input.operation.configurationByKey.bodyInputPath
+    ? protocolPointer(
+        literalConfigurationString(input.operation.configurationByKey.bodyInputPath, code),
+        code
+      )
+    : undefined;
+  const bodyValue = bodyInputPath === undefined
+    ? cloneJson(input.operationInput)
+    : selectProtocolPointer(input.operationInput, bodyInputPath, code);
+  if (bodyValue === undefined)
+    throw new DataRuntimeFailure('DATA_ASYNCAPI_INPUT_INVALID');
+  const idempotency = await protocolIdempotency({
+    documentId: input.documentId,
+    document: input.document,
+    operation: input.operation,
+    operationInput: input.operationInput,
+    invocationId: input.invocationId,
+    sequence: input.sequence,
+    code,
+  });
+  const contents = await executeClientJsonRequest({
+    adapter: 'core.asyncapi',
+    url,
+    headers: Object.freeze({
+      accept: 'application/json',
+      'content-type': 'application/json',
+      ...(idempotency ? { [idempotency.header]: idempotency.key } : {}),
+    }),
+    body: canonicalJson(bodyValue),
+    requestId: input.invocationId + ':' + input.attempt,
+    documentId: input.documentId,
+    operationId: input.operation.id,
+    invocationId: input.invocationId,
+    sequence: input.sequence,
+    attempt: input.attempt,
+    requestFailureCode: 'DATA_ASYNCAPI_REQUEST_FAILED',
+    statusFailureCode: 'DATA_ASYNCAPI_STATUS_FAILED',
+    responseLimitCode: 'DATA_ASYNCAPI_RESPONSE_LIMIT_EXCEEDED',
+    publishNetworkTrace: input.publishNetworkTrace,
+  });
+  if (action === 'publish') return Object.freeze({ value: true, empty: false });
+  if (!contents.byteLength)
+    throw new DataRuntimeFailure('DATA_ASYNCAPI_RESPONSE_INVALID');
+  let value = decodeBoundedProtocolJson(
+    contents,
+    'DATA_ASYNCAPI_RESPONSE_INVALID',
+    'DATA_ASYNCAPI_RESPONSE_LIMIT_EXCEEDED'
+  );
+  const responseBodyPath = input.operation.configurationByKey.responseBodyPath
+    ? protocolPointer(
+        literalConfigurationString(input.operation.configurationByKey.responseBodyPath, code),
+        code
+      )
+    : undefined;
+  if (responseBodyPath !== undefined) {
+    const projected = selectProtocolPointer(value, responseBodyPath, code);
+    if (projected === undefined)
+      throw new DataRuntimeFailure('DATA_ASYNCAPI_RESPONSE_INVALID');
+    value = projected;
+  }
+  const emptyWhen = input.operation.configurationByKey.emptyWhen
+    ? literalConfigurationString(input.operation.configurationByKey.emptyWhen, code)
+    : 'never';
+  if (!['never', 'null', 'empty-array'].includes(emptyWhen))
+    throw new DataRuntimeFailure(code);
+  return Object.freeze({
+    value,
+    empty:
+      (emptyWhen === 'null' && value === null) ||
+      (emptyWhen === 'empty-array' && Array.isArray(value) && value.length === 0),
+  });
+};
+
+const invokeLiveData = async (input: Readonly<{
+  documentId: string;
+  document: DataRuntimeDocument;
+  operation: DataRuntimeOperation;
+  operationInput: unknown;
+  invocationId: string;
+  sequence: number;
+  attempt: number;
+  publishNetworkTrace(trace: DataRuntimeNetworkTrace): void;
+}>): Promise<DataRuntimeResult> => {
+  switch (input.document.source.adapterId) {
+    case 'core.http':
+      return invokeLiveHttp(input);
+    case 'core.graphql':
+      return invokeLiveGraphql(input);
+    case 'core.asyncapi':
+      return invokeLiveAsyncApi(input);
+    default:
+      throw new DataRuntimeFailure('DATA_ADAPTER_UNAVAILABLE');
+  }
 };
 
 const schemaValidators = new Map<string, (value: unknown) => boolean>();
@@ -794,7 +1755,7 @@ const dataCacheKey = async (input: Readonly<{
   input: selectedCacheInput(input.operationInput, input.operation.policies.cache?.keyInputPaths),
   runtimeZone: input.document.source.runtimeZone,
   mode: input.mode,
-  adapter: { sourceId: input.document.source.adapterId, implementationId: input.mode === 'mock' ? 'core.mock' : 'core.http', implementationVersion: '1' },
+  adapter: { sourceId: input.document.source.adapterId, implementationId: input.mode === 'mock' ? 'core.mock' : input.document.source.adapterId, implementationVersion: '1' },
   targetId: 'react-vite-standalone',
   partitionId: 'runtime-instance',
 }));

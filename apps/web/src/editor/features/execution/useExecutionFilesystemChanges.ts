@@ -5,13 +5,27 @@ import {
   createWorkspaceRuntimeFilesystemProposal,
   type RuntimeFilesystemProposalEntry,
 } from '@prodivix/prodivix-compiler';
-import type { ExecutionFilesystemDiff } from '@prodivix/runtime-core';
+import type {
+  ExecutionFilesystemDiff,
+  ExecutionSourceTrace,
+} from '@prodivix/runtime-core';
+import {
+  RemoteExecutionArtifactResolutionError,
+  RemoteExecutionClientError,
+} from '@prodivix/runtime-remote';
 import type { WorkspaceSnapshot } from '@prodivix/workspace';
 import { useAuthStore } from '@/auth/useAuthStore';
 import { dispatchWorkspaceAuthoringOperation } from '@/editor/workspaceSync/workspaceAuthoringOperationDispatcher';
 import { createWorkspaceClientOperationId } from '@/editor/workspaceSync/workspaceOperationIdentity';
 import type { ExecutionFilesystemArtifactReference } from './executionFilesystemChanges.types';
+import { resolveExecutionPrimarySourceTrace } from './executionSourceTraceModel';
 import { uploadRuntimeFilesystemAssets } from './runtimeFilesystemAssetUpload';
+
+export type ExecutionFilesystemChangeEntry = RuntimeFilesystemProposalEntry &
+  Readonly<{
+    sourceTrace?: readonly ExecutionSourceTrace[];
+    primarySourceTrace?: ExecutionSourceTrace;
+  }>;
 
 export type ExecutionFilesystemChangesController = Readonly<{
   status:
@@ -23,10 +37,11 @@ export type ExecutionFilesystemChangesController = Readonly<{
     | 'applied'
     | 'error';
   complete?: boolean;
-  entries: readonly RuntimeFilesystemProposalEntry[];
+  entries: readonly ExecutionFilesystemChangeEntry[];
   selectedChangeIds: readonly string[];
   readonly: boolean;
   message?: string;
+  recovery?: 'new-request';
   toggle(changeId: string): void;
   apply(): Promise<void>;
   retry(): void;
@@ -37,6 +52,7 @@ type LoadState = Readonly<{
   status: 'idle' | 'loading' | 'ready' | 'applying' | 'applied' | 'error';
   diff?: ExecutionFilesystemDiff;
   message?: string;
+  recovery?: 'new-request';
 }>;
 
 const INITIAL_LOAD_STATE: LoadState = Object.freeze({ status: 'idle' });
@@ -82,11 +98,16 @@ export const useExecutionFilesystemChanges = (input: {
       })
       .catch((error: unknown) => {
         if (!active) return;
+        const requiresNewRequest =
+          error instanceof RemoteExecutionArtifactResolutionError ||
+          (error instanceof RemoteExecutionClientError &&
+            error.remoteCode === 'not-found');
         setLoad(
           Object.freeze({
             status: 'error',
             referenceKey,
             message: error instanceof Error ? error.message : String(error),
+            ...(requiresNewRequest ? { recovery: 'new-request' as const } : {}),
           })
         );
       });
@@ -102,6 +123,24 @@ export const useExecutionFilesystemChanges = (input: {
         : undefined,
     [input.workspace, load.diff]
   );
+  const entries = useMemo<readonly ExecutionFilesystemChangeEntry[]>(() => {
+    if (!analysis || !load.diff) return Object.freeze([]);
+    const changes = new Map(
+      load.diff.changes.map((change) => [change.changeId, change] as const)
+    );
+    return Object.freeze(
+      analysis.entries.map((entry) => {
+        const sourceTrace = changes.get(entry.changeId)?.sourceTrace;
+        const primarySourceTrace =
+          resolveExecutionPrimarySourceTrace(sourceTrace);
+        return Object.freeze({
+          ...entry,
+          ...(sourceTrace ? { sourceTrace } : {}),
+          ...(primarySourceTrace ? { primarySourceTrace } : {}),
+        });
+      })
+    );
+  }, [analysis, load.diff]);
 
   useEffect(() => {
     if (!analysis) return;
@@ -263,10 +302,11 @@ export const useExecutionFilesystemChanges = (input: {
   return Object.freeze({
     status: input.reference ? load.status : 'unavailable',
     ...(analysis ? { complete: analysis.complete } : {}),
-    entries: analysis?.entries ?? Object.freeze([]),
+    entries,
     selectedChangeIds,
     readonly: input.readonly,
     ...(load.message ? { message: load.message } : {}),
+    ...(load.recovery ? { recovery: load.recovery } : {}),
     toggle,
     apply,
     retry,

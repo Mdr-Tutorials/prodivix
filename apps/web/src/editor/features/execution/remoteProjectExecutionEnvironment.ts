@@ -6,6 +6,7 @@ import {
   createRemoteExecutionTerminalClient,
   createRemoteExecutionTerminalHttpTransport,
   createRemotePreviewExecutionProvider,
+  createRemoteTestExecutionProvider,
   type RemoteExecutionTerminalClient,
   type RemoteExecutionSnapshotSource,
 } from '@prodivix/runtime-remote';
@@ -16,6 +17,10 @@ import {
   createRemoteDataGatewayClient,
   type RemoteDataGatewayClient,
 } from './remoteDataGatewayClient';
+import {
+  createRemoteDataStreamGatewayClient,
+  type RemoteDataStreamGatewayClient,
+} from './remoteDataStreamGatewayClient';
 import {
   createRemoteServerFunctionGatewayClient,
   type RemoteServerFunctionGatewayClient,
@@ -31,8 +36,10 @@ export type CreateRemoteProjectExecutionEnvironmentOptions = Readonly<{
 export type RemoteProjectExecutionEnvironment = Readonly<{
   client: ReturnType<typeof createRemoteExecutionClient>;
   provider: ReturnType<typeof createRemotePreviewExecutionProvider>;
+  testProvider: ReturnType<typeof createRemoteTestExecutionProvider>;
   artifacts: ReturnType<typeof createRemoteExecutionArtifactResolver>;
   dataGateway: RemoteDataGatewayClient;
+  dataStreams: RemoteDataStreamGatewayClient;
   serverFunctions: RemoteServerFunctionGatewayClient;
   terminal: RemoteExecutionTerminalClient;
   previewOrigins: ReturnType<typeof createRemotePreviewOriginClient>;
@@ -65,6 +72,10 @@ export const createRemoteProjectExecutionEnvironment = (
     accessToken: options.accessToken,
     http,
   });
+  const dataStreams = createRemoteDataStreamGatewayClient({
+    baseUrl,
+    accessToken: options.accessToken,
+  });
   const serverFunctions = createRemoteServerFunctionGatewayClient({
     baseUrl,
     accessToken: options.accessToken,
@@ -87,11 +98,16 @@ export const createRemoteProjectExecutionEnvironment = (
       materializeArtifact: ({ executionId, artifact }) =>
         previewOrigins.materialize({ executionId, artifact }),
     }),
+    testProvider: createRemoteTestExecutionProvider({
+      client,
+      resolveSnapshot: options.resolveSnapshot,
+    }),
     artifacts: createRemoteExecutionArtifactResolver({
       client,
       contentTransport,
     }),
     dataGateway,
+    dataStreams,
     serverFunctions,
     terminal,
     previewOrigins,

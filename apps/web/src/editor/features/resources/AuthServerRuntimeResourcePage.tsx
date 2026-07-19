@@ -4,6 +4,7 @@ import { KeyRound, Route, ShieldCheck, TriangleAlert } from 'lucide-react';
 import {
   ISOLATED_SERVER_FUNCTION_WORKSPACE_OWNER_PERMISSION_ID,
   ISOLATED_SERVER_FUNCTION_WORKSPACE_READ_PERMISSION_ID,
+  ISOLATED_SERVER_FUNCTION_WORKSPACE_WRITE_PERMISSION_ID,
   PRODIVIX_PRODUCT_SESSION_AUTH_PROVIDER_ID,
 } from '@prodivix/server-runtime';
 import { createWorkspaceServerRuntimeAuthConfigurationPlan } from '@prodivix/workspace';
@@ -19,6 +20,10 @@ const supportedPermissions = Object.freeze([
   Object.freeze({
     permissionId: ISOLATED_SERVER_FUNCTION_WORKSPACE_READ_PERMISSION_ID,
     descriptionKey: 'resourceManager.auth.permissions.workspaceRead' as const,
+  }),
+  Object.freeze({
+    permissionId: ISOLATED_SERVER_FUNCTION_WORKSPACE_WRITE_PERMISSION_ID,
+    descriptionKey: 'resourceManager.auth.permissions.workspaceWrite' as const,
   }),
 ]);
 

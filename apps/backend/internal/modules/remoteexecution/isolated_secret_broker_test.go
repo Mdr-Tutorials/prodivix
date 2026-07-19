@@ -36,6 +36,9 @@ func (store *fakeIsolatedSecretStore) GetExecutionAuthorityForSecretBroker(_ con
 		return nil, ErrExecutionNotFound
 	}
 	copy := *store.authority
+	if copy.Permissions == nil {
+		copy.Permissions = cloneExecutionPermissions(workspaceOwnerExecutionPermissions)
+	}
 	return &copy, nil
 }
 
@@ -88,7 +91,39 @@ func (store *fakeIsolatedSecretStore) AbandonIsolatedSecretResolution(_ context.
 }
 
 func isolatedSecretCodeDocument() []byte {
-	return []byte(`{"language":"ts","source":"export const useKey = () => undefined;","metadata":{"prodivix.serverRuntime":{"schemaVersion":"1.0","functionsByExport":{"useKey":{"kind":"function","runtimeZone":"server","adapterId":"prodivix.code-export","effect":"read","auth":{"kind":"public"},"inputSchema":true,"outputSchema":true,"environment":{"secretsByField":{"signingKey":{"bindingId":"webhook-signing-key"}}}}}}}}`)
+	return []byte(`{"language":"ts","source":"export const useKey = () => undefined;","metadata":{"prodivix.serverRuntime":{"schemaVersion":"1.0","functionsByExport":{"useKey":{"kind":"function","runtimeZone":"server","adapterId":"prodivix.code-export","effect":"read","auth":{"kind":"permission","permissionId":"workspace.read"},"inputSchema":true,"outputSchema":true,"environment":{"secretsByField":{"signingKey":{"bindingId":"webhook-signing-key"}}}}}}}}`)
+}
+
+func TestValidIsolatedSecretPolicyAllowsExactReadAuthorities(t *testing.T) {
+	base := serverFunctionProfileEntry{
+		Kind:        "function",
+		RuntimeZone: "server",
+		AdapterID:   isolatedCodeExportAdapterID,
+		Effect:      "read",
+		Environment: &serverFunctionEnvironmentPolicy{SecretsByField: map[string]serverFunctionSecretReference{
+			"signingKey": {BindingID: "webhook-signing-key"},
+		}},
+	}
+	for _, testCase := range []struct {
+		name    string
+		auth    serverFunctionAuthPolicy
+		allowed bool
+	}{
+		{name: "public", auth: serverFunctionAuthPolicy{Kind: "public"}, allowed: true},
+		{name: "authenticated", auth: serverFunctionAuthPolicy{Kind: "authenticated"}, allowed: true},
+		{name: "workspace owner", auth: serverFunctionAuthPolicy{Kind: "permission", PermissionID: workspaceOwnerPermissionID}, allowed: true},
+		{name: "workspace read", auth: serverFunctionAuthPolicy{Kind: "permission", PermissionID: workspaceReadPermissionID}, allowed: true},
+		{name: "workspace write", auth: serverFunctionAuthPolicy{Kind: "permission", PermissionID: workspaceWritePermissionID}, allowed: false},
+		{name: "unknown permission", auth: serverFunctionAuthPolicy{Kind: "permission", PermissionID: "workspace.admin"}, allowed: false},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			candidate := base
+			candidate.Auth = testCase.auth
+			if actual := validIsolatedSecretPolicy(&candidate); actual != testCase.allowed {
+				t.Fatalf("unexpected policy result: got %t, want %t", actual, testCase.allowed)
+			}
+		})
+	}
 }
 
 func decryptIsolatedSecretEnvelope(t *testing.T, privateKey *ecdh.PrivateKey, raw json.RawMessage) map[string]string {
@@ -143,8 +178,9 @@ func TestIsolatedSecretBrokerSealsExactRevisionMaterialAndRotatesCiphertextAcros
 		authority: &ExecutionAuthority{
 			ExecutionID: "execution-secret",
 			WorkspaceID: "workspace-1",
-			OwnerID:     "user-1",
+			PrincipalID: "user-1",
 			SessionID:   "session-server-only",
+			Permissions: []string{workspaceReadPermissionID},
 			SnapshotID:  "snapshot-1",
 			PartitionRevisions: map[string]string{
 				"workspace":                    "2",

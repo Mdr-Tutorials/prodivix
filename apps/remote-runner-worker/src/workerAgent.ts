@@ -25,6 +25,7 @@ import {
   toServerFunctionInvocationTraceValue,
 } from '@prodivix/server-runtime';
 import { readRemoteWorkerServerFunctionArtifact } from './serverFunctionArtifact';
+import { readRemoteWorkerProjectSourceMutationArtifact } from './projectSourceMutationArtifact';
 import { createRemoteWorkerSecretRecipient } from './remoteWorkerSecretRecipient';
 import type {
   RemoteWorkerControlPlaneClient,
@@ -442,6 +443,24 @@ export const createRemoteWorkerAgent = (
           ),
           sourceTrace: projection.sourceTrace,
         });
+        if (
+          isolatedPlan &&
+          isolatedPlan.definition.effect === 'mutation' &&
+          !readRemoteWorkerProjectSourceMutationArtifact({
+            snapshot,
+            response: projection.response,
+            artifacts: result.artifacts ?? [],
+          })
+        ) {
+          await options.client.transition({
+            executionId,
+            workerId: options.workerId,
+            leaseToken,
+            status: 'failed',
+            reason: 'invalid-project-source-mutation',
+          });
+          return true;
+        }
       }
       const installSourceTrace = snapshot.files.find(
         (file) => file.path === snapshot.dependencyPlan.manifestFilePath
@@ -567,18 +586,31 @@ export const createRemoteWorkerAgent = (
         }
       }
       for (const [index, artifact] of (result.artifacts ?? []).entries()) {
+        let canonicalTestReport: ReturnType<
+          typeof readExecutionTestReportValue
+        >;
         if (artifact.mediaType === EXECUTION_TEST_REPORT_MEDIA_TYPE) {
-          let report: ReturnType<typeof readExecutionTestReportValue>;
           try {
-            report = readExecutionTestReportValue(
+            canonicalTestReport = readExecutionTestReportValue(
               JSON.parse(
                 Buffer.from(artifact.contents).toString('utf8')
               ) as unknown
             );
           } catch {
-            report = undefined;
+            canonicalTestReport = undefined;
           }
-          if (!report) {
+          const expectedReportId = `test-report:${executionId}`;
+          if (
+            claim.execution.request.profile !== 'test' ||
+            !canonicalTestReport ||
+            canonicalTestReport.reportId !== expectedReportId ||
+            artifact.artifactId !== expectedReportId ||
+            artifact.kind !== 'report' ||
+            artifact.metadata?.reportId !== expectedReportId ||
+            artifact.metadata?.snapshotDigest !== snapshot.contentDigest ||
+            artifact.metadata?.status !== canonicalTestReport.status ||
+            !artifact.sourceTrace?.length
+          ) {
             await options.client.transition({
               executionId,
               workerId: options.workerId,
@@ -586,39 +618,6 @@ export const createRemoteWorkerAgent = (
               status: 'failed',
               reason: 'invalid-test-report',
             });
-            return true;
-          }
-          const appended = await options.client.appendEvent({
-            executionId,
-            workerId: options.workerId,
-            leaseToken,
-            workerEventId: `${claim.lease.attempt}:test-report:trace`,
-            event: {
-              kind: 'trace',
-              trace: {
-                traceId: `test:${executionId}`,
-                spanId: `test-report:${executionId}`,
-                name: EXECUTION_TEST_REPORT_TRACE_NAME,
-                phase: 'event',
-                detail: toExecutionTestReportValue(report),
-                ...(artifact.sourceTrace
-                  ? { sourceTrace: artifact.sourceTrace }
-                  : {}),
-              },
-            },
-          });
-          if (appended === 'budget-exceeded') {
-            await options.client.transition({
-              executionId,
-              workerId: options.workerId,
-              leaseToken,
-              status: 'failed',
-              reason: 'event-budget-exceeded',
-            });
-            return true;
-          }
-          if (appended === 'rejected') {
-            abort.abort('lease-lost');
             return true;
           }
         }
@@ -661,6 +660,41 @@ export const createRemoteWorkerAgent = (
           abort.abort('artifact-rejected');
           return true;
         }
+        if (canonicalTestReport) {
+          const appended = await options.client.appendEvent({
+            executionId,
+            workerId: options.workerId,
+            leaseToken,
+            workerEventId: `${claim.lease.attempt}:test-report:trace`,
+            event: {
+              kind: 'trace',
+              trace: {
+                traceId: `test:${executionId}`,
+                spanId: `test-report:${executionId}`,
+                name: EXECUTION_TEST_REPORT_TRACE_NAME,
+                phase: 'event',
+                detail: toExecutionTestReportValue(canonicalTestReport),
+                ...(artifact.sourceTrace
+                  ? { sourceTrace: artifact.sourceTrace }
+                  : {}),
+              },
+            },
+          });
+          if (appended === 'budget-exceeded') {
+            await options.client.transition({
+              executionId,
+              workerId: options.workerId,
+              leaseToken,
+              status: 'failed',
+              reason: 'event-budget-exceeded',
+            });
+            return true;
+          }
+          if (appended === 'rejected') {
+            abort.abort('lease-lost');
+            return true;
+          }
+        }
         if (serverFunctionTraceProjection?.artifact === artifact) {
           const appended = await options.client.appendEvent({
             executionId,
@@ -700,7 +734,14 @@ export const createRemoteWorkerAgent = (
         workerId: options.workerId,
         leaseToken,
         status: terminalStatus(result.status),
-        ...(result.reason === undefined ? {} : { reason: result.reason }),
+        ...(result.reason !== undefined
+          ? { reason: result.reason }
+          : result.status === 'failed' &&
+              result.networkTraces?.some(
+                (network) => network.outcome === 'denied'
+              )
+            ? { reason: 'network-policy-denied' }
+            : {}),
       });
       return true;
     } finally {

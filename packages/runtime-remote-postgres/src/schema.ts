@@ -64,6 +64,18 @@ CREATE INDEX IF NOT EXISTS idx_remote_executions_expired_lease
   ON remote_executions(lease_expires_at)
   WHERE lease_expires_at IS NOT NULL;
 
+CREATE TABLE IF NOT EXISTS remote_execution_terminal_sessions (
+  execution_id TEXT PRIMARY KEY REFERENCES remote_executions(execution_id) ON DELETE CASCADE,
+  terminal_session_id TEXT NOT NULL UNIQUE,
+  state_revision BIGINT NOT NULL CHECK (state_revision >= 1),
+  expires_at BIGINT NOT NULL CHECK (expires_at >= 0),
+  sealed_state BYTEA NOT NULL,
+  CONSTRAINT remote_terminal_sealed_state_size_check
+    CHECK (octet_length(sealed_state) BETWEEN 1 AND 2101248)
+);
+CREATE INDEX IF NOT EXISTS idx_remote_execution_terminal_expiry
+  ON remote_execution_terminal_sessions(expires_at, execution_id);
+
 CREATE TABLE IF NOT EXISTS remote_execution_server_authorities (
   execution_id TEXT PRIMARY KEY REFERENCES remote_executions(execution_id) ON DELETE CASCADE,
   authority_json JSONB NOT NULL,

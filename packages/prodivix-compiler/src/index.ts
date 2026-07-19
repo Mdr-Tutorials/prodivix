@@ -46,6 +46,12 @@ export {
   type WorkspaceReactViteCompileOptions,
 } from '#src/react/workspaceProject';
 export {
+  compileWorkspaceToVueViteExportProgram,
+  generateWorkspaceVueViteBundle,
+  type VueExportBundle,
+  type WorkspaceVueViteCompileOptions,
+} from '#src/vue/workspaceProject';
+export {
   analyzeWorkspaceDataRuntimeTarget,
   EXECUTION_PARENT_GATEWAY_DATA_RUNTIME_TARGET,
   PROVIDER_MOCK_DATA_RUNTIME_TARGET,
@@ -81,6 +87,11 @@ export {
   type WorkspaceExecutableProjectResult,
 } from '#src/executableProject/workspaceExecutableProject';
 export {
+  generateWorkspaceVueViteExecutableProject,
+  type GenerateWorkspaceVueViteExecutableProjectOptions,
+  type WorkspaceVueViteExecutableProjectResult,
+} from '#src/executableProject/workspaceVueExecutableProject';
+export {
   generateWorkspaceIsolatedServerFunctionExecutableProject,
   ISOLATED_SERVER_FUNCTION_ADAPTER_ID,
   type GenerateIsolatedServerFunctionExecutableProjectOptions,
@@ -114,6 +125,7 @@ export {
   collectExportCodeArtifactContributions,
   collectExportCodeArtifactFileContributions,
   createReactViteExportPreset,
+  createVueViteExportPreset,
   createUniqueExportPath,
   exportArtifactToProgramContribution,
   exportArtifactsToProgramContribution,

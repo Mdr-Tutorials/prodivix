@@ -428,6 +428,73 @@ describe('remote runner worker', () => {
     expect(JSON.stringify(events)).not.toMatch(/authorization|cookie|token=/u);
   });
 
+  it('marks a failed denied install request as a network policy recovery path', async () => {
+    const transitions: Array<{ status: string; reason?: string }> = [];
+    let claimed = false;
+    const client: RemoteWorkerControlPlaneClient = {
+      async claim() {
+        if (claimed) return undefined;
+        claimed = true;
+        return claim();
+      },
+      async renew() {
+        return { lease: claim().lease, cancellationRequested: false };
+      },
+      async snapshot() {
+        return snapshot;
+      },
+      async transition(input) {
+        transitions.push({ status: input.status, reason: input.reason });
+        return true;
+      },
+      async appendEvent() {
+        return 'stored';
+      },
+      async uploadArtifact() {
+        return 'stored';
+      },
+    };
+    const agent = createRemoteWorkerAgent({
+      workerId: 'worker-1',
+      providerId: provider.id,
+      client,
+      sandbox: {
+        async execute() {
+          return {
+            status: 'failed',
+            stdout: '',
+            stderr: 'dependency install failed',
+            outputTruncated: false,
+            networkTraces: [
+              {
+                requestId: 'install-trace-denied:1',
+                method: 'CONNECT',
+                sanitizedUrl: 'https://blocked.example/',
+                protocol: 'https',
+                startedAt: 100,
+                completedAt: 105,
+                outcome: 'denied',
+                status: 403,
+                requestBytes: 12,
+                responseBytes: 0,
+              },
+            ],
+          } as const;
+        },
+      },
+      leaseDurationMs: 100,
+      heartbeatIntervalMs: 20,
+      defaultTimeoutMs: 1_000,
+      defaultMaximumOutputBytes: 1_000,
+    });
+
+    await expect(agent.pollOnce()).resolves.toBe(true);
+    expect(transitions).toEqual([
+      { status: 'running', reason: undefined },
+      { status: 'failed', reason: 'network-policy-denied' },
+    ]);
+  });
+
   it('aborts the sandbox and never publishes terminal state after lease loss', async () => {
     const transitions: string[] = [];
     const client: RemoteWorkerControlPlaneClient = {
@@ -581,7 +648,7 @@ describe('remote runner worker', () => {
     ]);
   });
 
-  it('publishes a canonical test.report trace before uploading the report artifact', async () => {
+  it('uploads the exact execution-bound report before publishing its canonical test.report trace', async () => {
     const testProvider = createExecutionProviderDescriptor({
       id: 'remote-worker-test-report',
       version: '1',
@@ -618,7 +685,7 @@ describe('remote runner worker', () => {
       };
     };
     const report = createExecutionTestReport({
-      reportId: 'report-1',
+      reportId: 'test-report:execution-1',
       tool: { name: 'vitest' },
       completedAt: 2_000,
       files: [
@@ -677,7 +744,7 @@ describe('remote runner worker', () => {
             outputTruncated: false,
             artifacts: [
               {
-                artifactId: 'test-report',
+                artifactId: 'test-report:execution-1',
                 kind: 'report',
                 mediaType: 'application/vnd.prodivix.test-report+json',
                 sourceTrace: [
@@ -688,6 +755,11 @@ describe('remote runner worker', () => {
                     },
                   },
                 ],
+                metadata: {
+                  reportId: 'test-report:execution-1',
+                  snapshotDigest: snapshot.contentDigest,
+                  status: 'passed',
+                },
                 contents: Buffer.from(
                   JSON.stringify(toExecutionTestReportValue(report)),
                   'utf8'
@@ -706,8 +778,8 @@ describe('remote runner worker', () => {
     await expect(agent.pollOnce()).resolves.toBe(true);
     expect(operationOrder).toEqual([
       'transition:running',
-      'event:trace',
       'artifact',
+      'event:trace',
       'transition:succeeded',
     ]);
     expect(events[0]).toMatchObject({

@@ -598,6 +598,11 @@
       "remote": "远端隔离",
       "remoteSignIn": "远端（需登录）"
     },
+    "runTarget": {
+      "label": "框架",
+      "react": "React / Vite",
+      "vue": "Vue / Vite"
+    },
     "modes": {
       "design": "设计",
       "designTitle": "设计模式（Ctrl+Alt+I）",

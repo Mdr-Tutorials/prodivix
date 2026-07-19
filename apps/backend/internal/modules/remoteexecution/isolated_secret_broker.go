@@ -125,7 +125,7 @@ func validIsolatedSecretPolicy(entry *serverFunctionProfileEntry) bool {
 	if entry.Auth.Kind == "public" || entry.Auth.Kind == "authenticated" {
 		return true
 	}
-	return entry.Auth.Kind == "permission" && entry.Auth.PermissionID == workspaceOwnerPermissionID
+	return entry.Auth.Kind == "permission" && (entry.Auth.PermissionID == workspaceOwnerPermissionID || entry.Auth.PermissionID == workspaceReadPermissionID)
 }
 
 func isolatedSecretEnvelopeAAD(envelope isolatedSecretEnvelope) []byte {
@@ -285,6 +285,9 @@ func (broker *IsolatedSecretBroker) Resolve(ctx context.Context, request isolate
 	if err != nil || !validIsolatedSecretPolicy(entry) {
 		return nil, ErrIsolatedSecretDenied
 	}
+	if entry.Auth.Kind == "permission" && !hasWorkspaceExecutionPermission(authority.Permissions, entry.Auth.PermissionID) {
+		return nil, ErrIsolatedSecretDenied
+	}
 	key := IsolatedSecretResolutionKey{ExecutionID: request.ExecutionID, WorkerID: request.WorkerID, WorkerAttempt: request.WorkerAttempt, ArtifactID: request.FunctionRef.ArtifactID, ExportName: request.FunctionRef.ExportName, InvocationID: request.InvocationID, RecipientPublicKey: request.RecipientPublicKey}
 	reservation, err := broker.store.ReserveIsolatedSecretResolution(ctx, key)
 	if err != nil {
@@ -302,7 +305,7 @@ func (broker *IsolatedSecretBroker) Resolve(ctx context.Context, request isolate
 			_ = broker.store.AbandonIsolatedSecretResolution(context.Background(), key)
 		}
 	}()
-	principal := backendenvironment.PrincipalSession{PrincipalID: authority.OwnerID, SessionID: authority.SessionID}
+	principal := backendenvironment.PrincipalSession{PrincipalID: authority.PrincipalID, SessionID: authority.SessionID}
 	snapshot, err := broker.environments.GetSnapshot(ctx, principal, authority.WorkspaceID, authority.Environment.EnvironmentID, authority.Environment.Revision)
 	if err != nil || snapshot == nil || snapshot.WorkspaceID != authority.WorkspaceID || snapshot.EnvironmentID != authority.Environment.EnvironmentID || snapshot.Revision != authority.Environment.Revision || snapshot.Mode != "live" {
 		return nil, ErrIsolatedSecretDenied

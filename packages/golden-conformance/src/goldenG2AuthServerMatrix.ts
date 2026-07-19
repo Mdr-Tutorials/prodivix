@@ -5,22 +5,26 @@ import { promisify } from 'node:util';
 import {
   DETERMINISTIC_TEST_SERVER_RUNTIME_TARGET,
   EXECUTION_PARENT_GATEWAY_SERVER_RUNTIME_TARGET,
+  createWorkspaceRuntimeFilesystemProposal,
   generateWorkspaceIsolatedServerFunctionExecutableProject,
   generateWorkspaceReactViteExecutableProject,
 } from '@prodivix/prodivix-compiler';
 import {
   createExecutionRequest,
+  createExecutionFilesystemDiff,
   projectExecutableProjectRuntimeFiles,
   type ExecutableProjectSnapshot,
 } from '@prodivix/runtime-core';
 import {
   createIsolatedServerFunctionAuthority,
+  createServerRouteActionInput,
   createServerRuntimeTestSession,
   decodeServerRuntimeProfile,
   EXECUTION_SERVER_FUNCTION_BRIDGE_REQUEST_TYPE,
   ISOLATED_SERVER_FUNCTION_AUTHORITY_PATH,
   ISOLATED_SERVER_FUNCTION_SECRET_MATERIAL_FORMAT,
   ISOLATED_SERVER_FUNCTION_SECRET_MATERIAL_PATH,
+  ISOLATED_SERVER_FUNCTION_SOURCE_MUTATION_DIRECTORY,
   readExecutionServerFunctionBridgeRequest,
   readIsolatedServerFunctionAuthority,
   readIsolatedServerFunctionExecutionResponse,
@@ -29,7 +33,12 @@ import {
   type ServerFunctionDefinition,
   type ServerFunctionReference,
 } from '@prodivix/server-runtime';
-import { isWorkspaceCodeDocumentContent } from '@prodivix/workspace';
+import {
+  applyWorkspaceTransaction,
+  createWorkspaceSourceMutationTransactionPlan,
+  isWorkspaceCodeDocumentContent,
+  type WorkspaceSnapshot,
+} from '@prodivix/workspace';
 import {
   createGoldenG2AuthServerTestProvision,
   createGoldenG2AuthServerWorkspace,
@@ -38,6 +47,7 @@ import {
   GOLDEN_G2_AUTH_SERVER_SOURCE_CANARY,
   GOLDEN_G2_ISOLATED_OWNER_FUNCTION_REF,
   GOLDEN_G2_ISOLATED_READ_FUNCTION_REF,
+  GOLDEN_G2_ISOLATED_READ_SECRET_FUNCTION_REF,
   GOLDEN_G2_ISOLATED_SECRET_FUNCTION_REF,
   GOLDEN_G2_REMOTE_HMAC_FUNCTION_REF,
   GOLDEN_G2_REMOTE_OWNER_FUNCTION_REF,
@@ -56,7 +66,9 @@ export type GoldenG2AuthServerFunction =
   | 'audited-secret-hmac'
   | 'isolated-code-export'
   | 'isolated-workspace-read-code-export'
-  | 'isolated-secret-code-export';
+  | 'isolated-secret-code-export'
+  | 'isolated-workspace-read-secret-code-export'
+  | 'isolated-project-source-mutation';
 
 export type GoldenG2AuthServerTargetMatrix = Readonly<
   Record<
@@ -73,11 +85,17 @@ export type GoldenG2AuthServerMatrixReport = Readonly<{
     browserStaticCodeExport: readonly string[];
     browserStaticWorkspaceReadCodeExport: readonly string[];
     browserStaticIsolatedSecret: readonly string[];
+    browserStaticWorkspaceReadSecret: readonly string[];
+    browserStaticProjectSourceMutation: readonly string[];
     deterministicTestSecretHmac: readonly string[];
     deterministicTestIsolatedSecret: readonly string[];
+    deterministicTestWorkspaceReadSecret: readonly string[];
+    deterministicTestProjectSourceMutation: readonly string[];
     remoteLiveCodeExport: readonly string[];
     remoteLiveWorkspaceReadCodeExport: readonly string[];
     remoteLiveIsolatedSecret: readonly string[];
+    remoteLiveWorkspaceReadSecret: readonly string[];
+    remoteLiveProjectSourceMutation: readonly string[];
     isolatedProductionAuditedAdapter: readonly string[];
     isolatedProductionSecretHmac: readonly string[];
   }>;
@@ -116,6 +134,23 @@ export type GoldenG2AuthServerMatrixReport = Readonly<{
     response: ExecutionServerFunctionBridgeResponse;
     secretMaterialConsumed: boolean;
   }>;
+  isolatedWorkspaceReadSecret: Readonly<{
+    snapshot: ExecutableProjectSnapshot;
+    response: ExecutionServerFunctionBridgeResponse;
+    authorityConsumed: boolean;
+    secretMaterialConsumed: boolean;
+  }>;
+  isolatedProjectSourceMutation: Readonly<{
+    snapshot: ExecutableProjectSnapshot;
+    response: ExecutionServerFunctionBridgeResponse;
+    authorityConsumed: boolean;
+    targetArtifactId: string;
+    workspaceUnchangedBeforeAdoption: boolean;
+    eligibleChangeIds: readonly string[];
+    adoptedTargetSource: string;
+    actionSourceUnchanged: boolean;
+    staleAdoptionBlocked: boolean;
+  }>;
   boundary: Readonly<{
     clientSnapshotsExcludeServerSource: boolean;
     snapshotsExcludeCredentialCanaries: boolean;
@@ -133,6 +168,8 @@ const targetMatrix: GoldenG2AuthServerTargetMatrix = Object.freeze({
     'isolated-code-export': 'blocked',
     'isolated-workspace-read-code-export': 'blocked',
     'isolated-secret-code-export': 'blocked',
+    'isolated-workspace-read-secret-code-export': 'blocked',
+    'isolated-project-source-mutation': 'blocked',
   }),
   'deterministic-test': Object.freeze({
     'audited-owner-adapter': 'supported',
@@ -140,6 +177,8 @@ const targetMatrix: GoldenG2AuthServerTargetMatrix = Object.freeze({
     'isolated-code-export': 'supported',
     'isolated-workspace-read-code-export': 'supported',
     'isolated-secret-code-export': 'blocked',
+    'isolated-workspace-read-secret-code-export': 'blocked',
+    'isolated-project-source-mutation': 'blocked',
   }),
   'remote-live': Object.freeze({
     'audited-owner-adapter': 'supported',
@@ -147,6 +186,8 @@ const targetMatrix: GoldenG2AuthServerTargetMatrix = Object.freeze({
     'isolated-code-export': 'blocked',
     'isolated-workspace-read-code-export': 'blocked',
     'isolated-secret-code-export': 'blocked',
+    'isolated-workspace-read-secret-code-export': 'blocked',
+    'isolated-project-source-mutation': 'blocked',
   }),
   'isolated-production': Object.freeze({
     'audited-owner-adapter': 'blocked',
@@ -154,6 +195,8 @@ const targetMatrix: GoldenG2AuthServerTargetMatrix = Object.freeze({
     'isolated-code-export': 'supported',
     'isolated-workspace-read-code-export': 'supported',
     'isolated-secret-code-export': 'supported',
+    'isolated-workspace-read-secret-code-export': 'supported',
+    'isolated-project-source-mutation': 'supported',
   }),
 });
 
@@ -190,6 +233,58 @@ const contentsText = (value: string | Uint8Array): string =>
 
 const snapshotText = (snapshot: ExecutableProjectSnapshot): string =>
   snapshot.files.map(({ contents }) => contentsText(contents)).join('\n');
+
+const GOLDEN_G2_SOURCE_MUTATION_ACTION_DOCUMENT =
+  'code-golden-source-mutation-action';
+const GOLDEN_G2_SOURCE_MUTATION_TARGET_DOCUMENT =
+  'code-golden-source-mutation-target';
+const GOLDEN_G2_SOURCE_MUTATION_REPLACEMENT =
+  "export const projectSourceValue = 'Adopted from isolated execution.';\n";
+
+const codeSource = (
+  workspace: WorkspaceSnapshot,
+  documentId: string
+): string | undefined => {
+  const document = workspace.docsById[documentId];
+  return document?.type === 'code' &&
+    isWorkspaceCodeDocumentContent(document.content)
+    ? document.content.source
+    : undefined;
+};
+
+const createGoldenG2SourceMutationWorkspace = () => {
+  const workspace = createGoldenG2AuthServerWorkspace('isolated-production');
+  const planned = createWorkspaceSourceMutationTransactionPlan({
+    workspace,
+    routeNodeId: GOLDEN_G2_AUTH_SERVER_IDS.route,
+    actionDocumentId: GOLDEN_G2_SOURCE_MUTATION_ACTION_DOCUMENT,
+    actionPath: '/server/golden-source-mutation.action.server.ts',
+    targetDocumentId: GOLDEN_G2_SOURCE_MUTATION_TARGET_DOCUMENT,
+    targetPath: '/server/golden-source-mutation.target.ts',
+    transactionId: 'golden-source-mutation-authoring',
+    issuedAt: '2026-07-19T08:30:00.000Z',
+  });
+  if (planned.status !== 'ready') {
+    throw new Error(
+      `Golden source mutation authoring failed: ${planned.message}`
+    );
+  }
+  const applied = applyWorkspaceTransaction(
+    workspace,
+    planned.plan.transaction
+  );
+  if (!applied.ok) {
+    throw new Error(
+      `Golden source mutation transaction failed: ${JSON.stringify(applied.issues)}`
+    );
+  }
+  return Object.freeze({
+    workspace: applied.snapshot,
+    functionRef: planned.plan.functionRef,
+    actionDocumentId: planned.plan.actionDocumentId,
+    targetDocumentId: planned.plan.targetDocumentId,
+  });
+};
 
 const definitions = (): readonly [
   ServerFunctionDefinition,
@@ -430,13 +525,238 @@ const runIsolatedProduction = async (input: {
   }
 };
 
-const runIsolatedSecretProduction = async () => {
+const runIsolatedSourceMutationProduction = async (input: {
+  workspace: WorkspaceSnapshot;
+  functionRef: ServerFunctionReference;
+  actionDocumentId: string;
+  targetDocumentId: string;
+}) => {
+  const result = requireReady(
+    generateWorkspaceIsolatedServerFunctionExecutableProject(input.workspace, {
+      functionRef: input.functionRef,
+    }),
+    'Isolated production project-source mutation target'
+  );
+  const plan = result.snapshot.serverFunctionPlan;
+  if (!plan)
+    throw new Error('Golden source mutation production plan is missing.');
+  const targetFile = result.snapshot.files.find(
+    ({ path, sourceTrace }) =>
+      path.startsWith(
+        `${ISOLATED_SERVER_FUNCTION_SOURCE_MUTATION_DIRECTORY}/`
+      ) &&
+      sourceTrace?.length === 1 &&
+      sourceTrace[0]?.sourceRef.kind === 'code-artifact' &&
+      sourceTrace[0].sourceRef.artifactId === input.targetDocumentId
+  );
+  if (!targetFile?.sourceTrace) {
+    throw new Error('Golden source mutation staging target is missing.');
+  }
+  const initialTargetSource = codeSource(
+    input.workspace,
+    input.targetDocumentId
+  );
+  const initialActionSource = codeSource(
+    input.workspace,
+    input.actionDocumentId
+  );
+  if (initialTargetSource === undefined || initialActionSource === undefined) {
+    throw new Error('Golden source mutation canonical source is missing.');
+  }
+  const root = await mkdtemp(
+    join(process.cwd(), '.golden-g2-auth-server-source-mutation-')
+  );
+  try {
+    for (const file of projectExecutableProjectRuntimeFiles(
+      result.snapshot,
+      'production'
+    )) {
+      const path = join(root, ...file.path.split('/'));
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, file.contents);
+    }
+    const bridgeRequest = Object.freeze({
+      type: EXECUTION_SERVER_FUNCTION_BRIDGE_REQUEST_TYPE,
+      requestId: 'golden-isolated-source-mutation:1',
+      invocationId: 'golden-isolated-source-mutation',
+      attempt: 1,
+      functionRef: input.functionRef,
+      input: createServerRouteActionInput({
+        route: {
+          routeNodeId: GOLDEN_G2_AUTH_SERVER_IDS.route,
+          currentPath: '/',
+          matchedPath: '/',
+          params: {},
+          searchParams: {},
+        },
+        submission: {
+          method: 'PATCH',
+          encType: 'application/json',
+          value: { source: GOLDEN_G2_SOURCE_MUTATION_REPLACEMENT },
+        },
+      }),
+    });
+    await mkdir(join(root, '.prodivix'), { recursive: true });
+    await writeFile(
+      join(root, '.prodivix', 'server-function-invocation.json'),
+      JSON.stringify(bridgeRequest)
+    );
+    const authority = createIsolatedServerFunctionAuthority({
+      workspaceId: result.snapshot.workspace.workspaceId,
+      snapshotId: result.snapshot.workspace.snapshotId,
+      principal: Object.freeze({
+        providerId: 'prodivix-product-session',
+        principalId: 'golden-owner',
+      }),
+      permissions: Object.freeze([
+        'workspace.owner',
+        'workspace.read',
+        'workspace.write',
+      ]),
+      expiresAt: Date.now() + 60_000,
+    });
+    const authorityPath = join(
+      root,
+      ...ISOLATED_SERVER_FUNCTION_AUTHORITY_PATH.split('/')
+    );
+    await writeFile(authorityPath, JSON.stringify(authority), { mode: 0o600 });
+    const targetPath = join(root, ...targetFile.path.split('/'));
+    const baseline = new Uint8Array(await readFile(targetPath));
+    await execFileAsync(process.execPath, [plan.entrypointFilePath], {
+      cwd: root,
+      windowsHide: true,
+    });
+    const runtime = new Uint8Array(await readFile(targetPath));
+    let authorityConsumed = false;
+    try {
+      await readFile(authorityPath, 'utf8');
+    } catch {
+      authorityConsumed = true;
+    }
+    const serializedResponse = await readFile(
+      join(root, '.prodivix', 'server-function-result.json'),
+      'utf8'
+    );
+    const request = createExecutionRequest({
+      requestId: 'golden-isolated-source-mutation-production-request',
+      profile: 'production',
+      runtimeZone: 'server',
+      workspace: result.snapshot.workspace,
+      invocation: {
+        kind: 'code',
+        targetRef: {
+          kind: 'code-artifact',
+          artifactId: input.functionRef.artifactId,
+        },
+        entrypoint: input.functionRef.exportName,
+        input: bridgeRequest,
+      },
+      requiredCapabilities: ['server-function'],
+    });
+    const response = readIsolatedServerFunctionExecutionResponse(
+      JSON.parse(serializedResponse) as unknown,
+      request,
+      plan
+    );
+    if (!response) {
+      throw new Error('Golden source mutation response was not trusted.');
+    }
+    const diff = createExecutionFilesystemDiff({
+      snapshotDigest: result.snapshot.contentDigest,
+      workspace: result.snapshot.workspace,
+      capturedAt: Date.parse('2026-07-19T08:31:00.000Z'),
+      complete: true,
+      changes: [
+        {
+          kind: 'modified',
+          path: targetFile.path,
+          baseline: { contents: baseline },
+          runtime: { contents: runtime },
+          sourceTrace: targetFile.sourceTrace,
+        },
+      ],
+    });
+    const changeId = diff.changes[0]?.changeId;
+    if (!changeId) throw new Error('Golden source mutation diff is empty.');
+    const proposal = createWorkspaceRuntimeFilesystemProposal({
+      workspace: input.workspace,
+      diff,
+      selectedChangeIds: [changeId],
+      transactionId: 'golden-source-mutation-adoption',
+      issuedAt: '2026-07-19T08:32:00.000Z',
+    });
+    if (proposal.status !== 'ready') {
+      throw new Error(
+        `Golden source mutation adoption was blocked: ${proposal.reason}`
+      );
+    }
+    const workspaceUnchangedBeforeAdoption =
+      codeSource(input.workspace, input.targetDocumentId) ===
+      initialTargetSource;
+    const adopted = applyWorkspaceTransaction(
+      input.workspace,
+      proposal.transaction
+    );
+    if (!adopted.ok) {
+      throw new Error(
+        `Golden source mutation adoption failed: ${JSON.stringify(adopted.issues)}`
+      );
+    }
+    const currentTarget = input.workspace.docsById[input.targetDocumentId];
+    if (!currentTarget)
+      throw new Error('Golden source mutation target vanished.');
+    const staleWorkspace: WorkspaceSnapshot = {
+      ...input.workspace,
+      workspaceRev: input.workspace.workspaceRev + 1,
+      docsById: {
+        ...input.workspace.docsById,
+        [input.targetDocumentId]: {
+          ...currentTarget,
+          contentRev: currentTarget.contentRev + 1,
+        },
+      },
+    };
+    const staleProposal = createWorkspaceRuntimeFilesystemProposal({
+      workspace: staleWorkspace,
+      diff,
+      selectedChangeIds: [changeId],
+      transactionId: 'golden-source-mutation-stale-adoption',
+      issuedAt: '2026-07-19T08:33:00.000Z',
+    });
+    return Object.freeze({
+      snapshot: result.snapshot,
+      response,
+      serializedResponse,
+      authorityConsumed,
+      targetArtifactId: input.targetDocumentId,
+      workspaceUnchangedBeforeAdoption,
+      eligibleChangeIds: proposal.analysis.eligibleChangeIds,
+      adoptedTargetSource: codeSource(adopted.snapshot, input.targetDocumentId),
+      actionSourceUnchanged:
+        codeSource(adopted.snapshot, input.actionDocumentId) ===
+        initialActionSource,
+      staleAdoptionBlocked:
+        staleProposal.status === 'blocked' &&
+        staleProposal.analysis.entries[0]?.reason === 'stale-content-revision',
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+};
+
+const runIsolatedSecretProduction = async (input: {
+  binding: 'isolated-secret' | 'isolated-read-secret';
+  functionRef: ServerFunctionReference;
+  invocationId: string;
+  label: string;
+  permissions?: readonly string[];
+}) => {
   const result = requireReady(
     generateWorkspaceIsolatedServerFunctionExecutableProject(
-      createGoldenG2AuthServerWorkspace('isolated-secret'),
-      { functionRef: GOLDEN_G2_ISOLATED_SECRET_FUNCTION_REF }
+      createGoldenG2AuthServerWorkspace(input.binding),
+      { functionRef: input.functionRef }
     ),
-    'Isolated production Secret code-export target'
+    input.label
   );
   const plan = result.snapshot.serverFunctionPlan;
   if (!plan)
@@ -455,10 +775,10 @@ const runIsolatedSecretProduction = async () => {
     }
     const bridgeRequest = Object.freeze({
       type: EXECUTION_SERVER_FUNCTION_BRIDGE_REQUEST_TYPE,
-      requestId: 'golden-isolated-secret:1',
-      invocationId: 'golden-isolated-secret',
+      requestId: `${input.invocationId}:1`,
+      invocationId: input.invocationId,
       attempt: 1,
-      functionRef: GOLDEN_G2_ISOLATED_SECRET_FUNCTION_REF,
+      functionRef: input.functionRef,
       input: Object.freeze({ routeId: GOLDEN_G2_AUTH_SERVER_IDS.route }),
     });
     await mkdir(join(root, '.prodivix'), { recursive: true });
@@ -466,6 +786,28 @@ const runIsolatedSecretProduction = async () => {
       join(root, '.prodivix', 'server-function-invocation.json'),
       JSON.stringify(bridgeRequest)
     );
+    const authorityPath = join(
+      root,
+      ...ISOLATED_SERVER_FUNCTION_AUTHORITY_PATH.split('/')
+    );
+    if (input.permissions) {
+      await writeFile(
+        authorityPath,
+        JSON.stringify(
+          createIsolatedServerFunctionAuthority({
+            workspaceId: result.snapshot.workspace.workspaceId,
+            snapshotId: result.snapshot.workspace.snapshotId,
+            principal: Object.freeze({
+              providerId: 'prodivix-product-session',
+              principalId: 'golden-owner',
+            }),
+            permissions: Object.freeze([...input.permissions]),
+            expiresAt: Date.now() + 60_000,
+          })
+        ),
+        { mode: 0o600 }
+      );
+    }
     const secretMaterialPath = join(
       root,
       ...ISOLATED_SERVER_FUNCTION_SECRET_MATERIAL_PATH.split('/')
@@ -490,12 +832,20 @@ const runIsolatedSecretProduction = async () => {
     } catch {
       secretMaterialConsumed = true;
     }
+    let authorityConsumed = input.permissions === undefined;
+    if (input.permissions) {
+      try {
+        await readFile(authorityPath, 'utf8');
+      } catch {
+        authorityConsumed = true;
+      }
+    }
     const serializedResponse = await readFile(
       join(root, '.prodivix', 'server-function-result.json'),
       'utf8'
     );
     const request = createExecutionRequest({
-      requestId: 'golden-isolated-secret-production-request',
+      requestId: `${input.invocationId}-production-request`,
       profile: 'production',
       runtimeZone: 'server',
       workspace: result.snapshot.workspace,
@@ -503,9 +853,9 @@ const runIsolatedSecretProduction = async () => {
         kind: 'code',
         targetRef: {
           kind: 'code-artifact',
-          artifactId: GOLDEN_G2_ISOLATED_SECRET_FUNCTION_REF.artifactId,
+          artifactId: input.functionRef.artifactId,
         },
-        entrypoint: GOLDEN_G2_ISOLATED_SECRET_FUNCTION_REF.exportName,
+        entrypoint: input.functionRef.exportName,
         input: bridgeRequest,
       },
       requiredCapabilities: ['environment-binding', 'server-function'],
@@ -523,6 +873,7 @@ const runIsolatedSecretProduction = async () => {
       snapshot: result.snapshot,
       response,
       serializedResponse,
+      authorityConsumed,
       secretMaterialConsumed,
     });
   } finally {
@@ -543,6 +894,10 @@ export const runGoldenG2AuthServerMatrix =
       createGoldenG2AuthServerWorkspace('isolated-read');
     const isolatedSecretWorkspace =
       createGoldenG2AuthServerWorkspace('isolated-secret');
+    const isolatedReadSecretWorkspace = createGoldenG2AuthServerWorkspace(
+      'isolated-read-secret'
+    );
+    const isolatedSourceMutation = createGoldenG2SourceMutationWorkspace();
     const browserStaticAuditedAdapter = requireBlockedCodes(
       generateWorkspaceReactViteExecutableProject(remoteWorkspace),
       'Browser/static audited-adapter target'
@@ -563,6 +918,16 @@ export const runGoldenG2AuthServerMatrix =
       generateWorkspaceReactViteExecutableProject(isolatedSecretWorkspace),
       'Browser/static isolated Secret code-export target'
     );
+    const browserStaticWorkspaceReadSecret = requireBlockedCodes(
+      generateWorkspaceReactViteExecutableProject(isolatedReadSecretWorkspace),
+      'Browser/static workspace.read Secret code-export target'
+    );
+    const browserStaticProjectSourceMutation = requireBlockedCodes(
+      generateWorkspaceReactViteExecutableProject(
+        isolatedSourceMutation.workspace
+      ),
+      'Browser/static project-source mutation target'
+    );
     const deterministicTestSecretHmac = requireBlockedCodes(
       generateWorkspaceReactViteExecutableProject(remoteSecretWorkspace, {
         serverRuntimeTarget: DETERMINISTIC_TEST_SERVER_RUNTIME_TARGET,
@@ -574,6 +939,19 @@ export const runGoldenG2AuthServerMatrix =
         serverRuntimeTarget: DETERMINISTIC_TEST_SERVER_RUNTIME_TARGET,
       }),
       'Deterministic Test isolated Secret code-export target'
+    );
+    const deterministicTestWorkspaceReadSecret = requireBlockedCodes(
+      generateWorkspaceReactViteExecutableProject(isolatedReadSecretWorkspace, {
+        serverRuntimeTarget: DETERMINISTIC_TEST_SERVER_RUNTIME_TARGET,
+      }),
+      'Deterministic Test workspace.read Secret code-export target'
+    );
+    const deterministicTestProjectSourceMutation = requireBlockedCodes(
+      generateWorkspaceReactViteExecutableProject(
+        isolatedSourceMutation.workspace,
+        { serverRuntimeTarget: DETERMINISTIC_TEST_SERVER_RUNTIME_TARGET }
+      ),
+      'Deterministic Test project-source mutation target'
     );
     const remoteLive = requireReady(
       generateWorkspaceReactViteExecutableProject(remoteWorkspace, {
@@ -598,6 +976,19 @@ export const runGoldenG2AuthServerMatrix =
         serverRuntimeTarget: EXECUTION_PARENT_GATEWAY_SERVER_RUNTIME_TARGET,
       }),
       'Remote live isolated Secret code-export target'
+    );
+    const remoteLiveWorkspaceReadSecret = requireBlockedCodes(
+      generateWorkspaceReactViteExecutableProject(isolatedReadSecretWorkspace, {
+        serverRuntimeTarget: EXECUTION_PARENT_GATEWAY_SERVER_RUNTIME_TARGET,
+      }),
+      'Remote live workspace.read Secret code-export target'
+    );
+    const remoteLiveProjectSourceMutation = requireBlockedCodes(
+      generateWorkspaceReactViteExecutableProject(
+        isolatedSourceMutation.workspace,
+        { serverRuntimeTarget: EXECUTION_PARENT_GATEWAY_SERVER_RUNTIME_TARGET }
+      ),
+      'Remote live project-source mutation target'
     );
     const remoteLiveSecret = requireReady(
       generateWorkspaceReactViteExecutableProject(remoteSecretWorkspace, {
@@ -624,6 +1015,8 @@ export const runGoldenG2AuthServerMatrix =
       isolatedProduction,
       isolatedWorkspaceReadProduction,
       isolatedProductionSecret,
+      isolatedWorkspaceReadSecret,
+      isolatedProjectSourceMutation,
     ] = await Promise.all([
       runDeterministicTest(),
       runIsolatedProduction({
@@ -640,7 +1033,20 @@ export const runGoldenG2AuthServerMatrix =
         label: 'Isolated production workspace.read code-export target',
         permissions: ['workspace.owner', 'workspace.read'],
       }),
-      runIsolatedSecretProduction(),
+      runIsolatedSecretProduction({
+        binding: 'isolated-secret',
+        functionRef: GOLDEN_G2_ISOLATED_SECRET_FUNCTION_REF,
+        invocationId: 'golden-isolated-secret',
+        label: 'Isolated production Secret code-export target',
+      }),
+      runIsolatedSecretProduction({
+        binding: 'isolated-read-secret',
+        functionRef: GOLDEN_G2_ISOLATED_READ_SECRET_FUNCTION_REF,
+        invocationId: 'golden-isolated-read-secret',
+        label: 'Isolated production workspace.read Secret code-export target',
+        permissions: ['workspace.owner', 'workspace.read'],
+      }),
+      runIsolatedSourceMutationProduction(isolatedSourceMutation),
     ]);
     const clientSnapshots = [
       remoteLive.snapshot,
@@ -654,6 +1060,8 @@ export const runGoldenG2AuthServerMatrix =
       isolatedProduction.snapshot,
       isolatedWorkspaceReadProduction.snapshot,
       isolatedProductionSecret.snapshot,
+      isolatedWorkspaceReadSecret.snapshot,
+      isolatedProjectSourceMutation.snapshot,
     ];
     const clientText = clientSnapshots.map(snapshotText).join('\n');
     const snapshotSerialization = JSON.stringify(allSnapshots);
@@ -661,12 +1069,16 @@ export const runGoldenG2AuthServerMatrix =
       isolatedProduction.serializedResponse,
       isolatedWorkspaceReadProduction.serializedResponse,
       isolatedProductionSecret.serializedResponse,
+      isolatedWorkspaceReadSecret.serializedResponse,
+      isolatedProjectSourceMutation.serializedResponse,
     ].join('\n');
     const sourceTraceSerialization = JSON.stringify(
       [
         isolatedProduction.snapshot,
         isolatedWorkspaceReadProduction.snapshot,
         isolatedProductionSecret.snapshot,
+        isolatedWorkspaceReadSecret.snapshot,
+        isolatedProjectSourceMutation.snapshot,
       ].flatMap((snapshot) =>
         snapshot.files.flatMap(({ sourceTrace }) => sourceTrace ?? [])
       )
@@ -689,11 +1101,17 @@ export const runGoldenG2AuthServerMatrix =
         browserStaticCodeExport,
         browserStaticWorkspaceReadCodeExport,
         browserStaticIsolatedSecret,
+        browserStaticWorkspaceReadSecret,
+        browserStaticProjectSourceMutation,
         deterministicTestSecretHmac,
         deterministicTestIsolatedSecret,
+        deterministicTestWorkspaceReadSecret,
+        deterministicTestProjectSourceMutation,
         remoteLiveCodeExport,
         remoteLiveWorkspaceReadCodeExport,
         remoteLiveIsolatedSecret,
+        remoteLiveWorkspaceReadSecret,
+        remoteLiveProjectSourceMutation,
         isolatedProductionAuditedAdapter,
         isolatedProductionSecretHmac,
       }),
@@ -747,6 +1165,28 @@ export const runGoldenG2AuthServerMatrix =
         snapshot: isolatedProductionSecret.snapshot,
         response: isolatedProductionSecret.response,
         secretMaterialConsumed: isolatedProductionSecret.secretMaterialConsumed,
+      }),
+      isolatedWorkspaceReadSecret: Object.freeze({
+        snapshot: isolatedWorkspaceReadSecret.snapshot,
+        response: isolatedWorkspaceReadSecret.response,
+        authorityConsumed: isolatedWorkspaceReadSecret.authorityConsumed,
+        secretMaterialConsumed:
+          isolatedWorkspaceReadSecret.secretMaterialConsumed,
+      }),
+      isolatedProjectSourceMutation: Object.freeze({
+        snapshot: isolatedProjectSourceMutation.snapshot,
+        response: isolatedProjectSourceMutation.response,
+        authorityConsumed: isolatedProjectSourceMutation.authorityConsumed,
+        targetArtifactId: isolatedProjectSourceMutation.targetArtifactId,
+        workspaceUnchangedBeforeAdoption:
+          isolatedProjectSourceMutation.workspaceUnchangedBeforeAdoption,
+        eligibleChangeIds: isolatedProjectSourceMutation.eligibleChangeIds,
+        adoptedTargetSource:
+          isolatedProjectSourceMutation.adoptedTargetSource ?? '',
+        actionSourceUnchanged:
+          isolatedProjectSourceMutation.actionSourceUnchanged,
+        staleAdoptionBlocked:
+          isolatedProjectSourceMutation.staleAdoptionBlocked,
       }),
       boundary: Object.freeze({
         clientSnapshotsExcludeServerSource: !clientText.includes(

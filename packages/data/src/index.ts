@@ -1,4 +1,24 @@
 export {
+  DATA_OPERATION_TEST_ISSUE_CODES,
+  runDataOperationTest,
+} from './dataOperationTest';
+export type {
+  DataOperationTestCase,
+  DataOperationTestExpectation,
+  DataOperationTestIssue,
+  DataOperationTestReport,
+} from './dataOperationTest';
+export {
+  createDataManualAuthoringProposal,
+  DATA_MANUAL_AUTHORING_ISSUE_CODES,
+} from './dataAuthoring';
+export type {
+  DataManualAuthoringChange,
+  DataManualAuthoringImpact,
+  DataManualAuthoringIssue,
+  DataManualAuthoringProposal,
+} from './dataAuthoring';
+export {
   createDataNetworkCorrelation,
   createDataOperationAdapterRegistry,
   createDataOperationInvocation,
@@ -74,11 +94,27 @@ export type {
   DataOperationAdapterInput,
   DataOperationAdapterRegistry,
   DataOperationAdapterResult,
+  DataOperationAdapterStream,
+  DataOperationAdapterStreamInput,
   DataOperationInvocation,
   DataSchemaRuntimeErrorCode,
   ExecuteDataOperationInput,
   ExecuteDataOperationResult,
 } from './dataRuntime';
+export {
+  DATA_STREAM_ERROR_CODES,
+  DATA_STREAM_LIMITS,
+  DataStreamError,
+  openDataOperationStream,
+} from './dataStreamRuntime';
+export type {
+  DataStreamErrorCode,
+  DataStreamEvent,
+  DataStreamSession,
+  DataStreamSessionSnapshot,
+  DataStreamTerminalReason,
+  OpenDataOperationStreamInput,
+} from './dataStreamRuntime';
 export {
   DATA_ENVIRONMENT_RUNTIME_ERROR_CODES,
   DataEnvironmentRuntimeError,
@@ -142,6 +178,8 @@ export {
   DATA_CACHE_POLICY_LIMITS,
   DATA_LIFECYCLE_STATUSES,
   DATA_DOCUMENT_ISSUE_CODES,
+  DATA_IMPORT_KINDS,
+  DATA_IMPORT_PROVENANCE_LIMITS,
   DATA_OPERATION_KINDS,
   DATA_SOURCE_WIRE_VERSION,
   JSON_SCHEMA_2020_12_URI,
@@ -182,4 +220,7 @@ export type {
   DataSourceDocumentValidationResult,
   DataSourceDocumentValidationOptions,
   DataSourceDocumentWireV1,
+  DataImportEntityMapping,
+  DataImportKind,
+  DataImportProvenance,
 } from './data.types';

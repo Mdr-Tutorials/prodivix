@@ -21,12 +21,13 @@ const (
 )
 
 type Store struct {
-	db             *sql.DB
-	cipher         *secretCipher
-	cipherErr      error
-	envelopeCipher *secretEnvelopeCipher
-	envelopeErr    error
-	now            func() time.Time
+	db                        *sql.DB
+	cipher                    *secretCipher
+	cipherErr                 error
+	envelopeCipher            *secretEnvelopeCipher
+	envelopeCiphersByProvider map[string]*secretEnvelopeCipher
+	envelopeErr               error
+	now                       func() time.Time
 }
 
 func NewStore(db *sql.DB, encodedMasterKey string) *Store {
@@ -39,22 +40,39 @@ func NewStore(db *sql.DB, encodedMasterKey string) *Store {
 }
 
 func NewStoreWithKeyRing(db *sql.DB, encodedLegacyMasterKey string, activeKeyID string, encodedKeys map[string]string) *Store {
-	legacyCipher, legacyErr := newSecretCipher(strings.TrimSpace(encodedLegacyMasterKey))
 	kms, kmsErr := newStaticKeyRingKMS(strings.TrimSpace(activeKeyID), encodedKeys)
+	return newStoreWithKMS(db, encodedLegacyMasterKey, kms, kmsErr)
+}
+
+func newStoreWithKMS(db *sql.DB, encodedLegacyMasterKey string, kms secretKeyManagementService, kmsErr error, decryptOnlyKMS ...secretKeyManagementService) *Store {
+	legacyCipher, legacyErr := newSecretCipher(strings.TrimSpace(encodedLegacyMasterKey))
 	var envelopeCipher *secretEnvelopeCipher
 	var envelopeErr error
+	envelopeCiphersByProvider := map[string]*secretEnvelopeCipher{}
 	if kmsErr == nil {
 		envelopeCipher, envelopeErr = newSecretEnvelopeCipher(kms)
+		if envelopeErr == nil {
+			envelopeCiphersByProvider[envelopeCipher.kms.ProviderID()] = envelopeCipher
+			for _, legacyKMS := range decryptOnlyKMS {
+				legacyEnvelopeCipher, err := newSecretEnvelopeCipher(legacyKMS)
+				if err != nil || legacyEnvelopeCipher.kms.ProviderID() == envelopeCipher.kms.ProviderID() {
+					envelopeErr = ErrUnavailable
+					break
+				}
+				envelopeCiphersByProvider[legacyEnvelopeCipher.kms.ProviderID()] = legacyEnvelopeCipher
+			}
+		}
 	} else {
 		envelopeErr = kmsErr
 	}
 	return &Store{
-		db:             db,
-		cipher:         legacyCipher,
-		cipherErr:      legacyErr,
-		envelopeCipher: envelopeCipher,
-		envelopeErr:    envelopeErr,
-		now:            func() time.Time { return time.Now().UTC() },
+		db:                        db,
+		cipher:                    legacyCipher,
+		cipherErr:                 legacyErr,
+		envelopeCipher:            envelopeCipher,
+		envelopeCiphersByProvider: envelopeCiphersByProvider,
+		envelopeErr:               envelopeErr,
+		now:                       func() time.Time { return time.Now().UTC() },
 	}
 }
 
@@ -428,7 +446,7 @@ func (store *Store) UseSecret(ctx context.Context, input UseSecretInput, consume
 		}
 		material, err = store.cipher.decrypt(nonce, ciphertext, additionalData)
 	} else if algorithm.Valid && keyProvider.Valid && keyID.Valid && len(wrappedKeyNonce) > 0 && len(wrappedKey) > 0 {
-		material, err = store.envelopeCipher.decrypt(ctx, storedSecretEnvelope{
+		material, err = store.decryptSecretEnvelope(ctx, storedSecretEnvelope{
 			Algorithm: algorithm.String, KeyProvider: keyProvider.String, KeyID: keyID.String,
 			WrappedKeyNonce: wrappedKeyNonce, WrappedKey: wrappedKey, Nonce: nonce, Ciphertext: ciphertext,
 		}, additionalData)

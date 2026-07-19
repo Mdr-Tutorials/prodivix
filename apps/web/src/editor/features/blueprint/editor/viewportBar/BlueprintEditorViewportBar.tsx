@@ -13,6 +13,7 @@ import {
   VIEWPORT_ZOOM_RANGE,
 } from '@/editor/features/blueprint/editor/model/viewport';
 import type { BlueprintCanvasMode } from '../canvas';
+import type { BlueprintProjectRunTarget } from '../runner/blueprintProjectRunPlan';
 
 type BlueprintEditorViewportBarProps = {
   canvasMode: BlueprintCanvasMode;
@@ -20,6 +21,8 @@ type BlueprintEditorViewportBarProps = {
   runProvider: 'browser' | 'remote';
   remoteAvailable: boolean;
   onRunProviderChange: (provider: 'browser' | 'remote') => void;
+  runTarget: BlueprintProjectRunTarget;
+  onRunTargetChange: (target: BlueprintProjectRunTarget) => void;
   viewportWidth: string;
   viewportHeight: string;
   onViewportWidthChange: (value: string) => void;
@@ -44,6 +47,8 @@ export function BlueprintEditorViewportBar({
   runProvider,
   remoteAvailable,
   onRunProviderChange,
+  runTarget,
+  onRunTargetChange,
   viewportWidth,
   viewportHeight,
   onViewportWidthChange,
@@ -129,6 +134,22 @@ export function BlueprintEditorViewportBar({
               ? t('viewport.runProvider.remote')
               : t('viewport.runProvider.remoteSignIn')}
           </option>
+        </select>
+      </label>
+      <label className="inline-flex h-6 flex-none items-center gap-1.5 rounded-full border border-(--border-default) bg-(--bg-muted) px-2 text-[11px] text-(--text-secondary)">
+        <span className="max-[1100px]:hidden">
+          {t('viewport.runTarget.label')}
+        </span>
+        <select
+          className="bg-transparent text-[11px] text-(--text-primary) outline-none"
+          value={runTarget}
+          aria-label={t('viewport.runTarget.label')}
+          onChange={(event) =>
+            onRunTargetChange(event.target.value as BlueprintProjectRunTarget)
+          }
+        >
+          <option value="react-vite">{t('viewport.runTarget.react')}</option>
+          <option value="vue-vite">{t('viewport.runTarget.vue')}</option>
         </select>
       </label>
       <div className="flex flex-none items-center gap-2.5">

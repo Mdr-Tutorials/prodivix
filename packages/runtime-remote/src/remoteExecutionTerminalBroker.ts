@@ -23,6 +23,7 @@ import {
   hasRemoteExecutionTerminalScope as terminalScopeAllowed,
   normalizeRemoteExecutionTerminalIdentifier as identifier,
   normalizeRemoteExecutionTerminalPositiveInteger as boundedPositiveInteger,
+  remoteExecutionTerminalDigestEqual as digestEqual,
   remoteExecutionTerminalActiveStatuses as activeStatuses,
   RemoteExecutionTerminalBrokerError,
   type CreateRemoteExecutionTerminalBrokerOptions,
@@ -160,7 +161,10 @@ export const createRemoteExecutionTerminalBroker = (
     if (
       resolved.lease.workerId !== stored.workerId ||
       resolved.lease.attempt !== stored.workerAttempt ||
-      tokenDigest(resolved.lease.token) !== stored.workerLeaseTokenDigest
+      !digestEqual(
+        tokenDigest(resolved.lease.token),
+        stored.workerLeaseTokenDigest
+      )
     ) {
       closeStored(stored, 'transport-lost');
       throw new RemoteExecutionTerminalBrokerError(
@@ -212,7 +216,7 @@ export const createRemoteExecutionTerminalBroker = (
     if (
       stored.accessTokenExpiresAt <= now() ||
       !stored.accessTokenDigest ||
-      tokenDigest(accessToken) !== stored.accessTokenDigest
+      !digestEqual(tokenDigest(accessToken), stored.accessTokenDigest)
     )
       throw new RemoteExecutionTerminalBrokerError(
         'access-expired',
@@ -412,7 +416,7 @@ export const createRemoteExecutionTerminalBroker = (
       return result;
     },
     ...workerBroker,
-    closeExecution(executionId, reason = 'execution-ended') {
+    async closeExecution(executionId, reason = 'execution-ended') {
       const sessionId = sessionByExecution.get(executionId);
       if (!sessionId) return 0;
       const stored = sessions.get(sessionId);
@@ -420,7 +424,7 @@ export const createRemoteExecutionTerminalBroker = (
       closeStored(stored, reason);
       return 1;
     },
-    sweepExpired() {
+    async sweepExpired() {
       let swept = 0;
       sessions.forEach((stored, sessionId) => {
         let snapshot = stored.controller.session.getSnapshot();

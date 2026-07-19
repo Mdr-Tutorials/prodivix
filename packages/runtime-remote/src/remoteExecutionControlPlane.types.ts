@@ -209,6 +209,12 @@ export type RemoteExecutionRepository = Readonly<{
       leaseToken: string;
       now: number;
       leaseDurationMs: number;
+      /**
+       * Maximum number of distinct worker leases for one immutable execution.
+       * An expired active execution at this limit is failed before another
+       * queued execution can be claimed.
+       */
+      maximumAttempts?: number;
     }>
   ): Promise<RemoteExecutionClaimResult | undefined>;
   renewLease(

@@ -2,7 +2,7 @@
 
 This file provides Claude Code-specific guidance for working in this repository.
 
-**Primary rule source:** read `AGENTS.md` first. It contains the cross-agent project architecture, Workspace VFS write/read model, and coding rules. This file should stay complementary: Claude-specific workflow notes, command shortcuts, and implementation map only.
+**Primary rule source:** read `AGENTS.md` first. It contains the cross-agent rules and links to canonical architecture, status, milestone, and ownership documents. This file should stay complementary: Claude-specific workflow notes, command shortcuts, and implementation map only.
 
 ## Claude Operating Rules
 
@@ -16,7 +16,7 @@ This file provides Claude Code-specific guidance for working in this repository.
 
 ## Project Summary
 
-Prodivix is an industrial browser-side visual front-end development tool. The current product position is **G1 Passed / G2 Foundation**; G2 `ProductGateStatus` is **In Progress**. G1 established three visual editors, a shared **Code Authoring Environment**, and a cross-domain **Workspace Semantic Index**:
+Prodivix is an industrial browser-side visual front-end development tool. Current phase status is maintained only in `specs/roadmap/current-status.md`; do not restate it here. Stable architecture diagrams live in `docs/architecture/overview.md`, and package ownership lives in `docs/architecture/package-ownership.md`:
 
 ```text
 Blueprint / NodeGraph / Animation

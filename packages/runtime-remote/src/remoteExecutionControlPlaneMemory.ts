@@ -296,23 +296,55 @@ export const createMemoryRemoteExecutionRepository =
         });
       },
       async claimNext(input): Promise<RemoteExecutionClaimResult | undefined> {
-        const candidate = [...byId.values()]
-          .filter(
-            (execution) =>
-              execution.record.provider.id === input.providerId &&
-              (execution.record.status === 'queued' ||
-                (execution.lease !== undefined &&
-                  execution.lease.expiresAt <= input.now &&
-                  ['starting', 'running', 'cancelling'].includes(
-                    execution.record.status
-                  )))
-          )
-          .sort(
-            (left, right) =>
-              left.record.createdAt - right.record.createdAt ||
-              left.record.executionId.localeCompare(right.record.executionId)
-          )[0];
-        if (!candidate) return undefined;
+        const maximumAttempts =
+          input.maximumAttempts ?? Number.MAX_SAFE_INTEGER;
+        if (!Number.isSafeInteger(maximumAttempts) || maximumAttempts < 1)
+          throw new TypeError(
+            'Remote maximum worker attempts must be a positive integer.'
+          );
+        let candidate: RemoteExecutionStoredRecord | undefined;
+        for (;;) {
+          candidate = [...byId.values()]
+            .filter(
+              (execution) =>
+                execution.record.provider.id === input.providerId &&
+                (execution.record.status === 'queued' ||
+                  (execution.lease !== undefined &&
+                    execution.lease.expiresAt <= input.now &&
+                    ['starting', 'running', 'cancelling'].includes(
+                      execution.record.status
+                    )))
+            )
+            .sort(
+              (left, right) =>
+                left.record.createdAt - right.record.createdAt ||
+                left.record.executionId.localeCompare(right.record.executionId)
+            )[0];
+          if (!candidate) return undefined;
+          if (
+            candidate.record.status !== 'queued' &&
+            candidate.lease !== undefined &&
+            candidate.lease.attempt >= maximumAttempts
+          ) {
+            const failed = applyStatus(
+              candidate,
+              'failed',
+              input.now,
+              'worker-recovery-exhausted'
+            );
+            const { lease: _expiredLease, ...withoutLease } = failed;
+            put(
+              freezeStored({
+                ...withoutLease,
+                events: failed.events,
+                artifacts: failed.artifacts,
+                cancellationIds: failed.cancellationIds,
+              })
+            );
+            continue;
+          }
+          break;
+        }
         const lease = Object.freeze({
           workerId: input.workerId,
           token: input.leaseToken,

@@ -4,7 +4,10 @@ import {
   type ExecutionSessionSnapshot,
 } from '@prodivix/runtime-core';
 import { describe, expect, it } from 'vitest';
-import { createExecutionNetworkEntries } from './executionNetworkModel';
+import {
+  createExecutionNetworkEntries,
+  filterExecutionNetworkEntries,
+} from './executionNetworkModel';
 
 describe('execution Network model', () => {
   it('consumes only canonical sanitized trace details', () => {
@@ -30,6 +33,16 @@ describe('execution Network model', () => {
           sequence: 1,
           attempt: 1,
         },
+        sourceTrace: [
+          {
+            sourceRef: {
+              kind: 'data-operation',
+              documentId: 'data-products',
+              operationId: 'list',
+            },
+            label: 'Data operation',
+          },
+        ],
       })
     );
     const session: ExecutionSessionSnapshot = {
@@ -98,8 +111,28 @@ describe('execution Network model', () => {
         redacted: true,
         correlation: { operationId: 'list', invocationId: 'invocation-1' },
       },
+      primarySourceTrace: {
+        sourceRef: {
+          kind: 'data-operation',
+          documentId: 'data-products',
+          operationId: 'list',
+        },
+        label: 'Data operation',
+      },
     });
     expect(JSON.stringify(entries)).not.toContain('authorization');
+    expect(
+      filterExecutionNetworkEntries(entries, {
+        documentId: 'data-products',
+        operationId: 'list',
+      })
+    ).toHaveLength(1);
+    expect(
+      filterExecutionNetworkEntries(entries, {
+        documentId: 'data-products',
+        operationId: 'other',
+      })
+    ).toEqual([]);
   });
 
   it('projects post-terminal Session observations and rejects canary field drift', () => {

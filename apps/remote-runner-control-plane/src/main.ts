@@ -4,8 +4,9 @@ import { Pool } from 'pg';
 import { createExecutionSecretLeakGuard } from '@prodivix/runtime-core';
 import {
   createActiveExecutionQuotaPolicy,
+  createReplicatedRemoteExecutionTerminalBroker,
   createRemoteExecutionControlPlane,
-  createRemoteExecutionTerminalBroker,
+  createRemoteExecutionRegionalTrafficGate,
   createScopeRemoteExecutionAuthorizationPolicy,
   createStaticRemoteExecutionProviderRouter,
   encodeRemoteExecutableProjectSnapshot,
@@ -16,18 +17,29 @@ import {
 } from '@prodivix/runtime-remote';
 import {
   createPostgresRemoteExecutionRepository,
+  createPostgresRemoteExecutionRegionalTrafficAuthority,
   createPostgresRemoteExecutionSnapshotStore,
+  createPostgresRemoteExecutionTerminalStateStore,
   migrateRemoteExecutionPostgres,
+  migrateRemoteExecutionRegionalTrafficPostgres,
 } from '@prodivix/runtime-remote-postgres';
 import {
   readIsolatedServerFunctionExecutionRequest,
   readIsolatedServerFunctionPlan,
 } from '@prodivix/server-runtime';
 import { createRemoteExecutionHttpHandler } from './httpHandler';
+import { readRemoteControlPlaneRegionalConfiguration } from './regionalConfiguration';
 import {
   createRemoteExecutionSecretBroker,
   isRemoteExecutionSecretResolutionLeaseEligible,
 } from './secretBrokerClient';
+import { createAwsKmsRemoteExecutionTerminalStateKeyManagementService } from './terminalStateAwsKms';
+import { createAesGcmRemoteExecutionTerminalStateCipher } from './terminalStateCipher';
+import {
+  readRemoteTerminalStateCipherConfiguration,
+  REMOTE_TERMINAL_STATE_KMS_PROVIDER_STATIC,
+} from './terminalStateConfiguration';
+import { createManagedRemoteExecutionTerminalStateCipher } from './terminalStateManagedCipher';
 
 const required = (name: string): string => {
   const value = process.env[name]?.trim();
@@ -103,9 +115,38 @@ const secretEqual = (provided: string, expected: string): boolean => {
 };
 
 const databaseUrl = required('REMOTE_CONTROL_PLANE_DATABASE_URL');
+const regionalConfiguration = readRemoteControlPlaneRegionalConfiguration(
+  process.env
+);
 const clientToken = required('REMOTE_CONTROL_PLANE_CLIENT_TOKEN');
 const clientSubject = required('REMOTE_CONTROL_PLANE_CLIENT_SUBJECT');
 const workerTokenById = workerTokens();
+const terminalStateConfiguration = readRemoteTerminalStateCipherConfiguration(
+  process.env
+);
+const terminalStateCipher =
+  terminalStateConfiguration.provider ===
+  REMOTE_TERMINAL_STATE_KMS_PROVIDER_STATIC
+    ? createAesGcmRemoteExecutionTerminalStateCipher(terminalStateConfiguration)
+    : createManagedRemoteExecutionTerminalStateCipher({
+        keyManagementService:
+          createAwsKmsRemoteExecutionTerminalStateKeyManagementService({
+            region: terminalStateConfiguration.region,
+            activeKeyId: terminalStateConfiguration.activeKeyId,
+            keyArns: terminalStateConfiguration.keyArns,
+            operationTimeoutMs: terminalStateConfiguration.operationTimeoutMs,
+          }),
+        ...(terminalStateConfiguration.legacyStaticKeys.length
+          ? {
+              legacyStaticCipher:
+                createAesGcmRemoteExecutionTerminalStateCipher({
+                  activeKeyId:
+                    terminalStateConfiguration.legacyStaticKeys[0]!.keyId,
+                  keys: terminalStateConfiguration.legacyStaticKeys,
+                }),
+            }
+          : {}),
+      });
 const secretBrokerUrl =
   process.env.REMOTE_CONTROL_PLANE_SECRET_BROKER_URL?.trim();
 const secretBrokerToken =
@@ -133,6 +174,10 @@ const maximumActiveExecutions = integer(
   'REMOTE_CONTROL_PLANE_MAX_ACTIVE_EXECUTIONS',
   4
 );
+const maximumWorkerAttempts = integer(
+  'REMOTE_CONTROL_PLANE_MAX_WORKER_ATTEMPTS',
+  3
+);
 const artifactSweepIntervalMs = integer(
   'REMOTE_CONTROL_PLANE_ARTIFACT_SWEEP_MS',
   60_000
@@ -144,6 +189,27 @@ const artifactSweepBatch = integer(
 
 const pool = new Pool({ connectionString: databaseUrl });
 await migrateRemoteExecutionPostgres(pool);
+const regionalTrafficPool = regionalConfiguration
+  ? new Pool({ connectionString: regionalConfiguration.databaseUrl })
+  : undefined;
+const regionalTrafficAuthority = regionalTrafficPool
+  ? createPostgresRemoteExecutionRegionalTrafficAuthority(regionalTrafficPool)
+  : undefined;
+if (regionalTrafficPool && regionalTrafficAuthority) {
+  await migrateRemoteExecutionRegionalTrafficPostgres(regionalTrafficPool);
+  await regionalTrafficAuthority.initialize({
+    deploymentId: regionalConfiguration!.deploymentId,
+    activeRegionId: regionalConfiguration!.initialActiveRegionId,
+    initializedAt: Date.now(),
+  });
+}
+const regionalTrafficGate = regionalTrafficAuthority
+  ? createRemoteExecutionRegionalTrafficGate({
+      authority: regionalTrafficAuthority,
+      deploymentId: regionalConfiguration!.deploymentId,
+      regionId: regionalConfiguration!.regionId,
+    })
+  : undefined;
 const repository = createPostgresRemoteExecutionRepository(pool);
 const snapshots = createPostgresRemoteExecutionSnapshotStore(pool);
 const controlPlane = createRemoteExecutionControlPlane({
@@ -159,17 +225,22 @@ const controlPlane = createRemoteExecutionControlPlane({
   ]),
   createExecutionId: () => `execution-${randomUUID()}`,
   createLeaseToken: () => `lease-${randomUUID()}`,
+  maximumWorkerAttempts,
   outputGuard: createExecutionSecretLeakGuard({
     secretValues: [
       clientToken,
       databaseUrl,
+      ...(regionalConfiguration ? [regionalConfiguration.databaseUrl] : []),
       ...Object.values(workerTokenById),
       ...(secretBrokerToken ? [secretBrokerToken] : []),
+      ...terminalStateConfiguration.encodedSecretValues,
       ...secretCanaries,
     ],
   }),
 });
-const terminalBroker = createRemoteExecutionTerminalBroker({
+const terminalBroker = createReplicatedRemoteExecutionTerminalBroker({
+  stateStore: createPostgresRemoteExecutionTerminalStateStore(pool),
+  stateCipher: terminalStateCipher,
   resolveExecution: (executionId) => repository.get(executionId),
   createTerminalSessionId: () => `terminal-${randomUUID()}`,
   createAccessToken: () => `terminal-access-${randomUUID()}-${randomUUID()}`,
@@ -177,14 +248,17 @@ const terminalBroker = createRemoteExecutionTerminalBroker({
   secretValues: [
     clientToken,
     databaseUrl,
+    ...(regionalConfiguration ? [regionalConfiguration.databaseUrl] : []),
     ...Object.values(workerTokenById),
     ...(secretBrokerToken ? [secretBrokerToken] : []),
+    ...terminalStateConfiguration.encodedSecretValues,
     ...secretCanaries,
   ],
 });
 const handler = createRemoteExecutionHttpHandler({
   controlPlane,
   terminalBroker,
+  ...(regionalTrafficGate ? { regionalTrafficGate } : {}),
   authenticator: Object.freeze({
     async authenticateClient(token: string) {
       return secretEqual(token, clientToken)
@@ -305,9 +379,20 @@ let sweepBusy = false;
 const artifactSweep = setInterval(() => {
   if (sweepBusy) return;
   sweepBusy = true;
-  void controlPlane
-    .sweepExpiredArtifacts(artifactSweepBatch)
-    .then((swept) => swept + terminalBroker.sweepExpired())
+  void (async () => {
+    const permit = regionalTrafficGate
+      ? await regionalTrafficGate.acquire()
+      : undefined;
+    if (regionalTrafficGate && !permit) return 0;
+    try {
+      return (
+        (await controlPlane.sweepExpiredArtifacts(artifactSweepBatch)) +
+        (await terminalBroker.sweepExpired())
+      );
+    } finally {
+      await permit?.release();
+    }
+  })()
     .catch(() => 0)
     .finally(() => {
       sweepBusy = false;
@@ -318,6 +403,7 @@ const shutdown = async (): Promise<void> => {
   clearInterval(artifactSweep);
   await new Promise<void>((resolve) => server.close(() => resolve()));
   await pool.end();
+  await regionalTrafficPool?.end();
 };
 process.once('SIGINT', () => void shutdown());
 process.once('SIGTERM', () => void shutdown());

@@ -3,11 +3,12 @@
 ## 状态
 
 - DecisionStatus：Accepted
-- ImplementationStatus：D0-D2 Implemented / D3-D4、D6-D8 In Progress / D5 Planned
+- ImplementationStatus：D0-D8 Contract/Gate Implemented / Product Closure In Progress
 - ProductGateStatus：G2 In Progress
 - Global Phase：G2 Executable Full-stack Workspace
-- 日期：2026-07-17
-- Owner：`@prodivix/data`、`@prodivix/data-http`、`@prodivix/data-mock`、
+- 日期：2026-07-19
+- Owner：`@prodivix/data`、`@prodivix/data-http`、`@prodivix/data-graphql`、
+  `@prodivix/data-asyncapi`、`@prodivix/data-mock`、
   `@prodivix/runtime-core`、protocol/runtime adapters、`@prodivix/prodivix-compiler`、composition root
 - 关联：
   - `specs/implementation/g2-executable-full-stack-workspace.md`
@@ -46,6 +47,29 @@ G2 完成的标志不是“能发一个 fetch”，而是同一 CRUD journey 在
   mutation 在没有显式 idempotency contract 时禁止自动 replay。
 - 独立 Browser live HTTP adapter/client-safe fetch，以及 session-scoped deterministic mock fixture adapter；
   mock 能在不改写 canonical source adapterId 的前提下覆盖协议 adapter。
+- OpenAPI 3.1 importer first vertical：4 MiB/深度/节点/路径/operation/schema/parameter 有界解析，
+  生成 canonical DataSourceDocument proposal、reference-only auth placeholder、stable external-to-target id 与
+  SHA-256 managed provenance；reimport 使用三方 managed digest 保留 local extension，在上游与本地同时修改时
+  fail closed，并要求 exact impact approval 后才能删除或改变已导入 contract。proposal 只由显式可逆
+  Workspace command 采纳，不直接写 Canonical Workspace。
+- D4 Data Resources 产品纵切：本地 JSON 输入生成 revision-fenced OpenAPI preview，展示 managed
+  diff、impact 与 conflict；只有 ready proposal 或 exact impact approval 才能通过单个可逆 Workspace
+  command 采纳。Data Source/Operation Inspector 只投影 canonical metadata、provenance 与 reference-only
+  binding identity；operation-scoped Issues、sanitized Network filter 与双向 Inspector navigation 共用 exact
+  `{ documentId, operationId }`，不保存 spec source bytes、Secret value 或第二套运行态真相。
+- `@prodivix/data-graphql` 已完成 finite query/mutation 与 bounded subscription、variables/operationName、
+  fragment-validating SDL + operation importer、partial data/error policy、schema projection、stable
+  provenance/reimport、idempotency 与 sanitized Network/SourceTrace correlation。
+- `@prodivix/data-asyncapi` 已完成 AsyncAPI 3.0 frozen subset：HTTP publish、单 reply request/reply 与 bounded
+  receive/stream、inline/local payload schema、stable provenance/reimport、idempotency 与 Network correlation；
+  stream extension、背压和 SourceTrace debugger 以 ADR 49 固定。
+- Data Resources 已增加手工 Schema 与完整 Operation Policy proposal；所有变更先做 canonical validation、
+  exact impact approval，再通过 revision-fenced 可逆 Workspace command 采纳。Test Operation 使用 disposable
+  mock-only runtime、exact source adapter emulation、schema validation 与显式 value/empty/error assertion，
+  不写 Workspace。
+- imported HTTP parameter/path/header/body/response mapping 已由 Browser adapter、Backend Remote gateway 与
+  React/Vite standalone public-client runtime 共同执行；只投影声明的输入，未映射值不出站，operation-level
+  Secret 仍只在授权 server/edge material callback 内注入。
 - `@prodivix/runtime-core` 的 environment snapshot/permission/material ports 与短期 resolution lease；exact
   revision/mode/binding kind、adapter field、runtime zone、execution class、provider isolation、expiry/revoke
   在 transport effect 前 fail closed。Data runtime 已接 preflight，HTTP public binding 与 server-side
@@ -59,13 +83,18 @@ G2 完成的标志不是“能发一个 fetch”，而是同一 CRUD journey 在
 - Data trigger/dispatch kernel：route/document/refresh/input-change/pagination/Blueprint event/CodeSlot/Test
   typed origin，literal/trigger/runtime/object/array/CodeSlot input mapping，monotonic sequence、canonical query
   equality、mutation dispatch identity replay fencing，以及 Browser execute composition。
-- React/Vite generated runtime 已从同一 Data current model 投影 public client live HTTP：显式 mock/live
+- React/Vite 与 controlled Vue/Vite generated runtime 已从同一 Data current model 投影 public client live
+  HTTP、finite GraphQL query/mutation 与 finite AsyncAPI request-reply/publish：显式 mock/live
   runtime manifest、JSON Schema 2020-12、retry、offset/cursor response mapping、bounded SHA-256 cache、
   optimistic CRUD/revalidation 与 sanitized Network correlation；environment/Secret 配置和非 client zone
-  不进入 public client fetch。Remote Preview 的 server/edge query/mutation 通过 value-only strict invocation bridge
+  不进入 public client fetch。Remote Preview 的 server/edge HTTP/GraphQL/AsyncAPI query/mutation 通过 value-only strict invocation bridge
   交给父窗口 product-authenticated Backend gateway；父窗口以 exact active frame、opaque origin 与 generation
   fence 校验请求，Preview Host CSP 仅开放当前 hash capability origin 的 runtime asset 读取。Browser Preview
   iframe 仍只允许 exact active frame/origin 的严格 Network bridge message 进入当前 Execution Job。
+- subscription 使用独立 value-only `open/pull(cursor)/event/complete/cancel` bridge；每次 pull 只读取一个事件，
+  Remote provider 显式要求 `data-stream` capability。Data kernel、Backend 和 generated runtime 共同执行 256 events、
+  256 KiB/event、4 MiB total、5 minute duration 与 30 second idle hard cut。当前只允许 public server/edge stream；
+  callback-only Secret stream、client/static stream、resume/replay 与协议私有 emitter fail closed。
 - Remote mutation dispatch 使用 runtime-unique UUID invocation；Backend PostgreSQL ledger 在 effect 前
   原子 claim，并以 SHA-256 fingerprint 绑定 exact snapshot/environment/document/input/method/endpoint/sequence。
   completed duplicate 只读取 sanitized result，identity drift、pending 与 indeterminate outcome 不再次访问上游；
@@ -83,11 +112,11 @@ G2 完成的标志不是“能发一个 fetch”，而是同一 CRUD journey 在
 
 ### 尚未实现
 
-- 完整 Remote live parity；当前 generated Remote Preview 已接 execution-bound server/edge HTTP
-  query/mutation gateway、durable replay/idempotency fence，以及 exact active-job Session observation。
+- 完整 Remote live parity；当前 generated Remote Preview 已接 execution-bound server/edge HTTP/GraphQL/AsyncAPI
+  finite gateway、GraphQL/AsyncAPI bounded stream、durable replay/idempotency fence，以及 exact active-job Session observation。
   finite Remote Preview 终态后产生的 metadata-only Network trace 通过 generation/stale fence、有限去重与
-  总 retention 预算进入产品 Session；manual cancellation/new-request restart 已完成，reconnect、artifact/
-  quota/worker-loss recovery presentation 仍待完成。
+  总 retention 预算进入产品 Session；manual cancellation/new-request restart、same-execution cursor reconnect、
+  artifact expiry/missing、quota wait-for-capacity 与 bounded worker-loss exhaustion presentation 已完成。
 - production Environment/Secret store first vertical、principal/session partition 与 durable permission/audit
   adapter 已落地；Remote create authority 已接 authenticated session 与 exact environment/snapshot preflight，
   server HTTP gateway/material resolution first vertical 已组合 exact Data revision、短期 grant 与公网 HTTPS/
@@ -95,16 +124,25 @@ G2 完成的标志不是“能发一个 fetch”，而是同一 CRUD journey 在
   artifact/test-report/crash durable surface canary Gate 已闭环；Structured Console 已增加 generated/bridge/
   core/copy 多层 credential redaction；Remote Terminal 已增加 Worker/Control Plane 双边、stdout/stderr 分流的
   transport-wide/cross-chunk canary 与 bounded copy redaction。Backend per-record KMS envelope、versioned static
-  key-ring first adapter、bounded atomic rewrap/legacy migration 与 aggregate-only rotation audit 已完成；
-  managed-cloud KMS adapter继续建设。
-- HTTP/OpenAPI、GraphQL、AsyncAPI importer/runtime adapter。
-- 完整 Data editor/Inspector/Issues/Network 产品旅程。
-- Preview/Test/Export 和第二 target 的 CRUD parity。
+  key-ring first adapter、bounded atomic rewrap/legacy migration 与 aggregate-only rotation audit 已完成；AWS
+  managed KMS exact ARN/hashed context/static decrypt-only migration first vertical 已配置，首次 live evidence 与第二
+  provider 继续建设。
+- D8 bounded journey/capability/target matrix 已闭环；Remote Test 与 Browser Test 共用 mock-only snapshot、
+  Execution Session 和 report UI，并完成 exact execution-bound artifact/trace/SourceTrace correlation。
+  client live matrix 接受 HTTP、finite GraphQL 与 finite AsyncAPI；server/edge 接受共用 authority/SSRF/budget
+  Gate 的 HTTP/GraphQL/AsyncAPI finite execution 与 public bounded subscription。
+- Vue/Vite second target 已通过同一 Data runtime 的五段 CRUD、loading/empty/error/retry/pagination Gate；ADR 54
+  又完成 current PIR/Route/Auth/Server/Asset compiler 与 deterministic authenticated Catalog list/create/update/delete
+  - PNG install/typecheck/test/build/Chrome 产品纵切。真实 Remote authenticated live journey 仍明确未完成。
 
-当前 Browser/generated public client、mock lifecycle 与 Remote server/edge query/mutation gateway first vertical
-已可执行，Remote Data Network、Structured Console、manual new-request recovery 和显式 upstream mutation
-idempotency/retry 也已关联产品 Session；但完整 Remote failure recovery、跨表面 correlation/canary 和第二 target 尚未闭环。这是明确
-边界，不能描述为完整 Data runtime。
+当前 Browser/generated public client、mock lifecycle、OpenAPI 3.1 proposal/reimport/product preview 与 Remote
+server/edge finite/stream gateway first vertical 已可执行；Data Inspector、Issues 与 Remote Data Network 已按
+exact operation correlation 形成产品导航，Network SourceTrace 通过 exact snapshot fence 可直接打开作者态 operation。
+GraphQL/AsyncAPI adapters、手工 authoring/Test Operation、
+bounded Remote recovery、Remote Test 产品 composition、D8 security/journey/capability/target matrix 与
+Vue/Vite current-contract product target 也已闭环。stream reconnect/resume、Secret credential renewal、真实 Remote
+authenticated cross-target journey 和
+其他 G2 主线仍是明确边界，不能描述为全部 G2 Data closure 已完成。
 
 ## Canonical 与运行态边界
 
@@ -291,25 +329,19 @@ DataSourceDocument。
 ### GraphQL
 
 - endpoint/source binding、document/operation selection、variables 与 output schema mapping；
-- query/mutation 映射现有 operation kinds；
+- query/mutation 映射 finite operation；subscription 使用独立 pull-driven stream session；
 - GraphQL errors 与 partial data 的显式 policy；
 - persisted query、auth、pagination 和 trace 走共享 contract。
 
-subscription 不在当前 query/mutation + finite lifecycle 内。不得用 query 假装 subscription。
+subscription 不写 finite lifecycle result，也不得用 query 假装 subscription。它只通过 ADR 49 的
+`open/pull/cancel` contract 发布 schema-valid event、sanitized Network 与 SourceTrace。
 
 ### AsyncAPI
 
-当前 G2 contract 只安全覆盖 publish 或 request/reply 这类有限 invocation。长期 subscription 需要
-stream lifecycle、message ordering、backpressure、reconnect、resume cursor、dispose 和 collection
-incremental update 语义，必须先修订 ADR/current model。
-
-因此 G2 二选一并在开工前冻结：
-
-1. 只实现能够映射为 finite mutation/query 的 AsyncAPI capability，并对 subscription 发布稳定
-   unsupported diagnostic；或
-2. 先接受 stream extension ADR，再实现完整 subscription contract。
-
-不允许 adapter 私有 event emitter 绕过 Data lifecycle、Session、Network 与 cancellation。
+finite publish/request-reply 与 bounded HTTP SSE/NDJSON receive/stream 已进入同一 current model。stream 只允许
+单 active identity、单 pending pull、monotonic cursor、明确 cancel/complete 和固定预算；不允许 adapter 私有
+event emitter 绕过 Data schema、Execution Session、Network/SourceTrace 与 cancellation。断线 resume、跨 execution
+replay、WebSocket/Kafka/MQTT 与 incremental collection merge 不在 first vertical 内。
 
 ## Import、编辑与重新导入
 
@@ -380,7 +412,8 @@ incremental update 语义，必须先修订 ADR/current model。
       identity。Remote 当前 durable 输出的 log/diagnostic/trace/artifact/report/cache/crash canary 已由 Worker +
       Control Plane 双 Gate 覆盖；Structured Console copy 与 Remote Terminal transport-wide/cross-chunk、
       stdout/stderr 分流和 bounded copy redaction，以及 Backend per-record KMS envelope、versioned static key-ring、
-      bounded atomic rewrap/legacy migration 与真实 PostgreSQL concurrency Gate 已完成；managed-cloud KMS adapter仍未完成。
+      bounded atomic rewrap/legacy migration、AWS managed KMS first vertical 与真实 PostgreSQL concurrency Gate 已完成；
+      首次 live evidence 与第二 managed provider 仍未完成。
 
 完成条件：未授权、错误 zone、stale environment 或缺 binding 均在执行前稳定拒绝；无明文泄漏。
 
@@ -398,42 +431,64 @@ incremental update 语义，必须先修订 ADR/current model。
       reconcile、error/cancel rollback 与 concurrent mutation property test；旧 inverse patch 不能覆盖新 owner。
 - [x] HTTP offset `totalPath` 与 cursor next/previous response path mapping；missing/invalid mapping fail closed，
       不从 value shape 猜测 page。
-- [ ] OpenAPI import proposal、provenance、stable id、reimport diff/impact/conflict。
-- [ ] Data editor/Inspector/Issues/Network 产品纵切。
+- [x] OpenAPI 3.1 bounded import proposal、reference-only security placeholder、stable id、SHA-256 provenance、
+      three-way reimport diff/local-extension preservation/impact/conflict，以及显式可逆 Workspace adoption；
+      Browser、Remote Backend 与 React/Vite standalone 已共同执行 imported path/query/header/body/response
+      mapping，`pnpm run verify:g2:data-openapi` 固定该纵切。
+- [x] Data Resources 产品纵切：OpenAPI local preview、managed diff/impact/conflict、exact approval、单个
+      Workspace command adoption、canonical Source/Operation Inspector、operation-scoped Issues、sanitized
+      Network exact filter，以及 Issues/Network -> Inspector 双向导航；UI 不读取外部 identity、不保留 spec
+      source bytes，也不展示 Secret value。
 
 完成条件：HTTP CRUD Golden 支持 mock/live、错误、重试、分页和 optimistic rollback。
 
-### D5：GraphQL 与 AsyncAPI 有限能力
+### D5：GraphQL、AsyncAPI 与 bounded stream
 
-- [ ] GraphQL query/mutation、variables、partial error 与 pagination mapping。
-- [ ] AsyncAPI scope checkpoint：finite-only 或先接受 stream ADR。
-- [ ] importer/runtime conformance 与稳定 unsupported diagnostics。
-- [ ] 不允许 adapter 私有 lifecycle/Secret/session。
+- [x] GraphQL query/mutation、variables、fragment-validating operation document、partial error 与 pagination mapping。
+- [x] AsyncAPI publish/request-reply 与 bounded HTTP receive/stream；ADR 49 固定 pull/backpressure 与 fail-close 边界。
+- [x] Canonical Backend Workspace validator 接受 subscription，并拒绝全部 finite invocation policy；mutation
+      invocation-key 与 bounded retry 仍按 current contract 原子校验。
+- [x] importer/runtime conformance、stable provenance/reimport 与稳定 unsupported diagnostics。
+- [x] protocol adapter 复用共享 schema/policy/lifecycle/Network correlation，不建立私有 lifecycle/Secret/session。
 
 完成条件：宣称支持的 capability 通过同一 runtime contract；未支持 shape 在 import/preflight 失败。
 
 ### D6：Preview/Test/Remote integration
 
-- [x] Browser 已接 protocol-neutral registry + HTTP + client-safe fetch；Backend Remote HTTP/environment
-      resolver first vertical 与 generated Remote Preview server/edge query/mutation invocation bridge/CSP 已建立。
+- [x] Browser 已接 protocol-neutral registry + HTTP + client-safe fetch；Backend Remote HTTP/GraphQL/AsyncAPI
+      finite gateway、public GraphQL/AsyncAPI stream、environment resolver 与 generated Remote Preview
+      invocation/stream bridge/CSP 已建立。
 - [x] Browser Network trace 已 correlation 到 operation/invocation/sequence/attempt/source trace，并进入
       active Project Job/Session；generated iframe 通过 strict envelope、exact origin 与 exact frame source
       复用该 Job trace，Console/Test correlation 继续建设。
-- [x] Browser Test Data composition 已具备 deterministic fixture、live opt-in、exact Executable Snapshot
+- [x] Browser Test Data composition 强制 deterministic fixture/mock-only、拒绝 environment resolver 与 live invocation，
+      并具备 exact Executable Snapshot
       provisioning 与 session-namespaced CRUD cleanup；Browser Host、filesystem adapter 与 rootless Worker
       从同一 snapshot 投影 mock runtime asset。生成 React/Vite runtime 已对 PIR query binding 发布
       loading/success/empty/error 并订阅刷新，Remote Preview/Test 通过同一 Worker 文件投影消费；Browser
       typed mutation dispatch 已接共享 execute kernel；standalone generated mock runtime 已执行 mutation CRUD
-      并重校验已激活 query，public client live HTTP 已执行 schema/retry/pagination/cache/optimistic 与 Network
-      correlation；Remote server/edge query/mutation 已经父窗口 gateway 执行并返回 metadata-only Network，
+      并重校验已激活 query，public client live HTTP/GraphQL/AsyncAPI finite runtime 已执行各协议 preflight、
+      schema/retry/pagination 或 response mapping、cache/optimistic 与 Network
+      correlation；Remote server/edge finite invocation 已经父窗口 gateway 执行并返回 metadata-only Network，
       mutation effect-before durable replay fence 已完成；Remote Network 使用 exact active Job identity 的
       bounded Session observation，并对 generation replacement、stop、重复结果和 identity drift fail closed。
-- [ ] 完整 Remote Test/live policy parity、跨 Console/Test correlation 与 recovery presentation。
+- [x] server/edge GraphQL/AsyncAPI gateway 复用 Remote Data authority/environment/permission/SSRF/预算 Gate；
+      subscription 通过 strict open/pull/cancel frame bridge、Backend SSE/NDJSON decoder、active generation fence 和
+      `data-stream` provider capability 执行。opening Network SourceTrace 可从 Execution Center 经 exact snapshot
+      fence 导航至 canonical Data operation。
+- [x] Remote Test/live policy parity 与跨 Console/Test correlation：Test 页面显式选择 Browser/Remote，二者消费
+      同一 mock-only snapshot 并进入同一 Session/report projection；Remote request 在 snapshot resolution 和
+      Backend create 两层拒绝 environment reference，durable authority 绑定 exact provider/profile/runtime zone，
+      live Data gateway 只接受 `prodivix.remote.preview/preview/client`。Worker 先上传
+      `test-report:<executionId>` artifact，再发布同 ID/status/SourceTrace 的 `test.report`；Provider 对重复、乱序、
+      identity/source drift 与 Test live runtime Network fail closed。
+- [x] same-execution reconnect、artifact expiry/missing、quota 与 bounded worker-loss recovery presentation。
 - [x] Remote mutation identity drift、concurrent pending 与 disconnect/crash 后 indeterminate outcome 不重复 effect；
       completed duplicate 返回相同 sanitized result。
 - [x] 显式 upstream `invocation-key` idempotency/retry contract：canonical policy、adapter capability、HTTP
       header mapping、React/Vite public/Remote runtime、Backend v3 next-attempt ledger 与并发 Gate 已闭环。
-- [ ] cancellation/timeout 后的产品 stale-result/recovery presentation。
+- [x] cancellation/timeout 后只允许显式 new request，旧 Job/event 保留且 stale result/mutation 不自动 replay；
+      Execution Center 使用独立 terminal recovery 文案。
 
 完成条件：相同 snapshot/environment/fixture 在 Browser/Remote 得到相同 lifecycle/test outcome。
 
@@ -446,22 +501,36 @@ incremental update 语义，必须先修订 ADR/current model。
       Browser/ZIP export、client environment reference 与 live worker/build/test Data zone 均稳定阻断；Workspace
       Test 使用强制 mock-only target，若 provider 错投 live manifest 则运行前拒绝。
 - [x] React/Vite standalone query/mutation runtime 已不依赖 editor/backend 私有 runtime，执行 durable
-      activation/input/event、mock CRUD 与 public client live HTTP/policy，并通过强制
+      activation/input/event、mock CRUD 与 public client live HTTP/GraphQL/AsyncAPI finite policy，并通过强制
       install/typecheck/test/build Gate。
-- [ ] 单一第二 target 使用相同 Data current model、policy kernel 和 conformance fixtures。
-- [ ] 第二 target 的 client/server/edge split、Secret exclusion、install/typecheck/test/build/browser-smoke。
+- [x] Vue/Vite controlled target 使用相同 Data current model、standalone runtime 和 CRUD conformance fixture。
+- [x] 第二 target static-client/provider-mock split、client/Secret stream fail-close、server/edge execution-parent
+      gateway capability projection、install/typecheck/test/build/browser-smoke。
+- [x] Vue current PIR/Route/Auth/Server/Asset product projection、Export/Test/Blueprint selector 与 deterministic
+      authenticated Catalog CRUD + exact PNG Chrome Gate。
 
 完成条件：不能安全导出的 capability fail closed；两个 target 运行同一 CRUD journey。
 
 ### D8：Golden 与 closure
 
-- [ ] 完整 CRUD、loading/empty/error/retry/pagination/optimistic journey。
-- [ ] HTTP/OpenAPI、GraphQL 和冻结范围的 AsyncAPI capability matrix。
-- [ ] mock/live、Browser/Remote、Preview/Test/Export、两个 target matrix。
-- [ ] property tests：cache partition、stale fencing、retry idempotency、optimistic concurrency。
-- [ ] Secret canary、network redaction、mock-miss 和 client-only denial security Gate。
+- [x] controlled HTTP/GraphQL/AsyncAPI mock × React/Vue snapshot、Preview/Test runtime asset、Remote codec 与
+      provider capability matrix；Vue 独立 install/typecheck/test/build/Chrome Gate 执行五段 CRUD、
+      loading、empty、error attempt 与 pagination journey。
+- [x] 完整 CRUD、loading/empty/error/retry/pagination/optimistic journey：Golden 独立工程覆盖产品 journey，
+      Data/HTTP runtime tests 覆盖 retry/cache/pagination，optimistic owner/version 由 property Gate 覆盖。
+- [x] HTTP/OpenAPI、GraphQL 和冻结范围的 AsyncAPI capability matrix；client finite live 与受审计 server/edge
+      finite gateway 允许，GraphQL/AsyncAPI public bounded subscription 要求 `data-stream`；client、HTTP adapter、
+      callback-Secret stream 稳定拒绝。
+- [x] mock/live、Browser/Remote、Preview/Test/Export、React/Vue matrix；Test 始终 mock-only，
+      live 只进入 Preview/Build/受审计 gateway 单元格。
+- [x] property tests：cache partition、stale fencing、retry idempotency、optimistic concurrency；
+      `verify:g2:data-protocols` 运行 Data 55、HTTP 17、GraphQL 8、AsyncAPI 8 tests。
+- [x] Secret canary、network redaction、mock-miss 和 client-only denial security Gate：
+      `verify:g2:data-security-matrix` 串联 Golden React/Vue Test/Export 投影、Runtime Core、Data Mock、Compiler、
+      Remote Provider、Worker/rootless decoder、Web 产品 composition 与 Backend durable execution-class Gate；
+      GitHub `G2 Data and Second Target Closure` 具有独立 security job。
 
-完成条件：证据进入 `g2-closure-evidence.md`，再更新 G2 ProductGateStatus。
+完成条件：D8 证据进入 `g2-closure-evidence.md`；G2 ProductGateStatus 仍由其他未完成主线共同决定。
 
 ## 横向 Gate
 
@@ -486,7 +555,7 @@ incremental update 语义，必须先修订 ADR/current model。
 - 若 mock miss 会访问 live、Test 会访问生产 mutation，立即 fail closed。
 - 若 optimistic inverse patch 可能覆盖新 sequence，禁用 optimistic apply 直到 version ownership 完成。
 - 若 importer 直接覆盖 Workspace 或丢失 provenance，改为 proposal/diff/Transaction。
-- 若 AsyncAPI subscription 需要无限 stream，先接受 stream ADR，不在 adapter 私有实现。
+- 若 subscription 需要 resume、durable replay、Secret credential renewal 或新 transport，修订 ADR 49；不在 adapter 私有实现。
 - 若 client-only export 需要 Secret，要求 server gateway/full-stack target 或拒绝构建。
 - 若 Auth/Session/Server Function 未有 ADR，禁止 Data adapter 自建持久化或权限真相。
 
@@ -497,8 +566,14 @@ incremental update 语义，必须先修订 ADR/current model。
 - [x] PIR/Inspector trigger/input durable authoring与 React/Vite generated runtime execution projection 完成。
 - [x] adapter registry、mock/live、policy executor 与 HTTP runtime 已形成 public client 与 Remote
       server/edge gateway first vertical。
-- [ ] OpenAPI importer 与完整 Remote parity 尚待完成。
-- [ ] GraphQL 和明确冻结范围的 AsyncAPI capability 完成。
-- [ ] Environment/Secret resolver、zone permission 和 leak Gate 完成。
-- [ ] Browser/Remote Preview/Test 与 standalone 两 target CRUD parity 通过。
-- [ ] 没有第二套 Data truth、私有 runtime lifecycle 或 Secret 明文旁路。
+- [x] OpenAPI 3.1 importer/reimport/Workspace adoption、产品 preview/diff/impact/conflict、
+      Inspector/Issues/Network navigation 与 Browser/Remote/standalone HTTP mapping first vertical 完成。
+- [x] bounded Remote reconnect/artifact/quota/worker-loss、authorization/permission/network denial、cancel/timeout
+      recovery，手工 Data authoring/Test Operation 与 controlled Vue/Vite CRUD parity 完成。
+- [x] GraphQL 和明确冻结范围的 AsyncAPI capability 完成。
+- [x] Environment/Secret resolver、zone permission 与当前 Data leak Gate first vertical 完成；managed-cloud
+      KMS 与其他 G2 横向 Secret closure 继续由 Auth/Server 主线建设。
+- [x] Browser/Remote Preview/Test 与 standalone React/Vue controlled Data target 的 bounded CRUD parity 通过。
+- [x] Vue deterministic authenticated Catalog 通过 canonical PIR Collection、Route guard/loader/action 与 exact Asset
+      materialization；Remote live execution 仍不在本完成声明内。
+- [x] 当前 Data Gate 未发现第二套 Data truth、私有 runtime lifecycle 或 Secret 明文旁路。

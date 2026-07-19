@@ -17,6 +17,14 @@ import {
   type ExecuteDataOperationResult,
 } from '@prodivix/data';
 import {
+  createDataAsyncApiAdapter,
+  type DataAsyncApiTransport,
+} from '@prodivix/data-asyncapi';
+import {
+  createDataGraphqlAdapter,
+  type DataGraphqlTransport,
+} from '@prodivix/data-graphql';
+import {
   createDataHttpAdapter,
   type DataHttpTransport,
 } from '@prodivix/data-http';
@@ -85,10 +93,7 @@ export type CreateBrowserDataExecutionEnvironmentOptions =
     }>;
 
 export type CreateBrowserTestDataExecutionEnvironmentOptions =
-  CreateBrowserDataExecutionEnvironmentOptions &
-    Readonly<{
-      allowLive?: boolean;
-    }>;
+  CreateBrowserDataExecutionEnvironmentOptions;
 
 /** Composes protocol-neutral Data execution with the browser fetch boundary without moving ownership into Web. */
 export const createBrowserDataExecutionEnvironment = (
@@ -124,6 +129,12 @@ export const createBrowserDataExecutionEnvironment = (
   registry.register(
     createDataHttpAdapter({ transport: network as DataHttpTransport })
   );
+  registry.register(
+    createDataGraphqlAdapter({ transport: network as DataGraphqlTransport })
+  );
+  registry.register(
+    createDataAsyncApiAdapter({ transport: network as DataAsyncApiTransport })
+  );
   if (options.mock && options.snapshot?.dataMockProvision)
     throw new TypeError(
       'Browser Data execution cannot combine direct and snapshot mock provisioning.'
@@ -132,7 +143,11 @@ export const createBrowserDataExecutionEnvironment = (
   if (options.mock) {
     mockSession = createDataMockRuntimeSession({
       fixtureStore: createMemoryDataMockFixtureStore(options.mock),
-      emulatedAdapterIds: options.mock.emulatedAdapterIds ?? ['core.http'],
+      emulatedAdapterIds: options.mock.emulatedAdapterIds ?? [
+        'core.asyncapi',
+        'core.graphql',
+        'core.http',
+      ],
       ...(options.mock.scheduler ? { scheduler: options.mock.scheduler } : {}),
       ...(options.mock.namespaceId
         ? { namespaceId: options.mock.namespaceId }
@@ -201,7 +216,7 @@ export const createBrowserDataExecutionEnvironment = (
   });
 };
 
-/** Browser Test uses fixture mode by default; live access requires an explicit environment opt-in. */
+/** Browser Test is a deterministic fixture host; production environment material is never accepted. */
 export const createBrowserTestDataExecutionEnvironment = (
   options: CreateBrowserTestDataExecutionEnvironmentOptions
 ): BrowserDataExecutionEnvironment => {
@@ -209,19 +224,23 @@ export const createBrowserTestDataExecutionEnvironment = (
     throw new Error(
       'Browser Test Data execution requires deterministic fixture provisioning.'
     );
+  if (options.environmentResolution)
+    throw new Error(
+      'Browser Test Data execution is mock-only and rejects environment resolution.'
+    );
   const environment = createBrowserDataExecutionEnvironment(options);
   return Object.freeze({
     execute(input) {
-      if (input.invocation.mode === 'live' && options.allowLive !== true)
+      if (input.invocation.mode === 'live')
         throw new Error(
-          'Browser Test Data execution denies live mode without explicit opt-in.'
+          'Browser Test Data execution is mock-only and denies live mode.'
         );
       return environment.execute(input);
     },
     dispatch(input) {
-      if (input.request.mode === 'live' && options.allowLive !== true)
+      if (input.request.mode === 'live')
         throw new Error(
-          'Browser Test Data execution denies live mode without explicit opt-in.'
+          'Browser Test Data execution is mock-only and denies live mode.'
         );
       return environment.dispatch(input);
     },

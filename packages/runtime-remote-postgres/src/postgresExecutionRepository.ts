@@ -405,17 +405,39 @@ export const createPostgresRemoteExecutionRepository = (
     });
   },
   async claimNext(input): Promise<RemoteExecutionClaimResult | undefined> {
+    const maximumAttempts = input.maximumAttempts ?? Number.MAX_SAFE_INTEGER;
+    if (!Number.isSafeInteger(maximumAttempts) || maximumAttempts < 1)
+      throw new TypeError(
+        'Remote maximum worker attempts must be a positive integer.'
+      );
     return withPostgresTransaction(pool, async (client) => {
-      let row = one(
-        await client.query<ExecutionRow>(
-          `${selectExecution}
+      let row: ExecutionRow | undefined;
+      for (;;) {
+        row = one(
+          await client.query<ExecutionRow>(
+            `${selectExecution}
         WHERE provider_json->>'id'=$1 AND (status='queued' OR
           (status=ANY($2::text[]) AND lease_expires_at <= $3))
         ORDER BY created_at, execution_id FOR UPDATE SKIP LOCKED LIMIT 1`,
-          [input.providerId, ['starting', 'running', 'cancelling'], input.now]
-        )
-      );
-      if (!row) return undefined;
+            [input.providerId, ['starting', 'running', 'cancelling'], input.now]
+          )
+        );
+        if (!row) return undefined;
+        if (
+          row.status !== 'queued' &&
+          integer(row.lease_attempt, 'leaseAttempt') >= maximumAttempts
+        ) {
+          await transitionLocked(
+            client,
+            row,
+            'failed',
+            input.now,
+            'worker-recovery-exhausted'
+          );
+          continue;
+        }
+        break;
+      }
       if (row.status === 'queued')
         row = await transitionLocked(client, row, 'starting', input.now);
       const result = one(

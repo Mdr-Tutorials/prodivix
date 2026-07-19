@@ -502,6 +502,7 @@ describe('rootless Podman sandbox contract', () => {
       }),
       snapshot,
       'production',
+      'execution-production-1',
       request,
       2_000,
       1_000,
@@ -587,6 +588,7 @@ describe('rootless Podman sandbox contract', () => {
       }),
       snapshot,
       'build',
+      'execution-build-1',
       undefined,
       2_000,
       1_000,
@@ -622,6 +624,7 @@ describe('rootless Podman sandbox contract', () => {
         }),
         snapshot,
         'build',
+        'execution-build-1',
         undefined,
         2_000,
         1_000,
@@ -699,6 +702,7 @@ describe('rootless Podman sandbox contract', () => {
       }),
       snapshot,
       'preview',
+      'execution-preview-1',
       undefined,
       2_000,
       1_000,
@@ -811,6 +815,7 @@ describe('rootless Podman sandbox contract', () => {
       }),
       snapshot,
       'build',
+      'execution-build-fs-1',
       undefined,
       2_000,
       1_000,
@@ -904,6 +909,7 @@ describe('rootless Podman sandbox contract', () => {
       }),
       snapshot,
       'test',
+      'execution-test-1',
       undefined,
       2_000,
       1_000,
@@ -915,7 +921,7 @@ describe('rootless Podman sandbox contract', () => {
     );
 
     expect(artifact).toMatchObject({
-      artifactId: `test-report:${snapshot.contentDigest}`,
+      artifactId: 'test-report:execution-test-1',
       kind: 'report',
       mediaType: 'application/vnd.prodivix.test-report+json',
       metadata: { status: 'passed', totalCases: '1' },
@@ -923,6 +929,7 @@ describe('rootless Podman sandbox contract', () => {
     });
     expect(report).toMatchObject({
       kind: 'test-report',
+      reportId: 'test-report:execution-test-1',
       status: 'passed',
       completedAt: 2_000,
       summary: { totalFiles: 1, totalCases: 1 },
@@ -940,6 +947,7 @@ describe('rootless Podman sandbox contract', () => {
         }),
         snapshot,
         'test',
+        'execution-test-host-failure',
         undefined,
         2_000,
         1_000,

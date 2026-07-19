@@ -155,6 +155,112 @@ const remoteServerWorkspace: WorkspaceSnapshot = {
   },
 };
 
+const clientProtocolWorkspace = (
+  adapterId: 'core.graphql' | 'core.asyncapi'
+): WorkspaceSnapshot => {
+  const document = workspace.docsById['data-products'];
+  if (!document || document.type !== 'data-source')
+    throw new Error('Expected the Data protocol test document.');
+  const graphql = adapterId === 'core.graphql';
+  return {
+    ...workspace,
+    id: `standalone-data-runtime-${adapterId.replace('.', '-')}`,
+    docsById: {
+      ...workspace.docsById,
+      'data-products': {
+        ...document,
+        content: {
+          ...document.content,
+          source: {
+            ...document.content.source,
+            adapterId,
+            configurationByKey: graphql
+              ? {
+                  endpoint: {
+                    kind: 'literal',
+                    value: 'https://api.example.test/graphql',
+                  },
+                }
+              : {
+                  endpoint: {
+                    kind: 'literal',
+                    value: 'https://events.example.test/v1/',
+                  },
+                },
+          },
+          schemasById: graphql
+            ? document.content.schemasById
+            : {
+                ...document.content.schemasById,
+                receipt: { id: 'receipt', schema: true },
+              },
+          operationsById: {
+            'list-products': {
+              ...document.content.operationsById['list-products']!,
+              configurationByKey: graphql
+                ? {
+                    document: {
+                      kind: 'literal',
+                      value:
+                        'query Products($limit: Int) { products(limit: $limit) { id name } }',
+                    },
+                    operationName: { kind: 'literal', value: 'Products' },
+                    resultPath: { kind: 'literal', value: '/products' },
+                    emptyWhen: { kind: 'literal', value: 'empty-array' },
+                  }
+                : {
+                    action: { kind: 'literal', value: 'request-reply' },
+                    path: { kind: 'literal', value: '/commands/products' },
+                    responseBodyPath: {
+                      kind: 'literal',
+                      value: '/payload',
+                    },
+                    emptyWhen: { kind: 'literal', value: 'empty-array' },
+                  },
+            },
+            'create-product': {
+              ...document.content.operationsById['create-product']!,
+              ...(graphql ? {} : { outputSchemaId: 'receipt' }),
+              configurationByKey: graphql
+                ? {
+                    document: {
+                      kind: 'literal',
+                      value:
+                        'mutation CreateProduct($product: ProductInput!) { createProduct(product: $product) { id name } }',
+                    },
+                    operationName: {
+                      kind: 'literal',
+                      value: 'CreateProduct',
+                    },
+                    resultPath: {
+                      kind: 'literal',
+                      value: '/createProduct',
+                    },
+                    idempotencyHeader: {
+                      kind: 'literal',
+                      value: 'idempotency-key',
+                    },
+                  }
+                : {
+                    action: { kind: 'literal', value: 'publish' },
+                    path: {
+                      kind: 'literal',
+                      value: '/events/product-created',
+                    },
+                    idempotencyHeader: {
+                      kind: 'literal',
+                      value: 'idempotency-key',
+                    },
+                  },
+              policies: { idempotency: { kind: 'invocation-key' } },
+            },
+          },
+        },
+      },
+    },
+  };
+};
+
 type Runtime = Readonly<{
   subscribeDataLifecycle(listener: () => void): () => void;
   subscribeNetworkTrace(listener: (trace: unknown) => void): () => void;
@@ -166,6 +272,13 @@ type Runtime = Readonly<{
   }>;
   activateDataBindings(request: unknown): Promise<void>;
   dispatchDataMutation(request: unknown): Promise<unknown>;
+  openDataSubscription(request: unknown): Promise<
+    Readonly<{
+      network: unknown;
+      next(): Promise<Readonly<{ cursor: number; value: unknown }> | undefined>;
+      close(): void;
+    }>
+  >;
   dispose(): void;
 }>;
 
@@ -399,6 +512,217 @@ describe('standalone Data runtime projection', () => {
         runtimeValuesById: {},
       })
     ).rejects.toMatchObject({ code: 'DATA_REMOTE_GATEWAY_INVALID' });
+    runtime.dispose();
+  });
+
+  it('pulls an edge GraphQL subscription through the parent stream bridge with exact cursor backpressure', async () => {
+    const sourceDocument = remoteServerWorkspace.docsById['data-products']!;
+    const streamWorkspace: WorkspaceSnapshot = {
+      ...remoteServerWorkspace,
+      docsById: {
+        'data-products': {
+          ...sourceDocument,
+          content: {
+            ...sourceDocument.content,
+            source: {
+              id: 'events',
+              adapterId: 'core.graphql',
+              runtimeZone: 'edge',
+              bindingsById: {},
+              configurationByKey: {
+                endpoint: {
+                  kind: 'literal',
+                  value: 'https://api.example.test/graphql',
+                },
+              },
+            },
+            operationsById: {
+              watch: {
+                id: 'watch',
+                kind: 'subscription',
+                outputSchemaId: 'products',
+                configurationByKey: {
+                  document: {
+                    kind: 'literal',
+                    value: 'subscription Watch { products { id name } }',
+                  },
+                  operationName: { kind: 'literal', value: 'Watch' },
+                  resultPath: { kind: 'literal', value: '/products' },
+                },
+                policies: {},
+              },
+            },
+          },
+        },
+      },
+    };
+    const generated = createWorkspaceStandaloneDataRuntimeModule(
+      streamWorkspace,
+      EXECUTION_PARENT_GATEWAY_DATA_RUNTIME_TARGET
+    );
+    const transformed = await transformWithEsbuild(
+      generated.body,
+      'prodivix-data-runtime.ts',
+      { loader: 'ts', target: 'es2022', format: 'cjs' }
+    );
+    const listeners = new Set<
+      (event: { source: unknown; data: unknown }) => void
+    >();
+    const posted: Array<Record<string, unknown>> = [];
+    let emitInvalidStreamEvent = false;
+    const parent = {
+      postMessage(value: unknown) {
+        const request = value as Record<string, unknown>;
+        posted.push(request);
+        if (request.type === 'prodivix.execution-data-stream-open.v1') {
+          queueMicrotask(() =>
+            listeners.forEach((listener) =>
+              listener({
+                source: parent,
+                data: {
+                  type: 'prodivix.execution-data-stream.v1',
+                  requestId: request.requestId,
+                  phase: 'open',
+                  network: {
+                    format: 'prodivix.execution-network-trace.v1',
+                    requestId: request.requestId,
+                    phase: 'runtime',
+                    runtimeZone: 'edge',
+                    mode: 'live',
+                    adapter: 'core.graphql',
+                    method: 'POST',
+                    sanitizedUrl: 'https://api.example.test/',
+                    protocol: 'https',
+                    startedAt: 100,
+                    completedAt: 101,
+                    durationMs: 1,
+                    outcome: 'allowed',
+                    status: 200,
+                    correlation: {
+                      kind: 'data-operation',
+                      documentId: request.documentId,
+                      operationId: request.operationId,
+                      invocationId: request.invocationId,
+                      sequence: request.sequence,
+                      attempt: 1,
+                    },
+                    sourceTrace: [
+                      {
+                        sourceRef: {
+                          kind: 'data-operation',
+                          documentId: request.documentId,
+                          operationId: request.operationId,
+                        },
+                        label: 'Data operation',
+                      },
+                    ],
+                    redacted: true,
+                  },
+                },
+              })
+            )
+          );
+          return;
+        }
+        if (request.type !== 'prodivix.execution-data-stream-pull.v1') return;
+        const cursor = request.cursor as number;
+        queueMicrotask(() =>
+          listeners.forEach((listener) =>
+            listener({
+              source: parent,
+              data:
+                cursor < 2
+                  ? {
+                      type: 'prodivix.execution-data-stream.v1',
+                      requestId: request.requestId,
+                      phase: 'event',
+                      cursor: cursor + 1,
+                      value: emitInvalidStreamEvent
+                        ? { id: `p${cursor + 1}` }
+                        : [{ id: `p${cursor + 1}`, name: 'Chair' }],
+                    }
+                  : {
+                      type: 'prodivix.execution-data-stream.v1',
+                      requestId: request.requestId,
+                      phase: 'complete',
+                      cursor,
+                    },
+            })
+          )
+        );
+      },
+    };
+    const runtimeGlobal = {
+      parent,
+      crypto: globalThis.crypto,
+      setTimeout: globalThis.setTimeout.bind(globalThis),
+      clearTimeout: globalThis.clearTimeout.bind(globalThis),
+      addEventListener: (
+        _type: string,
+        listener: (event: { source: unknown; data: unknown }) => void
+      ) => listeners.add(listener),
+      removeEventListener: (
+        _type: string,
+        listener: (event: { source: unknown; data: unknown }) => void
+      ) => listeners.delete(listener),
+    };
+    const record: { exports: Record<string, unknown> } = { exports: {} };
+    Function(
+      'module',
+      'exports',
+      'fetch',
+      'Ajv2020',
+      'globalThis',
+      transformed.code
+    )(
+      record,
+      record.exports,
+      async () =>
+        Response.json({
+          format: 'prodivix.executable-data-runtime.v1',
+          mode: 'live',
+        }),
+      Ajv2020,
+      runtimeGlobal
+    );
+    const runtime = (
+      record.exports.createWorkspaceDataRuntime as () => Runtime
+    )();
+    const traces: unknown[] = [];
+    runtime.subscribeNetworkTrace((trace) => traces.push(trace));
+    const stream = await runtime.openDataSubscription({
+      operation: { documentId: 'data-products', operationId: 'watch' },
+      input: {},
+    });
+    await expect(stream.next()).resolves.toMatchObject({
+      cursor: 1,
+      value: [{ id: 'p1' }],
+    });
+    await expect(stream.next()).resolves.toMatchObject({
+      cursor: 2,
+      value: [{ id: 'p2' }],
+    });
+    await expect(stream.next()).resolves.toBeUndefined();
+    expect(traces).toHaveLength(1);
+    expect(posted.map((entry) => entry.type)).toEqual([
+      'prodivix.execution-data-stream-open.v1',
+      'prodivix.execution-network-bridge.v1',
+      'prodivix.execution-data-stream-pull.v1',
+      'prodivix.execution-data-stream-pull.v1',
+      'prodivix.execution-data-stream-pull.v1',
+    ]);
+    expect(JSON.stringify(posted)).not.toContain('/graphql');
+    emitInvalidStreamEvent = true;
+    const invalidStream = await runtime.openDataSubscription({
+      operation: { documentId: 'data-products', operationId: 'watch' },
+      input: {},
+    });
+    await expect(invalidStream.next()).rejects.toMatchObject({
+      code: 'DATA_OUTPUT_SCHEMA_INVALID',
+    });
+    expect(posted.at(-1)).toMatchObject({
+      type: 'prodivix.execution-data-stream-cancel.v1',
+    });
     runtime.dispose();
   });
 
@@ -818,6 +1142,140 @@ describe('standalone Data runtime projection', () => {
     runtime.dispose();
   });
 
+  it('executes imported OpenAPI parameter, body, and response mappings without forwarding unrelated input', async () => {
+    const liveWorkspace: WorkspaceSnapshot = {
+      ...workspace,
+      docsById: {
+        'data-products': {
+          ...workspace.docsById['data-products']!,
+          content: {
+            ...workspace.docsById['data-products']!.content,
+            source: {
+              id: 'products',
+              adapterId: 'core.http',
+              runtimeZone: 'client',
+              bindingsById: {},
+              configurationByKey: {
+                baseUrl: {
+                  kind: 'literal',
+                  value: 'https://api.example.test/v1/',
+                },
+              },
+            },
+            operationsById: {
+              ...workspace.docsById['data-products']!.content.operationsById,
+              'create-product': {
+                ...workspace.docsById['data-products']!.content.operationsById[
+                  'create-product'
+                ]!,
+                configurationByKey: {
+                  method: { kind: 'literal', value: 'POST' },
+                  path: {
+                    kind: 'literal',
+                    value: '/accounts/{accountId}/products',
+                  },
+                  emptyWhen: { kind: 'literal', value: 'never' },
+                  parameterMappings: {
+                    kind: 'literal',
+                    value: {
+                      path: { accountId: '/routeAccount' },
+                      query: { dryRun: '/dryRun' },
+                      header: { 'x-request-scope': '/scope' },
+                    },
+                  },
+                  bodyInputPath: { kind: 'literal', value: '/payload' },
+                  responseBodyPath: { kind: 'literal', value: '/data' },
+                },
+                policies: {},
+              },
+            },
+          },
+        },
+      },
+    };
+    const generated = createWorkspaceStandaloneDataRuntimeModule(liveWorkspace);
+    const transformed = await transformWithEsbuild(
+      generated.body,
+      'prodivix-data-runtime.ts',
+      { loader: 'ts', target: 'es2022', format: 'cjs' }
+    );
+    const requests: Array<Readonly<{ url: string; init?: RequestInit }>> = [];
+    const fetch = vi.fn(
+      async (
+        input: string | URL | Request,
+        init?: RequestInit
+      ): Promise<Response> => {
+        if (String(input).endsWith('/.prodivix/data-runtime.json'))
+          return Response.json({
+            format: 'prodivix.executable-data-runtime.v1',
+            mode: 'live',
+          });
+        requests.push({ url: String(input), init });
+        return Response.json(
+          { data: { id: 'created' }, privateMetadata: 'not-projected' },
+          { status: 201 }
+        );
+      }
+    );
+    const record: { exports: Record<string, unknown> } = { exports: {} };
+    Function(
+      'module',
+      'exports',
+      'fetch',
+      'Ajv2020',
+      transformed.code
+    )(record, record.exports, fetch, Ajv2020);
+    const runtime = (
+      record.exports.createWorkspaceDataRuntime as () => Runtime
+    )();
+
+    await expect(
+      runtime.dispatchDataMutation({
+        binding: {
+          kind: 'dispatch-data-operation',
+          operation: {
+            documentId: 'data-products',
+            operationId: 'create-product',
+          },
+          input: {
+            kind: 'object',
+            propertiesByKey: {
+              routeAccount: { kind: 'literal', value: 'org/a' },
+              dryRun: { kind: 'literal', value: true },
+              scope: { kind: 'literal', value: 'catalog' },
+              payload: {
+                kind: 'object',
+                propertiesByKey: {
+                  name: { kind: 'literal', value: 'Desk' },
+                },
+              },
+              unrelated: { kind: 'literal', value: 'must-not-leave' },
+            },
+          },
+        },
+        payload: {},
+        runtimeValuesById: {},
+        source: {
+          documentId: 'page',
+          nodeId: 'create',
+          eventName: 'onClick',
+          instancePath: '/page/create',
+        },
+      })
+    ).resolves.toEqual({ id: 'created' });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]!.url).toBe(
+      'https://api.example.test/accounts/org%2Fa/products?dryRun=true'
+    );
+    expect(new Headers(requests[0]!.init?.headers).get('x-request-scope')).toBe(
+      'catalog'
+    );
+    expect(requests[0]!.init?.body).toBe('{"name":"Desk"}');
+    expect(JSON.stringify(requests)).not.toContain('must-not-leave');
+    runtime.dispose();
+  });
+
   it('retries public live mutation with one opaque upstream idempotency key', async () => {
     const liveWorkspace: WorkspaceSnapshot = {
       ...workspace,
@@ -955,6 +1413,300 @@ describe('standalone Data runtime projection', () => {
       }),
     ]);
     runtime.dispose();
+  });
+
+  it('executes finite client GraphQL query/mutation with revalidation and sanitized correlation', async () => {
+    const generated = createWorkspaceStandaloneDataRuntimeModule(
+      clientProtocolWorkspace('core.graphql')
+    );
+    const transformed = await transformWithEsbuild(
+      generated.body,
+      'prodivix-data-runtime.ts',
+      { loader: 'ts', target: 'es2022', format: 'cjs' }
+    );
+    const products = [{ id: 'p1', name: 'Alpha' }];
+    const requests: Array<
+      Readonly<{ body: Record<string, unknown>; headers: Headers }>
+    > = [];
+    const fetch = vi.fn(
+      async (
+        input: string | URL | Request,
+        init?: RequestInit
+      ): Promise<Response> => {
+        if (String(input).endsWith('/.prodivix/data-runtime.json'))
+          return Response.json({
+            format: 'prodivix.executable-data-runtime.v1',
+            mode: 'live',
+          });
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        requests.push({ body, headers: new Headers(init?.headers) });
+        if (String(body.query).startsWith('mutation')) {
+          const variables = body.variables as {
+            product: { id: string; name: string };
+          };
+          products.push(variables.product);
+          return Response.json({ data: { createProduct: variables.product } });
+        }
+        return Response.json({ data: { products } });
+      }
+    );
+    const record: { exports: Record<string, unknown> } = { exports: {} };
+    Function(
+      'module',
+      'exports',
+      'fetch',
+      'Ajv2020',
+      transformed.code
+    )(record, record.exports, fetch, Ajv2020);
+    const runtime = (
+      record.exports.createWorkspaceDataRuntime as () => Runtime
+    )();
+    const traces: Array<Record<string, unknown>> = [];
+    runtime.subscribeNetworkTrace((trace) =>
+      traces.push(trace as Record<string, unknown>)
+    );
+    const binding = {
+      operation: {
+        documentId: 'data-products',
+        operationId: 'list-products',
+      },
+      input: { kind: 'literal', value: { limit: 2 } },
+    } as const;
+    const request = {
+      documentId: 'page',
+      instancePath: '/page',
+      dataId: 'products',
+      binding,
+    };
+
+    await runtime.activateDataBindings({
+      documentId: 'page',
+      instancePath: '/page',
+      bindingsByDataId: { products: binding },
+      runtimeValuesById: {},
+    });
+    expect(runtime.resolveDataLifecycleSnapshot(request)).toMatchObject({
+      status: 'success',
+      value: [{ id: 'p1', name: 'Alpha' }],
+    });
+
+    await expect(
+      runtime.dispatchDataMutation({
+        binding: {
+          kind: 'dispatch-data-operation',
+          operation: {
+            documentId: 'data-products',
+            operationId: 'create-product',
+          },
+          input: {
+            kind: 'literal',
+            value: { product: { id: 'p2', name: 'Beta' } },
+          },
+        },
+        payload: {},
+        runtimeValuesById: {},
+        source: {
+          documentId: 'page',
+          nodeId: 'create',
+          eventName: 'onClick',
+          instancePath: '/page/create',
+        },
+      })
+    ).resolves.toEqual({ id: 'p2', name: 'Beta' });
+    expect(runtime.resolveDataLifecycleSnapshot(request)).toMatchObject({
+      status: 'success',
+      value: [
+        { id: 'p1', name: 'Alpha' },
+        { id: 'p2', name: 'Beta' },
+      ],
+    });
+    expect(requests).toHaveLength(3);
+    expect(requests[1]?.headers.get('idempotency-key')).toMatch(
+      /^prodivix-data-sha256-[0-9a-f]{64}$/u
+    );
+    expect(traces).toHaveLength(3);
+    expect(traces).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          adapter: 'core.graphql',
+          method: 'POST',
+          sanitizedUrl: 'https://api.example.test/',
+          redacted: true,
+        }),
+      ])
+    );
+    expect(JSON.stringify(traces)).not.toContain('/graphql');
+    runtime.dispose();
+  });
+
+  it('executes finite client AsyncAPI request-reply/publish and keeps receive fail closed', async () => {
+    const generated = createWorkspaceStandaloneDataRuntimeModule(
+      clientProtocolWorkspace('core.asyncapi')
+    );
+    const transformed = await transformWithEsbuild(
+      generated.body,
+      'prodivix-data-runtime.ts',
+      { loader: 'ts', target: 'es2022', format: 'cjs' }
+    );
+    const products = [{ id: 'p1', name: 'Alpha' }];
+    const requests: Array<Readonly<{ url: string; headers: Headers }>> = [];
+    const fetch = vi.fn(
+      async (
+        input: string | URL | Request,
+        init?: RequestInit
+      ): Promise<Response> => {
+        if (String(input).endsWith('/.prodivix/data-runtime.json'))
+          return Response.json({
+            format: 'prodivix.executable-data-runtime.v1',
+            mode: 'live',
+          });
+        const url = String(input);
+        requests.push({ url, headers: new Headers(init?.headers) });
+        if (url.endsWith('/events/product-created')) {
+          const body = JSON.parse(String(init?.body)) as {
+            product: { id: string; name: string };
+          };
+          products.push(body.product);
+          return new Response('', { status: 202 });
+        }
+        return Response.json({ payload: products });
+      }
+    );
+    const record: { exports: Record<string, unknown> } = { exports: {} };
+    Function(
+      'module',
+      'exports',
+      'fetch',
+      'Ajv2020',
+      transformed.code
+    )(record, record.exports, fetch, Ajv2020);
+    const runtime = (
+      record.exports.createWorkspaceDataRuntime as () => Runtime
+    )();
+    const traces: Array<Record<string, unknown>> = [];
+    runtime.subscribeNetworkTrace((trace) =>
+      traces.push(trace as Record<string, unknown>)
+    );
+    const binding = {
+      operation: {
+        documentId: 'data-products',
+        operationId: 'list-products',
+      },
+      input: { kind: 'literal', value: {} },
+    } as const;
+    const request = {
+      documentId: 'page',
+      instancePath: '/page',
+      dataId: 'products',
+      binding,
+    };
+
+    await runtime.activateDataBindings({
+      documentId: 'page',
+      instancePath: '/page',
+      bindingsByDataId: { products: binding },
+      runtimeValuesById: {},
+    });
+    await expect(
+      runtime.dispatchDataMutation({
+        binding: {
+          kind: 'dispatch-data-operation',
+          operation: {
+            documentId: 'data-products',
+            operationId: 'create-product',
+          },
+          input: {
+            kind: 'literal',
+            value: { product: { id: 'p2', name: 'Beta' } },
+          },
+        },
+        payload: {},
+        runtimeValuesById: {},
+        source: {
+          documentId: 'page',
+          nodeId: 'create',
+          eventName: 'onClick',
+          instancePath: '/page/create',
+        },
+      })
+    ).resolves.toBe(true);
+    expect(runtime.resolveDataLifecycleSnapshot(request)).toMatchObject({
+      status: 'success',
+      value: [
+        { id: 'p1', name: 'Alpha' },
+        { id: 'p2', name: 'Beta' },
+      ],
+    });
+    expect(requests).toHaveLength(3);
+    expect(requests[1]?.headers.get('idempotency-key')).toMatch(
+      /^prodivix-data-sha256-[0-9a-f]{64}$/u
+    );
+    expect(traces).toHaveLength(3);
+    expect(traces.every(({ adapter }) => adapter === 'core.asyncapi')).toBe(
+      true
+    );
+    expect(JSON.stringify(traces)).not.toContain('/commands/products');
+    runtime.dispose();
+
+    const receiveWorkspace = clientProtocolWorkspace('core.asyncapi');
+    const source = receiveWorkspace.docsById['data-products'];
+    if (!source || source.type !== 'data-source')
+      throw new Error('Expected the AsyncAPI receive test document.');
+    const blocked = createWorkspaceStandaloneDataRuntimeModule({
+      ...receiveWorkspace,
+      docsById: {
+        ...receiveWorkspace.docsById,
+        'data-products': {
+          ...source,
+          content: {
+            ...source.content,
+            operationsById: {
+              ...source.content.operationsById,
+              'list-products': {
+                ...source.content.operationsById['list-products']!,
+                configurationByKey: {
+                  ...source.content.operationsById['list-products']!
+                    .configurationByKey,
+                  action: { kind: 'literal', value: 'receive' },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const blockedTransform = await transformWithEsbuild(
+      blocked.body,
+      'prodivix-data-runtime.ts',
+      { loader: 'ts', target: 'es2022', format: 'cjs' }
+    );
+    const blockedRecord: { exports: Record<string, unknown> } = { exports: {} };
+    Function(
+      'module',
+      'exports',
+      'fetch',
+      'Ajv2020',
+      blockedTransform.code
+    )(blockedRecord, blockedRecord.exports, fetch, Ajv2020);
+    const blockedRuntime = (
+      blockedRecord.exports.createWorkspaceDataRuntime as () => Runtime
+    )();
+    await blockedRuntime.activateDataBindings({
+      documentId: 'page',
+      instancePath: '/receive',
+      bindingsByDataId: { products: binding },
+      runtimeValuesById: {},
+    });
+    expect(
+      blockedRuntime.resolveDataLifecycleSnapshot({
+        ...request,
+        instancePath: '/receive',
+      })
+    ).toMatchObject({
+      status: 'error',
+      error: { code: 'DATA_ASYNCAPI_ACTION_UNSUPPORTED' },
+    });
+    blockedRuntime.dispose();
   });
 
   it('never falls back to live HTTP when explicit mock provisioning is missing', async () => {

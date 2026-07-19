@@ -2,6 +2,7 @@ import {
   getWorkspaceOperationId,
   collectWorkspaceCodeArtifactLifecycleDiagnostics,
   createWorkspaceCodeArtifactProvider,
+  decodeWorkspaceDataSourceDocument,
   decodeWorkspacePirDocument,
   projectWorkspaceServerRuntimeAuthoring,
   readWorkspaceServerRuntimeAuthConfiguration,
@@ -244,6 +245,37 @@ const collectNodeGraphDiagnostics = (
     }));
   });
 
+const collectDataDiagnostics = (
+  workspace: WorkspaceSnapshot
+): ProdivixDiagnostic[] =>
+  Object.values(workspace.docsById).flatMap((document) => {
+    if (document.type !== 'data-source') return [];
+    const read = decodeWorkspaceDataSourceDocument(document);
+    if (read.status !== 'invalid') return [];
+    return read.issues.map((issue): ProdivixDiagnostic => {
+      const operationMatch = /^\/operationsById\/([^/]+)/u.exec(issue.path);
+      const operationId = operationMatch?.[1]
+        ? unescapePointerSegment(operationMatch[1])
+        : undefined;
+      return {
+        code: issue.code,
+        severity: 'error',
+        domain: 'data',
+        message: issue.message,
+        hint: 'Open Data Resources to inspect the canonical source or reimport proposal.',
+        docsUrl: '/reference/diagnostics/data-diagnostic-codes',
+        targetRef: operationId
+          ? {
+              kind: 'data-operation',
+              documentId: document.id,
+              operationId,
+            }
+          : { kind: 'data-source', documentId: document.id },
+        meta: { path: issue.path, documentId: document.id },
+      };
+    });
+  });
+
 export const collectWorkspaceModelIssueSnapshots = (input: {
   workspace: WorkspaceSnapshot;
   revision: DiagnosticIssueRevision;
@@ -277,6 +309,10 @@ export const collectWorkspaceModelIssueSnapshots = (input: {
     createSnapshot(
       'nodegraph-codec',
       collectNodeGraphDiagnostics(input.workspace)
+    ),
+    createSnapshot(
+      'workspace-data-contract',
+      collectDataDiagnostics(input.workspace)
     ),
     createSnapshot(
       'workspace-code-language',

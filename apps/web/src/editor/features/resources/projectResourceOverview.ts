@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Library,
   Boxes,
+  Database,
   Palette,
   ShieldCheck,
 } from 'lucide-react';
@@ -26,11 +27,13 @@ import { buildPublicResourceTreeFromWorkspace } from './workspacePublicResources
 import { buildProjectFilesFromWorkspace } from './workspaceProjectFiles';
 import { buildI18nResourceValueFromWorkspace } from './workspaceI18nResources';
 import { buildExternalLibrariesValueFromWorkspace } from './workspaceExternalLibraries';
+import { buildDataResourceModelFromDocuments } from './dataResourceModel';
 
 export type SectionId =
   | 'overview'
   | 'components'
   | 'tokens'
+  | 'data'
   | 'auth'
   | 'public'
   | 'code'
@@ -47,6 +50,7 @@ export const sectionMetas: SectionMeta[] = [
   { id: 'overview', icon: LayoutDashboard },
   { id: 'components', icon: Boxes },
   { id: 'tokens', icon: Palette },
+  { id: 'data', icon: Database },
   { id: 'auth', icon: ShieldCheck },
   { id: 'public', icon: FileArchive },
   { id: 'code', icon: FileCode2 },
@@ -97,6 +101,11 @@ export type OverviewSnapshot = {
     resolvers: number;
     tokens: number;
     contexts: number;
+  };
+  data: {
+    documents: number;
+    operations: number;
+    invalid: number;
   };
   i18n: {
     locales: number;
@@ -229,6 +238,9 @@ export const buildOverviewSnapshot = (
   const externalLibraries = buildExternalLibrariesValueFromWorkspace(
     workspaceDocumentsById
   );
+  const dataResources = buildDataResourceModelFromDocuments(
+    workspaceDocumentsById
+  );
   const projectFiles = buildProjectFilesFromWorkspace(workspaceDocumentsById);
   const enabledProjectFiles = flattenEnabledProjectFiles(projectFiles);
 
@@ -257,6 +269,11 @@ export const buildOverviewSnapshot = (
       resolvers: resolverDocuments.length,
       tokens: designTokenCount,
       contexts: designTokenContextCount,
+    },
+    data: {
+      documents: dataResources.sourceCount,
+      operations: dataResources.operationCount,
+      invalid: dataResources.invalidCount,
     },
     i18n: {
       locales: i18nLocales.length,

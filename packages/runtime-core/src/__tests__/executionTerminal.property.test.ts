@@ -146,6 +146,32 @@ describe('execution Terminal contract', () => {
     ).toThrow(/execution\/provider fence/u);
   });
 
+  it('keeps a renewed lease active beyond the original expiry', () => {
+    let clock = 100;
+    const terminal = createTerminal({
+      grant: {
+        grantId: 'grant-1',
+        executionId: 'execution-1',
+        jobId: 'job-1',
+        providerId: terminalProvider.id,
+        expiresAt: 200,
+      },
+      now: () => clock,
+    });
+    terminal.renewGrant({
+      grantId: 'grant-2',
+      executionId: 'execution-1',
+      jobId: 'job-1',
+      providerId: terminalProvider.id,
+      expiresAt: 400,
+    });
+    clock = 250;
+    expect(terminal.session.getSnapshot()).toMatchObject({
+      status: 'open',
+      leaseExpiresAt: 400,
+    });
+  });
+
   it('serializes stdin, deduplicates reconnect retries, and rejects drift or gaps', async () => {
     const acceptedInputs: string[] = [];
     const terminal = createTerminal({
@@ -207,6 +233,58 @@ describe('execution Terminal contract', () => {
     expect(() => terminal.session.read({ afterCursor: 4 })).toThrow(
       /ahead of the latest cursor/u
     );
+  });
+
+  it('strictly restores output, input idempotency, and cursors from a bounded checkpoint', async () => {
+    const terminal = createTerminal({
+      maximumOutputRecords: 2,
+      maximumRetainedOutputBytes: 64,
+      maximumInputFingerprints: 2,
+    });
+    await terminal.session.write({ data: 'first', clientSequence: 1 });
+    await terminal.session.write({ data: 'second', clientSequence: 2 });
+    terminal.emitOutput({ stream: 'stdout', data: 'first-output\n' });
+    terminal.emitOutput({ stream: 'stderr', data: 'second-output\n' });
+    terminal.emitOutput({ stream: 'stdout', data: 'third-output\n' });
+
+    const checkpoint = JSON.parse(JSON.stringify(terminal.createCheckpoint()));
+    const accepted: string[] = [];
+    const restored = createTerminal({
+      checkpoint,
+      maximumOutputRecords: 2,
+      maximumRetainedOutputBytes: 64,
+      maximumInputFingerprints: 2,
+      requestInput: ({ data }) => {
+        accepted.push(data);
+      },
+    });
+    expect(restored.session.read({ afterCursor: 0 })).toMatchObject({
+      gap: true,
+      latestCursor: 3,
+      nextCursor: 3,
+    });
+    expect(
+      await restored.session.write({ data: 'second', clientSequence: 2 })
+    ).toEqual({ status: 'duplicate', clientSequence: 2 });
+    expect(
+      await restored.session.write({ data: 'third', clientSequence: 3 })
+    ).toEqual({ status: 'accepted', clientSequence: 3 });
+    expect(accepted).toEqual(['third']);
+    expect(
+      restored.emitOutput({ stream: 'stdout', data: 'fourth-output\n' })?.cursor
+    ).toBe(4);
+
+    expect(() =>
+      createTerminal({
+        checkpoint: {
+          ...checkpoint,
+          snapshot: { ...checkpoint.snapshot, executionId: 'drifted' },
+        },
+        maximumOutputRecords: 2,
+        maximumRetainedOutputBytes: 64,
+        maximumInputFingerprints: 2,
+      })
+    ).toThrow(/checkpoint execution id/u);
   });
 
   it('redacts known Secret material and re-redacts the bounded copy projection', () => {
@@ -285,6 +363,26 @@ describe('execution Terminal contract', () => {
     expect(terminal.emitOutput({ stream: 'stdout', data: 'late' })).toBe(
       undefined
     );
+  });
+
+  it('does not serialize the transient closing state', async () => {
+    let release: (() => void) | undefined;
+    let started: (() => void) | undefined;
+    const closeStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const terminal = createTerminal({
+      requestClose: () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+          started?.();
+        }),
+    });
+    const closing = terminal.session.close();
+    await closeStarted;
+    expect(() => terminal.createCheckpoint()).toThrow(/transient closing/u);
+    release?.();
+    await expect(closing).resolves.toEqual({ status: 'closed' });
   });
 
   it('revokes an expired lease and asks the adapter to clean up once', async () => {

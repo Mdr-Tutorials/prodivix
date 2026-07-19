@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createRemoteProjectExecutionEnvironment } from './remoteProjectExecutionEnvironment';
 
 describe('Remote project execution composition', () => {
-  it('requires the authenticated product session and exposes the canonical Preview provider', () => {
+  it('requires the authenticated product session and exposes independent Preview/Test providers', () => {
     expect(() =>
       createRemoteProjectExecutionEnvironment({
         accessToken: ' ',
@@ -23,6 +23,15 @@ describe('Remote project execution composition', () => {
       profiles: ['preview'],
       isolation: 'remote-isolated',
     });
+    expect(environment.testProvider.descriptor).toMatchObject({
+      id: 'prodivix.remote.test',
+      profiles: ['test'],
+      runtimeZones: ['test'],
+      isolation: 'remote-isolated',
+    });
+    expect(environment.testProvider.descriptor.capabilities).not.toContain(
+      'environment-binding'
+    );
     expect(environment.artifacts.resolvePreviewBundle).toBeTypeOf('function');
     expect(environment.serverFunctions.invoke).toBeTypeOf('function');
   });

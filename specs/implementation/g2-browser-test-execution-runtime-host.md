@@ -3,11 +3,12 @@
 ## 状态
 
 - DecisionStatus：Accepted
-- ImplementationStatus：Browser Test + Neutral Snapshot Implemented / Remote Parity Planned
+- ImplementationStatus：Browser/Remote Test + Neutral Snapshot + Mock-only Data Security Implemented / Product Scale Closure Pending
 - ProductGateStatus：G2 In Progress
 - Global Phase：G2 Executable Full-stack Workspace
 - 日期：2026-07-16
-- Owner：`@prodivix/runtime-core`、`@prodivix/runtime-browser`、`apps/web` composition root
+- Owner：`@prodivix/runtime-core`、`@prodivix/runtime-browser`、`@prodivix/runtime-remote`、
+  Remote Worker、Compiler、`apps/web` composition root
 - 关联：
   - `specs/implementation/g2-executable-full-stack-workspace.md`
   - `specs/implementation/g2-execution-provider-remote-runner.md`
@@ -39,10 +40,12 @@ VerificationPlan 或 VerificationEvidence，也不把运行报告持久化为 Wo
 
 ### 未实现
 
-- Remote Test Provider、artifact transport、断线/replay/timeout conformance 尚未实现。
-- 测试选择、发现、watch/re-run、stale revision 和大型报告预算仍需收敛。
-- Data mock/live policy、Secret permission 和 CRUD runtime journey 尚未接入。
-- standalone second target 的同一 test suite parity 尚未建立。
+- 测试选择、发现、watch/re-run 和大型报告预算仍需收敛。
+- report truncation、attachment reference 与 cancel/timeout partial-report 规则仍需冻结。
+- 完整 CRUD/live/capability target matrix 仍需补齐；其中 live journey 属于 Preview/production
+  gateway，不得穿透 Workspace Test。
+- Vue/Vite 已进入同一 mock-only contract，并由 ADR 54 完成 deterministic authenticated Catalog 产品 Golden；
+  真实 Remote authenticated live journey 与 layout/outlet 仍需闭环。
 
 ## Test request 与 report
 
@@ -51,7 +54,7 @@ Test request 必须显式声明：
 - exact Workspace/snapshot revision 与 target；
 - `profile=test`、`runtimeZone=test`、`invocation=test`；
 - test selection/filter、timeout、required capabilities；
-- environment snapshot reference 和 mock/live policy；
+- deterministic fixture identity 和强制 mock-only policy；environment snapshot reference 禁止出现；
 - stable diagnostic target 与非秘密 metadata。
 
 当前 `ExecutionTestReport` 已稳定表达：
@@ -67,7 +70,6 @@ outcome；如果执行未形成完整工具报告，不能伪造 passed/failed r
 
 - report、failure、SourceTrace 和 tool metadata 的显式字节/数量预算与 truncation marker；
 - stdout/stderr/attachment 的 bounded summary 或 digest/size/media type artifact reference；
-- request/job/provider/snapshot/report/artifact correlation conformance；
 - partial report 是否允许发布的单一规则，以及 cancel/timeout 时 report 与 terminal result 的一致性。
 
 工具 adapter 负责把 Vitest 等私有结构转换为这些字段。共享层不承诺 snapshot serializer、hook
@@ -86,12 +88,13 @@ outcome；如果执行未形成完整工具报告，不能伪造 passed/failed r
 
 ## Test isolation 与环境策略
 
-- Test 默认使用 deterministic mock environment；启用 live 必须显式选择并满足 provider/zone
-  permission。
+- Workspace Test 强制使用 deterministic mock environment；当前 Browser/Remote Test contract 不提供 live
+  opt-in。需要生产探测时必须建立独立、显式且 query-only/isolated 的后续 capability，不能复用 Test provider。
 - mutation fixture 需要 per-run namespace、cleanup 或事务回滚策略，禁止无隔离访问生产环境。
 - clock、random、id 和 scheduler 通过 runtime test ports 注入，以便 retry/pagination/optimistic
   行为可重复。
-- Secret 只在授权 Test runtime zone resolve，不能进入 report、console、snapshot 或 attachment。
+- Test composition 拒绝 environment resolver/`environment-binding`；Secret 不得进入 report、console、snapshot
+  或 attachment。
 - test file、generated source 与 user code 运行在 provider sandbox 中，受 timeout、memory、process、
   filesystem、network 和 output budget 限制。
 
@@ -102,7 +105,7 @@ outcome；如果执行未形成完整工具报告，不能伪造 passed/failed r
 - [x] transport-neutral report、file/case/outcome 与 trace contract。
 - [x] strict adapter boundary；Web 不解析工具私有 payload。
 - [ ] 补充 report budget、truncation、attachment ref 与 source trace conformance。
-- [ ] 补充 request/job/provider/snapshot/report/artifact correlation conformance。
+- [x] request/job/provider/snapshot/report/artifact 使用 exact execution/report identity 与 SourceTrace correlation。
 - [ ] 冻结 cancel/timeout、partial report 与 terminal result 的一致性规则。
 
 ### T1：Browser Test Provider
@@ -122,44 +125,45 @@ outcome；如果执行未形成完整工具报告，不能伪造 passed/failed r
 
 - [x] Test compiler/plan 产出 Executable Project Snapshot current contract。
 - [x] Browser Test consumer 去除 Browser-owned snapshot dependency。
-- [ ] snapshot digest、test selection、target 与 source trace 纳入 request/result correlation。
+- [x] snapshot digest、target 与 source trace 纳入 request/result correlation；selection 继续为全 Workspace Test plan。
 - [x] 删除兼容层。
 
 完成条件：Browser Preview/Test 与 Remote Test 可以消费同一 snapshot，不复制工程 planner。
 
 ### T4：Remote Test Provider
 
-- [ ] Remote descriptor、start/cancel/event/report/artifact adapter。
-- [ ] worker-side test tool adapter，只输出 shared report。
-- [ ] cursor replay、disconnect、timeout、worker loss 与 retry semantics。
-- [ ] artifact digest/TTL/authorization 和 bounded report upload。
+- [x] Remote descriptor、start/cancel/event/report/artifact adapter。
+- [x] worker-side Vitest adapter 私有 payload 只在 Worker 内转换，公开 shared report。
+- [x] cursor replay、disconnect、timeout、bounded worker loss 与 manual recovery semantics。
+- [x] artifact digest/TTL/authorization、bounded report upload，以及 upload-before-trace 顺序。
+- [x] Web 使用 Browser/Remote selector、同一 Session/state/report UI；未登录 Remote fail closed。
 
 完成条件：Web 对 Browser/Remote Test 使用同一 selector、state 与 report UI。
 
 ### T5：Data 与 environment test runtime
 
-- [ ] deterministic mock adapter/fixtures 是默认 Test environment。
-- [ ] Data operation trigger、loading/empty/error/retry/pagination/optimistic fixtures。
-- [ ] live opt-in、zone permission、network policy、Secret canary 与 mutation isolation。
-- [ ] Console/Network/Test report correlation 到同一 operation/source trace。
+- [x] deterministic mock adapter/fixtures 是唯一 Test environment，mock miss 不回退 live。
+- [x] Data operation trigger、loading/empty/error/retry/pagination/optimistic fixture kernel。
+- [x] Browser/Remote 两层 live/environment denial、network policy、Secret canary 与 mutation namespace isolation。
+- [x] Console/Network/Test report 通过同一 Job/Session、operation identity 与 SourceTrace 关联。
 
 完成条件：mock 缺失 fail closed，不静默访问 live；test report 无 Secret。
 
 ### T6：Test authoring/product flow
 
 - [ ] test discovery、stable selection、run all/run selected/re-run failed。
-- [ ] 当前 revision、运行 revision 和 stale result 明确可见。
-- [ ] report failure 可跳转 Workspace Code/PIR/Data/source trace。
+- [x] 当前 revision、运行 revision 和 stale result 明确可见。
+- [x] report failure 可按 SourceTrace 跳转 Workspace 作者态。
 - [ ] large suite virtualization 与 bounded in-memory retention，不依赖 DOM 结构测试。
 
 完成条件：用户可以从一个失败用例直接定位作者态，并判断结果是否已 stale。
 
 ### T7：Parity 与 Golden
 
-- [ ] Browser/Remote shared conformance suite。
-- [ ] React/Vite 与单一第二 target 执行同一 runtime test suite。
-- [ ] Golden CRUD journey 覆盖 mock 和显式受控 live environment。
-- [ ] standalone install/typecheck/test/build/browser-smoke。
+- [x] Browser/Remote shared canonical report conformance suite。
+- [x] React/Vite 与 controlled Vue/Vite 投影同一 mock-only runtime/test contract。
+- [ ] Golden CRUD journey 覆盖 Test mock，以及与 Test 隔离的显式受控 Preview/live environment。
+- [x] standalone install/typecheck/test/build/browser-smoke first vertical。
 
 完成条件：同一 snapshot/fixture 的语义结果一致；runner/tool 差异不会泄漏到产品 contract。
 
@@ -173,15 +177,15 @@ G2 report 可以成为未来 Evidence 的输入，但不能提前宣称自己就
 
 ## Gate
 
-| Gate               | 断言                                                              |
-| ------------------ | ----------------------------------------------------------------- |
-| Provider isolation | Preview/Test provider、Job、Session、cancel/result 不共享         |
-| Host lifecycle     | install 可复用，project generation/process 不串 owner             |
-| Report neutrality  | Web/shared package 不解析 Vitest/Remote 私有 JSON                 |
-| Revision           | request/report 精确绑定 snapshot digest 与 Workspace revision     |
-| Data safety        | Test 默认 mock；live/mutation/Secret 需显式授权并隔离             |
-| Parity             | Browser/Remote 和两个 target 使用同一 conformance/runtime journey |
-| Persistence        | report/event/attachment 不成为 Workspace truth                    |
+| Gate               | 断言                                                                |
+| ------------------ | ------------------------------------------------------------------- |
+| Provider isolation | Preview/Test provider、Job、Session、cancel/result 不共享           |
+| Host lifecycle     | install 可复用，project generation/process 不串 owner               |
+| Report neutrality  | Web/shared package 不解析 Vitest/Remote 私有 JSON                   |
+| Revision           | request/report 精确绑定 snapshot digest 与 Workspace revision       |
+| Data safety        | Test 强制 mock-only；environment/live/Secret 穿透在多层 fail closed |
+| Parity             | Browser/Remote 和两个 target 使用同一 conformance/runtime journey   |
+| Persistence        | report/event/attachment 不成为 Workspace truth                      |
 
 ## 风险与停止条件
 
@@ -195,6 +199,6 @@ G2 report 可以成为未来 Evidence 的输入，但不能提前宣称自己就
 
 - [x] Browser Test 已使用独立 provider 和 shared report contract。
 - [x] Preview/Test 只复用安全的 install cache。
-- [ ] neutral snapshot、Remote Test 与 recovery conformance 完成。
-- [ ] deterministic Data test runtime 与 Secret/mutation safety Gate 完成。
-- [ ] Browser/Remote、React/Vite/第二 target parity 和 Golden CRUD 通过。
+- [x] neutral snapshot、Remote Test 与 recovery conformance 完成。
+- [x] deterministic Data test runtime 与 Secret/mutation safety Gate 完成。
+- [ ] Browser/Remote、React/Vite/第二 target 的完整产品 Golden CRUD 通过。

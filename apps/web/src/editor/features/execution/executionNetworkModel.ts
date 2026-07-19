@@ -13,7 +13,28 @@ export type ExecutionNetworkEntry = Readonly<{
   snapshotId: string;
   trace: ExecutionNetworkTrace;
   sourceTrace?: readonly ExecutionSourceTrace[];
+  primarySourceTrace?: ExecutionSourceTrace;
 }>;
+
+export type ExecutionNetworkOperationFilter = Readonly<{
+  documentId: string;
+  operationId: string;
+}>;
+
+/** Selects one exact Data operation owner from a sanitized correlated trace. */
+export const resolveExecutionNetworkPrimarySourceTrace = (
+  trace: ExecutionNetworkTrace,
+  sourceTrace: readonly ExecutionSourceTrace[] | undefined
+): ExecutionSourceTrace | undefined => {
+  if (trace.correlation?.kind !== 'data-operation') return undefined;
+  const matches = (sourceTrace ?? []).filter(
+    (candidate) =>
+      candidate.sourceRef.kind === 'data-operation' &&
+      candidate.sourceRef.documentId === trace.correlation!.documentId &&
+      candidate.sourceRef.operationId === trace.correlation!.operationId
+  );
+  return matches.length === 1 ? matches[0] : undefined;
+};
 
 /** Projects only strict metadata-only Network traces; malformed or provider-private payloads stay invisible. */
 export const createExecutionNetworkEntries = (
@@ -28,6 +49,11 @@ export const createExecutionNetworkEntries = (
       return [];
     const trace = readExecutionNetworkTraceValue(event.trace.detail);
     if (!trace) return [];
+    const sourceTrace = event.trace.sourceTrace ?? trace.sourceTrace;
+    const primarySourceTrace = resolveExecutionNetworkPrimarySourceTrace(
+      trace,
+      sourceTrace
+    );
     return [
       Object.freeze({
         id: `${record.jobId}:${event.sequence}:${trace.requestId}`,
@@ -35,9 +61,8 @@ export const createExecutionNetworkEntries = (
         providerId: record.providerId,
         snapshotId: record.snapshotId,
         trace,
-        ...(event.trace.sourceTrace
-          ? { sourceTrace: event.trace.sourceTrace }
-          : {}),
+        ...(sourceTrace ? { sourceTrace } : {}),
+        ...(primarySourceTrace ? { primarySourceTrace } : {}),
       }),
     ];
   });
@@ -45,6 +70,11 @@ export const createExecutionNetworkEntries = (
     if (record.trace.name !== EXECUTION_NETWORK_TRACE_NAME) return [];
     const trace = readExecutionNetworkTraceValue(record.trace.detail);
     if (!trace) return [];
+    const sourceTrace = record.trace.sourceTrace ?? trace.sourceTrace;
+    const primarySourceTrace = resolveExecutionNetworkPrimarySourceTrace(
+      trace,
+      sourceTrace
+    );
     return [
       Object.freeze({
         id: `${record.jobId}:observation:${record.sequence}:${trace.requestId}`,
@@ -52,9 +82,8 @@ export const createExecutionNetworkEntries = (
         providerId: record.providerId,
         snapshotId: record.snapshotId,
         trace,
-        ...(record.trace.sourceTrace
-          ? { sourceTrace: record.trace.sourceTrace }
-          : {}),
+        ...(sourceTrace ? { sourceTrace } : {}),
+        ...(primarySourceTrace ? { primarySourceTrace } : {}),
       }),
     ];
   });
@@ -66,3 +95,18 @@ export const createExecutionNetworkEntries = (
     )
   );
 };
+
+export const filterExecutionNetworkEntries = (
+  entries: readonly ExecutionNetworkEntry[],
+  filter: ExecutionNetworkOperationFilter | undefined
+): readonly ExecutionNetworkEntry[] =>
+  filter
+    ? Object.freeze(
+        entries.filter(
+          (entry) =>
+            entry.trace.correlation?.kind === 'data-operation' &&
+            entry.trace.correlation.documentId === filter.documentId &&
+            entry.trace.correlation.operationId === filter.operationId
+        )
+      )
+    : entries;

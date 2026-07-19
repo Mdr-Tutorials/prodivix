@@ -11,15 +11,21 @@ import {
   readBlueprintProjectConsoleBridgeMessage,
   readBlueprintProjectNetworkBridgeMessage,
   readBlueprintRemoteDataBridgeMessage,
+  readBlueprintRemoteDataStreamCancellation,
+  readBlueprintRemoteDataStreamOpen,
+  readBlueprintRemoteDataStreamPull,
   readBlueprintRemoteServerFunctionBridgeCancellation,
   readBlueprintRemoteServerFunctionBridgeMessage,
 } from '@/editor/features/blueprint/editor/runner/blueprintProjectNetworkBridge';
 import {
   cancelBlueprintProjectRemoteServerFunctionBridge,
+  cancelBlueprintProjectRemoteDataStream,
   executeBlueprintProjectRemoteDataBridge,
   executeBlueprintProjectRemoteServerFunctionBridge,
   publishBlueprintProjectConsoleLog,
   publishBlueprintProjectNetworkTrace,
+  openBlueprintProjectRemoteDataStream,
+  pullBlueprintProjectRemoteDataStream,
 } from '@/editor/features/blueprint/editor/runner/blueprintProjectRunnerClient';
 
 export type BlueprintProjectRunnerSurfaceController = Readonly<{
@@ -108,6 +114,40 @@ export function BlueprintProjectRunnerSurface({
             frameWindow.postMessage(response, '*');
           }
         );
+        return;
+      }
+      const streamCancellation = readBlueprintRemoteDataStreamCancellation({
+        provider,
+        previewUrl,
+        messageOrigin: event.origin,
+        value: event.data,
+      });
+      if (streamCancellation) {
+        cancelBlueprintProjectRemoteDataStream(streamCancellation);
+        return;
+      }
+      const streamPull = readBlueprintRemoteDataStreamPull({
+        provider,
+        previewUrl,
+        messageOrigin: event.origin,
+        value: event.data,
+      });
+      if (streamPull) {
+        void pullBlueprintProjectRemoteDataStream(streamPull);
+        return;
+      }
+      const streamRequest = readBlueprintRemoteDataStreamOpen({
+        provider,
+        previewUrl,
+        messageOrigin: event.origin,
+        value: event.data,
+      });
+      if (streamRequest) {
+        void openBlueprintProjectRemoteDataStream(streamRequest, (message) => {
+          if (!active || frameRef.current?.contentWindow !== frameWindow)
+            return;
+          frameWindow.postMessage(message, '*');
+        });
         return;
       }
       const serverFunctionCancellation =

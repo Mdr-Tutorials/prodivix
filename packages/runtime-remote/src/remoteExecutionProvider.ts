@@ -6,6 +6,7 @@ import {
   EXECUTION_BUILD_BUNDLE_MEDIA_TYPE,
   EXECUTION_FILESYSTEM_DIFF_FORMAT,
   EXECUTION_FILESYSTEM_DIFF_MEDIA_TYPE,
+  EXECUTION_NETWORK_TRACE_NAME,
   EXECUTION_PREVIEW_BUNDLE_MEDIA_TYPE,
   EXECUTION_SECRET_LEAK_DIAGNOSTIC_CODE,
   EXECUTION_SECRET_LEAK_FAILURE_CODE,
@@ -14,6 +15,7 @@ import {
   EXECUTION_TEST_REPORT_TRACE_NAME,
   getExecutionProviderCompatibility,
   isExecutionJobTerminalStatus,
+  readExecutionNetworkTraceValue,
   readExecutionTestReportValue,
   type ExecutionJobController,
   type ExecutionJobEvent,
@@ -34,6 +36,10 @@ import {
   RemoteExecutionClientError,
   RemoteExecutionRecoveryRequiredError,
 } from './remoteExecutionClient';
+import {
+  createRemoteExecutionRecoveryPlan,
+  reconnectRemoteExecution,
+} from './remoteExecutionRecovery';
 import type {
   RemoteExecutionClient,
   RemoteExecutionRecord,
@@ -71,6 +77,7 @@ export const remotePreviewExecutionProviderDescriptor =
     capabilities: [
       ...commonCapabilities,
       'console',
+      'data-stream',
       'environment-binding',
       'server-function',
       'terminal',
@@ -133,6 +140,7 @@ export type CreateRemoteExecutionProviderOptions = Readonly<{
   resolveSnapshot: ResolveRemoteExecutionSnapshot;
   pollIntervalMs?: number;
   eventPageSize?: number;
+  maximumReconnectAttempts?: number;
   delay?: (milliseconds: number) => Promise<void>;
   createCancellationId?: (
     executionId: string,
@@ -225,6 +233,36 @@ const terminal = (
         });
         return;
       }
+      if (reason === 'worker-recovery-exhausted') {
+        controller.fail({
+          code: 'REMOTE_WORKER_RECOVERY_EXHAUSTED',
+          message:
+            'The remote execution exhausted its bounded worker recovery attempts.',
+          retryable: true,
+        });
+        return;
+      }
+      if (
+        reason === 'network-policy-denied' ||
+        reason === 'runtime-network-isolation-failed'
+      ) {
+        controller.fail({
+          code: 'REMOTE_NETWORK_POLICY_DENIED',
+          message:
+            'Remote execution was blocked by the configured network policy.',
+          retryable: false,
+        });
+        return;
+      }
+      if (reason === 'secret-resolution-denied') {
+        controller.fail({
+          code: 'REMOTE_PERMISSION_DENIED',
+          message:
+            'Remote execution could not resolve an authorized runtime binding.',
+          retryable: false,
+        });
+        return;
+      }
       controller.fail({
         code: 'REMOTE_EXECUTION_FAILED',
         message: reason ?? 'Remote execution failed.',
@@ -308,6 +346,35 @@ const emitSynchronizationFailure = (
   ) {
     controller.emitDiagnostic(error.diagnostic);
   }
+  const operation =
+    error instanceof RemoteExecutionClientError ||
+    error instanceof RemoteExecutionRecoveryRequiredError
+      ? error.operation
+      : undefined;
+  const recovery = createRemoteExecutionRecoveryPlan({
+    error,
+    ...(operation ? { operation } : {}),
+  });
+  if (recovery.status === 'restore-authorization') {
+    controller.fail({
+      code: 'REMOTE_AUTHORIZATION_REQUIRED',
+      message:
+        'Remote execution authorization must be restored before resuming this execution.',
+      retryable: false,
+    });
+    return;
+  }
+  if (
+    recovery.status === 'blocked' &&
+    recovery.reason === 'permission-denied'
+  ) {
+    controller.fail({
+      code: 'REMOTE_PERMISSION_DENIED',
+      message: 'Remote execution permission was denied.',
+      retryable: false,
+    });
+    return;
+  }
   controller.fail({
     code: 'REMOTE_EXECUTION_SYNC_FAILED',
     message:
@@ -325,6 +392,7 @@ const synchronize = async (
     initialRecord: RemoteExecutionRecord;
     pollIntervalMs: number;
     eventPageSize: number;
+    maximumReconnectAttempts: number;
     delay: (milliseconds: number) => Promise<void>;
     materializeArtifact?: CreateRemoteExecutionProviderOptions['materializeArtifact'];
   }>
@@ -340,9 +408,11 @@ const synchronize = async (
     readonly ExecutionSourceTrace[] | undefined;
   let serverFunctionTracePublished = false;
   let testReportStatus: 'passed' | 'failed' | undefined;
+  let testReportSourceTrace: readonly ExecutionSourceTrace[] | undefined;
   let testReportTraceStatus: 'passed' | 'failed' | undefined;
-  try {
-    while (active(input.controller)) {
+  let reconnectAttempts = 0;
+  while (active(input.controller)) {
+    try {
       let hasMore = true;
       while (hasMore && active(input.controller)) {
         const page = await input.client.readEvents({
@@ -445,9 +515,13 @@ const synchronize = async (
             input.controller.job.request.profile === 'test'
           ) {
             const status = event.artifact.metadata?.status;
+            const expectedReportId = `test-report:${record.executionId}`;
             if (
+              testReportStatus ||
               event.artifact.kind !== 'report' ||
               event.artifact.mediaType !== EXECUTION_TEST_REPORT_MEDIA_TYPE ||
+              event.artifact.artifactId !== expectedReportId ||
+              event.artifact.metadata?.reportId !== expectedReportId ||
               event.artifact.metadata?.snapshotDigest !==
                 record.snapshotDigest ||
               (status !== 'passed' && status !== 'failed') ||
@@ -458,6 +532,7 @@ const synchronize = async (
                 'events.read'
               );
             testReportStatus = status;
+            testReportSourceTrace = event.artifact.sourceTrace;
           }
           if (
             event.kind === 'artifact' &&
@@ -555,12 +630,45 @@ const synchronize = async (
           if (
             event.kind === 'trace' &&
             input.controller.job.request.profile === 'test' &&
+            event.trace.name === EXECUTION_NETWORK_TRACE_NAME
+          ) {
+            const network = readExecutionNetworkTraceValue(event.trace.detail);
+            if (
+              !network ||
+              event.trace.phase !== 'event' ||
+              event.trace.traceId !== `network:${record.executionId}` ||
+              event.trace.spanId !== network.requestId ||
+              network.runtimeZone !== 'test' ||
+              (network.phase === 'dependency-install'
+                ? network.mode !== 'live' || network.correlation !== undefined
+                : network.mode !== 'mock' || !network.correlation)
+            )
+              throw new RemoteExecutionRecoveryRequiredError(
+                'Remote Test network trace crossed its mock-only runtime boundary.',
+                'events.read'
+              );
+          }
+          if (
+            event.kind === 'trace' &&
+            input.controller.job.request.profile === 'test' &&
             event.trace.name === EXECUTION_TEST_REPORT_TRACE_NAME
           ) {
             const report = readExecutionTestReportValue(event.trace.detail);
-            if (!report || !event.trace.sourceTrace?.length)
+            const expectedReportId = `test-report:${record.executionId}`;
+            if (
+              testReportTraceStatus ||
+              !testReportStatus ||
+              !report ||
+              report.reportId !== expectedReportId ||
+              report.status !== testReportStatus ||
+              event.trace.phase !== 'event' ||
+              event.trace.traceId !== `test:${record.executionId}` ||
+              event.trace.spanId !== expectedReportId ||
+              !event.trace.sourceTrace?.length ||
+              !sameSourceTrace(event.trace.sourceTrace, testReportSourceTrace)
+            )
               throw new RemoteExecutionRecoveryRequiredError(
-                'Remote Test trace does not contain a canonical report.',
+                'Remote Test trace does not match its execution-bound report artifact.',
                 'events.read'
               );
             testReportTraceStatus = report.status;
@@ -676,10 +784,47 @@ const synchronize = async (
         terminal(input.controller, record.status, terminalReason);
         return;
       }
+      reconnectAttempts = 0;
+      await input.delay(input.pollIntervalMs);
+    } catch (error) {
+      const recovery = createRemoteExecutionRecoveryPlan({
+        error,
+        ...(error instanceof RemoteExecutionClientError ||
+        error instanceof RemoteExecutionRecoveryRequiredError
+          ? { operation: error.operation }
+          : {}),
+        afterCursor: cursor,
+      });
+      if (
+        recovery.status !== 'reconnect' ||
+        reconnectAttempts >= input.maximumReconnectAttempts
+      ) {
+        emitSynchronizationFailure(input.controller, error);
+        return;
+      }
+      reconnectAttempts += 1;
+      try {
+        const refreshed = await reconnectRemoteExecution({
+          client: input.client,
+          expected: {
+            executionId: record.executionId,
+            requestId: record.requestId,
+            snapshotDigest: record.snapshotDigest,
+            providerId: record.provider.id,
+          },
+          afterCursor: cursor,
+          pageSize: input.eventPageSize,
+          maximumPages: 1,
+        });
+        record = refreshed.execution;
+      } catch (reconnectError) {
+        if (reconnectAttempts >= input.maximumReconnectAttempts) {
+          emitSynchronizationFailure(input.controller, reconnectError);
+          return;
+        }
+      }
       await input.delay(input.pollIntervalMs);
     }
-  } catch (error) {
-    emitSynchronizationFailure(input.controller, error);
   }
 };
 
@@ -707,10 +852,22 @@ export const createRemoteExecutionProvider = (
     throw new TypeError(
       'Remote provider event page size exceeds protocol limits.'
     );
+  const maximumReconnectAttempts = positiveSafeInteger(
+    options.maximumReconnectAttempts ?? 3,
+    'Remote provider maximum reconnect attempts'
+  );
   const delay = options.delay ?? defaultDelay;
   return Object.freeze({
     descriptor: options.descriptor,
     async start(request) {
+      if (
+        request.profile === 'test' &&
+        (request.environment !== undefined ||
+          request.requiredCapabilities.includes('environment-binding'))
+      )
+        throw new TypeError(
+          'Remote Test is mock-only and cannot accept an environment binding.'
+        );
       const compatibility = getExecutionProviderCompatibility(
         options.descriptor,
         request
@@ -786,6 +943,7 @@ export const createRemoteExecutionProvider = (
         initialRecord: execution,
         pollIntervalMs,
         eventPageSize,
+        maximumReconnectAttempts,
         delay,
         ...(options.materializeArtifact
           ? { materializeArtifact: options.materializeArtifact }

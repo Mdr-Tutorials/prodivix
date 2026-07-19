@@ -7,6 +7,15 @@ import {
   SERVER_FUNCTION_INVOCATION_TRACE_NAME,
   type ServerFunctionInvocationTrace,
 } from '@prodivix/server-runtime';
+import type {
+  ExecutionSourceNavigationInput,
+  ExecutionSourceNavigationResult,
+} from './executionSourceTraceModel';
+
+export type {
+  ExecutionSourceNavigationInput,
+  ExecutionSourceNavigationResult,
+} from './executionSourceTraceModel';
 
 export type ExecutionServerFunctionEntry = Readonly<{
   id: string;
@@ -18,19 +27,10 @@ export type ExecutionServerFunctionEntry = Readonly<{
   primarySourceTrace?: ExecutionSourceTrace;
 }>;
 
-export type ExecutionServerFunctionSourceNavigationInput = Readonly<{
-  jobId: string;
-  providerId: string;
-  snapshotId: string;
-  sourceTrace: ExecutionSourceTrace;
-}>;
-
+export type ExecutionServerFunctionSourceNavigationInput =
+  ExecutionSourceNavigationInput;
 export type ExecutionServerFunctionSourceNavigationResult =
-  | Readonly<{ status: 'opened' }>
-  | Readonly<{
-      status: 'unavailable';
-      reason: 'snapshot-stale' | 'source-unavailable';
-    }>;
+  ExecutionSourceNavigationResult;
 
 /** Selects one unambiguous root CodeArtifact trace for the invoked function. */
 export const resolveExecutionServerFunctionPrimarySourceTrace = (

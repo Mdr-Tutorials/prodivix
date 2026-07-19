@@ -38,6 +38,8 @@ import {
   createWorkspacePIRCollectionUnwrapTransactionPlan,
   createWorkspaceOwnerGuardTransactionPlan,
   createWorkspaceReadGuardTransactionPlan,
+  createWorkspaceReadSecretLoaderTransactionPlan,
+  createWorkspaceSourceMutationTransactionPlan,
   createWorkspaceServerRuntimeBindingPlan,
   createWorkspacePIRElementBatchUpdateTransactionPlan,
   createWorkspacePIRElementUpdateTransactionPlan,
@@ -785,6 +787,82 @@ export const useBlueprintEditorInspectorController = ({
     workspace,
     workspaceReadonly,
   ]);
+  const createWorkspaceReadSecretLoader = useCallback(
+    (secretBindingId: string) => {
+      if (!activeRouteDetails || workspaceReadonly) return;
+      const current = useEditorStore.getState().workspace;
+      const source = current?.id === workspace.id ? current : workspace;
+      const transactionId = createWorkspaceClientOperationId(
+        'server-read-secret-loader'
+      );
+      const documentId = createWorkspaceClientOperationId(
+        'server-read-secret-loader-artifact'
+      );
+      const result = createWorkspaceReadSecretLoaderTransactionPlan({
+        workspace: source,
+        routeNodeId: activeRouteDetails.id,
+        documentId,
+        path: `/server/isolated-read-secret-${documentId.slice(0, 8)}.loader.server.ts`,
+        secretBindingId,
+        transactionId,
+        issuedAt: new Date().toISOString(),
+      });
+      if (result.status === 'rejected') {
+        report(result.message);
+        return;
+      }
+      void dispatchOperation({
+        kind: 'transaction',
+        transaction: result.plan.transaction,
+      });
+    },
+    [
+      activeRouteDetails,
+      dispatchOperation,
+      report,
+      workspace,
+      workspaceReadonly,
+    ]
+  );
+  const createWorkspaceSourceMutation = useCallback(() => {
+    if (!activeRouteDetails || workspaceReadonly) return;
+    const current = useEditorStore.getState().workspace;
+    const source = current?.id === workspace.id ? current : workspace;
+    const transactionId = createWorkspaceClientOperationId(
+      'server-source-mutation'
+    );
+    const actionDocumentId = createWorkspaceClientOperationId(
+      'server-source-mutation-action'
+    );
+    const targetDocumentId = createWorkspaceClientOperationId(
+      'server-source-mutation-target'
+    );
+    const suffix = actionDocumentId.slice(0, 8);
+    const result = createWorkspaceSourceMutationTransactionPlan({
+      workspace: source,
+      routeNodeId: activeRouteDetails.id,
+      actionDocumentId,
+      actionPath: `/server/source-mutation-${suffix}.action.server.ts`,
+      targetDocumentId,
+      targetPath: `/server/source-mutation-${suffix}.target.ts`,
+      transactionId,
+      issuedAt: new Date().toISOString(),
+    });
+    if (result.status === 'rejected') {
+      report(result.message);
+      return;
+    }
+    void dispatchOperation({
+      kind: 'transaction',
+      transaction: result.plan.transaction,
+    });
+  }, [
+    activeRouteDetails,
+    dispatchOperation,
+    report,
+    workspace,
+    workspaceReadonly,
+  ]);
   const outletRouteNodeId =
     selectedNode?.type === 'PdxOutlet'
       ? findOutletRouteNodeId(composedRouteManifest.root, selectedNode.id)
@@ -1407,6 +1485,8 @@ export const useBlueprintEditorInspectorController = ({
       setServerRuntimeBinding,
       createWorkspaceOwnerGuard,
       createWorkspaceReadGuard,
+      createWorkspaceReadSecretLoader,
+      createWorkspaceSourceMutation,
       openServerRuntimeArtifact: (artifactId) => {
         navigateToCodeArtifact(artifactId);
       },
@@ -1427,6 +1507,8 @@ export const useBlueprintEditorInspectorController = ({
       dataMutationOptions,
       createWorkspaceOwnerGuard,
       createWorkspaceReadGuard,
+      createWorkspaceReadSecretLoader,
+      createWorkspaceSourceMutation,
       hasAnimationDefinition,
       hasOnClickTrigger,
       isAnimationMounted,

@@ -95,7 +95,12 @@ export const WORKSPACE_DOCUMENT_POLICIES = Object.freeze({
   'design-tokens': topLevel('token'),
   'design-token-resolver': topLevel('token'),
   code: roots('code', ['/language', '/source', '/metadata'], ['/x-']),
-  'data-source': roots('data', ['/source', '/schemasById', '/operationsById']),
+  'data-source': roots('data', [
+    '/source',
+    '/schemasById',
+    '/operationsById',
+    '/importProvenanceById',
+  ]),
   asset: roots('resource', [
     '/mime',
     '/category',

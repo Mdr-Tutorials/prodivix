@@ -12,13 +12,18 @@ import type {
   RuntimeFilesystemAssetUploadRequest,
 } from '@prodivix/prodivix-compiler';
 import {
+  createExecutionNetworkTrace,
   createExecutionFilesystemDiff,
   createExecutionJobController,
   createExecutionProviderDescriptor,
   createExecutionRequest,
+  toExecutionNetworkTraceValue,
   type ExecutionProviderCapability,
 } from '@prodivix/runtime-core';
-import type { RemoteExecutionTerminalClient } from '@prodivix/runtime-remote';
+import {
+  RemoteExecutionArtifactResolutionError,
+  type RemoteExecutionTerminalClient,
+} from '@prodivix/runtime-remote';
 import {
   createServerFunctionInvocationTrace,
   EXECUTION_SERVER_FUNCTION_BRIDGE_REQUEST_TYPE,
@@ -28,6 +33,7 @@ import {
 } from '@prodivix/server-runtime';
 import type { WorkspaceSnapshot } from '@prodivix/workspace';
 import { ExecutionCenter } from './ExecutionCenter';
+import { useExecutionCenterNavigationStore } from './executionCenterNavigation';
 import { executionSessionCoordinator } from './executionSessionEnvironment';
 
 const dispatchWorkspaceOperation = vi.hoisted(() => vi.fn());
@@ -86,12 +92,14 @@ const activateSession = (
   return controller;
 };
 
-const createTerminalClient = (): RemoteExecutionTerminalClient => {
+const createTerminalClient = (
+  suffix = 'connected'
+): RemoteExecutionTerminalClient => {
   const snapshot = Object.freeze({
-    terminalSessionId: 'terminal-connected',
-    executionId: 'job-terminal-connected',
-    jobId: 'job-terminal-connected',
-    providerId: 'provider-terminal-connected',
+    terminalSessionId: `terminal-${suffix}`,
+    executionId: `job-terminal-${suffix}`,
+    jobId: `job-terminal-${suffix}`,
+    providerId: `provider-terminal-${suffix}`,
     providerVersion: '1',
     capability: 'shell' as const,
     status: 'open' as const,
@@ -177,6 +185,109 @@ afterEach(() => {
   sessionIds.clear();
   dispatchWorkspaceOperation.mockReset();
   uploadRuntimeAssets.mockReset();
+  useExecutionCenterNavigationStore.getState().clear();
+});
+
+describe('ExecutionCenter Remote recovery', () => {
+  it('presents quota and exhausted-worker recovery as explicit new-request policies', async () => {
+    const controller = activateSession('worker-recovery', []);
+    controller.fail({
+      code: 'REMOTE_WORKER_RECOVERY_EXHAUSTED',
+      message: 'worker recovery exhausted',
+      retryable: true,
+    });
+    await controller.job.completion;
+    const view = render(<ExecutionCenter sessionId="worker-recovery" />);
+    expect(screen.getByText('execution.recovery.workerExhausted')).toBeTruthy();
+
+    view.rerender(
+      <ExecutionCenter
+        sessionId="quota-recovery"
+        status="failed"
+        diagnostics={[
+          { code: 'EXE-4291', severity: 'error', message: 'quota exceeded' },
+        ]}
+      />
+    );
+    expect(screen.getByText('execution.recovery.quota')).toBeTruthy();
+  });
+
+  it('presents authorization, permission, network, cancellation, and timeout repair paths', async () => {
+    const authorization = activateSession('authorization-recovery', []);
+    authorization.fail({
+      code: 'REMOTE_AUTHORIZATION_REQUIRED',
+      message: 'authorization required',
+      retryable: false,
+    });
+    await authorization.job.completion;
+    const view = render(<ExecutionCenter sessionId="authorization-recovery" />);
+    expect(
+      screen.getByText('execution.recovery.authorizationRequired')
+    ).toBeTruthy();
+
+    const permission = activateSession('permission-recovery', []);
+    permission.fail({
+      code: 'REMOTE_PERMISSION_DENIED',
+      message: 'permission denied',
+      retryable: false,
+    });
+    await permission.job.completion;
+    view.rerender(<ExecutionCenter sessionId="permission-recovery" />);
+    expect(
+      screen.getByText('execution.recovery.permissionDenied')
+    ).toBeTruthy();
+
+    const network = activateSession('network-recovery', []);
+    network.fail({
+      code: 'REMOTE_NETWORK_POLICY_DENIED',
+      message: 'network denied',
+      retryable: false,
+    });
+    await network.job.completion;
+    view.rerender(<ExecutionCenter sessionId="network-recovery" />);
+    expect(
+      screen.getByText('execution.recovery.networkPolicyDenied')
+    ).toBeTruthy();
+
+    const cancelled = activateSession('cancelled-recovery', []);
+    cancelled.finishCancelled('requested');
+    await cancelled.job.completion;
+    view.rerender(<ExecutionCenter sessionId="cancelled-recovery" />);
+    expect(screen.getByText('execution.recovery.cancelled')).toBeTruthy();
+
+    const timedOut = activateSession('timeout-recovery', []);
+    timedOut.finishTimedOut(1_000);
+    await timedOut.job.completion;
+    view.rerender(<ExecutionCenter sessionId="timeout-recovery" />);
+    expect(screen.getByText('execution.recovery.timedOut')).toBeTruthy();
+  });
+
+  it('requires a new request when a runtime filesystem artifact is unavailable', async () => {
+    render(
+      <ExecutionCenter
+        sessionId="artifact-recovery"
+        filesystemArtifact={{
+          executionId: 'execution-1',
+          jobId: 'job-execution-1',
+          providerId: 'provider-execution-1',
+          artifactId: 'artifact-1',
+          snapshotDigest: `sha256-${'a'.repeat(64)}`,
+          workspaceSnapshotId: 'snapshot-1',
+          resolve: async () => {
+            throw new RemoteExecutionArtifactResolutionError(
+              'Remote artifact is unavailable.'
+            );
+          },
+        }}
+      />
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'execution.surface.files' })
+    );
+    expect(
+      await screen.findByText('execution.recovery.artifactUnavailable')
+    ).toBeTruthy();
+  });
 });
 
 describe('ExecutionCenter Server Function surface', () => {
@@ -285,6 +396,201 @@ describe('ExecutionCenter Server Function surface', () => {
   });
 });
 
+describe('ExecutionCenter Console SourceTrace navigation', () => {
+  it('opens a correlated artifact owner and preserves exact snapshot failures', () => {
+    const sessionId = 'console-artifact-source';
+    const controller = activateSession(sessionId, ['artifacts']);
+    controller.emitArtifact({
+      artifactId: 'coverage-report',
+      kind: 'coverage',
+      label: 'Coverage report',
+      sourceTrace: [
+        {
+          sourceRef: { kind: 'code-artifact', artifactId: 'code-test' },
+        },
+      ],
+    });
+    controller.succeed();
+    const openSourceTrace = vi.fn(() => ({ status: 'opened' as const }));
+    const view = render(
+      <ExecutionCenter
+        sessionId={sessionId}
+        onOpenSourceTrace={openSourceTrace}
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'execution.openSource' })
+    );
+    expect(openSourceTrace).toHaveBeenCalledWith({
+      jobId: controller.job.id,
+      providerId: controller.job.provider.id,
+      snapshotId: controller.job.request.workspace.snapshotId,
+      sourceTrace: {
+        sourceRef: { kind: 'code-artifact', artifactId: 'code-test' },
+      },
+    });
+
+    view.rerender(
+      <ExecutionCenter
+        sessionId={sessionId}
+        onOpenSourceTrace={() => ({
+          status: 'unavailable',
+          reason: 'snapshot-stale',
+        })}
+      />
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'execution.openSource' })
+    );
+    expect(
+      screen.getByText('execution.sourceNavigation.snapshotStale')
+    ).toBeTruthy();
+  });
+});
+
+describe('ExecutionCenter Data Network navigation', () => {
+  it('opens a requested exact-operation filter and links the trace back to Inspector', async () => {
+    const sessionId = 'data-network-navigation';
+    const controller = activateSession(sessionId, ['console']);
+    const publishNetwork = (
+      requestId: string,
+      operationId: string,
+      sanitizedUrl: string,
+      observedAt: number
+    ) => {
+      const trace = createExecutionNetworkTrace({
+        requestId,
+        phase: 'runtime',
+        runtimeZone: 'server',
+        mode: 'live',
+        adapter: 'core.http',
+        method: 'GET',
+        sanitizedUrl,
+        protocol: 'https',
+        startedAt: observedAt - 10,
+        completedAt: observedAt,
+        outcome: 'allowed',
+        status: 200,
+        correlation: {
+          kind: 'data-operation',
+          documentId: 'data-catalog',
+          operationId,
+          invocationId: `invocation-${operationId}`,
+          sequence: 1,
+          attempt: 1,
+        },
+        sourceTrace: [
+          {
+            sourceRef: {
+              kind: 'data-operation',
+              documentId: 'data-catalog',
+              operationId,
+            },
+            label: 'Data operation',
+          },
+        ],
+      });
+      executionSessionCoordinator.publishTrace({
+        sessionId,
+        jobId: controller.job.id,
+        observedAt,
+        trace: {
+          traceId: `network:${controller.job.id}`,
+          spanId: requestId,
+          name: 'network.request',
+          phase: 'event',
+          detail: toExecutionNetworkTraceValue(trace),
+        },
+      });
+    };
+    publishNetwork(
+      'listproducts:1',
+      'listproducts',
+      'https://catalog.example.test/',
+      110
+    );
+    publishNetwork(
+      'createproduct:1',
+      'createproduct',
+      'https://create.catalog.example.test/',
+      120
+    );
+    useExecutionCenterNavigationStore.getState().openNetworkOperation({
+      workspaceId: 'workspace',
+      documentId: 'data-catalog',
+      operationId: 'listproducts',
+    });
+    const openDataOperation = vi.fn();
+    const openSourceTrace = vi.fn(() => ({ status: 'opened' as const }));
+    const workspace: WorkspaceSnapshot = {
+      id: 'workspace',
+      workspaceRev: 1,
+      routeRev: 1,
+      opSeq: 1,
+      treeRootId: 'root',
+      treeById: {
+        root: {
+          id: 'root',
+          kind: 'dir',
+          name: '/',
+          parentId: null,
+          children: [],
+        },
+      },
+      docsById: {},
+      routeManifest: { version: '1', root: { id: 'route-root' } },
+    };
+
+    render(
+      <ExecutionCenter
+        sessionId={sessionId}
+        workspace={workspace}
+        onOpenDataOperation={openDataOperation}
+        onOpenSourceTrace={openSourceTrace}
+      />
+    );
+
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole('button', { name: 'execution.surface.network' })
+          .getAttribute('aria-pressed')
+      ).toBe('true')
+    );
+    expect(screen.getByText('listproducts ×')).toBeTruthy();
+    expect(screen.getByText('https://catalog.example.test/')).toBeTruthy();
+    expect(
+      screen.queryByText('https://create.catalog.example.test/')
+    ).toBeNull();
+    expect(useExecutionCenterNavigationStore.getState().request).toBeNull();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'execution.openDataInspector' })
+    );
+    expect(openDataOperation).toHaveBeenCalledWith({
+      documentId: 'data-catalog',
+      operationId: 'listproducts',
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'execution.openSource' })
+    );
+    expect(openSourceTrace).toHaveBeenCalledWith({
+      jobId: controller.job.id,
+      providerId: controller.job.provider.id,
+      snapshotId: controller.job.request.workspace.snapshotId,
+      sourceTrace: {
+        sourceRef: {
+          kind: 'data-operation',
+          documentId: 'data-catalog',
+          operationId: 'listproducts',
+        },
+        label: 'Data operation',
+      },
+    });
+  });
+});
+
 describe('ExecutionCenter Terminal availability', () => {
   it('shows an explicit unsupported state instead of a fallback shell', () => {
     activateSession('terminal-unsupported', ['console']);
@@ -339,14 +645,13 @@ describe('ExecutionCenter Terminal availability', () => {
       screen.getByRole('button', { name: 'execution.terminal.open' })
     );
 
-    await screen.findByText(/remote-ready/);
+    expect(await screen.findAllByText(/remote-ready/)).toHaveLength(2);
     const input = screen.getByRole('textbox', {
-      name: 'execution.terminal.inputPlaceholder',
+      name: 'execution.terminal.inputLabel',
     });
-    fireEvent.change(input, { target: { value: 'pwd' } });
-    fireEvent.click(
-      screen.getByRole('button', { name: 'execution.terminal.send' })
-    );
+    fireEvent.paste(input, {
+      clipboardData: { getData: () => 'pwd\n' },
+    });
 
     await waitFor(() =>
       expect(terminalClient.write).toHaveBeenCalledWith(
@@ -358,7 +663,175 @@ describe('ExecutionCenter Terminal availability', () => {
         })
       )
     );
-    expect((input as HTMLInputElement).value).toBe('');
+    expect((input as HTMLTextAreaElement).value).toBe('');
+    expect(screen.getByTestId('execution-terminal-emulator')).toBeTruthy();
+  });
+
+  it('renders ANSI state and drains rapid keyboard input in exact sequence', async () => {
+    activateSession('terminal-emulator', ['terminal']);
+    const terminalClient = createTerminalClient('emulator');
+    const data = '\u001b[?1h\u001b[31mansi-ready\u001b[0m\r\n';
+    vi.mocked(terminalClient.read).mockImplementation(async (input) => ({
+      terminalSessionId: 'terminal-emulator',
+      executionId: 'job-terminal-emulator',
+      jobId: 'job-terminal-emulator',
+      status: 'open',
+      afterCursor: input.afterCursor,
+      nextCursor: 1,
+      latestCursor: 1,
+      earliestAvailableCursor: 1,
+      gap: false,
+      hasMore: false,
+      records:
+        input.afterCursor === 0
+          ? [
+              {
+                terminalSessionId: 'terminal-emulator',
+                executionId: 'job-terminal-emulator',
+                jobId: 'job-terminal-emulator',
+                cursor: 1,
+                emittedAt: 2,
+                stream: 'stdout',
+                data,
+                byteLength: Buffer.byteLength(data),
+                redacted: false,
+                truncated: false,
+              },
+            ]
+          : [],
+    }));
+    render(
+      <ExecutionCenter
+        sessionId="terminal-emulator"
+        terminalPermission="allowed"
+        terminalClient={terminalClient}
+      />
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'execution.surface.terminal' })
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'execution.terminal.open' })
+    );
+
+    const rendered = (await screen.findAllByText('ansi-ready')).find(
+      (element) => element.getAttribute('aria-live') === null
+    );
+    expect(rendered?.style.color).toBe('rgb(239, 68, 68)');
+    const input = screen.getByRole('textbox', {
+      name: 'execution.terminal.inputLabel',
+    });
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    fireEvent.keyDown(input, { key: 'p' });
+    fireEvent.keyDown(input, { key: 'w' });
+    fireEvent.keyDown(input, { key: 'd' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.keyDown(input, { key: 'c', ctrlKey: true });
+
+    await waitFor(() => expect(terminalClient.write).toHaveBeenCalledTimes(5));
+    expect(
+      vi.mocked(terminalClient.write).mock.calls.map(([call]) => ({
+        data: call.data,
+        clientSequence: call.clientSequence,
+      }))
+    ).toEqual([
+      { data: '\u001bOA', clientSequence: 1 },
+      { data: 'p', clientSequence: 2 },
+      { data: 'w', clientSequence: 3 },
+      { data: 'd', clientSequence: 4 },
+      { data: '\r', clientSequence: 5 },
+    ]);
+    expect(terminalClient.signal).toHaveBeenCalledWith(
+      expect.objectContaining({ signal: 'interrupt' })
+    );
+  });
+
+  it('retries only the exact unacknowledged input after cursor reconnect', async () => {
+    activateSession('terminal-retry', ['terminal']);
+    const terminalClient = createTerminalClient('retry');
+    vi.mocked(terminalClient.write)
+      .mockRejectedValueOnce(new Error('transport lost after write'))
+      .mockImplementationOnce(async (input) => ({
+        status: 'duplicate',
+        clientSequence: input.clientSequence,
+      }));
+    render(
+      <ExecutionCenter
+        sessionId="terminal-retry"
+        terminalPermission="allowed"
+        terminalClient={terminalClient}
+      />
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'execution.surface.terminal' })
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'execution.terminal.open' })
+    );
+    await screen.findAllByText(/remote-ready/);
+    fireEvent.paste(
+      screen.getByRole('textbox', {
+        name: 'execution.terminal.inputLabel',
+      }),
+      { clipboardData: { getData: () => 'id\n' } }
+    );
+
+    await waitFor(() => expect(terminalClient.write).toHaveBeenCalledTimes(2), {
+      timeout: 2_000,
+    });
+    expect(terminalClient.resume).toHaveBeenCalled();
+    const writes = vi.mocked(terminalClient.write).mock.calls;
+    expect(writes[0]?.[0]).toMatchObject({ data: 'id\n', clientSequence: 1 });
+    expect(writes[1]?.[0]).toMatchObject({ data: 'id\n', clientSequence: 1 });
+  });
+
+  it('fails closed before rendering output with invalid byte identity', async () => {
+    activateSession('terminal-invalid-output', ['terminal']);
+    const terminalClient = createTerminalClient('invalid-output');
+    vi.mocked(terminalClient.read).mockImplementation(async (input) => ({
+      terminalSessionId: 'terminal-invalid-output',
+      executionId: 'job-terminal-invalid-output',
+      jobId: 'job-terminal-invalid-output',
+      status: 'open',
+      afterCursor: input.afterCursor,
+      nextCursor: 1,
+      latestCursor: 1,
+      earliestAvailableCursor: 1,
+      gap: false,
+      hasMore: false,
+      records: [
+        {
+          terminalSessionId: 'terminal-invalid-output',
+          executionId: 'job-terminal-invalid-output',
+          jobId: 'job-terminal-invalid-output',
+          cursor: 1,
+          emittedAt: 2,
+          stream: 'stdout',
+          data: 'must-not-render',
+          byteLength: 1,
+          redacted: false,
+          truncated: false,
+        },
+      ],
+    }));
+    render(
+      <ExecutionCenter
+        sessionId="terminal-invalid-output"
+        terminalPermission="allowed"
+        terminalClient={terminalClient}
+      />
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'execution.surface.terminal' })
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'execution.terminal.open' })
+    );
+
+    expect(
+      await screen.findByText('execution.terminal.error.output-invalid')
+    ).toBeTruthy();
+    expect(screen.queryByText('must-not-render')).toBeNull();
   });
 });
 
@@ -432,6 +905,7 @@ describe('ExecutionCenter runtime filesystem proposal', () => {
       status: 'applied',
       operationId: 'operation-1',
     });
+    const openSourceTrace = vi.fn(() => ({ status: 'opened' as const }));
     render(
       <ExecutionCenter
         sessionId="filesystem-proposal"
@@ -439,11 +913,14 @@ describe('ExecutionCenter runtime filesystem proposal', () => {
         workspaceReadonly={false}
         filesystemArtifact={{
           executionId: 'execution-1',
+          jobId: 'job-execution-1',
+          providerId: 'provider-execution-1',
           artifactId: `filesystem-diff:${snapshotDigest}`,
           snapshotDigest,
           workspaceSnapshotId: 'snapshot',
           resolve: vi.fn(async () => diff),
         }}
+        onOpenSourceTrace={openSourceTrace}
       />
     );
 
@@ -455,6 +932,17 @@ describe('ExecutionCenter runtime filesystem proposal', () => {
     });
     const apply = screen.getByRole('button', {
       name: 'execution.files.apply',
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'execution.openSource' })
+    );
+    expect(openSourceTrace).toHaveBeenCalledWith({
+      jobId: 'job-execution-1',
+      providerId: 'provider-execution-1',
+      snapshotId: 'snapshot',
+      sourceTrace: {
+        sourceRef: { kind: 'code-artifact', artifactId: 'code-1' },
+      },
     });
     expect((apply as HTMLButtonElement).disabled).toBe(true);
 
@@ -583,6 +1071,8 @@ describe('ExecutionCenter runtime filesystem proposal', () => {
         workspaceReadonly={false}
         filesystemArtifact={{
           executionId: 'execution-vfs',
+          jobId: 'job-execution-vfs',
+          providerId: 'provider-execution-vfs',
           artifactId: `filesystem-diff:${snapshotDigest}`,
           snapshotDigest,
           workspaceSnapshotId: 'snapshot-vfs',
@@ -723,6 +1213,8 @@ describe('ExecutionCenter runtime filesystem proposal', () => {
         workspaceReadonly={false}
         filesystemArtifact={{
           executionId: 'execution-assets',
+          jobId: 'job-execution-assets',
+          providerId: 'provider-execution-assets',
           artifactId: `filesystem-diff:${snapshotDigest}`,
           snapshotDigest,
           workspaceSnapshotId: 'snapshot-assets',

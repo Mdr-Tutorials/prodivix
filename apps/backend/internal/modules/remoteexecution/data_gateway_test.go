@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -42,15 +44,19 @@ func (store *fakeDataGatewayStore) RecordExecution(context.Context, ExecutionAut
 	return nil
 }
 
-func (store *fakeDataGatewayStore) VerifyExecutionOwner(context.Context, string, string, string) error {
+func (store *fakeDataGatewayStore) VerifyExecutionPrincipalSession(context.Context, string, string, string) error {
 	return nil
 }
 
 func (store *fakeDataGatewayStore) GetExecutionAuthority(_ context.Context, ownerID string, sessionID string, executionID string) (*ExecutionAuthority, error) {
-	if store.err != nil || store.authority == nil || store.authority.ExecutionID != executionID || store.authority.OwnerID != ownerID || store.authority.SessionID != sessionID {
+	if store.err != nil || store.authority == nil || store.authority.ExecutionID != executionID || store.authority.PrincipalID != ownerID || store.authority.SessionID != sessionID {
 		return nil, ErrExecutionNotFound
 	}
-	return store.authority, nil
+	authority := *store.authority
+	if authority.Permissions == nil {
+		authority.Permissions = cloneExecutionPermissions(workspaceOwnerExecutionPermissions)
+	}
+	return &authority, nil
 }
 
 func (store *fakeDataGatewayStore) GetDataSourceDocument(_ context.Context, authority ExecutionAuthority, documentID string) ([]byte, error) {
@@ -138,6 +144,7 @@ func (store *fakeDataGatewayStore) FenceDataGatewayMutation(_ context.Context, k
 
 type fakeDataGatewayEnvironment struct {
 	canary       string
+	principal    backendenvironment.PrincipalSession
 	grant        backendenvironment.IssueGrantInput
 	use          backendenvironment.UseSecretInput
 	revokedGrant string
@@ -146,7 +153,11 @@ type fakeDataGatewayEnvironment struct {
 func (environment *fakeDataGatewayEnvironment) Available() bool { return true }
 
 func (environment *fakeDataGatewayEnvironment) GetSnapshot(_ context.Context, principal backendenvironment.PrincipalSession, workspaceID string, environmentID string, revision string) (*backendenvironment.Snapshot, error) {
-	if principal != (backendenvironment.PrincipalSession{PrincipalID: "user-1", SessionID: "session-1"}) || workspaceID != "workspace-1" || environmentID != "environment-1" || revision != "revision-7" {
+	expectedPrincipal := environment.principal
+	if expectedPrincipal.PrincipalID == "" {
+		expectedPrincipal = backendenvironment.PrincipalSession{PrincipalID: "user-1", SessionID: "session-1"}
+	}
+	if principal != expectedPrincipal || workspaceID != "workspace-1" || environmentID != "environment-1" || revision != "revision-7" {
 		return nil, backendenvironment.ErrPermissionDenied
 	}
 	return &backendenvironment.Snapshot{
@@ -177,9 +188,21 @@ func (environment *fakeDataGatewayEnvironment) RevokeGrant(_ context.Context, gr
 }
 
 type fakeDataGatewayTransport struct {
-	requests []DataGatewayTransportRequest
-	response *DataGatewayTransportResponse
-	err      error
+	requests       []DataGatewayTransportRequest
+	response       *DataGatewayTransportResponse
+	err            error
+	streamResponse *DataGatewayStreamTransportResponse
+	streamErr      error
+}
+
+func (transport *fakeDataGatewayTransport) OpenStream(_ context.Context, request DataGatewayTransportRequest) (*DataGatewayStreamTransportResponse, error) {
+	copyRequest := request
+	copyRequest.Headers = map[string]string{}
+	for name, value := range request.Headers {
+		copyRequest.Headers[name] = value
+	}
+	transport.requests = append(transport.requests, copyRequest)
+	return transport.streamResponse, transport.streamErr
 }
 
 type blockingDataGatewayTransport struct {
@@ -257,6 +280,41 @@ func remoteMutationDocument() []byte {
 	).Replace(string(remoteDataDocument())))
 }
 
+func remoteMappedDataDocument() []byte {
+	return []byte(`{
+  "wireVersion": 1,
+  "source": {
+    "id": "catalog",
+    "adapterId": "core.http",
+    "runtimeZone": "server",
+    "bindingsById": {
+      "api-url": {"kind":"environment-ref","reference":{"bindingId":"api-url"}},
+      "api-token": {"kind":"secret-ref","reference":{"bindingId":"api-token"}}
+    },
+    "configurationByKey": {
+      "baseUrl": {"kind":"environment-ref","reference":{"bindingId":"api-url"}}
+    }
+  },
+  "schemasById": {},
+  "operationsById": {
+    "read": {
+      "id": "read",
+      "kind": "query",
+      "outputSchemaId": "item",
+      "configurationByKey": {
+        "method": {"kind":"literal","value":"GET"},
+        "path": {"kind":"literal","value":"/items/{id}"},
+        "parameterMappings": {"kind":"literal","value":{"path":{"id":"/id"},"query":{"include":"/include"},"header":{"x-trace-id":"/trace"}}},
+        "responseBodyPath": {"kind":"literal","value":"/data"},
+        "authorization": {"kind":"secret-ref","reference":{"bindingId":"api-token"}},
+        "emptyWhen": {"kind":"literal","value":"never"}
+      },
+      "policies": {}
+    }
+  }
+}`)
+}
+
 func remoteIdempotentMutationDocument() []byte {
 	return []byte(strings.NewReplacer(
 		`"emptyWhen": {"kind":"literal","value":"never"}`,
@@ -266,11 +324,257 @@ func remoteIdempotentMutationDocument() []byte {
 	).Replace(string(remoteMutationDocument())))
 }
 
+func remoteGraphQLDocument() []byte {
+	return []byte(`{
+  "wireVersion": 1,
+  "source": {
+    "id": "catalog-graphql",
+    "adapterId": "core.graphql",
+    "runtimeZone": "edge",
+    "bindingsById": {
+      "api-url": {"kind":"environment-ref","reference":{"bindingId":"api-url"}},
+      "api-token": {"kind":"secret-ref","reference":{"bindingId":"api-token"}}
+    },
+    "configurationByKey": {
+      "endpoint": {"kind":"environment-ref","reference":{"bindingId":"api-url"}},
+      "authorization": {"kind":"secret-ref","reference":{"bindingId":"api-token"}}
+    }
+  },
+  "schemasById": {},
+  "operationsById": {
+    "list": {
+      "id": "list",
+      "kind": "query",
+      "outputSchemaId": "items",
+      "configurationByKey": {
+        "document": {"kind":"literal","value":"query ListProducts($page: Int) { products(page: $page) { id } }"},
+        "operationName": {"kind":"literal","value":"ListProducts"},
+        "resultPath": {"kind":"literal","value":"/products"},
+        "emptyWhen": {"kind":"literal","value":"empty-array"}
+      },
+      "policies": {}
+    }
+  }
+}`)
+}
+
+func remoteAsyncAPIDocument(action string) []byte {
+	kind := "query"
+	operationID := "lookup"
+	policies := `{}`
+	extra := `,"responseBodyPath":{"kind":"literal","value":"/payload"},"emptyWhen":{"kind":"literal","value":"never"}`
+	if action == "publish" {
+		kind = "mutation"
+		operationID = "publish"
+		policies = `{"idempotency":{"kind":"invocation-key"},"retry":{"maxAttempts":2,"backoff":"fixed","initialDelayMs":0}}`
+		extra = `,"idempotencyHeader":{"kind":"literal","value":"idempotency-key"}`
+	}
+	return []byte(fmt.Sprintf(`{
+  "wireVersion": 1,
+  "source": {
+    "id": "events",
+    "adapterId": "core.asyncapi",
+    "runtimeZone": "server",
+    "bindingsById": {"api-url":{"kind":"environment-ref","reference":{"bindingId":"api-url"}}},
+    "configurationByKey": {"endpoint":{"kind":"environment-ref","reference":{"bindingId":"api-url"}}}
+  },
+  "schemasById": {},
+  "operationsById": {
+    %q: {
+      "id": %q,
+      "kind": %q,
+      "outputSchemaId": "result",
+      "configurationByKey": {"action":{"kind":"literal","value":%q},"path":{"kind":"literal","value":"/events/products"}%s},
+      "policies": %s
+    }
+  }
+}`, operationID, operationID, kind, action, extra, policies))
+}
+
+func remoteGraphQLSubscriptionDocument() []byte {
+	return []byte(`{
+  "wireVersion": 1,
+  "source": {
+    "id": "catalog-graphql",
+    "adapterId": "core.graphql",
+    "runtimeZone": "edge",
+    "bindingsById": {"api-url":{"kind":"environment-ref","reference":{"bindingId":"api-url"}}},
+    "configurationByKey": {"endpoint":{"kind":"environment-ref","reference":{"bindingId":"api-url"}}}
+  },
+  "schemasById": {},
+  "operationsById": {
+    "watch": {
+      "id": "watch",
+      "kind": "subscription",
+      "outputSchemaId": "event",
+      "configurationByKey": {
+        "document": {"kind":"literal","value":"subscription WatchProducts { products { id } }"},
+        "operationName": {"kind":"literal","value":"WatchProducts"},
+        "resultPath": {"kind":"literal","value":"/products"}
+      },
+      "policies": {}
+    }
+  }
+}`)
+}
+
+func remoteAsyncAPIStreamDocument() []byte {
+	return []byte(`{
+  "wireVersion": 1,
+  "source": {
+    "id": "events",
+    "adapterId": "core.asyncapi",
+    "runtimeZone": "server",
+    "bindingsById": {"api-url":{"kind":"environment-ref","reference":{"bindingId":"api-url"}}},
+    "configurationByKey": {"endpoint":{"kind":"environment-ref","reference":{"bindingId":"api-url"}}}
+  },
+  "schemasById": {},
+  "operationsById": {
+    "watch": {
+      "id": "watch",
+      "kind": "subscription",
+      "outputSchemaId": "event",
+      "configurationByKey": {
+        "action": {"kind":"literal","value":"receive"},
+        "path": {"kind":"literal","value":"/events/products"},
+        "responseBodyPath": {"kind":"literal","value":"/payload"}
+      },
+      "policies": {}
+    }
+  }
+}`)
+}
+
+func newProtocolGatewayStore(document []byte) *fakeDataGatewayStore {
+	return &fakeDataGatewayStore{
+		authority: &ExecutionAuthority{
+			ExecutionID: "execution-1", WorkspaceID: "workspace-1", PrincipalID: "user-1", SessionID: "session-1", ProviderID: "prodivix.remote.preview", Profile: "preview", RuntimeZone: "client", SnapshotID: "snapshot-1",
+			PartitionRevisions: map[string]string{"workspace": "7", "document:data-1:content": "3"},
+			Environment:        &EnvironmentReference{EnvironmentID: "environment-1", Revision: "revision-7", Mode: "live"},
+		},
+		document:        document,
+		replayAvailable: true,
+	}
+}
+
+func TestDataGatewayExecutesGraphQLServerEdgeWithExactProtocolAndSourceTrace(t *testing.T) {
+	canary := "secret-canary-graphql-gateway"
+	transport := &fakeDataGatewayTransport{response: &DataGatewayTransportResponse{Status: 200, Body: []byte(`{"data":{"products":[]}}`)}}
+	gateway := NewDataGateway(newProtocolGatewayStore(remoteGraphQLDocument()), &fakeDataGatewayEnvironment{canary: canary}, transport)
+	result, err := gateway.Invoke(t.Context(), backendenvironment.PrincipalSession{PrincipalID: "user-1", SessionID: "session-1"}, "execution-1", "data-1", "list", DataGatewayInvocation{
+		InvocationID: "graphql-query", Sequence: 7, Attempt: 1, Input: json.RawMessage(`{"page":2}`),
+	})
+	if err != nil || result == nil {
+		t.Fatalf("invoke GraphQL gateway: result=%#v err=%v", result, err)
+	}
+	if len(transport.requests) != 1 || transport.requests[0].Method != "POST" || transport.requests[0].URL != "https://api.example.test/v1/" || transport.requests[0].Headers["authorization"] != canary {
+		t.Fatalf("GraphQL transport projection drifted: %#v", transport.requests)
+	}
+	var body map[string]any
+	if json.Unmarshal(transport.requests[0].Body, &body) != nil || body["operationName"] != "ListProducts" {
+		t.Fatalf("GraphQL request envelope drifted: %s", transport.requests[0].Body)
+	}
+	if !result.Empty || result.Network.Adapter != "core.graphql" || result.Network.RuntimeZone != "edge" || len(result.Network.SourceTrace) != 1 || result.Network.SourceTrace[0].SourceRef.OperationID != "list" {
+		t.Fatalf("GraphQL result projection drifted: %#v", result)
+	}
+	encoded, _ := json.Marshal(result)
+	if bytes.Contains(encoded, []byte(canary)) || bytes.Contains(encoded, []byte("page\":2")) {
+		t.Fatalf("GraphQL material escaped sanitized result: %s", encoded)
+	}
+}
+
+func TestDataGatewayExecutesAsyncAPIRequestReplyAndFencesPublish(t *testing.T) {
+	principal := backendenvironment.PrincipalSession{PrincipalID: "user-1", SessionID: "session-1"}
+	requestTransport := &fakeDataGatewayTransport{response: &DataGatewayTransportResponse{Status: 200, Body: []byte(`{"payload":{"id":"p1"}}`)}}
+	requestGateway := NewDataGateway(newProtocolGatewayStore(remoteAsyncAPIDocument("request-reply")), &fakeDataGatewayEnvironment{}, requestTransport)
+	requestResult, err := requestGateway.Invoke(t.Context(), principal, "execution-1", "data-1", "lookup", DataGatewayInvocation{InvocationID: "async-query", Sequence: 1, Attempt: 1, Input: json.RawMessage(`{"id":"p1"}`)})
+	if err != nil || requestResult == nil || requestResult.Network.Adapter != "core.asyncapi" || fmt.Sprint(requestResult.Value) != "map[id:p1]" {
+		t.Fatalf("AsyncAPI request-reply drifted: result=%#v err=%v", requestResult, err)
+	}
+
+	publishStore := newProtocolGatewayStore(remoteAsyncAPIDocument("publish"))
+	publishTransport := &fakeDataGatewayTransport{response: &DataGatewayTransportResponse{Status: 202, Body: nil}}
+	publishGateway := NewDataGateway(publishStore, &fakeDataGatewayEnvironment{}, publishTransport)
+	invocation := DataGatewayInvocation{InvocationID: "async-publish", Sequence: 2, Attempt: 1, Input: json.RawMessage(`{"id":"p1"}`)}
+	publishResult, err := publishGateway.Invoke(t.Context(), principal, "execution-1", "data-1", "publish", invocation)
+	if err != nil || publishResult == nil || publishResult.Value != true || len(publishTransport.requests) != 1 || publishTransport.requests[0].Headers["idempotency-key"] == "" {
+		t.Fatalf("AsyncAPI publish drifted: result=%#v requests=%#v err=%v", publishResult, publishTransport.requests, err)
+	}
+	replayed, err := publishGateway.Invoke(t.Context(), principal, "execution-1", "data-1", "publish", invocation)
+	if err != nil || replayed == nil || len(publishTransport.requests) != 1 {
+		t.Fatalf("AsyncAPI publish replay crossed transport: result=%#v requests=%d err=%v", replayed, len(publishTransport.requests), err)
+	}
+}
+
+func TestDataGatewayStreamsGraphQLSSEWithCursorBudgetAndIdentityFence(t *testing.T) {
+	transport := &fakeDataGatewayTransport{streamResponse: &DataGatewayStreamTransportResponse{
+		Status: 200, ContentType: "text/event-stream; charset=utf-8",
+		Body: io.NopCloser(strings.NewReader("event: next\ndata: {\"data\":{\"products\":[{\"id\":\"p1\"}]}}\n\nevent: complete\n\n")),
+	}}
+	gateway := NewDataGateway(newProtocolGatewayStore(remoteGraphQLSubscriptionDocument()), &fakeDataGatewayEnvironment{}, transport)
+	principal := backendenvironment.PrincipalSession{PrincipalID: "user-1", SessionID: "session-1"}
+	invocation := DataGatewayInvocation{InvocationID: "graphql-stream", Sequence: 3, Attempt: 1, Input: json.RawMessage(`{}`)}
+	stream, err := gateway.OpenStream(t.Context(), principal, "execution-1", "data-1", "watch", invocation)
+	if err != nil || stream == nil || stream.Network.Adapter != "core.graphql" || stream.Network.RuntimeZone != "edge" {
+		t.Fatalf("open GraphQL stream: stream=%#v err=%v", stream, err)
+	}
+	if duplicate, duplicateErr := gateway.OpenStream(t.Context(), principal, "execution-1", "data-1", "watch", invocation); duplicate != nil || !errors.Is(duplicateErr, ErrDataGatewayStreamConflict) {
+		t.Fatalf("duplicate stream identity was not fenced: stream=%#v err=%v", duplicate, duplicateErr)
+	}
+	event, complete, err := stream.Next(t.Context())
+	if err != nil || complete || event.Cursor != 1 || fmt.Sprint(event.Value) != "[map[id:p1]]" {
+		t.Fatalf("GraphQL stream event drifted: event=%#v complete=%v err=%v", event, complete, err)
+	}
+	if _, complete, err = stream.Next(t.Context()); err != nil || !complete {
+		t.Fatalf("GraphQL stream completion drifted: complete=%v err=%v", complete, err)
+	}
+	if len(transport.requests) != 1 || transport.requests[0].Headers["accept"] != "text/event-stream" {
+		t.Fatalf("GraphQL stream transport drifted: %#v", transport.requests)
+	}
+}
+
+func TestDataGatewayStreamsAsyncAPINDJSONAndHandlerKeepsStrictEnvelope(t *testing.T) {
+	transport := &fakeDataGatewayTransport{streamResponse: &DataGatewayStreamTransportResponse{
+		Status: 200, ContentType: "application/x-ndjson",
+		Body: io.NopCloser(strings.NewReader("{\"payload\":{\"id\":\"p1\"}}\n{\"payload\":{\"id\":\"p2\"}}\n")),
+	}}
+	gateway := NewDataGateway(newProtocolGatewayStore(remoteAsyncAPIStreamDocument()), &fakeDataGatewayEnvironment{}, transport)
+	handler := &Handler{dataGateway: gateway}
+	router := testRouterSession(handler, "user-1", "session-1")
+	path := "/api/remote-executions/execution-1/data-sources/data-1/operations/watch/stream"
+	request := httptest.NewRequest(http.MethodPost, path, bytes.NewReader([]byte(`{"invocationId":"async-stream","sequence":1,"attempt":1,"input":{}}`)))
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || response.Header().Get("Content-Type") != "application/x-ndjson" || response.Header().Get("Cache-Control") != "private, no-store" {
+		t.Fatalf("unsafe stream response: status=%d headers=%v body=%s", response.Code, response.Header(), response.Body.String())
+	}
+	lines := strings.Split(strings.TrimSpace(response.Body.String()), "\n")
+	if len(lines) != 4 || !strings.Contains(lines[0], `"phase":"open"`) || !strings.Contains(lines[1], `"cursor":1`) || !strings.Contains(lines[2], `"cursor":2`) || !strings.Contains(lines[3], `"phase":"complete"`) {
+		t.Fatalf("stream envelope drifted: %q", lines)
+	}
+	if strings.Contains(response.Body.String(), "api-url") || strings.Contains(response.Body.String(), "/events/products") {
+		t.Fatalf("stream response leaked configuration: %s", response.Body.String())
+	}
+}
+
+func TestDataGatewayProtocolJSONDecoderRejectsTrailingAndStructuralOverflow(t *testing.T) {
+	if _, err := decodeDataGatewayJSON([]byte(`{"data":{}} trailing`)); !errors.Is(err, ErrDataGatewayUpstream) {
+		t.Fatalf("trailing protocol bytes were accepted: %v", err)
+	}
+	deep := strings.Repeat("[", maximumDataGatewayJSONDepth+1) + "null" + strings.Repeat("]", maximumDataGatewayJSONDepth+1)
+	if _, err := decodeDataGatewayJSON([]byte(deep)); !errors.Is(err, ErrDataGatewayUpstream) {
+		t.Fatalf("deep upstream payload was not mapped to a safe upstream failure: %v", err)
+	}
+	if _, err := decodeInvocationInput(json.RawMessage(`{} {}`)); !errors.Is(err, ErrDataGatewayInvalidRequest) {
+		t.Fatalf("trailing invocation bytes were accepted: %v", err)
+	}
+}
+
 func TestDataGatewayExecutesExactSnapshotWithCallbackOnlySecret(t *testing.T) {
 	canary := "secret-canary-remote-live-7f0c"
 	store := &fakeDataGatewayStore{
 		authority: &ExecutionAuthority{
-			ExecutionID: "execution-1", WorkspaceID: "workspace-1", OwnerID: "user-1", SessionID: "session-1", SnapshotID: "snapshot-1",
+			ExecutionID: "execution-1", WorkspaceID: "workspace-1", PrincipalID: "user-1", SessionID: "session-1", ProviderID: "prodivix.remote.preview", Profile: "preview", RuntimeZone: "client", SnapshotID: "snapshot-1",
 			PartitionRevisions: map[string]string{"workspace": "7", "document:data-1:content": "3"},
 			Environment:        &EnvironmentReference{EnvironmentID: "environment-1", Revision: "revision-7", Mode: "live"},
 		},
@@ -303,10 +607,103 @@ func TestDataGatewayExecutesExactSnapshotWithCallbackOnlySecret(t *testing.T) {
 	}
 }
 
+func TestDataGatewayExecutesImportedParameterAndResponseMappings(t *testing.T) {
+	canary := "secret-canary-openapi-mapping"
+	store := &fakeDataGatewayStore{
+		authority: &ExecutionAuthority{
+			ExecutionID: "execution-1", WorkspaceID: "workspace-1", PrincipalID: "user-1", SessionID: "session-1", ProviderID: "prodivix.remote.preview", Profile: "preview", RuntimeZone: "client", SnapshotID: "snapshot-1",
+			PartitionRevisions: map[string]string{"workspace": "7", "document:data-1:content": "3"},
+			Environment:        &EnvironmentReference{EnvironmentID: "environment-1", Revision: "revision-7", Mode: "live"},
+		},
+		document: remoteMappedDataDocument(),
+	}
+	environments := &fakeDataGatewayEnvironment{canary: canary}
+	transport := &fakeDataGatewayTransport{response: &DataGatewayTransportResponse{Status: 200, Body: []byte(`{"data":{"id":"a/b"},"ignored":"private"}`)}}
+	gateway := NewDataGateway(store, environments, transport)
+	result, err := gateway.Invoke(t.Context(), backendenvironment.PrincipalSession{PrincipalID: "user-1", SessionID: "session-1"}, "execution-1", "data-1", "read", DataGatewayInvocation{
+		InvocationID: "openapi-read", Sequence: 1, Attempt: 1, Input: json.RawMessage(`{"id":"a/b","include":"details","trace":"trace-1","localOnly":"must-not-leak"}`),
+	})
+	if err != nil {
+		t.Fatalf("invoke imported Remote Data mapping: %v", err)
+	}
+	if len(transport.requests) != 1 || transport.requests[0].URL != "https://api.example.test/items/a%2Fb?include=details" || transport.requests[0].Headers["x-trace-id"] != "trace-1" || transport.requests[0].Headers["authorization"] != canary {
+		t.Fatalf("imported request mapping drifted: %#v", transport.requests)
+	}
+	encodedRequest, _ := json.Marshal(transport.requests[0])
+	if bytes.Contains(encodedRequest, []byte("must-not-leak")) {
+		t.Fatalf("unmapped input reached transport: %s", encodedRequest)
+	}
+	encodedResult, _ := json.Marshal(result.Value)
+	if string(encodedResult) != `{"id":"a/b"}` || environments.use.Field != "operation.authorization" {
+		t.Fatalf("imported response or Secret field drifted: value=%s use=%#v", encodedResult, environments.use)
+	}
+}
+
+func TestDataGatewayEnforcesDurableReadOnlyExecutionPermissionsBeforeEffect(t *testing.T) {
+	store := &fakeDataGatewayStore{
+		authority: &ExecutionAuthority{
+			ExecutionID: "execution-viewer", WorkspaceID: "workspace-1", PrincipalID: "viewer-1", SessionID: "session-viewer", Permissions: []string{workspaceReadPermissionID}, ProviderID: "prodivix.remote.preview", Profile: "preview", RuntimeZone: "client", SnapshotID: "snapshot-1",
+			PartitionRevisions: map[string]string{"workspace": "7", "document:data-1:content": "3"},
+			Environment:        &EnvironmentReference{EnvironmentID: "environment-1", Revision: "revision-7", Mode: "live"},
+		},
+		document: remoteDataDocument(),
+	}
+	transport := &fakeDataGatewayTransport{response: &DataGatewayTransportResponse{Status: 200, Body: []byte(`{"items":[]}`)}}
+	principal := backendenvironment.PrincipalSession{PrincipalID: "viewer-1", SessionID: "session-viewer"}
+	gateway := NewDataGateway(store, &fakeDataGatewayEnvironment{principal: principal}, transport)
+	if _, err := gateway.Invoke(t.Context(), principal, "execution-viewer", "data-1", "list", DataGatewayInvocation{InvocationID: "viewer-query", Attempt: 1, Input: json.RawMessage(`{}`)}); err != nil || len(transport.requests) != 1 {
+		t.Fatalf("workspace.read query was not authorized exactly: requests=%d err=%v", len(transport.requests), err)
+	}
+
+	store.document = remoteMutationDocument()
+	if result, err := gateway.Invoke(t.Context(), principal, "execution-viewer", "data-1", "create", DataGatewayInvocation{InvocationID: "viewer-mutation", Attempt: 1, Input: json.RawMessage(`{"name":"Desk"}`)}); result != nil || !errors.Is(err, ErrDataGatewayDenied) || len(transport.requests) != 1 {
+		t.Fatalf("workspace.read reached a mutation effect: result=%#v requests=%d err=%v", result, len(transport.requests), err)
+	}
+}
+
+func TestDataGatewayAllowsLiveEffectsOnlyForExactRemotePreviewClass(t *testing.T) {
+	base := ExecutionAuthority{
+		ExecutionID: "execution-class", WorkspaceID: "workspace-1", PrincipalID: "user-1", SessionID: "session-1",
+		Permissions: []string{workspaceOwnerPermissionID, workspaceReadPermissionID, workspaceWritePermissionID},
+		ProviderID:  "prodivix.remote.preview", Profile: "preview", RuntimeZone: "client", SnapshotID: "snapshot-1",
+		PartitionRevisions: map[string]string{"workspace": "7", "document:data-1:content": "3"},
+		Environment:        &EnvironmentReference{EnvironmentID: "environment-1", Revision: "revision-7", Mode: "live"},
+	}
+	for _, testCase := range []struct {
+		name        string
+		providerID  string
+		profile     string
+		runtimeZone string
+	}{
+		{name: "remote-test", providerID: "prodivix.remote.test", profile: "test", runtimeZone: "test"},
+		{name: "remote-build", providerID: "prodivix.remote.build", profile: "build", runtimeZone: "build"},
+		{name: "profile-drift", providerID: "prodivix.remote.preview", profile: "test", runtimeZone: "client"},
+		{name: "zone-drift", providerID: "prodivix.remote.preview", profile: "preview", runtimeZone: "test"},
+		{name: "legacy-unbound"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			authority := base
+			authority.ProviderID = testCase.providerID
+			authority.Profile = testCase.profile
+			authority.RuntimeZone = testCase.runtimeZone
+			transport := &fakeDataGatewayTransport{response: &DataGatewayTransportResponse{Status: 200, Body: []byte(`{"items":[]}`)}}
+			gateway := NewDataGateway(
+				&fakeDataGatewayStore{authority: &authority, document: remoteDataDocument()},
+				&fakeDataGatewayEnvironment{},
+				transport,
+			)
+			result, err := gateway.Invoke(t.Context(), backendenvironment.PrincipalSession{PrincipalID: "user-1", SessionID: "session-1"}, "execution-class", "data-1", "list", DataGatewayInvocation{InvocationID: "class-check", Attempt: 1, Input: json.RawMessage(`{}`)})
+			if result != nil || !errors.Is(err, ErrDataGatewayDenied) || len(transport.requests) != 0 {
+				t.Fatalf("non-preview execution class reached live Data: result=%#v requests=%d err=%v", result, len(transport.requests), err)
+			}
+		})
+	}
+}
+
 func TestDataGatewayFailsClosedBeforeTransportOnAuthorityOrZoneDrift(t *testing.T) {
 	store := &fakeDataGatewayStore{
 		authority: &ExecutionAuthority{
-			ExecutionID: "execution-1", WorkspaceID: "workspace-1", OwnerID: "user-1", SessionID: "session-1", SnapshotID: "snapshot-1",
+			ExecutionID: "execution-1", WorkspaceID: "workspace-1", PrincipalID: "user-1", SessionID: "session-1", ProviderID: "prodivix.remote.preview", Profile: "preview", RuntimeZone: "client", SnapshotID: "snapshot-1",
 			PartitionRevisions: map[string]string{"document:data-1:content": "2"},
 			Environment:        &EnvironmentReference{EnvironmentID: "environment-1", Revision: "revision-7", Mode: "live"},
 		},
@@ -337,7 +734,7 @@ func TestDataGatewayMutationUsesDurableReplayFenceAndReturnsStoredResult(t *test
 	store := &fakeDataGatewayStore{
 		replayAvailable: true,
 		authority: &ExecutionAuthority{
-			ExecutionID: "execution-1", WorkspaceID: "workspace-1", OwnerID: "user-1", SessionID: "session-1", SnapshotID: "snapshot-1",
+			ExecutionID: "execution-1", WorkspaceID: "workspace-1", PrincipalID: "user-1", SessionID: "session-1", ProviderID: "prodivix.remote.preview", Profile: "preview", RuntimeZone: "client", SnapshotID: "snapshot-1",
 			PartitionRevisions: map[string]string{"workspace": "7", "document:data-1:content": "3"},
 			Environment:        &EnvironmentReference{EnvironmentID: "environment-1", Revision: "revision-7", Mode: "live"},
 		},
@@ -370,7 +767,7 @@ func TestDataGatewayIdempotentMutationRetriesWithOneOpaqueUpstreamKey(t *testing
 	store := &fakeDataGatewayStore{
 		replayAvailable: true,
 		authority: &ExecutionAuthority{
-			ExecutionID: "execution-1", WorkspaceID: "workspace-1", OwnerID: "user-1", SessionID: "session-1", SnapshotID: "snapshot-1",
+			ExecutionID: "execution-1", WorkspaceID: "workspace-1", PrincipalID: "user-1", SessionID: "session-1", ProviderID: "prodivix.remote.preview", Profile: "preview", RuntimeZone: "client", SnapshotID: "snapshot-1",
 			PartitionRevisions: map[string]string{"workspace": "7", "document:data-1:content": "3"},
 			Environment:        &EnvironmentReference{EnvironmentID: "environment-1", Revision: "revision-7", Mode: "live"},
 		},
@@ -425,7 +822,7 @@ func TestDataGatewayRejectsUnsafeIdempotencyHeaderBeforeReplayClaim(t *testing.T
 	store := &fakeDataGatewayStore{
 		replayAvailable: true,
 		authority: &ExecutionAuthority{
-			ExecutionID: "execution-1", WorkspaceID: "workspace-1", OwnerID: "user-1", SessionID: "session-1", SnapshotID: "snapshot-1",
+			ExecutionID: "execution-1", WorkspaceID: "workspace-1", PrincipalID: "user-1", SessionID: "session-1", ProviderID: "prodivix.remote.preview", Profile: "preview", RuntimeZone: "client", SnapshotID: "snapshot-1",
 			PartitionRevisions: map[string]string{"document:data-1:content": "3"},
 			Environment:        &EnvironmentReference{EnvironmentID: "environment-1", Revision: "revision-7", Mode: "live"},
 		},
@@ -443,7 +840,7 @@ func TestDataGatewayMutationNeverReplaysIndeterminateEffect(t *testing.T) {
 	store := &fakeDataGatewayStore{
 		replayAvailable: true,
 		authority: &ExecutionAuthority{
-			ExecutionID: "execution-1", WorkspaceID: "workspace-1", OwnerID: "user-1", SessionID: "session-1", SnapshotID: "snapshot-1",
+			ExecutionID: "execution-1", WorkspaceID: "workspace-1", PrincipalID: "user-1", SessionID: "session-1", ProviderID: "prodivix.remote.preview", Profile: "preview", RuntimeZone: "client", SnapshotID: "snapshot-1",
 			PartitionRevisions: map[string]string{"workspace": "7", "document:data-1:content": "3"},
 			Environment:        &EnvironmentReference{EnvironmentID: "environment-1", Revision: "revision-7", Mode: "live"},
 		},
@@ -474,7 +871,7 @@ func TestDataGatewayMutationConcurrentDuplicateCannotReachTransport(t *testing.T
 	store := &fakeDataGatewayStore{
 		replayAvailable: true,
 		authority: &ExecutionAuthority{
-			ExecutionID: "execution-1", WorkspaceID: "workspace-1", OwnerID: "user-1", SessionID: "session-1", SnapshotID: "snapshot-1",
+			ExecutionID: "execution-1", WorkspaceID: "workspace-1", PrincipalID: "user-1", SessionID: "session-1", ProviderID: "prodivix.remote.preview", Profile: "preview", RuntimeZone: "client", SnapshotID: "snapshot-1",
 			PartitionRevisions: map[string]string{"workspace": "7", "document:data-1:content": "3"},
 			Environment:        &EnvironmentReference{EnvironmentID: "environment-1", Revision: "revision-7", Mode: "live"},
 		},
@@ -505,7 +902,7 @@ func TestDataGatewayDiscardsNonSuccessBodyAndTransportErrors(t *testing.T) {
 	canary := "secret-canary-upstream-error-68bf"
 	store := &fakeDataGatewayStore{
 		authority: &ExecutionAuthority{
-			ExecutionID: "execution-1", WorkspaceID: "workspace-1", OwnerID: "user-1", SessionID: "session-1", SnapshotID: "snapshot-1",
+			ExecutionID: "execution-1", WorkspaceID: "workspace-1", PrincipalID: "user-1", SessionID: "session-1", ProviderID: "prodivix.remote.preview", Profile: "preview", RuntimeZone: "client", SnapshotID: "snapshot-1",
 			PartitionRevisions: map[string]string{"workspace": "7", "document:data-1:content": "3"},
 			Environment:        &EnvironmentReference{EnvironmentID: "environment-1", Revision: "revision-7", Mode: "live"},
 		},
@@ -541,7 +938,7 @@ func TestDataGatewayHandlerKeepsCanaryOutOfHTTPResponseAndRejectsExtraFields(t *
 	canary := "secret-canary-http-surface-19aa"
 	store := &fakeDataGatewayStore{
 		authority: &ExecutionAuthority{
-			ExecutionID: "execution-1", WorkspaceID: "workspace-1", OwnerID: "user-1", SessionID: "session-1", SnapshotID: "snapshot-1",
+			ExecutionID: "execution-1", WorkspaceID: "workspace-1", PrincipalID: "user-1", SessionID: "session-1", ProviderID: "prodivix.remote.preview", Profile: "preview", RuntimeZone: "client", SnapshotID: "snapshot-1",
 			PartitionRevisions: map[string]string{"workspace": "7", "document:data-1:content": "3"},
 			Environment:        &EnvironmentReference{EnvironmentID: "environment-1", Revision: "revision-7", Mode: "live"},
 		},

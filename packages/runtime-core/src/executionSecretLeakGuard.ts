@@ -9,6 +9,9 @@ export const EXECUTION_SECRET_LEAK_DIAGNOSTIC_CODE = 'EXE-5004' as const;
 export const EXECUTION_SECRET_LEAK_FAILURE_CODE =
   'EXECUTION_SECRET_LEAK_BLOCKED' as const;
 export const EXECUTION_SECRET_LEAK_REASON = 'secret-material-detected' as const;
+export const EXECUTION_SECRET_STREAM_CHECKPOINT_FORMAT =
+  'prodivix.execution-secret-stream-checkpoint' as const;
+export const EXECUTION_SECRET_STREAM_CHECKPOINT_VERSION = 1 as const;
 
 export const EXECUTION_SECRET_LEAK_SURFACES = Object.freeze([
   'request',
@@ -44,6 +47,13 @@ export type ExecutionSecretRedaction = Readonly<{
 export type ExecutionSecretTextStreamRedactor = Readonly<{
   push(value: string): ExecutionSecretRedaction;
   flush(): ExecutionSecretRedaction;
+  createCheckpoint(): ExecutionSecretTextStreamCheckpoint;
+}>;
+
+export type ExecutionSecretTextStreamCheckpoint = Readonly<{
+  format: typeof EXECUTION_SECRET_STREAM_CHECKPOINT_FORMAT;
+  version: typeof EXECUTION_SECRET_STREAM_CHECKPOINT_VERSION;
+  pending: string;
 }>;
 
 export type ExecutionSecretLeakGuard = Readonly<{
@@ -64,6 +74,11 @@ export type ExecutionSecretLeakGuard = Readonly<{
 
 export type CreateExecutionSecretLeakGuardInput = Readonly<{
   secretValues: readonly string[];
+}>;
+
+export type CreateExecutionSecretTextStreamRedactorInput = Readonly<{
+  secretValues: readonly string[];
+  checkpoint?: ExecutionSecretTextStreamCheckpoint;
 }>;
 
 type ByteMatcherNode = {
@@ -153,10 +168,27 @@ const longestSecretPrefixSuffix = (
  * suffix that can still become a protected value is retained between pushes.
  */
 export const createExecutionSecretTextStreamRedactor = (
-  input: CreateExecutionSecretLeakGuardInput
+  input: CreateExecutionSecretTextStreamRedactorInput
 ): ExecutionSecretTextStreamRedactor => {
   const secretValues = normalizeSecretValues(input.secretValues);
-  let pending = '';
+  const checkpoint = input.checkpoint;
+  if (
+    checkpoint !== undefined &&
+    (typeof checkpoint !== 'object' ||
+      checkpoint === null ||
+      Array.isArray(checkpoint) ||
+      Object.keys(checkpoint).some(
+        (key) => !['format', 'version', 'pending'].includes(key)
+      ) ||
+      checkpoint.format !== EXECUTION_SECRET_STREAM_CHECKPOINT_FORMAT ||
+      checkpoint.version !== EXECUTION_SECRET_STREAM_CHECKPOINT_VERSION ||
+      typeof checkpoint.pending !== 'string' ||
+      utf8ToBytes(checkpoint.pending).byteLength > maximumSecretBytes ||
+      longestSecretPrefixSuffix(checkpoint.pending, secretValues) !==
+        checkpoint.pending.length)
+  )
+    throw new TypeError('Execution Secret stream checkpoint is invalid.');
+  let pending = checkpoint?.pending ?? '';
   return Object.freeze({
     push(value) {
       if (typeof value !== 'string')
@@ -178,6 +210,13 @@ export const createExecutionSecretTextStreamRedactor = (
       const redaction = redactSecretValues(pending, secretValues);
       pending = '';
       return redaction;
+    },
+    createCheckpoint() {
+      return Object.freeze({
+        format: EXECUTION_SECRET_STREAM_CHECKPOINT_FORMAT,
+        version: EXECUTION_SECRET_STREAM_CHECKPOINT_VERSION,
+        pending,
+      });
     },
   });
 };

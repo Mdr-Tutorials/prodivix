@@ -1,6 +1,7 @@
 import { type ComponentType } from 'react';
 import {
   ArrowRight,
+  Database,
   FileArchive,
   FileCode2,
   FileCog,
@@ -180,6 +181,28 @@ export function ResourceOverviewPanel({
             }
             actionLabel={t('resourceManager.overview.actions.open')}
             onAction={() => onOpenSection('tokens')}
+          />
+          <ResourceTile
+            icon={Database}
+            title={t('resourceManager.tabs.data')}
+            description={t('resourceManager.overview.cards.data.description')}
+            metrics={[
+              {
+                label: t('resourceManager.overview.metrics.sources'),
+                value: String(overviewSnapshot.data.documents),
+              },
+              {
+                label: t('resourceManager.overview.metrics.operations'),
+                value: String(overviewSnapshot.data.operations),
+              },
+              {
+                label: t('resourceManager.overview.metrics.invalid'),
+                value: String(overviewSnapshot.data.invalid),
+              },
+            ]}
+            status={overviewSnapshot.data.invalid > 0 ? 'warning' : 'default'}
+            actionLabel={t('resourceManager.overview.actions.open')}
+            onAction={() => onOpenSection('data')}
           />
           <ResourceTile
             icon={Globe2}

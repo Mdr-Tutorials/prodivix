@@ -9,7 +9,7 @@ Prodivix is an open-source, browser-based visual development environment for mod
 
 The **Canonical Workspace VFS is the single source of authoring truth**. PIR owns normalized UI documents; NodeGraph and Animation use their own Workspace document types, while route manifests, code documents, assets, and configuration remain first-class records. `CodeReference` connects domain documents to code without embedding the source into a single giant JSON file.
 
-Prodivix is in active alpha development. The current product position is **G1 Passed / G2 Foundation**: semantic visual/code hybrid authoring has a repeatable closure, while executable full-stack Workspace capabilities are now being built.
+Prodivix is in active alpha development. The canonical phase status is maintained in [`specs/roadmap/current-status.md`](specs/roadmap/current-status.md) so this README does not drift from engineering Gates.
 
 ## Project Goals
 
@@ -64,19 +64,7 @@ Prodivix is built around several long-term constraints:
 
 ## Current Status
 
-| Area                                     | Status                                                                                                                                                                                                                                      |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Overall product position                 | **G1 Passed / G2 Foundation**; G2 `ProductGateStatus` is `In Progress`                                                                                                                                                                      |
-| Truth & Change Kernel                    | G0 passed: canonical truth, History, Atomic Commit, revision conflicts, Durable Outbox, local replica, and a single production write path are in place                                                                                      |
-| Diagnostics and Issues                   | G0 passed: revision-aware aggregation, stable targets, source spans, Quick Fix boundaries, and editor navigation are covered                                                                                                                |
-| Golden conformance and React/Vite export | G0 non-browser closure passed; G1 Golden covers Blueprint reuse, Public Contract props/events/slots/variants, controlled JSX/CSS round-trip, and independent generated-project install/typecheck/test/build                                 |
-| Semantic visual/code authoring           | G1 passed with the revision-bound Workspace Semantic Index, TS/JS/CSS/SCSS/GLSL/WGSL capabilities, shader validation, cross-editor CodeSlots, Blueprint reuse, durable production writes, and controlled PIR-current ↔ JSX/CSS round-trip   |
-| Design tokens                            | Canonical Workspace DTCG token and Resolver documents use versionless current models, reversible Commands, alias/type validation, standardized theme/variant resolution plans, shared Semantic Providers, and a Resources authoring surface |
-| Blueprint, Route, and PIR authoring      | One version-independent PIR-current domain model drives Component Instance, extraction, contracts, Collection, preview, and export; numeric versions stay at the wire migration boundary                                                    |
-| NodeGraph and Animation                  | Independent domain/runtime packages own their kernels; later gates complete lifecycle, composition, and end-to-end behavior verification                                                                                                    |
-| AI-assisted authoring                    | Foundation only; AI may propose planner input but must use the same Command, Outbox, and Atomic Commit path as human edits                                                                                                                  |
-
-The global phase definition and repeatable closure evidence are maintained in [`specs/roadmap/global-phases.md`](specs/roadmap/global-phases.md), [`specs/roadmap/g0-closure-evidence.md`](specs/roadmap/g0-closure-evidence.md), and [`specs/roadmap/g1-closure-evidence.md`](specs/roadmap/g1-closure-evidence.md).
+The canonical current phase status is maintained in [`specs/roadmap/current-status.md`](specs/roadmap/current-status.md). Global phase definitions and exit gates live in [`specs/roadmap/global-phases.md`](specs/roadmap/global-phases.md); repeatable G0/G1 evidence lives in the adjacent evidence documents. The README intentionally does not duplicate the status table.
 
 ## Getting Started
 

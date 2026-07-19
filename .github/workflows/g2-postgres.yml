@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - 'apps/backend/**'
+      - 'apps/remote-runner-control-plane/**'
       - 'packages/runtime-core/**'
       - 'packages/runtime-remote/**'
       - 'packages/runtime-remote-postgres/**'
@@ -20,6 +21,7 @@ on:
       - main
     paths:
       - 'apps/backend/**'
+      - 'apps/remote-runner-control-plane/**'
       - 'packages/runtime-core/**'
       - 'packages/runtime-remote/**'
       - 'packages/runtime-remote-postgres/**'
@@ -38,7 +40,7 @@ permissions:
 
 jobs:
   postgres-contracts:
-    name: Remote Control Plane, Data/Server Replay, and Asset Retention
+    name: Remote Control Plane, Regional DR, Data/Server Replay, Viewer Authority, and Asset Retention
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -86,6 +88,9 @@ jobs:
       - name: Run Remote Control Plane PostgreSQL Gate
         run: pnpm run test:remote-postgres
 
+      - name: Run regional PostgreSQL, Worker, and traffic DR drill
+        run: pnpm run verify:g2:regional-dr
+
       - name: Run Backend Data replay PostgreSQL Gate
         working-directory: apps/backend
         run: go test ./internal/modules/remoteexecution -run '^TestDataGatewayMutationReplayPostgreSQLGate$' -count=1 -v
@@ -94,9 +99,17 @@ jobs:
         working-directory: apps/backend
         run: go test ./internal/modules/remoteexecution -run '^TestServerFunctionLiveMutationPostgreSQLGate$' -count=1 -v
 
+      - name: Run Backend collaborator viewer authority PostgreSQL Gate
+        working-directory: apps/backend
+        run: go test ./internal/modules/remoteexecution -run '^TestWorkspaceExecutionViewerRolePostgreSQLGate$' -count=1 -v
+
       - name: Run Backend Environment Secret KMS rotation PostgreSQL Gate
         working-directory: apps/backend
         run: go test ./internal/modules/environment -run '^TestEnvironmentSecretKeyRotationPostgreSQLGate$' -count=1 -v
+
+      - name: Run Backend static-to-managed KMS migration PostgreSQL Gate
+        working-directory: apps/backend
+        run: go test ./internal/modules/environment -run '^TestEnvironmentSecretAWSKMSMigrationPostgreSQLGate$' -count=1 -v
 
       - name: Run Backend Binary Asset retention PostgreSQL Gate
         working-directory: apps/backend

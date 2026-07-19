@@ -22,7 +22,7 @@ apps/docs/
 
 - `apps/docs` 解释如何使用产品以及当前交付边界。
 - `specs/` 保存 schema、ADR、wire contract、Global Phase 与验证证据。
-- `specs/roadmap/global-phases.md` 是阶段状态唯一来源。
+- `specs/roadmap/current-status.md` 是当前阶段状态唯一来源；`specs/roadmap/global-phases.md` 只定义阶段与退出 Gate。
 - `specs/pir/PIR-current.json` 与 activation manifest 定义 PIR wire 边界。
 - `specs/api/workspace-sync.openapi.yaml` 定义 Workspace sync wire contract。
 

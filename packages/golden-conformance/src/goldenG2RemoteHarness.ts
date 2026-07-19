@@ -112,7 +112,7 @@ const artifactFor = (
       }),
     });
   return Object.freeze({
-    artifactId: 'golden-test-report',
+    artifactId: report.reportId,
     kind: 'report',
     label: 'Golden Remote Test',
     mediaType: EXECUTION_TEST_REPORT_MEDIA_TYPE,
@@ -120,6 +120,7 @@ const artifactFor = (
     digest: sha256(GOLDEN_G2_VITEST_REPORT),
     sourceTrace: goldenG2TestSourceTrace(snapshot),
     metadata: Object.freeze({
+      reportId: report.reportId,
       snapshotDigest: snapshot.contentDigest,
       status: report.status,
     }),
@@ -151,10 +152,10 @@ const eventsFor = (
       sequence: 4,
       emittedAt: 3_004,
       trace: {
-        traceId: 'golden-test-report-trace',
-        spanId: 'golden-test-report-span',
+        traceId: `test:${execution.executionId}`,
+        spanId: `test-report:${execution.executionId}`,
         name: EXECUTION_TEST_REPORT_TRACE_NAME,
-        phase: 'end',
+        phase: 'event',
         detail: toExecutionTestReportValue(report),
         sourceTrace: goldenG2TestSourceTrace(snapshot),
       },
@@ -286,7 +287,10 @@ const runProfile = async (
   snapshot: ExecutableProjectSnapshot,
   profile: GoldenExecutionProfile
 ): Promise<GoldenRemoteProfileResult> => {
-  const report = createGoldenG2TestReport(snapshot, `golden-remote-${profile}`);
+  const report = createGoldenG2TestReport(
+    snapshot,
+    `test-report:golden-remote-${profile}`
+  );
   const harness = createGoldenRemoteClient(snapshot, profile, report);
   const provider = providerFor(profile, harness.client, snapshot);
   const job = await provider.start(

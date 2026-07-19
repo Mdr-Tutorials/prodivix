@@ -1,0 +1,161 @@
+name: G2 Data and Second Target Closure
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'apps/backend/go.mod'
+      - 'apps/backend/go.sum'
+      - 'apps/backend/server.go'
+      - 'apps/backend/internal/app/**'
+      - 'apps/backend/internal/config/**'
+      - 'apps/backend/internal/modules/workspace/**'
+      - 'apps/backend/internal/modules/remoteexecution/**'
+      - 'apps/backend/internal/platform/database/**'
+      - 'apps/remote-runner-control-plane/**'
+      - 'apps/remote-runner-worker/**'
+      - 'apps/web/package.json'
+      - 'apps/web/tsconfig.json'
+      - 'apps/web/src/editor/features/blueprint/**'
+      - 'apps/web/src/editor/features/execution/**'
+      - 'apps/web/src/editor/features/issues/**'
+      - 'apps/web/src/editor/features/resources/**'
+      - 'apps/web/src/editor/features/testing/**'
+      - 'apps/web/src/i18n/resources/**'
+      - 'packages/data/**'
+      - 'packages/data-http/**'
+      - 'packages/data-mock/**'
+      - 'packages/data-asyncapi/**'
+      - 'packages/data-graphql/**'
+      - 'packages/golden-conformance/**'
+      - 'packages/diagnostics/**'
+      - 'packages/prodivix-compiler/**'
+      - 'packages/runtime-browser/**'
+      - 'packages/runtime-remote/**'
+      - 'packages/runtime-remote-postgres/**'
+      - 'packages/runtime-core/**'
+      - 'packages/workspace/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/g2-data-closure.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/backend/go.mod'
+      - 'apps/backend/go.sum'
+      - 'apps/backend/server.go'
+      - 'apps/backend/internal/app/**'
+      - 'apps/backend/internal/config/**'
+      - 'apps/backend/internal/modules/workspace/**'
+      - 'apps/backend/internal/modules/remoteexecution/**'
+      - 'apps/backend/internal/platform/database/**'
+      - 'apps/remote-runner-control-plane/**'
+      - 'apps/remote-runner-worker/**'
+      - 'apps/web/package.json'
+      - 'apps/web/tsconfig.json'
+      - 'apps/web/src/editor/features/blueprint/**'
+      - 'apps/web/src/editor/features/execution/**'
+      - 'apps/web/src/editor/features/issues/**'
+      - 'apps/web/src/editor/features/resources/**'
+      - 'apps/web/src/editor/features/testing/**'
+      - 'apps/web/src/i18n/resources/**'
+      - 'packages/data/**'
+      - 'packages/data-http/**'
+      - 'packages/data-mock/**'
+      - 'packages/data-asyncapi/**'
+      - 'packages/data-graphql/**'
+      - 'packages/golden-conformance/**'
+      - 'packages/diagnostics/**'
+      - 'packages/prodivix-compiler/**'
+      - 'packages/runtime-browser/**'
+      - 'packages/runtime-remote/**'
+      - 'packages/runtime-remote-postgres/**'
+      - 'packages/runtime-core/**'
+      - 'packages/workspace/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/g2-data-closure.yml'
+
+concurrency:
+  group: g2-data-closure-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  protocols-and-recovery:
+    name: Protocol adapters, authoring, Test Operation, and Remote recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: apps/backend/go.mod
+          cache-dependency-path: apps/backend/go.sum
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify Data protocols and product authoring
+        run: pnpm run verify:g2:data-protocols
+      - name: Verify server and edge streams with SourceTrace debugging
+        run: pnpm run verify:g2:data-stream-debugger
+      - name: Verify encrypted cross-replica Terminal and Remote recovery contracts
+        run: pnpm run verify:g2:remote-recovery
+
+  vue-vite-portability:
+    name: Vue Vite product surface and authenticated Catalog CRUD Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify Vue PIR, Route, Auth, Server, Asset product surface
+        env:
+          E2E_BROWSER_CHANNEL: chrome
+        run: pnpm run verify:g2:vue-product
+
+  data-security-matrix:
+    name: Remote Test correlation and D8 security matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: apps/backend/go.mod
+          cache-dependency-path: apps/backend/go.sum
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify Remote Test correlation and D8 security matrix
+        run: pnpm run verify:g2:data-security-matrix

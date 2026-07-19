@@ -19,6 +19,7 @@ import {
   startWorkspaceAnimationExecution,
   stopWorkspaceAnimationExecution,
   useExecutionSession,
+  useWorkspaceExecutionSourceNavigation,
 } from '@/editor/features/execution';
 import { useWorkspaceSemanticNavigationStore } from '@/editor/navigation';
 import { useWorkspaceHistoryShortcuts } from '@/editor/shortcuts';
@@ -105,6 +106,10 @@ export const AnimationEditorContent = ({
   } = useAnimationEditorState({
     animationDocumentId,
     persistedAnimation,
+  });
+  const sourceNavigation = useWorkspaceExecutionSourceNavigation({
+    workspace,
+    originSurface: 'animation-timeline',
   });
   const codeArtifacts = useMemo(
     () =>
@@ -495,6 +500,9 @@ export const AnimationEditorContent = ({
       {executionSessionId && executionSession ? (
         <ExecutionCenter
           sessionId={executionSessionId}
+          workspace={workspace ?? undefined}
+          onOpenSourceTrace={sourceNavigation.openSourceTrace}
+          onOpenDataOperation={sourceNavigation.openDataOperation}
           onRestart={() => void runActiveTimeline()}
           onStop={stopPlayback}
         />

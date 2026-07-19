@@ -1,4 +1,4 @@
-export type ExportTab = 'react' | 'vfs';
+export type ExportTab = 'react' | 'vue' | 'vfs';
 
 export type ExportFileLanguage =
   | 'typescript'
@@ -98,6 +98,14 @@ export const resolveProjectFileLanguage = (
   if (lower.endsWith('.html') || lower.endsWith('.htm')) return 'html';
   if (lower.endsWith('.css')) return 'css';
   if (lower.endsWith('.md')) return 'markdown';
+  if (lower.endsWith('.vue')) return 'typescript';
+  if (
+    lower.endsWith('.ts') ||
+    lower.endsWith('.tsx') ||
+    lower.endsWith('.js') ||
+    lower.endsWith('.jsx')
+  )
+    return 'typescript';
   return 'text';
 };
 

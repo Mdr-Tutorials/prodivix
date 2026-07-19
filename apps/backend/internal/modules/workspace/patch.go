@@ -47,7 +47,7 @@ func applyWorkspaceDocumentPatch(documentType WorkspaceDocumentType, content jso
 }
 
 func validateWorkspaceDataSourcePatchPath(path string) error {
-	return validateWorkspaceDocumentRootPath(path, "source", "schemasById", "operationsById")
+	return validateWorkspaceDocumentRootPath(path, "source", "schemasById", "operationsById", "importProvenanceById")
 }
 
 func validateWorkspaceAssetPatchPath(path string) error {

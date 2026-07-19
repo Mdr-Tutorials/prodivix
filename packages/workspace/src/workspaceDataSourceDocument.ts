@@ -120,6 +120,27 @@ const appendReplacePatch = (
   reverseOps.unshift({ op: 'replace', path, value: before });
 };
 
+const appendOptionalRootPatch = (
+  forwardOps: WorkspacePatchOperation[],
+  reverseOps: WorkspacePatchOperation[],
+  path: string,
+  before: unknown,
+  after: unknown
+): void => {
+  if (valuesEqual(before, after)) return;
+  if (before === undefined) {
+    forwardOps.push({ op: 'add', path, value: after });
+    reverseOps.unshift({ op: 'remove', path });
+    return;
+  }
+  if (after === undefined) {
+    forwardOps.push({ op: 'remove', path });
+    reverseOps.unshift({ op: 'add', path, value: before });
+    return;
+  }
+  appendReplacePatch(forwardOps, reverseOps, path, before, after);
+};
+
 /** Builds one reversible update across the stable Data current-model roots. */
 export const createWorkspaceDataSourceDocumentUpdateCommand = (
   input: CreateWorkspaceDataSourceDocumentUpdateCommandInput
@@ -161,6 +182,13 @@ export const createWorkspaceDataSourceDocumentUpdateCommand = (
     '/operationsById',
     current.decodedContent.operationsById,
     after.operationsById
+  );
+  appendOptionalRootPatch(
+    forwardOps,
+    reverseOps,
+    '/importProvenanceById',
+    current.decodedContent.importProvenanceById,
+    after.importProvenanceById
   );
   if (forwardOps.length === 0) return null;
 

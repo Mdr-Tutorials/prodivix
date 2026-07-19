@@ -2,10 +2,12 @@ import {
   createExecutionConsoleSnapshot,
   redactExecutionConsoleText,
   type ExecutionConsoleCategory,
+  type ExecutionConsoleCorrelation,
   type ExecutionConsoleLevel,
   type ExecutionSourceTrace,
   type ExecutionSessionSnapshot,
 } from '@prodivix/runtime-core';
+import { resolveExecutionPrimarySourceTrace } from './executionSourceTraceModel';
 
 export type ExecutionConsoleFilter =
   'all' | 'errors' | 'application' | 'system';
@@ -27,7 +29,9 @@ export type ExecutionConsoleLine = Readonly<{
   detail?: string;
   redacted: boolean;
   truncated: boolean;
+  correlation?: ExecutionConsoleCorrelation;
   sourceTrace?: readonly ExecutionSourceTrace[];
+  primarySourceTrace?: ExecutionSourceTrace;
 }>;
 
 export type ExecutionConsoleView = Readonly<{
@@ -75,6 +79,9 @@ export const createExecutionConsoleView = (input: {
       record.arguments[0] === record.message
         ? record.arguments.slice(1)
         : record.arguments;
+    const primarySourceTrace = resolveExecutionPrimarySourceTrace(
+      record.sourceTrace
+    );
     return Object.freeze({
       id: record.recordId,
       category: record.category,
@@ -87,7 +94,9 @@ export const createExecutionConsoleView = (input: {
         : {}),
       redacted: record.redacted,
       truncated: record.truncated,
+      correlation: record.correlation,
       ...(record.sourceTrace ? { sourceTrace: record.sourceTrace } : {}),
+      ...(primarySourceTrace ? { primarySourceTrace } : {}),
     });
   });
   const diagnosticLines = (input.diagnostics ?? []).map((diagnostic, index) => {

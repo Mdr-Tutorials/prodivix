@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import {
@@ -21,10 +21,11 @@ import type {
 import {
   createWorkspaceExecutionSnapshotId,
   ExecutionCenter,
+  useWorkspaceExecutionSourceNavigation,
 } from '@/editor/features/execution';
 import { selectWorkspace, useEditorStore } from '@/editor/store/useEditorStore';
-import { navigateToWorkspaceSemanticTarget } from '@/editor/navigation';
 import { useProjectTestRunner } from './useProjectTestRunner';
+import { resolveProjectTestPrimarySourceTrace } from './projectTestReportModel';
 
 const activeStatuses = new Set([
   'compiling',
@@ -57,6 +58,13 @@ export default function ProjectTestingPage() {
   const navigate = useNavigate();
   const workspace = useEditorStore(selectWorkspace);
   const runner = useProjectTestRunner(workspace);
+  const sourceNavigation = useWorkspaceExecutionSourceNavigation({
+    workspace,
+    originSurface: 'execution-center',
+  });
+  const [sourceNavigationFailure, setSourceNavigationFailure] = useState<
+    'snapshot-stale' | 'source-unavailable'
+  >();
   const counts = runner.report?.summary ?? {
     totalFiles: 0,
     failedFiles: 0,
@@ -84,17 +92,31 @@ export default function ProjectTestingPage() {
     [runner.diagnostics]
   );
 
+  useEffect(() => {
+    setSourceNavigationFailure(undefined);
+  }, [runner.reportJobId, runner.reportSnapshotId]);
+
   const actionClass =
     'inline-flex h-8 items-center gap-1.5 rounded-lg border border-(--border-default) bg-(--bg-canvas) px-3 text-xs font-medium text-(--text-primary) transition-colors hover:bg-(--bg-raised) disabled:cursor-not-allowed disabled:opacity-40';
   const openSourceTrace = (trace: ExecutionSourceTrace | undefined): void => {
-    if (!workspace || !trace) return;
-    navigateToWorkspaceSemanticTarget({
-      projectId: workspace.id,
-      target: trace.sourceSpan
-        ? { kind: 'source-span', sourceSpan: trace.sourceSpan }
-        : { kind: 'diagnostic-target', targetRef: trace.sourceRef },
-      navigate,
+    if (
+      !trace ||
+      !runner.reportJobId ||
+      !runner.reportProviderId ||
+      !runner.reportSnapshotId
+    ) {
+      setSourceNavigationFailure('source-unavailable');
+      return;
+    }
+    const result = sourceNavigation.openSourceTrace({
+      jobId: runner.reportJobId,
+      providerId: runner.reportProviderId,
+      snapshotId: runner.reportSnapshotId,
+      sourceTrace: trace,
     });
+    setSourceNavigationFailure(
+      result.status === 'unavailable' ? result.reason : undefined
+    );
   };
 
   return (
@@ -110,6 +132,47 @@ export default function ProjectTestingPage() {
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <label className="inline-flex h-8 items-center gap-2 rounded-lg border border-(--border-default) bg-(--bg-canvas) px-2 text-xs text-(--text-secondary)">
+            <span>{t('testing.target.label')}</span>
+            <select
+              className="min-w-20 bg-transparent text-xs font-medium text-(--text-primary) outline-none"
+              value={runner.target}
+              disabled={active}
+              aria-label={t('testing.target.label')}
+              onChange={(event) =>
+                runner.setTarget(
+                  event.target.value === 'vue-vite' ? 'vue-vite' : 'react-vite'
+                )
+              }
+            >
+              <option value="react-vite">{t('testing.target.react')}</option>
+              <option value="vue-vite">{t('testing.target.vue')}</option>
+            </select>
+          </label>
+          <label className="inline-flex h-8 items-center gap-2 rounded-lg border border-(--border-default) bg-(--bg-canvas) px-2 text-xs text-(--text-secondary)">
+            <span>{t('testing.provider.label')}</span>
+            <select
+              className="min-w-20 bg-transparent text-xs font-medium text-(--text-primary) outline-none"
+              value={runner.provider}
+              disabled={active}
+              aria-label={t('testing.provider.label')}
+              title={
+                runner.remoteAvailable
+                  ? undefined
+                  : t('testing.provider.remoteSignIn')
+              }
+              onChange={(event) =>
+                runner.setProvider(
+                  event.target.value === 'remote' ? 'remote' : 'browser'
+                )
+              }
+            >
+              <option value="browser">{t('testing.provider.browser')}</option>
+              <option value="remote" disabled={!runner.remoteAvailable}>
+                {t('testing.provider.remote')}
+              </option>
+            </select>
+          </label>
           <button
             type="button"
             className={actionClass}
@@ -216,6 +279,18 @@ export default function ProjectTestingPage() {
                   · {runner.reportSnapshotId}
                 </span>
               </header>
+              {sourceNavigationFailure ? (
+                <div
+                  role="status"
+                  className="border-b border-(--border-subtle) px-4 py-2 text-[11px] text-(--warning-color)"
+                >
+                  {t(
+                    sourceNavigationFailure === 'snapshot-stale'
+                      ? 'execution.sourceNavigation.snapshotStale'
+                      : 'execution.sourceNavigation.sourceUnavailable'
+                  )}
+                </div>
+              ) : null}
               {runner.report.failureMessages.map((message, index) => (
                 <pre
                   key={`report-failure:${index}`}
@@ -225,68 +300,92 @@ export default function ProjectTestingPage() {
                 </pre>
               ))}
               <div className="divide-y divide-(--border-subtle)">
-                {runner.report.files.map((file) => (
-                  <article key={file.fileId} className="px-4 py-3">
-                    <div className="flex items-center gap-2 text-xs font-medium">
-                      <FileCode2 size={14} className="text-(--text-muted)" />
-                      <span className="min-w-0 flex-1 truncate font-mono">
-                        {file.path}
-                      </span>
-                      <span className="text-[10px] font-normal text-(--text-muted)">
-                        {formatDuration(file.durationMs)}
-                      </span>
-                    </div>
-                    {file.failureMessages.map((message, index) => (
-                      <pre
-                        key={`${file.fileId}:failure:${index}`}
-                        className="mt-2 overflow-auto rounded-md border border-(--border-subtle) bg-(--bg-canvas) p-2 font-mono text-[10px] leading-4 whitespace-pre-wrap text-(--danger-color)"
-                      >
-                        {message}
-                      </pre>
-                    ))}
-                    <div className="mt-2 grid gap-1">
-                      {file.cases.map((testCase) => (
-                        <div
-                          key={testCase.caseId}
-                          className="rounded-lg bg-(--bg-canvas) px-3 py-2"
-                        >
-                          <div
-                            className={`flex items-center gap-2 text-xs ${statusClass(testCase.status)}`}
+                {runner.report.files.map((file) => {
+                  const fileSourceTrace = resolveProjectTestPrimarySourceTrace(
+                    file.sourceTrace
+                  );
+                  return (
+                    <article key={file.fileId} className="px-4 py-3">
+                      <div className="flex items-center gap-2 text-xs font-medium">
+                        <FileCode2 size={14} className="text-(--text-muted)" />
+                        <span className="min-w-0 flex-1 truncate font-mono">
+                          {file.path}
+                        </span>
+                        <span className="text-[10px] font-normal text-(--text-muted)">
+                          {formatDuration(file.durationMs)}
+                        </span>
+                        {fileSourceTrace ? (
+                          <button
+                            type="button"
+                            className="inline-flex size-6 items-center justify-center rounded-md text-(--text-muted) hover:bg-(--bg-raised) hover:text-(--text-primary)"
+                            title={t('testing.actions.openSource')}
+                            aria-label={t('testing.actions.openSource')}
+                            onClick={() => openSourceTrace(fileSourceTrace)}
                           >
-                            {statusIcon(testCase.status)}
-                            <span className="min-w-0 flex-1 truncate">
-                              {testCase.fullName ?? testCase.name}
-                            </span>
-                            <span className="text-[10px] text-(--text-muted)">
-                              {formatDuration(testCase.durationMs)}
-                            </span>
-                            {testCase.sourceTrace?.[0] ? (
-                              <button
-                                type="button"
-                                className="inline-flex size-6 items-center justify-center rounded-md text-(--text-muted) hover:bg-(--bg-raised) hover:text-(--text-primary)"
-                                title={t('testing.actions.openSource')}
-                                aria-label={t('testing.actions.openSource')}
-                                onClick={() =>
-                                  openSourceTrace(testCase.sourceTrace?.[0])
-                                }
-                              >
-                                <LocateFixed size={12} />
-                              </button>
-                            ) : null}
-                          </div>
-                          {testCase.failureMessages?.map((message, index) => (
-                            <pre
-                              key={`${testCase.caseId}:failure:${index}`}
-                              className="mt-2 overflow-auto rounded-md border border-(--border-subtle) bg-(--bg-panel) p-2 font-mono text-[10px] leading-4 whitespace-pre-wrap text-(--danger-color)"
-                            >
-                              {message}
-                            </pre>
-                          ))}
-                        </div>
+                            <LocateFixed size={12} />
+                          </button>
+                        ) : null}
+                      </div>
+                      {file.failureMessages.map((message, index) => (
+                        <pre
+                          key={`${file.fileId}:failure:${index}`}
+                          className="mt-2 overflow-auto rounded-md border border-(--border-subtle) bg-(--bg-canvas) p-2 font-mono text-[10px] leading-4 whitespace-pre-wrap text-(--danger-color)"
+                        >
+                          {message}
+                        </pre>
                       ))}
-                    </div>
-                  </article>
-                ))}
+                      <div className="mt-2 grid gap-1">
+                        {file.cases.map((testCase) => {
+                          const caseSourceTrace =
+                            resolveProjectTestPrimarySourceTrace(
+                              testCase.sourceTrace
+                            );
+                          return (
+                            <div
+                              key={testCase.caseId}
+                              className="rounded-lg bg-(--bg-canvas) px-3 py-2"
+                            >
+                              <div
+                                className={`flex items-center gap-2 text-xs ${statusClass(testCase.status)}`}
+                              >
+                                {statusIcon(testCase.status)}
+                                <span className="min-w-0 flex-1 truncate">
+                                  {testCase.fullName ?? testCase.name}
+                                </span>
+                                <span className="text-[10px] text-(--text-muted)">
+                                  {formatDuration(testCase.durationMs)}
+                                </span>
+                                {caseSourceTrace ? (
+                                  <button
+                                    type="button"
+                                    className="inline-flex size-6 items-center justify-center rounded-md text-(--text-muted) hover:bg-(--bg-raised) hover:text-(--text-primary)"
+                                    title={t('testing.actions.openSource')}
+                                    aria-label={t('testing.actions.openSource')}
+                                    onClick={() =>
+                                      openSourceTrace(caseSourceTrace)
+                                    }
+                                  >
+                                    <LocateFixed size={12} />
+                                  </button>
+                                ) : null}
+                              </div>
+                              {testCase.failureMessages?.map(
+                                (message, index) => (
+                                  <pre
+                                    key={`${testCase.caseId}:failure:${index}`}
+                                    className="mt-2 overflow-auto rounded-md border border-(--border-subtle) bg-(--bg-panel) p-2 font-mono text-[10px] leading-4 whitespace-pre-wrap text-(--danger-color)"
+                                  >
+                                    {message}
+                                  </pre>
+                                )
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             </section>
           ) : (
@@ -318,6 +417,9 @@ export default function ProjectTestingPage() {
         sessionId={runner.sessionId}
         status={runner.status}
         diagnostics={consoleDiagnostics}
+        workspace={workspace ?? undefined}
+        onOpenSourceTrace={sourceNavigation.openSourceTrace}
+        onOpenDataOperation={sourceNavigation.openDataOperation}
         onRestart={() => void runner.run()}
         onStop={() => void runner.stop()}
       />

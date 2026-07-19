@@ -45,8 +45,9 @@ pnpm verify:g1:browser
 ## 当前限制
 
 - React/Vite 是当前唯一完成 Golden Gate 的生产 target。
-- Workspace Test 页面已可通过独立 Browser Test provider 运行当前 React/Vite snapshot 并展示 canonical test report；这不等同于 G3 VerificationEvidence。
-- Browser Project Runner 与共享 Runtime Host 已可运行当前 snapshot；Data/API 作者态和 reference-only environment/Secret contract 已建立，但 Data runtime、Secret resolution、Remote Runner 与 Deployment 产品面继续按各自 Gate 建设。
-- 其他框架 target 必须通过自己的 parity 与独立构建 Gate 后才会标记为可用。
+- Workspace Test 页面已可通过独立 Browser/Remote Test provider 运行同一当前 React/Vite snapshot，并在共享 Session 中展示 canonical test report；两者均为 mock-only，这不等同于 G3 VerificationEvidence。
+- Browser Project Runner 与 Remote provider 已可运行当前 snapshot。Data runtime 支持跨协议 mock、public static client 有界 finite live，以及共用 execution authority 的 server/edge HTTP/GraphQL/AsyncAPI finite gateway；public GraphQL/AsyncAPI stream 使用显式 pull bridge。Workspace Test 不会执行 live Data。
+- Vue/Vite 已通过 current PIR/Route/Auth/Server/Asset compiler、产品 target selector、独立构建与 authenticated Catalog CRUD + PNG Chrome Gate；真实 Remote authenticated live journey、layout/outlet 和完整 Asset delivery/sanitize matrix 仍待关闭。其他框架 target 也必须通过各自 parity 与独立构建 Gate 后才会标记为可用。
+- Secret resolution 只存在于授权的 Remote effect 边界；client/static stream、Secret 长连接、stream reconnect/resume、更多 transport 与完整部署产品面仍 fail closed。
 
 架构说明见[Preview 与 Export](/concepts/preview-and-export)和[测试与产品 Gate](/developer/testing-and-gates)。

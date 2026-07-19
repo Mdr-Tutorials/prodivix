@@ -84,6 +84,7 @@ export type CreateRemoteExecutionControlPlaneOptions = Readonly<{
   now?: () => number;
   createExecutionId: () => string;
   createLeaseToken: () => string;
+  maximumWorkerAttempts?: number;
   ingestionLimits?: Partial<RemoteExecutionIngestionLimits>;
   outputGuard?: ExecutionSecretLeakGuard;
 }>;
@@ -219,6 +220,11 @@ export const createRemoteExecutionControlPlane = (
   options: CreateRemoteExecutionControlPlaneOptions
 ): RemoteExecutionControlPlane => {
   const now = options.now ?? Date.now;
+  const maximumWorkerAttempts = options.maximumWorkerAttempts ?? 3;
+  if (!Number.isSafeInteger(maximumWorkerAttempts) || maximumWorkerAttempts < 1)
+    throw new TypeError(
+      'Remote maximum worker attempts must be a positive integer.'
+    );
   const ingestionLimits: RemoteExecutionIngestionLimits = Object.freeze({
     maximumEvents: options.ingestionLimits?.maximumEvents ?? 10_000,
     maximumEventBytes:
@@ -579,6 +585,7 @@ export const createRemoteExecutionControlPlane = (
         ...input,
         leaseToken: options.createLeaseToken(),
         now: now(),
+        maximumAttempts: maximumWorkerAttempts,
       });
     },
     async renewLease(input) {

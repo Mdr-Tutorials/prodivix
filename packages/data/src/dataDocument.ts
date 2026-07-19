@@ -2,6 +2,8 @@ import { RUNTIME_ZONES, type RuntimeZone } from '@prodivix/runtime-core';
 import {
   DATA_CACHE_POLICY_LIMITS,
   DATA_DOCUMENT_ISSUE_CODES,
+  DATA_IMPORT_KINDS,
+  DATA_IMPORT_PROVENANCE_LIMITS,
   DATA_OPERATION_KINDS,
   JSON_SCHEMA_2020_12_URI,
   type DataCachePolicy,
@@ -13,6 +15,8 @@ import {
   type DataJsonSchema202012,
   type DataJsonSchemaType,
   type DataJsonValue,
+  type DataImportEntityMapping,
+  type DataImportProvenance,
   type DataLifecycleSnapshot,
   type DataOffsetPageSnapshot,
   type DataOffsetPaginationPolicy,
@@ -36,6 +40,7 @@ type JsonRecord = Readonly<Record<string, unknown>>;
 
 const runtimeZones = new Set<RuntimeZone>(RUNTIME_ZONES);
 const operationKinds = new Set(DATA_OPERATION_KINDS);
+const importKinds = new Set(DATA_IMPORT_KINDS);
 const schemaTypes = new Set<DataJsonSchemaType>([
   'null',
   'boolean',
@@ -1315,7 +1320,7 @@ const parseOperations = (
       appendIssue(
         issues,
         childPath(operationPath, 'kind'),
-        'Operation kind must be "query" or "mutation".'
+        'Operation kind must be "query", "mutation", or "subscription".'
       );
     }
     const configurationByKey = parseConfiguration(
@@ -1373,6 +1378,20 @@ const parseOperations = (
       );
     }
     if (
+      rawOperation.kind === 'subscription' &&
+      (policies.cache ||
+        policies.retry ||
+        policies.idempotency ||
+        policies.pagination ||
+        policies.optimistic)
+    ) {
+      appendIssue(
+        issues,
+        childPath(operationPath, 'policies'),
+        'Subscription operations use the bounded stream session policy and cannot use finite invocation policies.'
+      );
+    }
+    if (
       !id ||
       !outputSchemaId ||
       !operationKinds.has(rawOperation.kind as DataOperation['kind'])
@@ -1392,6 +1411,195 @@ const parseOperations = (
         policies,
       }),
     ]);
+  }
+  return Object.freeze(Object.fromEntries(entries));
+};
+
+const dataImportDigestPattern = /^sha256-[0-9a-f]{64}$/u;
+
+const parseImportDigest = (
+  value: unknown,
+  path: string,
+  issues: DataDocumentIssue[]
+): string | undefined => {
+  const digest = readCanonicalString(value, path, issues);
+  if (digest && !dataImportDigestPattern.test(digest)) {
+    appendIssue(issues, path, 'Expected a lowercase SHA-256 content digest.');
+    return undefined;
+  }
+  return digest;
+};
+
+const parseImportEntityMappings = (
+  value: unknown,
+  path: string,
+  issues: DataDocumentIssue[]
+): Readonly<Record<string, DataImportEntityMapping>> => {
+  const record = readRecord(value, path, issues);
+  if (!record) return Object.freeze({});
+  const keys = Object.keys(record).sort(compareText);
+  if (keys.length > DATA_IMPORT_PROVENANCE_LIMITS.maxMappingsPerImport) {
+    appendIssue(
+      issues,
+      path,
+      `Import mapping count exceeds ${DATA_IMPORT_PROVENANCE_LIMITS.maxMappingsPerImport}.`
+    );
+  }
+  const entries: [string, DataImportEntityMapping][] = [];
+  for (const externalId of keys) {
+    const mappingPath = childPath(path, externalId);
+    const canonicalExternalId = readCanonicalString(
+      externalId,
+      mappingPath,
+      issues
+    );
+    if (
+      canonicalExternalId &&
+      canonicalExternalId.length >
+        DATA_IMPORT_PROVENANCE_LIMITS.maxExternalIdentityLength
+    ) {
+      appendIssue(
+        issues,
+        mappingPath,
+        `External identity exceeds ${DATA_IMPORT_PROVENANCE_LIMITS.maxExternalIdentityLength} characters.`
+      );
+    }
+    const mapping = readRecord(record[externalId], mappingPath, issues);
+    if (!canonicalExternalId || !mapping) continue;
+    checkExactKeys(
+      mapping,
+      new Set(['targetId', 'importedDigest']),
+      new Set(),
+      mappingPath,
+      issues
+    );
+    const targetId = readCanonicalString(
+      mapping.targetId,
+      childPath(mappingPath, 'targetId'),
+      issues
+    );
+    const importedDigest = parseImportDigest(
+      mapping.importedDigest,
+      childPath(mappingPath, 'importedDigest'),
+      issues
+    );
+    if (targetId && importedDigest) {
+      entries.push([
+        canonicalExternalId,
+        Object.freeze({ targetId, importedDigest }),
+      ]);
+    }
+  }
+  return Object.freeze(Object.fromEntries(entries));
+};
+
+const parseImportProvenance = (
+  value: unknown,
+  path: string,
+  issues: DataDocumentIssue[]
+): Readonly<Record<string, DataImportProvenance>> => {
+  const record = readRecord(value, path, issues);
+  if (!record) return Object.freeze({});
+  const keys = Object.keys(record).sort(compareText);
+  if (keys.length > DATA_IMPORT_PROVENANCE_LIMITS.maxImports) {
+    appendIssue(
+      issues,
+      path,
+      `Import provenance count exceeds ${DATA_IMPORT_PROVENANCE_LIMITS.maxImports}.`
+    );
+  }
+  const entries: [string, DataImportProvenance][] = [];
+  for (const key of keys) {
+    const importPath = childPath(path, key);
+    const canonicalKey = readCanonicalString(key, importPath, issues);
+    const raw = readRecord(record[key], importPath, issues);
+    if (!canonicalKey || !raw) continue;
+    checkExactKeys(
+      raw,
+      new Set([
+        'id',
+        'kind',
+        'externalDocumentId',
+        'sourceDigest',
+        'sourceImportedDigest',
+        'schemasByExternalId',
+        'operationsByExternalId',
+      ]),
+      new Set(),
+      importPath,
+      issues
+    );
+    const id = readCanonicalString(raw.id, childPath(importPath, 'id'), issues);
+    const externalDocumentId = readCanonicalString(
+      raw.externalDocumentId,
+      childPath(importPath, 'externalDocumentId'),
+      issues
+    );
+    if (
+      externalDocumentId &&
+      externalDocumentId.length >
+        DATA_IMPORT_PROVENANCE_LIMITS.maxExternalIdentityLength
+    ) {
+      appendIssue(
+        issues,
+        childPath(importPath, 'externalDocumentId'),
+        `External document identity exceeds ${DATA_IMPORT_PROVENANCE_LIMITS.maxExternalIdentityLength} characters.`
+      );
+    }
+    if (!importKinds.has(raw.kind as DataImportProvenance['kind'])) {
+      appendIssue(
+        issues,
+        childPath(importPath, 'kind'),
+        'Unsupported Data import provenance kind.'
+      );
+    }
+    const sourceDigest = parseImportDigest(
+      raw.sourceDigest,
+      childPath(importPath, 'sourceDigest'),
+      issues
+    );
+    const sourceImportedDigest = parseImportDigest(
+      raw.sourceImportedDigest,
+      childPath(importPath, 'sourceImportedDigest'),
+      issues
+    );
+    const schemasByExternalId = parseImportEntityMappings(
+      raw.schemasByExternalId,
+      childPath(importPath, 'schemasByExternalId'),
+      issues
+    );
+    const operationsByExternalId = parseImportEntityMappings(
+      raw.operationsByExternalId,
+      childPath(importPath, 'operationsByExternalId'),
+      issues
+    );
+    if (id && id !== canonicalKey) {
+      appendIssue(
+        issues,
+        childPath(importPath, 'id'),
+        'Import provenance record key must equal provenance.id.'
+      );
+    }
+    if (
+      id &&
+      externalDocumentId &&
+      sourceDigest &&
+      sourceImportedDigest &&
+      importKinds.has(raw.kind as DataImportProvenance['kind'])
+    ) {
+      entries.push([
+        canonicalKey,
+        Object.freeze({
+          id,
+          kind: raw.kind as DataImportProvenance['kind'],
+          externalDocumentId,
+          sourceDigest,
+          sourceImportedDigest,
+          schemasByExternalId,
+          operationsByExternalId,
+        }),
+      ]);
+    }
   }
   return Object.freeze(Object.fromEntries(entries));
 };
@@ -1437,6 +1645,57 @@ const validateRelations = (
       }
     }
   }
+  for (const provenance of Object.values(document.importProvenanceById ?? {})) {
+    const provenancePath = childPath('/importProvenanceById', provenance.id);
+    const schemaTargets = new Set<string>();
+    for (const [externalId, mapping] of Object.entries(
+      provenance.schemasByExternalId
+    )) {
+      const mappingPath = childPath(
+        childPath(provenancePath, 'schemasByExternalId'),
+        externalId
+      );
+      if (!document.schemasById[mapping.targetId]) {
+        appendIssue(
+          issues,
+          childPath(mappingPath, 'targetId'),
+          `Imported schema target "${mapping.targetId}" does not exist.`
+        );
+      }
+      if (schemaTargets.has(mapping.targetId)) {
+        appendIssue(
+          issues,
+          childPath(mappingPath, 'targetId'),
+          `Imported schema target "${mapping.targetId}" is mapped more than once.`
+        );
+      }
+      schemaTargets.add(mapping.targetId);
+    }
+    const operationTargets = new Set<string>();
+    for (const [externalId, mapping] of Object.entries(
+      provenance.operationsByExternalId
+    )) {
+      const mappingPath = childPath(
+        childPath(provenancePath, 'operationsByExternalId'),
+        externalId
+      );
+      if (!document.operationsById[mapping.targetId]) {
+        appendIssue(
+          issues,
+          childPath(mappingPath, 'targetId'),
+          `Imported operation target "${mapping.targetId}" does not exist.`
+        );
+      }
+      if (operationTargets.has(mapping.targetId)) {
+        appendIssue(
+          issues,
+          childPath(mappingPath, 'targetId'),
+          `Imported operation target "${mapping.targetId}" is mapped more than once.`
+        );
+      }
+      operationTargets.add(mapping.targetId);
+    }
+  }
 };
 
 /** Internal current-model decoder shared by validation and the strict wire boundary. */
@@ -1454,7 +1713,7 @@ export const decodeCurrentDataSourceDocument = (
   checkExactKeys(
     record,
     new Set(['source', 'schemasById', 'operationsById']),
-    new Set(),
+    new Set(['importProvenanceById']),
     '/',
     issues
   );
@@ -1466,6 +1725,14 @@ export const decodeCurrentDataSourceDocument = (
     source,
     issues
   );
+  const importProvenanceById =
+    record.importProvenanceById === undefined
+      ? undefined
+      : parseImportProvenance(
+          record.importProvenanceById,
+          '/importProvenanceById',
+          issues
+        );
   if (!source) {
     return Object.freeze({ ok: false, issues: Object.freeze(issues) });
   }
@@ -1473,6 +1740,7 @@ export const decodeCurrentDataSourceDocument = (
     source,
     schemasById,
     operationsById,
+    ...(importProvenanceById ? { importProvenanceById } : {}),
   });
   validateRelations(document, options, issues);
   return issues.length > 0

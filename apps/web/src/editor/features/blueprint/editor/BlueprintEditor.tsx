@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { DndContext, DragOverlay } from '@dnd-kit/core';
 import { ChevronRight, SlidersHorizontal } from 'lucide-react';
 import type { PIRDataOperationRuntimePort } from '@prodivix/pir-react-renderer';
@@ -15,10 +15,9 @@ import { useAuthStore } from '@/auth/useAuthStore';
 import {
   ExecutionCenter,
   executionSessionCoordinator,
-  openWorkspaceExecutionSourceTrace,
-  type ExecutionServerFunctionSourceNavigationInput,
-  type ExecutionServerFunctionSourceNavigationResult,
+  useExecutionCenterNavigationVisibility,
   useExecutionSession,
+  useWorkspaceExecutionSourceNavigation,
 } from '@/editor/features/execution';
 import { BlueprintAssistantPanel } from './assistant';
 import { BlueprintEditorAddressBar } from './addressBar';
@@ -95,6 +94,8 @@ export function BlueprintEditor({
   compactHeader = false,
 }: BlueprintEditorProps = {}) {
   const workspace = useEditorStore((state) => state.workspace);
+  const navigationOpenedExecutionCenter =
+    useExecutionCenterNavigationVisibility(workspace?.id);
   const accessToken = useAuthStore((state) => state.token);
   const workspaceId = useEditorStore(selectWorkspaceId);
   const activeDocumentId = useEditorStore(selectActiveDocumentId);
@@ -129,11 +130,15 @@ export function BlueprintEditor({
     controller.entry?.status === 'valid'
   );
   const isRunMode = canvas.canvasMode === 'run';
+  const [runTarget, setRunTarget] = useState<'react-vite' | 'vue-vite'>(
+    'react-vite'
+  );
   const projectRunner = useBlueprintProjectRunner(
     controller.workspace,
     canAuthor && isRunMode,
     viewportBar.runProvider,
-    accessToken
+    accessToken,
+    runTarget
   );
   const projectExecutionSession = useExecutionSession(projectRunner.sessionId);
   const visibleExecutionSessionId = isRunMode
@@ -156,21 +161,13 @@ export function BlueprintEditor({
     [addressBar.currentPath, projectRunner.state.previewUrl]
   );
   const showExecutionCenter = Boolean(
-    controller.workspace && (isRunMode || visibleExecutionSession)
+    controller.workspace &&
+    (isRunMode || visibleExecutionSession || navigationOpenedExecutionCenter)
   );
-  const openExecutionSourceTrace = (
-    input: ExecutionServerFunctionSourceNavigationInput
-  ): ExecutionServerFunctionSourceNavigationResult => {
-    if (!controller.workspace) {
-      return { status: 'unavailable', reason: 'source-unavailable' };
-    }
-    return openWorkspaceExecutionSourceTrace({
-      workspace: controller.workspace,
-      snapshotId: input.snapshotId,
-      sourceTrace: input.sourceTrace,
-      originSurface: 'blueprint-canvas',
-    });
-  };
+  const sourceNavigation = useWorkspaceExecutionSourceNavigation({
+    workspace: controller.workspace,
+    originSurface: 'blueprint-canvas',
+  });
 
   useEffect(() => {
     if (
@@ -465,7 +462,8 @@ export function BlueprintEditor({
                 }
               : undefined
           }
-          onOpenSourceTrace={openExecutionSourceTrace}
+          onOpenSourceTrace={sourceNavigation.openSourceTrace}
+          onOpenDataOperation={sourceNavigation.openDataOperation}
         />
       ) : null}
       <BlueprintEditorViewportBar
@@ -474,6 +472,8 @@ export function BlueprintEditor({
         runProvider={viewportBar.runProvider}
         remoteAvailable={Boolean(accessToken)}
         onRunProviderChange={viewportBar.onRunProviderChange}
+        runTarget={runTarget}
+        onRunTargetChange={setRunTarget}
         viewportWidth={viewportBar.viewportWidth}
         viewportHeight={viewportBar.viewportHeight}
         onViewportWidthChange={viewportBar.onViewportWidthChange}

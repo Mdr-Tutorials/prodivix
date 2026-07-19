@@ -91,16 +91,18 @@ runtime network removal, and revalidates the result against the trusted snapshot
 profile before publishing one canonical report artifact. Only unique relative
 static ESM imports are supported; external, dynamic, CommonJS, reference,
 ambiguous, and over-budget graphs fail before execution. The result SourceTrace
-aggregates the root and imported CodeArtifacts. Authenticated and `workspace.owner`
-permission reads/guards
+aggregates the root and imported CodeArtifacts. Authenticated, `workspace.owner`, and
+`workspace.read` permission reads/guards
 additionally require an unexpired Control Plane authority bound to the exact
 execution, worker attempt, Workspace, and snapshot. The Worker reduces it to
 `AuthPrincipal` plus the bounded allowed-permission list, writes a mode-0600
 execution-local authority file, and the generated runner strictly validates the exact
 required permission and removes that file before invoking project code. Public
 functions never receive the projection. Session id, Bearer, cookie, lease token,
-other permission policies, runtime network, and project-source mutation remain
-fail closed in this isolated target.
+other permission policies, runtime network, and Secret-bearing mutation remain
+fail closed. The separate exact `workspace.write + mutation + invocation-key`
+profile may emit one bounded whole-file staging replacement, but never writes the
+Canonical Workspace directly.
 
 When the exact code-export profile declares reference-only Secret fields, the
 Worker creates a per-resolution X25519 key and calls the worker-token + lease
@@ -139,9 +141,10 @@ Gate rather than a default local test. The dedicated
 runner and executes it as the non-root runner account. It builds the sandbox from a
 digest-pinned base, runs active isolation and cgroup probes, then emits the living
 Golden Workspace through the strict Remote snapshot codec and performs real
-dependency install, Preview, Build, canonical Test, and a workspace-owner-permission one-shot
-Server Function with a transitive canonical helper module and isolated Secret
-`useSecret` inside Podman. The Gate
+dependency install, Preview, Build, canonical Test, an exact read-only
+`workspace.read` Server Function, a workspace-write staging mutation, and a
+read + Secret one-shot Server Function with a transitive canonical helper module
+inside Podman. The Gate
 compares strict Preview/Build file facts, verifies source trace, cancellation,
 timeout, phase-network isolation and orphan cleanup, and uploads structured JSON
 evidence plus the full Gate log. It builds the worker and its complete workspace

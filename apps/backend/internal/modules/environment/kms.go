@@ -204,10 +204,14 @@ func (value *secretEnvelopeCipher) decrypt(ctx context.Context, envelope storedS
 }
 
 func (value *secretEnvelopeCipher) rewrap(ctx context.Context, envelope storedSecretEnvelope, additionalData []byte) (storedSecretEnvelope, error) {
-	if value == nil || value.kms == nil || envelope.Algorithm != secretEnvelopeAlgorithm || envelope.KeyProvider != value.kms.ProviderID() {
+	return value.rewrapFrom(ctx, value, envelope, additionalData)
+}
+
+func (value *secretEnvelopeCipher) rewrapFrom(ctx context.Context, source *secretEnvelopeCipher, envelope storedSecretEnvelope, additionalData []byte) (storedSecretEnvelope, error) {
+	if value == nil || value.kms == nil || source == nil || source.kms == nil || envelope.Algorithm != secretEnvelopeAlgorithm || envelope.KeyProvider != source.kms.ProviderID() {
 		return storedSecretEnvelope{}, ErrPermissionDenied
 	}
-	dataKey, err := value.kms.UnwrapDataKey(ctx, envelope.KeyID, envelope.WrappedKeyNonce, envelope.WrappedKey, domainSeparatedAdditionalData("prodivix.environment-secret.data-key.v1", additionalData))
+	dataKey, err := source.kms.UnwrapDataKey(ctx, envelope.KeyID, envelope.WrappedKeyNonce, envelope.WrappedKey, domainSeparatedAdditionalData("prodivix.environment-secret.data-key.v1", additionalData))
 	if err != nil {
 		return storedSecretEnvelope{}, err
 	}
@@ -217,7 +221,30 @@ func (value *secretEnvelopeCipher) rewrap(ctx context.Context, envelope storedSe
 		return storedSecretEnvelope{}, err
 	}
 	envelope.KeyID = keyID
+	envelope.KeyProvider = value.kms.ProviderID()
 	envelope.WrappedKeyNonce = nonce
 	envelope.WrappedKey = wrappedKey
 	return envelope, nil
+}
+
+func (store *Store) decryptSecretEnvelope(ctx context.Context, envelope storedSecretEnvelope, additionalData []byte) ([]byte, error) {
+	if store == nil || store.envelopeCiphersByProvider == nil {
+		return nil, ErrPermissionDenied
+	}
+	cipher := store.envelopeCiphersByProvider[envelope.KeyProvider]
+	if cipher == nil {
+		return nil, ErrPermissionDenied
+	}
+	return cipher.decrypt(ctx, envelope, additionalData)
+}
+
+func (store *Store) rewrapSecretEnvelope(ctx context.Context, envelope storedSecretEnvelope, additionalData []byte) (storedSecretEnvelope, error) {
+	if store == nil || store.envelopeCipher == nil || store.envelopeCiphersByProvider == nil {
+		return storedSecretEnvelope{}, ErrPermissionDenied
+	}
+	source := store.envelopeCiphersByProvider[envelope.KeyProvider]
+	if source == nil {
+		return storedSecretEnvelope{}, ErrPermissionDenied
+	}
+	return store.envelopeCipher.rewrapFrom(ctx, source, envelope, additionalData)
 }

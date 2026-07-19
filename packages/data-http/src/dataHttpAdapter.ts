@@ -135,6 +135,78 @@ const appendQuery = (url: URL, input: DataJsonValue): void => {
   }
 };
 
+type DataHttpParameterLocation = 'path' | 'query' | 'header';
+type DataHttpParameterMappings = Readonly<
+  Record<DataHttpParameterLocation, Readonly<Record<string, string>>>
+>;
+
+const isJsonObject = (value: DataJsonValue): value is DataJsonObject =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const readParameterMappings = (
+  value: DataConfigurationValue | undefined
+): DataHttpParameterMappings | undefined => {
+  if (!value) return undefined;
+  if (value.kind !== 'literal' || !isJsonObject(value.value))
+    throw new DataHttpOperationError(
+      'DATA_HTTP_CONFIGURATION_INVALID',
+      'HTTP parameterMappings must be a literal object.'
+    );
+  const allowedLocations = new Set<DataHttpParameterLocation>([
+    'path',
+    'query',
+    'header',
+  ]);
+  const result: Record<
+    DataHttpParameterLocation,
+    Readonly<Record<string, string>>
+  > = {
+    path: Object.freeze({}),
+    query: Object.freeze({}),
+    header: Object.freeze({}),
+  };
+  for (const [location, rawMappings] of Object.entries(value.value)) {
+    if (!allowedLocations.has(location as DataHttpParameterLocation))
+      throw new DataHttpOperationError(
+        'DATA_HTTP_CONFIGURATION_INVALID',
+        'HTTP parameterMappings contains an unsupported location.'
+      );
+    if (!isJsonObject(rawMappings))
+      throw new DataHttpOperationError(
+        'DATA_HTTP_CONFIGURATION_INVALID',
+        'HTTP parameter location mapping must be an object.'
+      );
+    const mappings: Record<string, string> = {};
+    for (const [wireName, pointer] of Object.entries(rawMappings)) {
+      if (
+        !wireName ||
+        wireName !== wireName.trim() ||
+        typeof pointer !== 'string' ||
+        !pointer.startsWith('/') ||
+        /~(?:[^01]|$)/u.test(pointer)
+      )
+        throw new DataHttpOperationError(
+          'DATA_HTTP_CONFIGURATION_INVALID',
+          'HTTP parameter mapping names and JSON Pointers must be canonical.'
+        );
+      if (
+        location === 'header' &&
+        (wireName !== wireName.toLowerCase() ||
+          wireName.length > 128 ||
+          !/^[!#$%&'*+.^_|~0-9a-z-]+$/u.test(wireName) ||
+          reservedIdempotencyHeaders.has(wireName))
+      )
+        throw new DataHttpOperationError(
+          'DATA_HTTP_CONFIGURATION_INVALID',
+          'HTTP header parameter mapping is unsafe.'
+        );
+      mappings[wireName] = pointer;
+    }
+    result[location as DataHttpParameterLocation] = Object.freeze(mappings);
+  }
+  return Object.freeze(result);
+};
+
 const freezeJson = (value: DataJsonValue): DataJsonValue => {
   if (value === null || typeof value !== 'object') return value;
   if (Array.isArray(value))
@@ -189,6 +261,96 @@ const readResponsePointer = (
     if (current === undefined) return undefined;
   }
   return current;
+};
+
+const scalarParameterValue = (
+  input: DataJsonValue,
+  pointer: string,
+  label: string,
+  required: boolean
+): string | undefined => {
+  const value = readResponsePointer(input, pointer);
+  if (value === undefined || value === null) {
+    if (required)
+      throw new DataHttpOperationError(
+        'DATA_HTTP_INPUT_INVALID',
+        `HTTP ${label} parameter is missing.`
+      );
+    return undefined;
+  }
+  if (
+    typeof value !== 'string' &&
+    typeof value !== 'number' &&
+    typeof value !== 'boolean'
+  )
+    throw new DataHttpOperationError(
+      'DATA_HTTP_INPUT_INVALID',
+      `HTTP ${label} parameter must be scalar.`
+    );
+  const result = String(value);
+  if (result.includes('\r') || result.includes('\n'))
+    throw new DataHttpOperationError(
+      'DATA_HTTP_INPUT_INVALID',
+      `HTTP ${label} parameter contains a line break.`
+    );
+  return result;
+};
+
+const mapHttpRequest = (
+  path: string,
+  input: DataJsonValue,
+  operationKind: 'query' | 'mutation',
+  mappings: DataHttpParameterMappings | undefined,
+  bodyInputPath: string | undefined
+): Readonly<{
+  path: string;
+  query: Readonly<Record<string, string>>;
+  headers: Readonly<Record<string, string>>;
+  body?: DataJsonValue;
+}> => {
+  if (!mappings && !bodyInputPath) {
+    return Object.freeze({
+      path,
+      query: Object.freeze({}),
+      headers: Object.freeze({}),
+      ...(operationKind === 'mutation' ? { body: input } : {}),
+    });
+  }
+  let mappedPath = path;
+  const query: Record<string, string> = {};
+  const headers: Record<string, string> = {};
+  for (const [wireName, pointer] of Object.entries(mappings?.path ?? {})) {
+    const value = scalarParameterValue(input, pointer, 'path', true)!;
+    const token = `{${wireName}}`;
+    if (!mappedPath.includes(token))
+      throw new DataHttpOperationError(
+        'DATA_HTTP_CONFIGURATION_INVALID',
+        'HTTP path parameter mapping does not match the path template.'
+      );
+    mappedPath = mappedPath.replaceAll(token, encodeURIComponent(value));
+  }
+  if (/[{}]/u.test(mappedPath))
+    throw new DataHttpOperationError(
+      'DATA_HTTP_INPUT_INVALID',
+      'HTTP path template contains an unresolved parameter.'
+    );
+  for (const [wireName, pointer] of Object.entries(mappings?.query ?? {})) {
+    const value = scalarParameterValue(input, pointer, 'query', false);
+    if (value !== undefined) query[wireName] = value;
+  }
+  for (const [wireName, pointer] of Object.entries(mappings?.header ?? {})) {
+    const value = scalarParameterValue(input, pointer, 'header', false);
+    if (value !== undefined) headers[wireName] = value;
+  }
+  const body = bodyInputPath
+    ? readResponsePointer(input, bodyInputPath)
+    : undefined;
+  return Object.freeze({
+    path: mappedPath,
+    query: Object.freeze(query),
+    headers: Object.freeze(headers),
+    ...(body === undefined ? {} : { body }),
+  });
 };
 
 const pageSnapshot = (
@@ -291,6 +453,12 @@ const reservedIdempotencyHeaders = new Set([
   'transfer-encoding',
 ]);
 
+const safeHeaderName = (value: string): boolean =>
+  value === value.toLowerCase() &&
+  value.length <= 128 &&
+  /^[!#$%&'*+.^_|~0-9a-z-]+$/u.test(value) &&
+  !reservedIdempotencyHeaders.has(value);
+
 const idempotencyHeader = (
   value: DataConfigurationValue | undefined,
   environment: ExecutionEnvironmentResolutionLease | undefined
@@ -344,6 +512,11 @@ export const createDataHttpAdapter = (input: {
       signal,
       publishNetworkTrace,
     }) {
+      if (operation.kind === 'subscription')
+        throw new DataHttpOperationError(
+          'DATA_HTTP_CONFIGURATION_INVALID',
+          'HTTP adapter does not implement subscription operations.'
+        );
       const baseUrl = literalString(
         source.configurationByKey.baseUrl,
         'HTTP source baseUrl',
@@ -384,12 +557,33 @@ export const createDataHttpAdapter = (input: {
           'DATA_HTTP_CONFIGURATION_INVALID',
           'HTTP operation emptyWhen is unsupported.'
         );
-      const url = endpoint(baseUrl, path);
-      if (operation.kind === 'query') appendQuery(url, invocation.input);
+      const parameterMappings = readParameterMappings(
+        operation.configurationByKey.parameterMappings
+      );
+      const bodyInputPath = operation.configurationByKey.bodyInputPath
+        ? literalString(
+            operation.configurationByKey.bodyInputPath,
+            'HTTP operation bodyInputPath',
+            'operation.bodyInputPath',
+            environment
+          )
+        : undefined;
+      const mappedRequest = mapHttpRequest(
+        path,
+        invocation.input,
+        operation.kind,
+        parameterMappings,
+        bodyInputPath
+      );
+      const url = endpoint(baseUrl, mappedRequest.path);
+      if (parameterMappings) {
+        for (const [key, value] of Object.entries(mappedRequest.query))
+          url.searchParams.append(key, value);
+      } else if (operation.kind === 'query') appendQuery(url, invocation.input);
       const body =
-        operation.kind === 'mutation'
-          ? JSON.stringify(invocation.input)
-          : undefined;
+        mappedRequest.body === undefined
+          ? undefined
+          : JSON.stringify(mappedRequest.body);
       if (
         operation.configurationByKey.idempotencyHeader &&
         !operation.policies.idempotency
@@ -407,14 +601,46 @@ export const createDataHttpAdapter = (input: {
             key: createDataOperationIdempotencyKey(invocation),
           }
         : undefined;
+      const authorizationField = operation.configurationByKey.authorization
+        ? 'operation.authorization'
+        : 'source.authorization';
       const authorization = secretConfiguration(
-        source.configurationByKey.authorization,
+        operation.configurationByKey.authorization ??
+          source.configurationByKey.authorization,
         'HTTP source authorization'
       );
+      const apiKey = secretConfiguration(
+        operation.configurationByKey.apiKey ?? source.configurationByKey.apiKey,
+        'HTTP source API key'
+      );
+      if (authorization && apiKey)
+        throw new DataHttpOperationError(
+          'DATA_HTTP_CONFIGURATION_INVALID',
+          'HTTP operations cannot combine authorization and API key Secret injection.'
+        );
+      const apiKeyHeader = apiKey
+        ? literalString(
+            operation.configurationByKey.apiKeyHeader ??
+              source.configurationByKey.apiKeyHeader,
+            'HTTP API key header',
+            'operation.apiKeyHeader',
+            environment
+          )
+        : undefined;
+      if (apiKeyHeader && !safeHeaderName(apiKeyHeader))
+        throw new DataHttpOperationError(
+          'DATA_HTTP_CONFIGURATION_INVALID',
+          'HTTP API key header is unsafe.'
+        );
       if (authorization && !environment)
         throw new DataHttpOperationError(
           'DATA_HTTP_CONFIGURATION_INVALID',
           'HTTP source authorization requires an environment lease.'
+        );
+      if (apiKey && !environment)
+        throw new DataHttpOperationError(
+          'DATA_HTTP_CONFIGURATION_INVALID',
+          'HTTP source API key requires an environment lease.'
         );
       const correlation = {
         kind: 'data-operation' as const,
@@ -425,30 +651,27 @@ export const createDataHttpAdapter = (input: {
         attempt: invocation.attempt,
       };
       const executeTransport = async (
-        authorizationMaterial?: string
+        secretMaterial?: string
       ): Promise<DataHttpTransportResponse> => {
+        const headers: Record<string, string> = {
+          ...mappedRequest.headers,
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+          ...(authorization && secretMaterial
+            ? { authorization: secretMaterial }
+            : {}),
+          ...(apiKey && apiKeyHeader && secretMaterial
+            ? { [apiKeyHeader]: secretMaterial }
+            : {}),
+          ...(upstreamIdempotency
+            ? { [upstreamIdempotency.header]: upstreamIdempotency.key }
+            : {}),
+        };
         try {
           return await input.transport.execute({
             requestId: `${invocation.invocationId}:${invocation.attempt}`,
             url: url.toString(),
             method,
-            ...(!authorizationMaterial && body === undefined
-              ? {}
-              : {
-                  headers: {
-                    ...(body === undefined
-                      ? {}
-                      : { 'content-type': 'application/json' }),
-                    ...(authorizationMaterial
-                      ? { authorization: authorizationMaterial }
-                      : {}),
-                    ...(upstreamIdempotency
-                      ? {
-                          [upstreamIdempotency.header]: upstreamIdempotency.key,
-                        }
-                      : {}),
-                  },
-                }),
+            ...(Object.keys(headers).length ? { headers } : {}),
             ...(body === undefined ? {} : { body }),
             signal,
             runtimeZone: invocation.runtimeZone,
@@ -473,7 +696,17 @@ export const createDataHttpAdapter = (input: {
       if (authorization && environment)
         await environment.useSecret(
           authorization.reference,
-          'source.authorization',
+          authorizationField,
+          async (material) => {
+            response = await executeTransport(material);
+          }
+        );
+      else if (apiKey && environment)
+        await environment.useSecret(
+          apiKey.reference,
+          operation.configurationByKey.apiKey
+            ? 'operation.apiKey'
+            : 'source.apiKey',
           async (material) => {
             response = await executeTransport(material);
           }
@@ -497,7 +730,23 @@ export const createDataHttpAdapter = (input: {
               response.status >= 500,
           }
         );
-      const value = readJson(response.text);
+      const rawValue = readJson(response.text);
+      const responseBodyPath = operation.configurationByKey.responseBodyPath
+        ? literalString(
+            operation.configurationByKey.responseBodyPath,
+            'HTTP operation responseBodyPath',
+            'operation.responseBodyPath',
+            environment
+          )
+        : undefined;
+      const value = responseBodyPath
+        ? readResponsePointer(rawValue, responseBodyPath)
+        : rawValue;
+      if (value === undefined)
+        throw new DataHttpOperationError(
+          'DATA_HTTP_RESPONSE_INVALID',
+          'HTTP response body mapping did not resolve.'
+        );
       const page = pageSnapshot(operation, invocation.input, value);
       return Object.freeze({
         value,

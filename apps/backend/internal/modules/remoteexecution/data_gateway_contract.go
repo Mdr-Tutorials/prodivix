@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"sync"
 	"time"
 
 	backendenvironment "github.com/Prodivix/prodivix/apps/backend/internal/modules/environment"
@@ -17,13 +19,17 @@ const (
 )
 
 var (
-	ErrDataGatewayInvalidRequest = errors.New("remote Data gateway request is invalid")
-	ErrDataGatewayDenied         = errors.New("remote Data gateway request is denied")
-	ErrDataGatewayUnavailable    = errors.New("remote Data gateway is unavailable")
-	ErrDataGatewayUpstream       = errors.New("remote Data gateway upstream failed")
-	ErrDataGatewayReplayConflict = errors.New("remote Data mutation replay identity conflicts")
-	ErrDataGatewayReplayUnsafe   = errors.New("remote Data mutation replay is unsafe")
-	ErrDataGatewayReplayCapacity = errors.New("remote Data mutation replay capacity exceeded")
+	ErrDataGatewayInvalidRequest   = errors.New("remote Data gateway request is invalid")
+	ErrDataGatewayDenied           = errors.New("remote Data gateway request is denied")
+	ErrDataGatewayUnavailable      = errors.New("remote Data gateway is unavailable")
+	ErrDataGatewayUpstream         = errors.New("remote Data gateway upstream failed")
+	ErrDataGatewayReplayConflict   = errors.New("remote Data mutation replay identity conflicts")
+	ErrDataGatewayReplayUnsafe     = errors.New("remote Data mutation replay is unsafe")
+	ErrDataGatewayReplayCapacity   = errors.New("remote Data mutation replay capacity exceeded")
+	ErrDataGatewayGraphQLUpstream  = errors.New("remote GraphQL Data gateway upstream failed")
+	ErrDataGatewayAsyncAPIUpstream = errors.New("remote AsyncAPI Data gateway upstream failed")
+	ErrDataGatewayStreamConflict   = errors.New("remote Data stream identity conflicts")
+	ErrDataGatewayStreamCapacity   = errors.New("remote Data stream capacity exceeded")
 )
 
 type DataGatewayEnvironmentStore interface {
@@ -48,6 +54,16 @@ type DataGatewayTransportResponse struct {
 
 type DataGatewayTransport interface {
 	Execute(ctx context.Context, request DataGatewayTransportRequest) (*DataGatewayTransportResponse, error)
+}
+
+type DataGatewayStreamTransportResponse struct {
+	Status      int
+	ContentType string
+	Body        io.ReadCloser
+}
+
+type DataGatewayStreamTransport interface {
+	OpenStream(ctx context.Context, request DataGatewayTransportRequest) (*DataGatewayStreamTransportResponse, error)
 }
 
 type DataGatewayMutationReplayKey struct {
@@ -92,24 +108,36 @@ type dataGatewayCorrelation struct {
 }
 
 type dataGatewayNetworkTrace struct {
-	Format        string                 `json:"format"`
-	RequestID     string                 `json:"requestId"`
-	Phase         string                 `json:"phase"`
-	RuntimeZone   string                 `json:"runtimeZone"`
-	Mode          string                 `json:"mode"`
-	Adapter       string                 `json:"adapter"`
-	Method        string                 `json:"method"`
-	SanitizedURL  string                 `json:"sanitizedUrl"`
-	Protocol      string                 `json:"protocol"`
-	StartedAt     int64                  `json:"startedAt"`
-	CompletedAt   int64                  `json:"completedAt"`
-	DurationMS    int64                  `json:"durationMs"`
-	Outcome       string                 `json:"outcome"`
-	Status        int                    `json:"status,omitempty"`
-	RequestBytes  int64                  `json:"requestBytes,omitempty"`
-	ResponseBytes int64                  `json:"responseBytes,omitempty"`
-	Correlation   dataGatewayCorrelation `json:"correlation"`
-	Redacted      bool                   `json:"redacted"`
+	Format        string                   `json:"format"`
+	RequestID     string                   `json:"requestId"`
+	Phase         string                   `json:"phase"`
+	RuntimeZone   string                   `json:"runtimeZone"`
+	Mode          string                   `json:"mode"`
+	Adapter       string                   `json:"adapter"`
+	Method        string                   `json:"method"`
+	SanitizedURL  string                   `json:"sanitizedUrl"`
+	Protocol      string                   `json:"protocol"`
+	StartedAt     int64                    `json:"startedAt"`
+	CompletedAt   int64                    `json:"completedAt"`
+	DurationMS    int64                    `json:"durationMs"`
+	Outcome       string                   `json:"outcome"`
+	Status        int                      `json:"status,omitempty"`
+	RequestBytes  int64                    `json:"requestBytes,omitempty"`
+	ResponseBytes int64                    `json:"responseBytes,omitempty"`
+	Correlation   dataGatewayCorrelation   `json:"correlation"`
+	Redacted      bool                     `json:"redacted"`
+	SourceTrace   []dataGatewaySourceTrace `json:"sourceTrace,omitempty"`
+}
+
+type dataGatewaySourceTrace struct {
+	SourceRef dataGatewaySourceRef `json:"sourceRef"`
+	Label     string               `json:"label,omitempty"`
+}
+
+type dataGatewaySourceRef struct {
+	Kind        string `json:"kind"`
+	DocumentID  string `json:"documentId"`
+	OperationID string `json:"operationId"`
 }
 
 type DataGatewayResult struct {
@@ -166,9 +194,12 @@ type dataGatewayDocument struct {
 }
 
 type DataGateway struct {
-	store        GrantStore
-	replays      DataGatewayMutationReplayStore
-	environments DataGatewayEnvironmentStore
-	transport    DataGatewayTransport
-	now          func() time.Time
+	store         GrantStore
+	replays       DataGatewayMutationReplayStore
+	environments  DataGatewayEnvironmentStore
+	transport     DataGatewayTransport
+	streams       DataGatewayStreamTransport
+	streamMu      sync.Mutex
+	activeStreams map[string]struct{}
+	now           func() time.Time
 }

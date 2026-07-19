@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   createWorkspaceServerRuntimeCandidateKey,
   type WorkspaceServerRuntimeAuthoringCandidate,
@@ -50,8 +51,11 @@ export function ServerRuntimeRoutePanel() {
     setServerRuntimeBinding,
     createWorkspaceOwnerGuard,
     createWorkspaceReadGuard,
+    createWorkspaceReadSecretLoader,
+    createWorkspaceSourceMutation,
     openServerRuntimeArtifact,
   } = useInspectorContext();
+  const [secretBindingId, setSecretBindingId] = useState('');
   if (!activeRouteDetails) return null;
 
   return (
@@ -189,6 +193,52 @@ export function ServerRuntimeRoutePanel() {
         >
           {t('inspector.serverRuntime.createIsolatedRead', {
             defaultValue: 'Create isolated read guard',
+          })}
+        </button>
+        <div className="col-span-2 grid gap-1 rounded-md border border-(--border-default) p-2">
+          <label
+            htmlFor="server-runtime-read-secret-binding"
+            className="text-[9px] font-medium text-(--text-muted)"
+          >
+            {t('inspector.serverRuntime.secretBindingId', {
+              defaultValue: 'Secret binding ID (reference only)',
+            })}
+          </label>
+          <input
+            id="server-runtime-read-secret-binding"
+            aria-label="Secret binding ID"
+            value={secretBindingId}
+            maxLength={4096}
+            disabled={!serverRuntimeWriteAvailable}
+            onChange={(event) => setSecretBindingId(event.target.value)}
+            placeholder={t('inspector.serverRuntime.secretBindingPlaceholder', {
+              defaultValue: 'production-webhook-signing-key',
+            })}
+            className="min-w-0 rounded-md border border-(--border-default) bg-(--bg-canvas) px-2 py-1.5 text-[10px] text-(--text-primary) disabled:cursor-not-allowed disabled:opacity-50"
+          />
+          <button
+            type="button"
+            className="rounded-md border border-(--border-default) px-2 py-1.5 text-[10px] text-(--text-secondary) hover:text-(--text-primary) disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={
+              !serverRuntimeWriteAvailable || !secretBindingId.trim().length
+            }
+            onClick={() =>
+              createWorkspaceReadSecretLoader(secretBindingId.trim())
+            }
+          >
+            {t('inspector.serverRuntime.createIsolatedReadSecret', {
+              defaultValue: 'Create isolated read + Secret loader',
+            })}
+          </button>
+        </div>
+        <button
+          type="button"
+          className="col-span-2 rounded-md border border-(--border-default) px-2 py-1.5 text-[10px] text-(--text-secondary) hover:text-(--text-primary) disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={!serverRuntimeWriteAvailable}
+          onClick={createWorkspaceSourceMutation}
+        >
+          {t('inspector.serverRuntime.createIsolatedSourceMutation', {
+            defaultValue: 'Create isolated source mutation action',
           })}
         </button>
       </div>

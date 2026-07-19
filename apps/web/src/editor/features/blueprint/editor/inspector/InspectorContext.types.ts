@@ -181,6 +181,8 @@ export type InspectorCodeContext = {
   ) => void;
   createWorkspaceOwnerGuard: (target: WorkspaceOwnerGuardTarget) => void;
   createWorkspaceReadGuard: () => void;
+  createWorkspaceReadSecretLoader: (secretBindingId: string) => void;
+  createWorkspaceSourceMutation: () => void;
   openServerRuntimeArtifact: (artifactId: string) => void;
 };
 

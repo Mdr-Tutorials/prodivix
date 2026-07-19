@@ -8,6 +8,7 @@ import {
   applyWorkspaceTransaction,
   createWorkspaceOwnerGuardTransactionPlan,
   createWorkspaceReadGuardTransactionPlan,
+  createWorkspaceReadSecretLoaderTransactionPlan,
   decodeWorkspaceSnapshot,
   encodeWorkspaceSnapshot,
   projectWorkspaceServerRuntimeAuthoring,
@@ -29,7 +30,7 @@ describe('G2 Golden Auth/Server target contract matrix', () => {
 
   beforeAll(async () => {
     matrix = await runGoldenG2AuthServerMatrix();
-  });
+  }, 30_000);
 
   it('keeps every supported and denied target cell explicit', () => {
     expect(matrix.targetMatrix).toEqual({
@@ -39,6 +40,8 @@ describe('G2 Golden Auth/Server target contract matrix', () => {
         'isolated-code-export': 'blocked',
         'isolated-workspace-read-code-export': 'blocked',
         'isolated-secret-code-export': 'blocked',
+        'isolated-workspace-read-secret-code-export': 'blocked',
+        'isolated-project-source-mutation': 'blocked',
       },
       'deterministic-test': {
         'audited-owner-adapter': 'supported',
@@ -46,6 +49,8 @@ describe('G2 Golden Auth/Server target contract matrix', () => {
         'isolated-code-export': 'supported',
         'isolated-workspace-read-code-export': 'supported',
         'isolated-secret-code-export': 'blocked',
+        'isolated-workspace-read-secret-code-export': 'blocked',
+        'isolated-project-source-mutation': 'blocked',
       },
       'remote-live': {
         'audited-owner-adapter': 'supported',
@@ -53,6 +58,8 @@ describe('G2 Golden Auth/Server target contract matrix', () => {
         'isolated-code-export': 'blocked',
         'isolated-workspace-read-code-export': 'blocked',
         'isolated-secret-code-export': 'blocked',
+        'isolated-workspace-read-secret-code-export': 'blocked',
+        'isolated-project-source-mutation': 'blocked',
       },
       'isolated-production': {
         'audited-owner-adapter': 'blocked',
@@ -60,6 +67,8 @@ describe('G2 Golden Auth/Server target contract matrix', () => {
         'isolated-code-export': 'supported',
         'isolated-workspace-read-code-export': 'supported',
         'isolated-secret-code-export': 'supported',
+        'isolated-workspace-read-secret-code-export': 'supported',
+        'isolated-project-source-mutation': 'supported',
       },
     });
     expect(matrix.blockedDiagnostics.browserStaticAuditedAdapter).toContain(
@@ -80,6 +89,9 @@ describe('G2 Golden Auth/Server target contract matrix', () => {
     expect(matrix.blockedDiagnostics.deterministicTestIsolatedSecret).toContain(
       'WKS-EXPORT-SERVER-ENVIRONMENT-UNSUPPORTED'
     );
+    expect(
+      matrix.blockedDiagnostics.deterministicTestWorkspaceReadSecret
+    ).toContain('WKS-EXPORT-SERVER-ENVIRONMENT-UNSUPPORTED');
     expect(matrix.blockedDiagnostics.remoteLiveCodeExport).toContain(
       'WKS-EXPORT-SERVER-ADAPTER-UNSUPPORTED'
     );
@@ -89,8 +101,23 @@ describe('G2 Golden Auth/Server target contract matrix', () => {
     expect(matrix.blockedDiagnostics.remoteLiveIsolatedSecret).toContain(
       'WKS-EXPORT-SERVER-ADAPTER-UNSUPPORTED'
     );
+    expect(matrix.blockedDiagnostics.remoteLiveWorkspaceReadSecret).toContain(
+      'WKS-EXPORT-SERVER-ADAPTER-UNSUPPORTED'
+    );
     expect(matrix.blockedDiagnostics.browserStaticIsolatedSecret).toContain(
       'WKS-EXPORT-SERVER-GATEWAY-REQUIRED'
+    );
+    expect(
+      matrix.blockedDiagnostics.browserStaticWorkspaceReadSecret
+    ).toContain('WKS-EXPORT-SERVER-GATEWAY-REQUIRED');
+    expect(
+      matrix.blockedDiagnostics.browserStaticProjectSourceMutation
+    ).toContain('WKS-EXPORT-SERVER-GATEWAY-REQUIRED');
+    expect(
+      matrix.blockedDiagnostics.deterministicTestProjectSourceMutation
+    ).toContain('WKS-EXPORT-SERVER-TEST-SOURCE-MUTATION-UNSUPPORTED');
+    expect(matrix.blockedDiagnostics.remoteLiveProjectSourceMutation).toContain(
+      'WKS-EXPORT-SERVER-ADAPTER-UNSUPPORTED'
     );
     expect(
       matrix.blockedDiagnostics.isolatedProductionAuditedAdapter
@@ -266,6 +293,112 @@ describe('G2 Golden Auth/Server target contract matrix', () => {
     ).not.toContain('golden-secret-material-canary');
   });
 
+  it('requires exact workspace.read authority and one-shot Secret material together', () => {
+    expect(matrix.isolatedWorkspaceReadSecret.snapshot).toMatchObject({
+      format: 'prodivix.executable-project.v6',
+      target: { presetId: 'isolated-server-function' },
+      serverFunctionPlan: {
+        functionRef: {
+          artifactId: GOLDEN_G2_AUTH_SERVER_IDS.serverDocument,
+          exportName: GOLDEN_G2_AUTH_SERVER_IDS.isolatedReadSecretExport,
+        },
+        runtimeManifest: {
+          functionsByExport: {
+            [GOLDEN_G2_AUTH_SERVER_IDS.isolatedReadSecretExport]: {
+              auth: {
+                kind: 'permission',
+                permissionId: 'workspace.read',
+              },
+              environment: {
+                secretsByField: {
+                  signingKey: { bindingId: 'golden-webhook-signing-key' },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    expect(
+      matrix.isolatedWorkspaceReadSecret.snapshot.capabilityRequirements
+        .production
+    ).toEqual(
+      expect.arrayContaining(['environment-binding', 'server-function'])
+    );
+    expect(matrix.isolatedWorkspaceReadSecret.authorityConsumed).toBe(true);
+    expect(matrix.isolatedWorkspaceReadSecret.secretMaterialConsumed).toBe(
+      true
+    );
+    expect(matrix.isolatedWorkspaceReadSecret.response).toMatchObject({
+      requestId: 'golden-isolated-read-secret:1',
+      ok: true,
+      result: {
+        kind: 'value',
+        value: { secretLength: 'golden-secret-material-canary'.length },
+      },
+    });
+    expect(
+      JSON.stringify(matrix.isolatedWorkspaceReadSecret.response)
+    ).not.toContain('golden-secret-material-canary');
+  });
+
+  it('executes one isolated source mutation and adopts only its selected revision-fenced diff', () => {
+    expect(matrix.isolatedProjectSourceMutation.snapshot).toMatchObject({
+      format: 'prodivix.executable-project.v6',
+      target: { presetId: 'isolated-server-function' },
+      serverFunctionPlan: {
+        functionRef: {
+          artifactId: 'code-golden-source-mutation-action',
+          exportName: 'replaceProjectSource',
+        },
+        runtimeManifest: {
+          functionsByExport: {
+            replaceProjectSource: {
+              kind: 'route-action',
+              effect: 'mutation',
+              auth: {
+                kind: 'permission',
+                permissionId: 'workspace.write',
+              },
+              idempotency: { kind: 'invocation-key' },
+            },
+          },
+        },
+      },
+    });
+    expect(
+      matrix.isolatedProjectSourceMutation.snapshot.capabilityRequirements
+        .production
+    ).not.toContain('network');
+    expect(matrix.isolatedProjectSourceMutation.response).toMatchObject({
+      requestId: 'golden-isolated-source-mutation:1',
+      ok: true,
+      result: { kind: 'value', value: { updated: true } },
+    });
+    expect(matrix.isolatedProjectSourceMutation.authorityConsumed).toBe(true);
+    expect(
+      matrix.isolatedProjectSourceMutation.workspaceUnchangedBeforeAdoption
+    ).toBe(true);
+    expect(matrix.isolatedProjectSourceMutation.eligibleChangeIds).toHaveLength(
+      1
+    );
+    expect(matrix.isolatedProjectSourceMutation.targetArtifactId).toBe(
+      'code-golden-source-mutation-target'
+    );
+    expect(matrix.isolatedProjectSourceMutation.adoptedTargetSource).toBe(
+      "export const projectSourceValue = 'Adopted from isolated execution.';\n"
+    );
+    expect(matrix.isolatedProjectSourceMutation.actionSourceUnchanged).toBe(
+      true
+    );
+    expect(matrix.isolatedProjectSourceMutation.staleAdoptionBlocked).toBe(
+      true
+    );
+    expect(
+      JSON.stringify(matrix.isolatedProjectSourceMutation.response)
+    ).not.toContain('Adopted from isolated execution.');
+  });
+
   it('keeps credential material, client-side source, and SourceTrace text outside their boundaries', () => {
     expect(matrix.boundary).toEqual({
       clientSnapshotsExcludeServerSource: true,
@@ -310,7 +443,11 @@ describe('G2 Golden Auth/Server target contract matrix', () => {
         status: 'ready',
         configuration: {
           providerId: 'prodivix-product-session',
-          permissionIds: ['workspace.owner', 'workspace.read'],
+          permissionIds: [
+            'workspace.owner',
+            'workspace.read',
+            'workspace.write',
+          ],
         },
       });
       expect(projection.bindings).toContainEqual(
@@ -405,6 +542,58 @@ describe('G2 Golden Auth/Server target contract matrix', () => {
         },
       },
     });
+    expect(JSON.stringify(project.snapshot)).not.toMatch(
+      /bearer|token|cookie|sessionId|secretValue/iu
+    );
+  });
+
+  it('authors, reloads, and compiles a reference-only workspace.read Secret loader', () => {
+    const workspace = createGoldenG2AuthServerWorkspace('isolated-read-secret');
+    const plan = createWorkspaceReadSecretLoaderTransactionPlan({
+      workspace,
+      routeNodeId: GOLDEN_G2_AUTH_SERVER_IDS.route,
+      documentId: 'code-authored-isolated-read-secret',
+      path: '/server/isolated-read-secret.loader.server.ts',
+      secretBindingId: 'golden-product-signing-key',
+      transactionId: 'golden-author-isolated-read-secret',
+      issuedAt: '2026-07-19T04:00:00.000Z',
+    });
+    expect(plan.status).toBe('ready');
+    if (plan.status !== 'ready') throw new Error(plan.message);
+    const applied = applyWorkspaceTransaction(workspace, plan.plan.transaction);
+    expect(applied.ok).toBe(true);
+    if (!applied.ok) throw new Error(JSON.stringify(applied.issues));
+    const reloaded = decodeWorkspaceSnapshot(
+      encodeWorkspaceSnapshot(applied.snapshot, {})
+    ).workspace;
+    expect(projectWorkspaceServerRuntimeAuthoring(reloaded).issues).toEqual([]);
+    const project = generateWorkspaceIsolatedServerFunctionExecutableProject(
+      reloaded,
+      { functionRef: plan.plan.functionRef }
+    );
+    if (project.status !== 'ready') {
+      throw new Error(
+        `Authored isolated workspace.read Secret loader did not compile: ${JSON.stringify(project.diagnostics)}`
+      );
+    }
+    expect(project.snapshot.serverFunctionPlan).toMatchObject({
+      functionRef: plan.plan.functionRef,
+      runtimeManifest: {
+        functionsByExport: {
+          loadWorkspaceReadSecret: {
+            auth: { kind: 'permission', permissionId: 'workspace.read' },
+            environment: {
+              secretsByField: {
+                signingKey: { bindingId: 'golden-product-signing-key' },
+              },
+            },
+          },
+        },
+      },
+    });
+    expect(project.snapshot.capabilityRequirements.production).toContain(
+      'environment-binding'
+    );
     expect(JSON.stringify(project.snapshot)).not.toMatch(
       /bearer|token|cookie|sessionId|secretValue/iu
     );

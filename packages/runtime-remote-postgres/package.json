@@ -21,9 +21,11 @@
     "clean": "node -e \"const fs=require('node:fs'); fs.rmSync('dist',{recursive:true,force:true}); fs.rmSync('tsconfig.tsbuildinfo',{force:true})\"",
     "test": "pnpm run typecheck && vitest --config vitest.config.ts --run",
     "test:postgres": "pnpm run typecheck && vitest --config vitest.config.ts --run src/postgresRepository.integration.test.ts",
+    "test:postgres-dr": "pnpm run typecheck && vitest --config vitest.config.ts --run src/postgresRegionalRecovery.integration.test.ts",
     "typecheck": "tsc -b tsconfig.test.json --pretty false"
   },
   "dependencies": {
+    "@noble/hashes": "^2.0.1",
     "@prodivix/runtime-core": "workspace:*",
     "@prodivix/runtime-remote": "workspace:*",
     "pg": "^8.16.3"

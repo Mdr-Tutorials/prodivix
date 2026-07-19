@@ -725,4 +725,134 @@ describe('Data HTTP adapter', () => {
       })
     ).rejects.toMatchObject({ code: 'DATA_HTTP_CONFIGURATION_INVALID' });
   });
+
+  it('executes imported path/query/header and response-body mappings without forwarding unmapped input', async () => {
+    const execute = vi.fn(async (request) => ({
+      status: 200,
+      ok: true,
+      text: '{"data":{"id":"a/b"},"ignored":"private"}',
+      trace: createExecutionNetworkTrace({
+        requestId: request.requestId,
+        phase: 'runtime',
+        runtimeZone: request.runtimeZone,
+        mode: request.mode,
+        adapter: request.adapter,
+        method: request.method,
+        sanitizedUrl: 'https://api.example.test/',
+        protocol: 'https',
+        startedAt: 1,
+        completedAt: 2,
+        outcome: 'allowed',
+        status: 200,
+        correlation: request.correlation,
+      }),
+    }));
+    const registry = createDataOperationAdapterRegistry();
+    registry.register(createDataHttpAdapter({ transport: { execute } }));
+    const result = await executeDataOperation({
+      registry,
+      invocation: createDataOperationInvocation({
+        ...invocation,
+        input: {
+          id: 'a/b',
+          include: 'details',
+          trace: 'trace-1',
+          notMapped: 'must-not-leak',
+        },
+      }),
+      document: {
+        ...document,
+        operationsById: {
+          list: {
+            ...operation,
+            configurationByKey: {
+              ...operation.configurationByKey,
+              path: { kind: 'literal', value: '/products/{id}' },
+              parameterMappings: {
+                kind: 'literal',
+                value: {
+                  path: { id: '/id' },
+                  query: { include: '/include' },
+                  header: { 'x-trace-id': '/trace' },
+                },
+              },
+              responseBodyPath: { kind: 'literal', value: '/data' },
+            },
+          },
+        },
+      },
+      lifecycleChannel: createDataLifecycleChannel(),
+      signal: new AbortController().signal,
+      now: () => 2,
+    });
+
+    expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://api.example.test/products/a%2Fb?include=details',
+        headers: { 'x-trace-id': 'trace-1' },
+      })
+    );
+    expect(result.result.value).toEqual({ id: 'a/b' });
+    expect(JSON.stringify(execute.mock.calls)).not.toContain('must-not-leak');
+  });
+
+  it('projects only the mapped JSON request body for imported mutations', async () => {
+    const execute = vi.fn(async (request) => ({
+      status: 201,
+      ok: true,
+      text: request.body ?? 'null',
+      trace: createExecutionNetworkTrace({
+        requestId: request.requestId,
+        phase: 'runtime',
+        runtimeZone: request.runtimeZone,
+        mode: request.mode,
+        adapter: request.adapter,
+        method: request.method,
+        sanitizedUrl: 'https://api.example.test/',
+        protocol: 'https',
+        startedAt: 1,
+        completedAt: 2,
+        outcome: 'allowed',
+        status: 201,
+        correlation: request.correlation,
+      }),
+    }));
+    const registry = createDataOperationAdapterRegistry();
+    registry.register(createDataHttpAdapter({ transport: { execute } }));
+    const mutation: DataOperation = {
+      id: 'create',
+      kind: 'mutation',
+      inputSchemaId: 'products',
+      outputSchemaId: 'products',
+      configurationByKey: {
+        method: { kind: 'literal', value: 'POST' },
+        path: { kind: 'literal', value: '/products' },
+        bodyInputPath: { kind: 'literal', value: '/body' },
+      },
+      policies: {},
+    };
+    await executeDataOperation({
+      registry,
+      invocation: createDataOperationInvocation({
+        ...invocation,
+        operation: { documentId: 'data-products', operationId: 'create' },
+        activation: 'event',
+        input: { body: { name: 'Keyboard' }, localOnly: 'must-not-leak' },
+      }),
+      document: {
+        ...document,
+        operationsById: { create: mutation },
+      },
+      lifecycleChannel: createDataLifecycleChannel(),
+      signal: new AbortController().signal,
+    });
+
+    expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: '{"name":"Keyboard"}',
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    expect(JSON.stringify(execute.mock.calls)).not.toContain('must-not-leak');
+  });
 });

@@ -118,6 +118,12 @@ export type ServerFunctionOutcome =
       status: 302 | 303 | 307 | 308;
     }>;
 
+/** One sandbox-local whole-file proposal. It never writes Canonical Workspace directly. */
+export type ServerFunctionProjectSourceMutation = Readonly<{
+  artifactId: string;
+  source: string;
+}>;
+
 export type ServerFunctionAdapterContext = Readonly<{
   workspaceId: string;
   invocationId: string;
@@ -128,6 +134,9 @@ export type ServerFunctionAdapterContext = Readonly<{
   useSecret?(
     field: string,
     consumer: (material: string) => void | Promise<void>
+  ): Promise<void>;
+  replaceProjectSource?(
+    mutation: ServerFunctionProjectSourceMutation
   ): Promise<void>;
 }>;
 

@@ -81,6 +81,7 @@ export type DataSchema = Readonly<{
 export const DATA_OPERATION_KINDS = Object.freeze([
   'query',
   'mutation',
+  'subscription',
 ] as const);
 export type DataOperationKind = (typeof DATA_OPERATION_KINDS)[number];
 
@@ -178,11 +179,46 @@ export type DataOperation = Readonly<{
   policies: DataOperationPolicies;
 }>;
 
+export const DATA_IMPORT_KINDS = Object.freeze([
+  'openapi-3.1',
+  'graphql-sdl',
+  'asyncapi-3.0',
+] as const);
+export type DataImportKind = (typeof DATA_IMPORT_KINDS)[number];
+
+export const DATA_IMPORT_PROVENANCE_LIMITS = Object.freeze({
+  maxImports: 4,
+  maxMappingsPerImport: 512,
+  maxExternalIdentityLength: 1_024,
+} as const);
+
+/**
+ * Records only the deterministic merge baseline for an imported canonical
+ * entity. The external protocol document remains an input, never a second
+ * Workspace truth.
+ */
+export type DataImportEntityMapping = Readonly<{
+  targetId: string;
+  importedDigest: string;
+}>;
+
+/** Bounded, credential-free metadata used for deterministic protocol reimport. */
+export type DataImportProvenance = Readonly<{
+  id: string;
+  kind: DataImportKind;
+  externalDocumentId: string;
+  sourceDigest: string;
+  sourceImportedDigest: string;
+  schemasByExternalId: Readonly<Record<string, DataImportEntityMapping>>;
+  operationsByExternalId: Readonly<Record<string, DataImportEntityMapping>>;
+}>;
+
 /** The stable current model deliberately has no persistence version field. */
 export type DataSourceDocument = Readonly<{
   source: DataSourceDefinition;
   schemasById: Readonly<Record<string, DataSchema>>;
   operationsById: Readonly<Record<string, DataOperation>>;
+  importProvenanceById?: Readonly<Record<string, DataImportProvenance>>;
 }>;
 
 export type DataSourceDocumentWireV1 = Readonly<{
@@ -190,6 +226,7 @@ export type DataSourceDocumentWireV1 = Readonly<{
   source: DataSourceDefinition;
   schemasById: Readonly<Record<string, DataSchema>>;
   operationsById: Readonly<Record<string, DataOperation>>;
+  importProvenanceById?: Readonly<Record<string, DataImportProvenance>>;
 }>;
 
 export type DataDocumentIssue = Readonly<{

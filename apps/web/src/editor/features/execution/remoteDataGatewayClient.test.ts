@@ -6,6 +6,7 @@ const invocation = {
   requestId: 'invocation-1:1',
   documentId: 'data/1',
   operationId: 'list:items',
+  adapterId: 'core.http',
   invocationId: 'invocation-1',
   sequence: 2,
   attempt: 1,

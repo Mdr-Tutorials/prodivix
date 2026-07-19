@@ -30,8 +30,6 @@ const executionPreviewBundleMediaType = "application/vnd.prodivix.execution-prev
 const executionServerAuthorityHeader = "X-Prodivix-Execution-Server-Authority"
 const executionServerAuthorityFormat = "prodivix.remote-execution-server-authority.v1"
 const productSessionProviderID = "prodivix-product-session"
-const workspaceOwnerPermissionID = "workspace.owner"
-const workspaceReadPermissionID = "workspace.read"
 const defaultExecutionAuthorityTTL = 2 * time.Minute
 const maximumExecutionAuthorityTTL = 5 * time.Minute
 
@@ -39,7 +37,7 @@ var canonicalSHA256Digest = regexp.MustCompile(`^sha256-[a-f0-9]{64}$`)
 var previewCapabilityLabel = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
 type Handler struct {
-	store                 GrantStore
+	store                 ExecutionGatewayStore
 	environments          EnvironmentAccessVerifier
 	baseURL               string
 	clientToken           string
@@ -67,7 +65,9 @@ type remoteEnvelope struct {
 
 type createPayload struct {
 	Request struct {
-		Workspace struct {
+		Profile     string `json:"profile"`
+		RuntimeZone string `json:"runtimeZone"`
+		Workspace   struct {
 			WorkspaceID        string            `json:"workspaceId"`
 			SnapshotID         string            `json:"snapshotId"`
 			PartitionRevisions map[string]string `json:"partitionRevisions"`
@@ -86,6 +86,9 @@ type envelopeAuthority struct {
 	snapshotID         string
 	partitionRevisions map[string]string
 	environment        *EnvironmentReference
+	permissions        []string
+	profile            string
+	runtimeZone        string
 }
 
 type executionPayload struct {
@@ -97,8 +100,26 @@ type createResponse struct {
 	Payload struct {
 		Execution struct {
 			ExecutionID string `json:"executionId"`
+			Provider    struct {
+				ID string `json:"id"`
+			} `json:"provider"`
 		} `json:"execution"`
 	} `json:"payload"`
+}
+
+func expectedRemoteProvider(profile string, runtimeZone string) (string, bool) {
+	switch {
+	case profile == "preview" && runtimeZone == "client":
+		return "prodivix.remote.preview", true
+	case profile == "test" && runtimeZone == "test":
+		return "prodivix.remote.test", true
+	case profile == "build" && runtimeZone == "build":
+		return "prodivix.remote.build", true
+	case profile == "production" && runtimeZone == "server":
+		return "prodivix.remote.server-function", true
+	default:
+		return "", false
+	}
 }
 
 type executionServerAuthority struct {
@@ -167,7 +188,7 @@ func normalizedPublicBaseURL(value string) string {
 	return baseURL
 }
 
-func NewHandler(store GrantStore, cfg backendconfig.RemoteRunnerConfig, previewCfg backendconfig.RemotePreviewHostConfig, environmentVerifier ...EnvironmentAccessVerifier) *Handler {
+func NewHandler(store ExecutionGatewayStore, cfg backendconfig.RemoteRunnerConfig, previewCfg backendconfig.RemotePreviewHostConfig, environmentVerifier ...EnvironmentAccessVerifier) *Handler {
 	baseURL := strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/")
 	clientToken := strings.TrimSpace(cfg.ClientToken)
 	executionAuthorityTTL := cfg.ExecutionAuthorityTTL
@@ -214,7 +235,7 @@ func NewHandler(store GrantStore, cfg backendconfig.RemoteRunnerConfig, previewC
 }
 
 func (handler *Handler) Routes(requireAuth gin.HandlerFunc) RouteHandlers {
-	return RouteHandlers{RequireAuth: requireAuth, Envelope: handler.HandleEnvelope, ArtifactContent: handler.HandleArtifactContent, PreviewSession: handler.HandlePreviewSession, DataOperation: handler.HandleDataOperation, ServerFunction: handler.HandleServerFunction, TerminalOpen: handler.HandleTerminalOpen, TerminalResume: handler.HandleTerminalResume, TerminalAction: handler.HandleTerminalAction, InternalSecrets: handler.HandleInternalSecrets}
+	return RouteHandlers{RequireAuth: requireAuth, Envelope: handler.HandleEnvelope, ArtifactContent: handler.HandleArtifactContent, PreviewSession: handler.HandlePreviewSession, DataOperation: handler.HandleDataOperation, DataStream: handler.HandleDataStream, ServerFunction: handler.HandleServerFunction, TerminalOpen: handler.HandleTerminalOpen, TerminalResume: handler.HandleTerminalResume, TerminalAction: handler.HandleTerminalAction, InternalSecrets: handler.HandleInternalSecrets}
 }
 
 func (handler *Handler) HandleInternalSecrets(c *gin.Context) {
@@ -369,8 +390,18 @@ func (handler *Handler) authorizeEnvelope(c *gin.Context, ownerID string, sessio
 			backendresponse.Error(c, http.StatusBadRequest, "EXE-4001", "Remote create request has no Workspace identity.")
 			return envelopeAuthority{}, false
 		}
+		if _, validProfile := expectedRemoteProvider(payload.Request.Profile, payload.Request.RuntimeZone); !validProfile {
+			backendresponse.Error(c, http.StatusBadRequest, "EXE-4001", "Remote create request has an invalid execution profile.")
+			return envelopeAuthority{}, false
+		}
 		workspaceID := strings.TrimSpace(payload.Request.Workspace.WorkspaceID)
-		if err := handler.store.VerifyWorkspaceOwner(c.Request.Context(), ownerID, workspaceID); err != nil {
+		permissions, err := handler.store.ResolveWorkspaceExecutionPermissions(c.Request.Context(), ownerID, workspaceID)
+		if err != nil {
+			backendresponse.Error(c, http.StatusNotFound, "EXE-4004", "Remote execution target was not found.")
+			return envelopeAuthority{}, false
+		}
+		permissions, validPermissions := canonicalWorkspaceExecutionPermissions(permissions)
+		if !validPermissions {
 			backendresponse.Error(c, http.StatusNotFound, "EXE-4004", "Remote execution target was not found.")
 			return envelopeAuthority{}, false
 		}
@@ -380,6 +411,16 @@ func (handler *Handler) authorizeEnvelope(c *gin.Context, ownerID string, sessio
 			return envelopeAuthority{}, false
 		}
 		if environment != nil {
+			if !((payload.Request.Profile == "preview" && payload.Request.RuntimeZone == "client") || (payload.Request.Profile == "production" && payload.Request.RuntimeZone == "server")) {
+				backendresponse.Error(c, http.StatusBadRequest, "EXE-4001", "Remote execution profile does not accept an environment reference.")
+				return envelopeAuthority{}, false
+			}
+			// A viewer role is intentionally Secret-free. Environment ownership is
+			// a separate authority and must not be inferred from workspace.read.
+			if !hasWorkspaceExecutionPermission(permissions, workspaceOwnerPermissionID) {
+				backendresponse.Error(c, http.StatusNotFound, "EXE-4004", "Remote execution target was not found.")
+				return envelopeAuthority{}, false
+			}
 			if handler.environments == nil || !handler.environments.Available() {
 				backendresponse.Error(c, http.StatusServiceUnavailable, "ENV-5001", "Environment Secret store is unavailable.", backendresponse.WithRetryable(true))
 				return envelopeAuthority{}, false
@@ -389,14 +430,14 @@ func (handler *Handler) authorizeEnvelope(c *gin.Context, ownerID string, sessio
 				return envelopeAuthority{}, false
 			}
 		}
-		return envelopeAuthority{workspaceID: workspaceID, snapshotID: payload.Request.Workspace.SnapshotID, partitionRevisions: payload.Request.Workspace.PartitionRevisions, environment: environment}, true
+		return envelopeAuthority{workspaceID: workspaceID, snapshotID: payload.Request.Workspace.SnapshotID, partitionRevisions: payload.Request.Workspace.PartitionRevisions, environment: environment, permissions: permissions, profile: payload.Request.Profile, runtimeZone: payload.Request.RuntimeZone}, true
 	case "get", "cancel", "events.read", "artifact.resolve":
 		var payload executionPayload
 		if json.Unmarshal(envelope.Payload, &payload) != nil || strings.TrimSpace(payload.ExecutionID) == "" {
 			backendresponse.Error(c, http.StatusBadRequest, "EXE-4001", "Remote request has no execution identity.")
 			return envelopeAuthority{}, false
 		}
-		if err := handler.store.VerifyExecutionOwner(c.Request.Context(), ownerID, sessionID, payload.ExecutionID); err != nil {
+		if err := handler.store.VerifyExecutionPrincipalSession(c.Request.Context(), ownerID, sessionID, payload.ExecutionID); err != nil {
 			backendresponse.Error(c, http.StatusNotFound, "EXE-4004", "Remote execution was not found.")
 			return envelopeAuthority{}, false
 		}
@@ -435,6 +476,10 @@ func (handler *Handler) executionServerAuthority(userID string, session *backend
 	if handler == nil || handler.now == nil || session == nil || authority.workspaceID == "" || authority.snapshotID == "" {
 		return nil, false
 	}
+	permissions, validPermissions := canonicalWorkspaceExecutionPermissions(authority.permissions)
+	if !validPermissions {
+		return nil, false
+	}
 	now := handler.now()
 	expiresAt := now.Add(handler.executionAuthorityTTL).UnixMilli()
 	if session.ExpiresAt < expiresAt {
@@ -445,10 +490,10 @@ func (handler *Handler) executionServerAuthority(userID string, session *backend
 	}
 	result := &executionServerAuthority{
 		Format: executionServerAuthorityFormat,
-		// Remote execution is currently owner-only. Project only the two bounded
-		// permissions implied by that verified role; the isolated Worker still
-		// requires the exact permission named by the immutable function profile.
-		Permissions: []string{workspaceOwnerPermissionID, workspaceReadPermissionID},
+		// Project only the exact permissions resolved from canonical Workspace
+		// ownership or the bounded viewer role. The isolated Worker still checks
+		// the immutable function profile before every project effect.
+		Permissions: permissions,
 		WorkspaceID: authority.workspaceID,
 		SnapshotID:  authority.snapshotID,
 		ExpiresAt:   expiresAt,
@@ -529,18 +574,23 @@ func (handler *Handler) HandleEnvelope(c *gin.Context) {
 	}
 	if envelope.Operation == "create" && response.StatusCode >= 200 && response.StatusCode < 300 {
 		var created createResponse
-		if json.Unmarshal(responseBody, &created) != nil || !created.OK || strings.TrimSpace(created.Payload.Execution.ExecutionID) == "" {
+		expectedProviderID, expectedProvider := expectedRemoteProvider(authority.profile, authority.runtimeZone)
+		if json.Unmarshal(responseBody, &created) != nil || !created.OK || strings.TrimSpace(created.Payload.Execution.ExecutionID) == "" || !expectedProvider || created.Payload.Execution.Provider.ID != expectedProviderID {
 			backendresponse.Error(c, http.StatusBadGateway, "EXE-5001", "Remote execution service returned an invalid create result.")
 			return
 		}
 		if err := handler.store.RecordExecution(c.Request.Context(), ExecutionAuthority{
 			ExecutionID:        created.Payload.Execution.ExecutionID,
 			WorkspaceID:        authority.workspaceID,
-			OwnerID:            user.ID,
+			PrincipalID:        user.ID,
 			SessionID:          session.ID,
+			Permissions:        append([]string(nil), authority.permissions...),
 			SnapshotID:         authority.snapshotID,
 			PartitionRevisions: authority.partitionRevisions,
 			Environment:        authority.environment,
+			ProviderID:         created.Payload.Execution.Provider.ID,
+			Profile:            authority.profile,
+			RuntimeZone:        authority.runtimeZone,
 		}); err != nil {
 			if errors.Is(err, ErrExecutionAuthorityConflict) {
 				backendresponse.Error(c, http.StatusConflict, "EXE-4009", "Remote execution identity conflicts with an existing authority.")
@@ -594,6 +644,79 @@ func (handler *Handler) HandleDataOperation(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+func (handler *Handler) HandleDataStream(c *gin.Context) {
+	user, session, ok := authIdentity(c)
+	if !ok {
+		return
+	}
+	if handler == nil || handler.dataGateway == nil || !handler.dataGateway.Available() {
+		backendresponse.Error(c, http.StatusServiceUnavailable, "ENV-5001", "Remote Data stream gateway is unavailable.", backendresponse.WithRetryable(true))
+		return
+	}
+	body, err := io.ReadAll(io.LimitReader(c.Request.Body, maximumDataGatewayRequestBytes+1))
+	if err != nil || int64(len(body)) > maximumDataGatewayRequestBytes {
+		backendresponse.Error(c, http.StatusRequestEntityTooLarge, "DAT-1001", "Remote Data stream invocation is too large.")
+		return
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(body, &fields) != nil || len(fields) != 4 {
+		backendresponse.Error(c, http.StatusBadRequest, "DAT-1001", "Remote Data stream invocation is invalid.")
+		return
+	}
+	for _, field := range []string{"invocationId", "sequence", "attempt", "input"} {
+		if _, exists := fields[field]; !exists {
+			backendresponse.Error(c, http.StatusBadRequest, "DAT-1001", "Remote Data stream invocation is invalid.")
+			return
+		}
+	}
+	var invocation DataGatewayInvocation
+	if json.Unmarshal(body, &invocation) != nil {
+		backendresponse.Error(c, http.StatusBadRequest, "DAT-1001", "Remote Data stream invocation is invalid.")
+		return
+	}
+	stream, err := handler.dataGateway.OpenStream(c.Request.Context(), backendenvironment.PrincipalSession{PrincipalID: user.ID, SessionID: session.ID}, c.Param("executionId"), c.Param("documentId"), c.Param("operationId"), invocation)
+	if err != nil {
+		status, code, message := dataGatewayStreamErrorStatus(err)
+		backendresponse.Error(c, status, code, message, backendresponse.WithRetryable(status >= 500))
+		return
+	}
+	defer stream.Close()
+	c.Header("Cache-Control", "private, no-store")
+	c.Header("Content-Type", "application/x-ndjson")
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Status(http.StatusOK)
+	if err := writeDataGatewayStreamRecord(c.Writer, map[string]any{
+		"type": "prodivix.execution-data-stream.v1", "phase": "open", "network": stream.Network,
+	}); err != nil {
+		return
+	}
+	c.Writer.Flush()
+	for {
+		event, complete, nextErr := stream.Next(c.Request.Context())
+		if nextErr != nil {
+			_, code, _ := dataGatewayStreamErrorStatus(nextErr)
+			_ = writeDataGatewayStreamRecord(c.Writer, map[string]any{
+				"type": "prodivix.execution-data-stream.v1", "phase": "error", "code": code,
+			})
+			c.Writer.Flush()
+			return
+		}
+		if complete {
+			_ = writeDataGatewayStreamRecord(c.Writer, map[string]any{
+				"type": "prodivix.execution-data-stream.v1", "phase": "complete", "cursor": stream.cursor,
+			})
+			c.Writer.Flush()
+			return
+		}
+		if writeDataGatewayStreamRecord(c.Writer, map[string]any{
+			"type": "prodivix.execution-data-stream.v1", "phase": "event", "cursor": event.Cursor, "value": event.Value,
+		}) != nil {
+			return
+		}
+		c.Writer.Flush()
+	}
+}
+
 func (handler *Handler) HandleServerFunction(c *gin.Context) {
 	user, session, ok := authIdentity(c)
 	if !ok {
@@ -637,7 +760,7 @@ func (handler *Handler) HandleArtifactContent(c *gin.Context) {
 	}
 	executionID := strings.TrimSpace(c.Param("executionId"))
 	artifactID := strings.TrimSpace(c.Param("artifactId"))
-	if executionID == "" || artifactID == "" || handler.store.VerifyExecutionOwner(c.Request.Context(), user.ID, session.ID, executionID) != nil {
+	if executionID == "" || artifactID == "" || handler.store.VerifyExecutionPrincipalSession(c.Request.Context(), user.ID, session.ID, executionID) != nil {
 		backendresponse.Error(c, http.StatusNotFound, "EXE-4004", "Remote artifact was not found.")
 		return
 	}
@@ -739,7 +862,7 @@ func (handler *Handler) HandlePreviewSession(c *gin.Context) {
 	}
 	executionID := strings.TrimSpace(c.Param("executionId"))
 	artifactID := strings.TrimSpace(c.Param("artifactId"))
-	if executionID == "" || artifactID == "" || handler.store.VerifyExecutionOwner(c.Request.Context(), user.ID, session.ID, executionID) != nil {
+	if executionID == "" || artifactID == "" || handler.store.VerifyExecutionPrincipalSession(c.Request.Context(), user.ID, session.ID, executionID) != nil {
 		backendresponse.Error(c, http.StatusNotFound, "EXE-4004", "Remote Preview artifact was not found.")
 		return
 	}

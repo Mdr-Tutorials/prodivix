@@ -27,6 +27,7 @@ import {
   startWorkspaceNodeGraphExecution,
   stopWorkspaceNodeGraphExecution,
   useExecutionSession,
+  useWorkspaceExecutionSourceNavigation,
 } from '@/editor/features/execution';
 import { useWorkspaceSemanticNavigationStore } from '@/editor/navigation';
 import { useWorkspaceHistoryShortcuts } from '@/editor/shortcuts';
@@ -90,6 +91,10 @@ type WorkspaceCommandFactory = (
 export const NodeGraphEditorContent = () => {
   const { t } = useTranslation('editor');
   const workspace = useEditorStore((state) => state.workspace);
+  const sourceNavigation = useWorkspaceExecutionSourceNavigation({
+    workspace,
+    originSurface: 'nodegraph',
+  });
   const workspaceId = useEditorStore(selectWorkspaceId);
   const activeDocumentId = useEditorStore(selectActiveDocumentId);
   const setActiveDocumentId = useEditorStore(
@@ -695,6 +700,9 @@ export const NodeGraphEditorContent = () => {
       {executionSessionId && executionSession ? (
         <ExecutionCenter
           sessionId={executionSessionId}
+          workspace={workspace ?? undefined}
+          onOpenSourceTrace={sourceNavigation.openSourceTrace}
+          onOpenDataOperation={sourceNavigation.openDataOperation}
           onRestart={() => void runActiveGraph()}
           onStop={stopActiveGraph}
         />

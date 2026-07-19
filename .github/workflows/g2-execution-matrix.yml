@@ -7,12 +7,14 @@ on:
       - main
     paths:
       - 'packages/golden-conformance/**'
+      - 'packages/authoring/**'
       - 'packages/prodivix-compiler/**'
       - 'packages/runtime-browser/**'
       - 'packages/runtime-core/**'
       - 'packages/runtime-remote/**'
       - 'packages/runtime-vitest/**'
       - 'packages/server-runtime/**'
+      - 'apps/web/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
@@ -23,12 +25,14 @@ on:
       - main
     paths:
       - 'packages/golden-conformance/**'
+      - 'packages/authoring/**'
       - 'packages/prodivix-compiler/**'
       - 'packages/runtime-browser/**'
       - 'packages/runtime-core/**'
       - 'packages/runtime-remote/**'
       - 'packages/runtime-vitest/**'
       - 'packages/server-runtime/**'
+      - 'apps/web/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
@@ -69,6 +73,12 @@ jobs:
 
       - name: Run Golden execution contract matrix
         run: pnpm run verify:g2:execution-matrix
+
+      - name: Run unified execution SourceTrace debugger Gate
+        run: pnpm run verify:g2:execution-source-debugger
+
+      - name: Run bounded Terminal emulator product Gate
+        run: pnpm run verify:g2:terminal-emulator
 
       - name: Run Auth and Server Runtime Golden target matrix
         run: pnpm run verify:g2:auth-server-golden

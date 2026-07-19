@@ -8,3 +8,18 @@ export type {
   DataHttpTransportRequest,
   DataHttpTransportResponse,
 } from './dataHttpAdapter';
+export {
+  createDataOpenApiImportProposal,
+  DATA_OPENAPI_IMPORT_ISSUE_CODES,
+  DATA_OPENAPI_IMPORT_LIMITS,
+} from './dataOpenApiImporter';
+export type {
+  CreateDataOpenApiImportProposalInput,
+  DataOpenApiImpactApproval,
+  DataOpenApiImportChange,
+  DataOpenApiImportImpact,
+  DataOpenApiImportIssue,
+  DataOpenApiImportIssueCode,
+  DataOpenApiImportProposal,
+  DataOpenApiImportTarget,
+} from './dataOpenApiImporter';

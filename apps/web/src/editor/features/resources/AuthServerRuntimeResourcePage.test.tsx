@@ -147,7 +147,7 @@ describe('AuthServerRuntimeResourcePage', () => {
         }) as HTMLButtonElement
       ).disabled
     ).toBe(true);
-    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
+    expect(screen.getAllByRole('checkbox')).toHaveLength(3);
     for (const checkbox of screen.getAllByRole('checkbox'))
       expect((checkbox as HTMLInputElement).disabled).toBe(true);
   });
@@ -179,6 +179,39 @@ describe('AuthServerRuntimeResourcePage', () => {
     ).toMatchObject({
       status: 'ready',
       configuration: { permissionIds: ['workspace.read'] },
+    });
+    expect(JSON.stringify(call.operation)).not.toMatch(
+      /bearer|accessToken|sessionId|cookie|secretValue/iu
+    );
+  });
+
+  it('authors workspace.write without accepting credential material', async () => {
+    const current = workspaceWithAuth();
+    act(() =>
+      useEditorStore.setState({
+        workspace: current,
+        workspaceReadonly: false,
+      })
+    );
+    render(<AuthServerRuntimeResourcePage />);
+
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: /workspace\.write/iu })
+    );
+    await waitFor(() =>
+      expect(dispatchWorkspaceAuthoringOperation).toHaveBeenCalledTimes(1)
+    );
+    const call = dispatchWorkspaceAuthoringOperation.mock.calls[0]?.[0];
+    expect(call.operation.kind).toBe('command');
+    if (call.operation.kind !== 'command') return;
+    const applied = applyWorkspaceCommand(current, call.operation.command);
+    expect(applied.ok).toBe(true);
+    if (!applied.ok) return;
+    expect(
+      readWorkspaceServerRuntimeAuthConfiguration(applied.snapshot)
+    ).toMatchObject({
+      status: 'ready',
+      configuration: { permissionIds: ['workspace.write'] },
     });
     expect(JSON.stringify(call.operation)).not.toMatch(
       /bearer|accessToken|sessionId|cookie|secretValue/iu

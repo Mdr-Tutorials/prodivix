@@ -8,7 +8,8 @@
     "stop": "停止运行",
     "reloadPreview": "重新加载预览",
     "openPreview": "在新标签页打开预览",
-    "openSource": "打开服务端函数源码",
+    "openSource": "打开精确运行源码",
+    "openDataInspector": "打开 Data operation Inspector",
     "clear": "清空控制台",
     "copy": "复制安全控制台输出",
     "copyFailed": "复制失败",
@@ -19,8 +20,8 @@
     "networkEmpty": "暂无脱敏网络记录。",
     "serverEmpty": "暂无脱敏服务端函数调用记录。",
     "sourceNavigation": {
-      "snapshotStale": "该调用属于较旧的 Workspace snapshot，请重新运行后再打开源码。",
-      "sourceUnavailable": "当前 Workspace 中不存在该服务端函数的精确源码。"
+      "snapshotStale": "该结果属于较旧的 Workspace snapshot，请重新运行后再打开源码。",
+      "sourceUnavailable": "当前 Workspace 中不存在唯一、精确的运行源码。"
     },
     "eventCount": "{{count}} 条事件",
     "surface": {
@@ -97,7 +98,12 @@
       "opening": "正在打开 execution-scoped 终端…",
       "noOutput": "终端已连接，暂无输出。",
       "outputGap": "较早的终端输出已超出保留范围。",
+      "protectedOutput": "受保护输出：已脱敏 {{redacted}} 条，已截断 {{truncated}} 条。",
       "inputPlaceholder": "输入 shell 命令",
+      "inputLabel": "终端键盘输入",
+      "keyboardHelp": "可直接在终端中输入。Enter、方向键、功能键、Control 组合键与有界粘贴会转发到 execution-scoped PTY。Control+C 用于中断，Control+Shift+C 保留给浏览器。",
+      "keyboardHint": "点击终端后直接输入",
+      "pasteTooLarge": "粘贴内容超过终端输入预算，已拒绝发送。",
       "send": "发送",
       "interrupt": "中断",
       "close": "关闭",
@@ -113,9 +119,10 @@
         "reconnect-rejected": "当前 execution 拒绝了终端重连请求。",
         "transport-disconnected": "终端传输已断开，正在按游标重连。",
         "open-rejected": "当前 execution 无法打开终端会话。",
-        "input-pending": "请先原样重试上一条未确认输入，再编辑新输入。",
+        "input-pending": "有界终端输入队列已满；请等待确认后再继续输入。",
         "input-unacknowledged": "终端输入未获确认；请重连后原样重试。",
-        "resize-unacknowledged": "终端尺寸变更未获确认，正在重新连接。"
+        "resize-unacknowledged": "终端尺寸变更未获确认，正在重新连接。",
+        "output-invalid": "终端输出未通过 identity、cursor 或 byte-length 契约，已拒绝渲染。"
       },
       "status": {
         "unavailable": "不可用",
@@ -134,6 +141,14 @@
     "recovery": {
       "waiting": "正在等待执行提供者确认终止；确认前不会创建新的运行请求。",
       "identityConflict": "终态身份不一致，已阻止恢复。请保留日志并重新打开运行表面。",
+      "quota": "Remote 容量已满。等待容量释放后创建新 request；旧 request 及其 mutation 不会自动重放。",
+      "workerExhausted": "该 Job 已耗尽有界 worker 恢复次数。请创建新 request；旧 Job 与事件会继续保留。",
+      "artifactUnavailable": "durable artifact 已过期或不可用。请创建新 request 生成新 artifact；旧执行不会被重放。",
+      "authorizationRequired": "Remote 授权已过期或缺失。重新登录后从已确认 cursor 续接同一 execution；不会重放 mutation。",
+      "permissionDenied": "Remote execution 权限被拒绝。请让 owner 更新所需权限，再创建新 request；被拒绝的运行会继续保留。",
+      "networkPolicyDenied": "Remote 网络策略拒绝了所需主机，或无法强制 runtime 隔离。请先查看脱敏 Network 记录并修正 allowlist，再创建新 request。",
+      "cancelled": "取消已形成终态。如需继续必须显式创建新 request；已取消 request 及其事件会继续保留。",
+      "timedOut": "execution 已达到终态超时。检查 timeout 与日志后创建新 request；不会自动重放已超时 request。",
       "requiresChange": "上一次运行以不可重试错误 {{code}} 结束。修改配置或代码后再创建新请求。",
       "newRequest": "恢复会创建全新的 request，并保留旧事件；旧运行中的 mutation 不会自动重放。",
       "compileBlocked": "先修复编译诊断，再创建新的运行请求。",
@@ -155,7 +170,18 @@
   },
   "testing": {
     "title": "Workspace 测试",
-    "subtitle": "将当前 canonical revision 作为 Prodivix 实际导出的同一份独立 React/Vite 工程运行。",
+    "subtitle": "通过所选 React/Vite 或 Vue/Vite 产品 target 运行当前 canonical revision。",
+    "target": {
+      "label": "框架",
+      "react": "React/Vite",
+      "vue": "Vue/Vite"
+    },
+    "provider": {
+      "label": "Provider",
+      "browser": "浏览器",
+      "remote": "远端",
+      "remoteSignIn": "登录后可在远端 sandbox 中运行同一套 mock-only 测试。"
+    },
     "actions": {
       "run": "运行测试",
       "rerun": "再次运行",
@@ -332,7 +358,8 @@
     "filters": {
       "search": "搜索错误码、消息、目标或 provider",
       "status": "问题状态",
-      "severity": "严重程度"
+      "severity": "严重程度",
+      "dataTarget": "Data 目标：{{target}}"
     },
     "status": {
       "open": "待处理",
@@ -1338,6 +1365,7 @@
       "overview": "概览",
       "components": "组件",
       "tokens": "Token",
+      "data": "数据与 API",
       "auth": "认证与服务端",
       "public": "Public",
       "code": "代码文件",
@@ -1361,6 +1389,9 @@
         "tokens": {
           "description": "DTCG Token 文档、主题、变体与设计系统解析。"
         },
+        "data": {
+          "description": "Canonical Data source、OpenAPI 导入提案、operation contract 与运行时关联。"
+        },
         "i18n": {
           "description": "用于语言与翻译键的矩阵编辑器。"
         },
@@ -1378,6 +1409,9 @@
         "scriptsStyles": "脚本/样式",
         "tokens": "Token",
         "contexts": "上下文",
+        "sources": "数据源",
+        "operations": "操作",
+        "invalid": "无效",
         "locales": "语言",
         "namespaces": "命名空间",
         "missingValues": "缺失值",
@@ -1498,6 +1532,146 @@
         "createFailed": "无法创建 Token 文档。"
       }
     },
+    "data": {
+      "header": {
+        "badge": "数据契约",
+        "title": "数据与 API",
+        "description": "检查 canonical Data source 与 operation，预览有界 OpenAPI 3.1 导入，并通过同一个 operation identity 在 Inspector、Issues 和 Network 之间导航。"
+      },
+      "summary": {
+        "sources": "{{count}} 个数据源",
+        "operations": "{{count}} 个操作",
+        "invalid": "{{count}} 个无效文档"
+      },
+      "status": {
+        "ready": "就绪",
+        "invalid": "无效"
+      },
+      "documents": {
+        "title": "数据源",
+        "empty": "当前没有 canonical Data source。可以先预览一个 OpenAPI 文档。"
+      },
+      "inspector": {
+        "badge": "Operation Inspector",
+        "empty": "选择 Data source 以检查 operation contract。",
+        "invalid": "该 Data source 不是 canonical 状态。重新导入前请先通过 Issues 修复。",
+        "input": "输入 Schema",
+        "output": "输出 Schema",
+        "mappings": "Wire 映射",
+        "policies": "策略",
+        "authorization": "授权保持 reference-only，并通过以下 binding 解析：{{bindings}}。",
+        "provenance": "导入 provenance",
+        "noOperation": "该 Data source 没有可检查的 operation。"
+      },
+      "actions": {
+        "openIssues": "在 Issues 中打开",
+        "openNetwork": "打开关联 Network"
+      },
+      "import": {
+        "badge": "OpenAPI 3.1",
+        "title": "导入预览",
+        "description": "粘贴 JSON 后只在本地编译 proposal。外部文档 URL 仅作为 provenance identity，不会自动请求。",
+        "referenceOnly": "凭据始终为引用",
+        "target": "导入目标",
+        "newTarget": "新建 Data source",
+        "documentId": "文档 ID",
+        "documentPath": "Workspace 路径",
+        "runtimeZone": "运行区域",
+        "importId": "导入 ID",
+        "externalDocumentId": "外部文档 identity",
+        "sourceId": "Source ID",
+        "baseUrl": "显式 Base URL 覆盖",
+        "baseUrlPlaceholder": "可选；否则使用第一个 OpenAPI server",
+        "specification": "OpenAPI JSON",
+        "preview": "生成预览",
+        "saving": "正在采纳…",
+        "adopt": "采纳可逆 Workspace 变更",
+        "previewResults": "OpenAPI 导入预览结果",
+        "status": {
+          "ready": "可采纳",
+          "invalid": "无效",
+          "conflict": "重新导入冲突",
+          "impact-required": "需要影响审批"
+        },
+        "changeCount": "{{count}} 项变更",
+        "impactCount": "{{count}} 个受影响 contract",
+        "confirmImpact": "我已检查精确影响。Schema：{{schemas}}。Operation：{{operations}}。",
+        "approveImpact": "审批精确影响并重新生成",
+        "diff": "受管理导入差异",
+        "invalidTarget": "修复 canonical validation issue 后才能重新导入该目标。",
+        "feedback": {
+          "adopted": "Workspace 已接受 OpenAPI proposal。",
+          "noChange": "该 proposal 不会改变 canonical Workspace。",
+          "proposal-not-ready": "该 proposal 尚不可采纳。",
+          "proposal-target-mismatch": "Proposal target 已不再匹配当前文档。",
+          "target-type-mismatch": "该 target identity 已由其他文档类型拥有。",
+          "revision-drift": "预览后 Data source 已变化，请重新生成预览。",
+          "workspace-conflict": "目标路径或 identity 与当前 Workspace 冲突。"
+        }
+      },
+      "authoring": {
+        "badge": "手工契约 authoring",
+        "title": "Schema 与 Policy 编辑器",
+        "description": "通过经过校验、可逆的 Workspace proposal 编写 JSON Schema 2020-12 与完整 Operation Policy。",
+        "canonical": "仅接受 canonical proposal",
+        "mode": {
+          "schema": "Schema",
+          "policy": "Operation Policy"
+        },
+        "noTarget": "先选择一个 canonical Data source，再编写其 contract。",
+        "schemaTarget": "Schema 目标",
+        "newSchema": "新建 Schema",
+        "schemaId": "Schema ID",
+        "operationTarget": "Operation 目标",
+        "schemaJson": "JSON Schema 2020-12",
+        "policyJson": "完整 Policy 对象",
+        "preview": "校验 proposal",
+        "approveImpact": "审批精确影响",
+        "saving": "正在应用…",
+        "apply": "应用可逆变更",
+        "impact": "Schema：{{schemas}}。Operation：{{operations}}。",
+        "status": {
+          "ready": "可应用",
+          "no-change": "没有 canonical 变更",
+          "invalid": "无效",
+          "impact-required": "需要影响审批"
+        },
+        "feedback": {
+          "invalidJson": "Authoring 草稿不是有效 JSON。",
+          "revisionDrift": "预览后 Data source 已变化，请重新校验 proposal。",
+          "noChange": "该 proposal 不会改变 canonical Workspace。",
+          "applied": "Workspace 已接受手工 Data authoring proposal。"
+        }
+      },
+      "test": {
+        "badge": "Test Operation",
+        "title": "确定性 Operation 测试",
+        "description": "运行一次经过 Schema 校验的 mock-only invocation。Fixture state 与 report 都是可丢弃运行态，不写入 Workspace。",
+        "noTarget": "选择一个 canonical Data operation 后再运行测试。",
+        "input": "Operation 输入 JSON",
+        "fixtureKind": "Mock fixture 结果类型",
+        "fixtureValue": "Mock 结果 JSON",
+        "fixtureError": "Mock 错误码",
+        "fixtureDraft": "Mock fixture 值或错误码",
+        "fixtureEmpty": "Fixture 结果为空",
+        "expectedKind": "预期结果类型",
+        "expectedValue": "预期结果 JSON",
+        "expectedError": "预期错误码",
+        "expectedDraft": "预期值或错误码",
+        "expectedEmpty": "预期结果为空",
+        "run": "运行 mock-only 测试",
+        "running": "正在运行…",
+        "report": "Data Operation 测试报告",
+        "status": {
+          "passed": "通过",
+          "failed": "失败"
+        },
+        "feedback": {
+          "invalidJson": "Input、fixture 与预期结果必须是有效 JSON。",
+          "errorCodeRequired": "错误 fixture 与预期需要 canonical error code。"
+        }
+      }
+    },
     "auth": {
       "header": {
         "badge": "服务端权限边界",
@@ -1512,7 +1686,8 @@
       "permissions": {
         "badge": "权限目录",
         "workspaceOwner": "允许受保护的 Workspace owner guard 请求精确的运行时权限判定。",
-        "workspaceRead": "允许不使用 Secret 的 isolated 只读函数请求有界的 workspace.read 运行时权限。",
+        "workspaceRead": "允许 isolated 只读函数请求有界的 workspace.read 运行时权限；使用 Secret 时仍须独立声明引用并取得一次性 environment lease。",
+        "workspaceWrite": "允许隔离调用提出一个有界的项目源码整文件替换，并在显式审阅后采纳。",
         "referenceOnly": "声明不等于授权。可信运行时的 permission port 仍会逐次判定调用。"
       },
       "bindings": {
@@ -1954,6 +2129,10 @@
         "createRemoteOwner": "创建 Remote 所有者守卫",
         "createIsolatedOwner": "创建隔离运行所有者守卫",
         "createIsolatedRead": "创建隔离运行只读守卫",
+        "createIsolatedReadSecret": "创建隔离运行 read + Secret loader",
+        "secretBindingId": "Secret binding ID（仅引用）",
+        "secretBindingPlaceholder": "production-webhook-signing-key",
+        "createIsolatedSourceMutation": "创建隔离源码变更动作",
         "readonly": "当前路由只读，或由已挂载的 Route 模块拥有。"
       },
       "track": {

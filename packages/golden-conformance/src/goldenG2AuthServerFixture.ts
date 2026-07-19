@@ -27,6 +27,7 @@ export const GOLDEN_G2_AUTH_SERVER_IDS = Object.freeze({
   isolatedExport: 'requireIsolatedOwner',
   isolatedReadExport: 'requireIsolatedRead',
   isolatedSecretExport: 'useIsolatedSecret',
+  isolatedReadSecretExport: 'useIsolatedReadSecret',
 });
 
 export const GOLDEN_G2_REMOTE_OWNER_FUNCTION_REF: ServerFunctionReference =
@@ -59,12 +60,19 @@ export const GOLDEN_G2_ISOLATED_SECRET_FUNCTION_REF: ServerFunctionReference =
     exportName: GOLDEN_G2_AUTH_SERVER_IDS.isolatedSecretExport,
   });
 
+export const GOLDEN_G2_ISOLATED_READ_SECRET_FUNCTION_REF: ServerFunctionReference =
+  Object.freeze({
+    artifactId: GOLDEN_G2_AUTH_SERVER_IDS.serverDocument,
+    exportName: GOLDEN_G2_AUTH_SERVER_IDS.isolatedReadSecretExport,
+  });
+
 export type GoldenG2AuthServerBinding =
   | 'remote-live'
   | 'remote-secret'
   | 'isolated-production'
   | 'isolated-read'
-  | 'isolated-secret';
+  | 'isolated-secret'
+  | 'isolated-read-secret';
 
 const permissionGuardProfile = (adapterId: string, permissionId: string) =>
   Object.freeze({
@@ -114,13 +122,18 @@ const hmacProfile = () =>
     }),
   });
 
-const isolatedSecretProfile = () =>
+const isolatedSecretProfile = (requiresWorkspaceRead = false) =>
   Object.freeze({
     kind: 'route-loader' as const,
     runtimeZone: 'server' as const,
     adapterId: 'prodivix.code-export',
     effect: 'read' as const,
-    auth: Object.freeze({ kind: 'public' as const }),
+    auth: requiresWorkspaceRead
+      ? Object.freeze({
+          kind: 'permission' as const,
+          permissionId: 'workspace.read',
+        })
+      : Object.freeze({ kind: 'public' as const }),
     inputSchema: Object.freeze({
       type: 'object',
       additionalProperties: false,
@@ -160,9 +173,11 @@ export const createGoldenG2AuthServerWorkspace = (
         ? GOLDEN_G2_REMOTE_HMAC_FUNCTION_REF
         : binding === 'isolated-secret'
           ? GOLDEN_G2_ISOLATED_SECRET_FUNCTION_REF
-          : binding === 'isolated-read'
-            ? GOLDEN_G2_ISOLATED_READ_FUNCTION_REF
-            : GOLDEN_G2_ISOLATED_OWNER_FUNCTION_REF;
+          : binding === 'isolated-read-secret'
+            ? GOLDEN_G2_ISOLATED_READ_SECRET_FUNCTION_REF
+            : binding === 'isolated-read'
+              ? GOLDEN_G2_ISOLATED_READ_FUNCTION_REF
+              : GOLDEN_G2_ISOLATED_OWNER_FUNCTION_REF;
   return {
     id: GOLDEN_G2_AUTH_SERVER_IDS.workspace,
     workspaceRev: 8,
@@ -173,7 +188,9 @@ export const createGoldenG2AuthServerWorkspace = (
           ? 6
           : binding === 'isolated-secret'
             ? 7
-            : 5,
+            : binding === 'isolated-read-secret'
+              ? 9
+              : 5,
     opSeq: 12,
     treeRootId: 'root',
     treeById: {
@@ -278,6 +295,8 @@ export const useIsolatedSecret = async (
   await context.useSecret?.('signingKey', (material) => { secretLength = material.length; });
   return { kind: 'value' as const, value: { secretLength } };
 };
+
+export const useIsolatedReadSecret = useIsolatedSecret;
 `,
           metadata: {
             'prodivix.serverRuntime': {
@@ -301,6 +320,8 @@ export const useIsolatedSecret = async (
                   ),
                 [GOLDEN_G2_AUTH_SERVER_IDS.isolatedSecretExport]:
                   isolatedSecretProfile(),
+                [GOLDEN_G2_AUTH_SERVER_IDS.isolatedReadSecretExport]:
+                  isolatedSecretProfile(true),
               },
             },
           },
@@ -332,7 +353,11 @@ export const useIsolatedSecret = async (
           value: {
             schemaVersion: '1.0',
             providerId: 'prodivix-product-session',
-            permissionIds: ['workspace.owner', 'workspace.read'],
+            permissionIds: [
+              'workspace.owner',
+              'workspace.read',
+              'workspace.write',
+            ],
           },
         },
       },
@@ -349,7 +374,8 @@ export const useIsolatedSecret = async (
             runtime:
               binding === 'remote-secret'
                 ? { actionRef: functionRef }
-                : binding === 'isolated-secret'
+                : binding === 'isolated-secret' ||
+                    binding === 'isolated-read-secret'
                   ? { loaderRef: functionRef }
                   : { guardRef: functionRef },
           },

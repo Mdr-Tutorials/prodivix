@@ -109,6 +109,11 @@ type DataMutationDispatchRequest = Readonly<{
   }>;
 }>;
 
+type DataSubscriptionOpenRequest = Readonly<{
+  operation: DataOperationReference;
+  input: unknown;
+}>;
+
 type DataMockBehavior =
   | Readonly<{ kind: 'result'; value: unknown; empty: boolean; page?: unknown; delayMs?: number }>
   | Readonly<{ kind: 'error'; code: string; retryable: boolean; delayMs?: number }>
@@ -276,12 +281,19 @@ export const createWorkspaceDataRuntime = () => {
   let runtimeManifest: Promise<DataRuntimeManifest> | undefined;
   let collectionStates: Map<string, DataMockCollectionState> | undefined;
   const cacheEntries = new Map<string, DataRuntimeCacheEntry>();
+  const activeStreams = new Set<DataRuntimeStreamSession>();
   let disposed = false;
 
   const createMutationInvocationId = (mutationSequence: number): string => {
     const dispatchId = globalThis.crypto?.randomUUID?.();
     if (!dispatchId) throw new DataRuntimeFailure('DATA_MUTATION_IDENTITY_UNAVAILABLE');
     return 'standalone:mutation:' + dispatchId + ':' + mutationSequence;
+  };
+
+  const createSubscriptionInvocationId = (streamSequence: number): string => {
+    const streamId = globalThis.crypto?.randomUUID?.();
+    if (!streamId) throw new DataRuntimeFailure('DATA_STREAM_IDENTITY_UNAVAILABLE');
+    return 'standalone:subscription:' + streamId + ':' + streamSequence;
   };
 
   const publish = () => listeners.forEach((listener) => listener());
@@ -296,23 +308,25 @@ export const createWorkspaceDataRuntime = () => {
         '*'
       );
   };
-  const operationKind = (operation: DataOperationReference): 'query' | 'mutation' | undefined =>
-    (operationKinds as Record<string, Record<string, 'query' | 'mutation'>>)[operation.documentId]?.[operation.operationId];
+  const operationKind = (operation: DataOperationReference): 'query' | 'mutation' | 'subscription' | undefined =>
+    (operationKinds as Record<string, Record<string, 'query' | 'mutation' | 'subscription'>>)[operation.documentId]?.[operation.operationId];
   const failure = (
     operation: DataOperationReference,
     currentSequence: number,
     invocationId: string,
     startedAt: number,
-    code: string
+    code: string,
+    attempt = 1,
+    retryable = false
   ): DataLifecycleSnapshot => Object.freeze({
     operation,
     sequence: currentSequence,
     status: 'error',
     invocationId,
-    attempt: 1,
+    attempt,
     startedAt,
     completedAt: Date.now(),
-    error: Object.freeze({ code, message: 'Data operation failed.', retryable: false }),
+    error: Object.freeze({ code, message: 'Data operation failed.', retryable }),
   });
 
   const readProvision = async (): Promise<DataMockProvision> => {
@@ -387,7 +401,11 @@ export const createWorkspaceDataRuntime = () => {
     const delayMs = fixture.behavior.delayMs;
     if (typeof delayMs === 'number' && delayMs > 0)
       await new Promise<void>((resolve) => globalThis.setTimeout(resolve, delayMs));
-    if (fixture.behavior.kind === 'error') throw new Error(fixture.behavior.code);
+    if (fixture.behavior.kind === 'error')
+      throw new DataRuntimeFailure(
+        fixture.behavior.code,
+        fixture.behavior.retryable
+      );
     if (fixture.behavior.kind === 'crud') return executeCrud(fixture.behavior, input);
     return {
       value: cloneJson(fixture.behavior.value),
@@ -496,9 +514,9 @@ export const createWorkspaceDataRuntime = () => {
     let lastFailure: unknown;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
-        result = manifest.mode === 'mock'
+        const candidate = manifest.mode === 'mock'
           ? await invokeMock(operationReference, kind, operationInput)
-          : await invokeLiveHttp({
+          : await invokeLiveData({
               documentId: operationReference.documentId,
               document,
               operation,
@@ -508,9 +526,12 @@ export const createWorkspaceDataRuntime = () => {
               attempt,
               publishNetworkTrace,
             });
+        result = Object.freeze({ ...candidate, attempt });
         break;
       } catch (error) {
-        lastFailure = error;
+        lastFailure = error instanceof DataRuntimeFailure
+          ? new DataRuntimeFailure(error.code, error.retryable, attempt)
+          : error;
         const retryable = error instanceof DataRuntimeFailure && error.retryable;
         if (!retryable || attempt >= maxAttempts) break;
         const exponential = retry?.backoff === 'exponential'
@@ -686,7 +707,7 @@ export const createWorkspaceDataRuntime = () => {
         sequence: currentSequence,
         status: result.empty ? 'empty' : 'success',
         invocationId,
-        attempt: 1,
+        attempt: result.attempt ?? 1,
         startedAt,
         completedAt: Date.now(),
         ...(result.empty ? {} : { value: result.value }),
@@ -699,7 +720,9 @@ export const createWorkspaceDataRuntime = () => {
         currentSequence,
         invocationId,
         startedAt,
-        runtimeFailureCode(error)
+        runtimeFailureCode(error),
+        error instanceof DataRuntimeFailure ? error.attempt : 1,
+        error instanceof DataRuntimeFailure && error.retryable
       ));
     }
     publish();
@@ -788,6 +811,57 @@ export const createWorkspaceDataRuntime = () => {
       return snapshot;
     },
     activateDataBindings: activateBindings,
+    async openDataSubscription(request: DataSubscriptionOpenRequest): Promise<DataRuntimeStreamSession> {
+      if (disposed) throw new DataRuntimeFailure('DATA_RUNTIME_DISPOSED');
+      if (operationKind(request.operation) !== 'subscription')
+        throw new DataRuntimeFailure('DATA_STREAM_OPERATION_UNAVAILABLE');
+      const document = dataDocuments[request.operation.documentId];
+      const operation = document?.operationsById[request.operation.operationId];
+      if (!document || !operation || operation.kind !== 'subscription')
+        throw new DataRuntimeFailure('DATA_STREAM_OPERATION_UNAVAILABLE');
+      const operationInput = cloneJson(request.input);
+      validateRuntimePayload(
+        request.operation.documentId,
+        document,
+        operation.inputSchemaId,
+        operationInput,
+        'input'
+      );
+      const manifest = await (runtimeManifest ??= loadDataRuntimeManifest());
+      if (dataRuntimeTarget.runtimeMode !== 'live' || manifest.mode !== 'live')
+        throw new DataRuntimeFailure('DATA_STREAM_MOCK_UNAVAILABLE');
+      const streamSequence = ++sequence;
+      const upstream = await openRemoteDataStream({
+        documentId: request.operation.documentId,
+        document,
+        operation,
+        operationInput,
+        invocationId: createSubscriptionInvocationId(streamSequence),
+        sequence: streamSequence,
+        publishNetworkTrace,
+      });
+      let closed = false;
+      const session: DataRuntimeStreamSession = Object.freeze({
+        network: upstream.network,
+        async next() {
+          if (closed) return undefined;
+          const event = await upstream.next();
+          if (!event) {
+            closed = true;
+            activeStreams.delete(session);
+          }
+          return event;
+        },
+        close() {
+          if (closed) return;
+          closed = true;
+          activeStreams.delete(session);
+          upstream.close();
+        },
+      });
+      activeStreams.add(session);
+      return session;
+    },
     async dispatchDataMutation(request: DataMutationDispatchRequest): Promise<unknown> {
       if (disposed) throw new Error('DATA_RUNTIME_DISPOSED');
       if (operationKind(request.binding.operation) !== 'mutation') throw new Error('DATA_MUTATION_OPERATION_UNRESOLVED');
@@ -831,6 +905,8 @@ export const createWorkspaceDataRuntime = () => {
     },
     dispose() {
       disposed = true;
+      for (const stream of activeStreams) stream.close();
+      activeStreams.clear();
       listeners.clear();
       networkListeners.clear();
       snapshots.clear();

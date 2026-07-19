@@ -1,10 +1,17 @@
-import { FileDiff, LoaderCircle, RefreshCcw } from 'lucide-react';
+import { FileDiff, LoaderCircle, LocateFixed, RefreshCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { ExecutionFilesystemChangesController } from './useExecutionFilesystemChanges';
+import type {
+  ExecutionFilesystemChangeEntry,
+  ExecutionFilesystemChangesController,
+} from './useExecutionFilesystemChanges';
 
 export const ExecutionFilesystemChangesPanel = ({
   controller,
-}: Readonly<{ controller: ExecutionFilesystemChangesController }>) => {
+  onOpenSource,
+}: Readonly<{
+  controller: ExecutionFilesystemChangesController;
+  onOpenSource?(entry: ExecutionFilesystemChangeEntry): void;
+}>) => {
   const { t } = useTranslation('editor');
   if (controller.status === 'unavailable' || controller.status === 'idle') {
     return (
@@ -78,9 +85,9 @@ export const ExecutionFilesystemChangesPanel = ({
                 : target
               : t(`execution.files.reason.${entry.reason}`);
             return (
-              <label
+              <div
                 key={entry.changeId}
-                className="grid grid-cols-[18px_70px_minmax(140px,1fr)_minmax(120px,1fr)] items-center gap-2 border-b border-(--border-subtle) px-2 py-1.5 text-[10px] last:border-b-0"
+                className="grid grid-cols-[18px_70px_minmax(140px,1fr)_minmax(120px,1fr)_28px] items-center gap-2 border-b border-(--border-subtle) px-2 py-1.5 text-[10px] last:border-b-0"
               >
                 <input
                   type="checkbox"
@@ -112,7 +119,20 @@ export const ExecutionFilesystemChangesPanel = ({
                 >
                   {detail}
                 </span>
-              </label>
+                {entry.primarySourceTrace && onOpenSource ? (
+                  <button
+                    type="button"
+                    className="inline-flex size-7 items-center justify-center rounded-md text-(--text-muted) transition-colors hover:bg-(--bg-raised) hover:text-(--text-primary)"
+                    title={t('execution.openSource')}
+                    aria-label={t('execution.openSource')}
+                    onClick={() => onOpenSource(entry)}
+                  >
+                    <LocateFixed size={12} />
+                  </button>
+                ) : (
+                  <span />
+                )}
+              </div>
             );
           })
         ) : (

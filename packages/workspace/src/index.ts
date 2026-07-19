@@ -17,6 +17,8 @@ export {
   createWorkspaceServerRuntimeCandidateKey,
   projectWorkspaceServerRuntimeAuthoring,
 } from './workspaceServerRuntimeAuthoring';
+export { createWorkspaceReadSecretLoaderTransactionPlan } from './workspaceServerRuntimeReadSecretAuthoring';
+export { createWorkspaceSourceMutationTransactionPlan } from './workspaceServerRuntimeSourceMutationAuthoring';
 export {
   createWorkspaceServerRuntimeAuthConfigurationPlan,
   readWorkspaceServerRuntimeAuthConfiguration,
@@ -352,6 +354,14 @@ export type {
   WorkspaceServerRuntimeRouteBinding,
   WorkspaceServerRuntimeRouteSlot,
 } from './workspaceServerRuntimeAuthoring';
+export type {
+  CreateWorkspaceReadSecretLoaderTransactionPlanInput,
+  WorkspaceReadSecretLoaderTransactionPlanResult,
+} from './workspaceServerRuntimeReadSecretAuthoring';
+export type {
+  CreateWorkspaceSourceMutationTransactionPlanInput,
+  WorkspaceSourceMutationTransactionPlanResult,
+} from './workspaceServerRuntimeSourceMutationAuthoring';
 export type {
   WorkspaceServerRuntimeAuthConfigurationIssue,
   WorkspaceServerRuntimeAuthConfigurationPlanResult,

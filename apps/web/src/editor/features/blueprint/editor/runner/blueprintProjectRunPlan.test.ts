@@ -39,4 +39,30 @@ describe('Blueprint Project Data target planning', () => {
       SERVER_DATA_SECRET_REFERENCE_CANARY
     );
   });
+
+  it('selects the Vue/Vite executable target for Remote Run Mode', () => {
+    const plan = createBlueprintProjectRunPlan(
+      serverDataWorkspace,
+      'remote',
+      [],
+      'vue-vite'
+    );
+
+    expect(
+      plan.status,
+      plan.status === 'blocked' ? JSON.stringify(plan.diagnostics) : ''
+    ).toBe('ready');
+    if (plan.status !== 'ready') return;
+    expect(plan.snapshot.target).toEqual({
+      presetId: 'vue-vite',
+      framework: 'vue',
+      runtime: 'vite',
+    });
+    expect(
+      plan.snapshot.files.some((file) => file.path === 'src/App.vue')
+    ).toBe(true);
+    expect(plan.request.requiredCapabilities).toEqual(
+      expect.arrayContaining(['environment-binding', 'network'])
+    );
+  });
 });

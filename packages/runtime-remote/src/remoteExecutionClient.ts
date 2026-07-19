@@ -124,6 +124,7 @@ const createDiagnostic = (
 export class RemoteExecutionClientError extends Error {
   readonly remoteCode: RemoteExecutionErrorCode;
   readonly retryable: boolean;
+  readonly operation: RemoteExecutionOperation;
   readonly diagnostic: RemoteExecutionClientDiagnostic;
 
   constructor(
@@ -136,16 +137,19 @@ export class RemoteExecutionClientError extends Error {
     this.name = 'RemoteExecutionClientError';
     this.remoteCode = error.code;
     this.retryable = error.retryable;
+    this.operation = operation;
     this.diagnostic = diagnostic;
   }
 }
 
 export class RemoteExecutionRecoveryRequiredError extends Error {
+  readonly operation: RemoteExecutionOperation;
   readonly diagnostic: RemoteExecutionClientDiagnostic;
 
   constructor(message: string, operation: RemoteExecutionOperation) {
     super(message);
     this.name = 'RemoteExecutionRecoveryRequiredError';
+    this.operation = operation;
     this.diagnostic = Object.freeze({
       code: 'EXE-4092',
       severity: 'error',

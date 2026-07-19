@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  createExecutionTerminalCopyText,
+  createExecutionTerminalEmulator,
+  createExecutionTerminalEmulatorCopyText,
+  EXECUTION_TERMINAL_LIMITS,
   type ExecutionTerminalAvailability,
+  type ExecutionTerminalEmulator,
+  type ExecutionTerminalEmulatorSnapshot,
   type ExecutionTerminalOutputRecord,
-  type ExecutionTerminalReadResult,
+  type ExecutionTerminalSize,
 } from '@prodivix/runtime-core';
 import type {
   RemoteExecutionTerminalAccess,
@@ -20,7 +24,8 @@ export type RemoteExecutionTerminalView = Readonly<{
     | 'open-rejected'
     | 'input-pending'
     | 'input-unacknowledged'
-    | 'resize-unacknowledged';
+    | 'resize-unacknowledged'
+    | 'output-invalid';
 }>;
 
 const initialView: RemoteExecutionTerminalView = Object.freeze({
@@ -30,7 +35,16 @@ const initialView: RemoteExecutionTerminalView = Object.freeze({
 });
 
 const maximumLocalRecords = 1_000;
+const maximumQueuedInputBytes = EXECUTION_TERMINAL_LIMITS.maximumInputBytes * 2;
+const maximumQueuedInputChunks = 256;
 const pollIntervalMs = 250;
+const defaultTerminalSize = Object.freeze({ columns: 100, rows: 30 });
+
+type QueuedTerminalInput = {
+  data: string;
+  byteLength: number;
+  resolve(value: boolean): void;
+};
 
 /** Keeps the short Terminal bearer outside React state and reconnects by cursor. */
 export const useRemoteExecutionTerminal = (input: {
@@ -39,6 +53,12 @@ export const useRemoteExecutionTerminal = (input: {
   client?: RemoteExecutionTerminalClient;
 }) => {
   const [view, setView] = useState<RemoteExecutionTerminalView>(initialView);
+  const [emulatorController] = useState<ExecutionTerminalEmulator>(() =>
+    createExecutionTerminalEmulator(defaultTerminalSize)
+  );
+  const [emulator, setEmulator] = useState<ExecutionTerminalEmulatorSnapshot>(
+    () => emulatorController.getSnapshot()
+  );
   const accessRef = useRef<RemoteExecutionTerminalAccess | undefined>(
     undefined
   );
@@ -49,6 +69,9 @@ export const useRemoteExecutionTerminal = (input: {
   const pendingInputRef = useRef<
     Readonly<{ clientSequence: number; data: string }> | undefined
   >(undefined);
+  const inputQueueRef = useRef<QueuedTerminalInput[]>([]);
+  const queuedInputBytesRef = useRef(0);
+  const drainingInputRef = useRef(false);
   const lastSizeRef = useRef<
     Readonly<{ columns: number; rows: number }> | undefined
   >(undefined);
@@ -56,6 +79,21 @@ export const useRemoteExecutionTerminal = (input: {
 
   const clearCredential = useCallback(() => {
     accessRef.current = undefined;
+  }, []);
+
+  const resetEmulator = useCallback(
+    (size: ExecutionTerminalSize = defaultTerminalSize) => {
+      const snapshot = emulatorController.reset(size);
+      setEmulator(snapshot);
+      return snapshot;
+    },
+    [emulatorController]
+  );
+
+  const rejectQueuedInputs = useCallback(() => {
+    inputQueueRef.current.splice(0).forEach((entry) => entry.resolve(false));
+    queuedInputBytesRef.current = 0;
+    pendingInputRef.current = undefined;
   }, []);
 
   const resume = useCallback(async (): Promise<boolean> => {
@@ -67,6 +105,7 @@ export const useRemoteExecutionTerminal = (input: {
       const resumed = await client.resume({ executionId, terminalSessionId });
       accessRef.current = resumed.access;
       lastSizeRef.current = resumed.snapshot.size;
+      setEmulator(emulatorController.resize(resumed.snapshot.size));
       setView((current) => ({ ...current, phase: 'open', error: undefined }));
       return true;
     } catch {
@@ -78,7 +117,7 @@ export const useRemoteExecutionTerminal = (input: {
       }));
       return false;
     }
-  }, [clearCredential, input.client]);
+  }, [clearCredential, emulatorController, input.client]);
 
   const refresh = useCallback(async (): Promise<void> => {
     if (busyRef.current || !input.client || !input.enabled) return;
@@ -101,13 +140,33 @@ export const useRemoteExecutionTerminal = (input: {
           accessToken: access.token,
           afterCursor: cursorRef.current,
         });
+        let emulatorSnapshot: ExecutionTerminalEmulatorSnapshot;
+        try {
+          emulatorSnapshot = emulatorController.consume({
+            records: result.records,
+            gap: result.gap,
+          });
+        } catch {
+          clearCredential();
+          setView((current) => ({
+            ...current,
+            phase: 'error',
+            error: 'output-invalid',
+          }));
+          return;
+        }
         cursorRef.current = result.nextCursor;
+        setEmulator(emulatorSnapshot);
         setView((current) => ({
           phase: result.status === 'closed' ? 'closed' : 'open',
           records: Object.freeze(
             [...current.records, ...result.records].slice(-maximumLocalRecords)
           ),
-          gap: current.gap || result.gap,
+          gap:
+            current.gap ||
+            result.gap ||
+            current.records.length + result.records.length >
+              maximumLocalRecords,
           error: undefined,
         }));
         if (result.status === 'closed') clearCredential();
@@ -123,7 +182,13 @@ export const useRemoteExecutionTerminal = (input: {
     } finally {
       busyRef.current = false;
     }
-  }, [clearCredential, input.client, input.enabled, resume]);
+  }, [
+    clearCredential,
+    emulatorController,
+    input.client,
+    input.enabled,
+    resume,
+  ]);
 
   const open = useCallback(async (): Promise<boolean> => {
     if (
@@ -153,8 +218,9 @@ export const useRemoteExecutionTerminal = (input: {
       accessRef.current = opened.access;
       cursorRef.current = 0;
       clientSequenceRef.current = 1;
-      pendingInputRef.current = undefined;
+      rejectQueuedInputs();
       lastSizeRef.current = opened.snapshot.size;
+      resetEmulator(opened.snapshot.size);
       setView({ ...initialView, phase: 'open' });
       return true;
     } catch {
@@ -168,51 +234,103 @@ export const useRemoteExecutionTerminal = (input: {
     } finally {
       busyRef.current = false;
     }
-  }, [clearCredential, input.availability, input.client, resume]);
+  }, [
+    clearCredential,
+    input.availability,
+    input.client,
+    rejectQueuedInputs,
+    resetEmulator,
+    resume,
+  ]);
+
+  const drainInputQueue = useCallback(async (): Promise<void> => {
+    if (drainingInputRef.current) return;
+    drainingInputRef.current = true;
+    try {
+      while (inputQueueRef.current.length) {
+        const queued = inputQueueRef.current[0]!;
+        const access = accessRef.current;
+        const executionId = executionIdRef.current;
+        const terminalSessionId = terminalSessionIdRef.current;
+        if (!input.client || !access || !executionId || !terminalSessionId)
+          return;
+        const pending = pendingInputRef.current;
+        if (pending && pending.data !== queued.data) {
+          setView((current) => ({ ...current, error: 'input-pending' }));
+          return;
+        }
+        const clientSequence =
+          pending?.clientSequence ?? clientSequenceRef.current;
+        pendingInputRef.current = Object.freeze({
+          clientSequence,
+          data: queued.data,
+        });
+        try {
+          const result = await input.client.write({
+            executionId,
+            terminalSessionId,
+            accessToken: access.token,
+            data: queued.data,
+            clientSequence,
+          });
+          if (result.status !== 'accepted' && result.status !== 'duplicate') {
+            inputQueueRef.current.shift();
+            queuedInputBytesRef.current -= queued.byteLength;
+            pendingInputRef.current = undefined;
+            queued.resolve(false);
+            continue;
+          }
+          inputQueueRef.current.shift();
+          queuedInputBytesRef.current -= queued.byteLength;
+          pendingInputRef.current = undefined;
+          clientSequenceRef.current += 1;
+          queued.resolve(true);
+          setView((current) => ({ ...current, error: undefined }));
+        } catch {
+          clearCredential();
+          setView((current) => ({
+            ...current,
+            phase: 'reconnecting',
+            error: 'input-unacknowledged',
+          }));
+          return;
+        }
+      }
+    } finally {
+      drainingInputRef.current = false;
+    }
+  }, [clearCredential, input.client]);
 
   const send = useCallback(
-    async (data: string): Promise<boolean> => {
+    (data: string): Promise<boolean> => {
+      const byteLength = new TextEncoder().encode(data).byteLength;
       const access = accessRef.current;
       const executionId = executionIdRef.current;
       const terminalSessionId = terminalSessionIdRef.current;
-      if (!input.client || !access || !executionId || !terminalSessionId)
-        return false;
-      const pending = pendingInputRef.current;
-      if (pending && pending.data !== data) {
+      if (
+        !data ||
+        byteLength > EXECUTION_TERMINAL_LIMITS.maximumInputBytes ||
+        !input.client ||
+        !access ||
+        !executionId ||
+        !terminalSessionId ||
+        inputQueueRef.current.length >= maximumQueuedInputChunks ||
+        queuedInputBytesRef.current + byteLength > maximumQueuedInputBytes
+      ) {
         setView((current) => ({
           ...current,
           error: 'input-pending',
         }));
-        return false;
+        return Promise.resolve(false);
       }
-      const clientSequence =
-        pending?.clientSequence ?? clientSequenceRef.current;
-      pendingInputRef.current = Object.freeze({ clientSequence, data });
-      try {
-        const result = await input.client.write({
-          executionId,
-          terminalSessionId,
-          accessToken: access.token,
-          data,
-          clientSequence,
-        });
-        if (result.status !== 'accepted' && result.status !== 'duplicate')
-          return false;
-        pendingInputRef.current = undefined;
-        clientSequenceRef.current += 1;
-        setView((current) => ({ ...current, error: undefined }));
-        return true;
-      } catch {
-        clearCredential();
-        setView((current) => ({
-          ...current,
-          phase: 'reconnecting',
-          error: 'input-unacknowledged',
-        }));
-        return false;
-      }
+      const queued = new Promise<boolean>((resolve) => {
+        inputQueueRef.current.push({ data, byteLength, resolve });
+        queuedInputBytesRef.current += byteLength;
+      });
+      void drainInputQueue();
+      return queued;
     },
-    [clearCredential, input.client]
+    [drainInputQueue, input.client]
   );
 
   const resize = useCallback(
@@ -239,6 +357,7 @@ export const useRemoteExecutionTerminal = (input: {
         if (result.status !== 'accepted' && result.status !== 'unchanged')
           return false;
         lastSizeRef.current = result.size;
+        setEmulator(emulatorController.resize(result.size));
         return true;
       } catch {
         clearCredential();
@@ -250,7 +369,7 @@ export const useRemoteExecutionTerminal = (input: {
         return false;
       }
     },
-    [clearCredential, input.client]
+    [clearCredential, emulatorController, input.client]
   );
 
   const interrupt = useCallback(async (): Promise<boolean> => {
@@ -279,7 +398,7 @@ export const useRemoteExecutionTerminal = (input: {
     clearCredential();
     executionIdRef.current = undefined;
     terminalSessionIdRef.current = undefined;
-    pendingInputRef.current = undefined;
+    rejectQueuedInputs();
     lastSizeRef.current = undefined;
     setView((current) => ({ ...current, phase: 'closed' }));
     if (!input.client || !access || !executionId || !terminalSessionId) return;
@@ -290,7 +409,7 @@ export const useRemoteExecutionTerminal = (input: {
         accessToken: access.token,
       })
       .catch(() => undefined);
-  }, [clearCredential, input.client]);
+  }, [clearCredential, input.client, rejectQueuedInputs]);
 
   useEffect(() => {
     if (!input.enabled || !['open', 'reconnecting'].includes(view.phase))
@@ -303,9 +422,14 @@ export const useRemoteExecutionTerminal = (input: {
   useEffect(
     () => () => {
       clearCredential();
+      rejectQueuedInputs();
     },
-    [clearCredential]
+    [clearCredential, rejectQueuedInputs]
   );
+
+  useEffect(() => {
+    if (view.phase === 'open') void drainInputQueue();
+  }, [drainInputQueue, view.phase]);
 
   useEffect(() => {
     if (
@@ -317,34 +441,28 @@ export const useRemoteExecutionTerminal = (input: {
     clearCredential();
     executionIdRef.current = undefined;
     terminalSessionIdRef.current = undefined;
-    pendingInputRef.current = undefined;
+    rejectQueuedInputs();
     lastSizeRef.current = undefined;
     cursorRef.current = 0;
     clientSequenceRef.current = 1;
+    resetEmulator();
     setView(initialView);
-  }, [clearCredential, input.availability, input.client]);
+  }, [
+    clearCredential,
+    input.availability,
+    input.client,
+    rejectQueuedInputs,
+    resetEmulator,
+  ]);
 
-  const copyText = useMemo(() => {
-    const first = view.records[0];
-    const latestCursor = view.records.at(-1)?.cursor ?? 0;
-    const result: ExecutionTerminalReadResult = Object.freeze({
-      terminalSessionId: first?.terminalSessionId ?? 'unavailable',
-      executionId: first?.executionId ?? 'unavailable',
-      jobId: first?.jobId ?? 'unavailable',
-      status: view.phase === 'closed' ? 'closed' : 'open',
-      afterCursor: 0,
-      nextCursor: latestCursor,
-      latestCursor,
-      earliestAvailableCursor: first?.cursor ?? latestCursor,
-      gap: view.gap,
-      hasMore: false,
-      records: view.records,
-    });
-    return createExecutionTerminalCopyText(result);
-  }, [view]);
+  const copyText = useMemo(
+    () => createExecutionTerminalEmulatorCopyText(emulator),
+    [emulator]
+  );
 
   return {
     view,
+    emulator,
     copyText,
     open,
     refresh,

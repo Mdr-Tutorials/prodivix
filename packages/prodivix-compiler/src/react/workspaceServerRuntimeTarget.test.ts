@@ -647,6 +647,37 @@ describe('Workspace Auth/Server runtime target Gate', () => {
     }
   });
 
+  it('blocks workspace.write project-source mutation even with an exact deterministic fixture', () => {
+    const provision = createServerTestProvision({
+      exportName: 'updateProfile',
+      outcome: { kind: 'value', value: { updated: true } },
+    });
+    const result = generateWorkspaceReactViteExecutableProject(
+      createServerWorkspace({
+        kind: 'route-action',
+        adapterId: 'prodivix.code-export',
+        auth: { kind: 'permission', permissionId: 'workspace.write' },
+        permissionIds: ['workspace.write'],
+        effect: 'mutation',
+      }),
+      {
+        serverRuntimeTarget: DETERMINISTIC_TEST_SERVER_RUNTIME_TARGET,
+        serverRuntimeMockProvision: {
+          ...provision,
+          permissions: [{ permissionId: 'workspace.write', allowed: true }],
+        },
+      }
+    );
+    expect(result.status).toBe('blocked');
+    if (result.status === 'blocked') {
+      expect(result.diagnostics).toContainEqual(
+        expect.objectContaining({
+          code: 'WKS-EXPORT-SERVER-TEST-SOURCE-MUTATION-UNSUPPORTED',
+        })
+      );
+    }
+  });
+
   it('generates a typed cancellable Route action dispatcher for deterministic mutation tests', () => {
     const result = generateWorkspaceReactViteExecutableProject(
       createServerWorkspace({ kind: 'route-action' }),

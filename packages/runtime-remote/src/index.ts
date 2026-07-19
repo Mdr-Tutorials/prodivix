@@ -23,10 +23,31 @@ export {
   RemoteExecutionHttpTransportError,
 } from './remoteExecutionHttpTransport';
 export {
+  createRemoteExecutionRecoveryPlan,
+  reconnectRemoteExecution,
+  recoverRemoteExecutionArtifact,
+} from './remoteExecutionRecovery';
+export {
+  assessRemoteExecutionRegionalRecovery,
+  createRemoteExecutionRegionalRecoveryCoordinator,
+  createRemoteExecutionRegionalTrafficGate,
+  REMOTE_EXECUTION_REGIONAL_RECOVERY_FORMAT,
+  REMOTE_EXECUTION_REGIONAL_RECOVERY_VERSION,
+  RemoteExecutionRegionalRecoveryError,
+} from './remoteExecutionRegionalRecovery';
+export {
   createRemoteExecutionTerminalBroker,
   REMOTE_EXECUTION_TERMINAL_ERROR_CODES,
   RemoteExecutionTerminalBrokerError,
 } from './remoteExecutionTerminalBroker';
+export { createReplicatedRemoteExecutionTerminalBroker } from './replicatedRemoteExecutionTerminalBroker';
+export {
+  createMemoryRemoteExecutionTerminalStateStore,
+  REMOTE_EXECUTION_TERMINAL_STATE_FORMAT,
+  REMOTE_EXECUTION_TERMINAL_STATE_LIMITS,
+  REMOTE_EXECUTION_TERMINAL_STATE_VERSION,
+  RemoteExecutionTerminalStateCipherUnavailableError,
+} from './remoteExecutionTerminalState';
 export { createRemoteExecutionTerminalClient } from './remoteExecutionTerminalClient';
 export {
   createRemoteExecutionTerminalHttpTransport,
@@ -98,6 +119,13 @@ export type {
   CreateRemoteExecutionTerminalBrokerOptions,
   RemoteExecutionTerminalErrorCode,
 } from './remoteExecutionTerminalBroker';
+export type { CreateReplicatedRemoteExecutionTerminalBrokerOptions } from './replicatedRemoteExecutionTerminalBroker';
+export type {
+  RemoteExecutionTerminalStateCipher,
+  RemoteExecutionTerminalStateCreateResult,
+  RemoteExecutionTerminalStateRecord,
+  RemoteExecutionTerminalStateStore,
+} from './remoteExecutionTerminalState';
 export type { CreateRemoteExecutionTerminalClientOptions } from './remoteExecutionTerminalClient';
 export type { CreateRemoteExecutionTerminalHttpTransportOptions } from './remoteExecutionTerminalHttpTransport';
 export type {
@@ -163,6 +191,26 @@ export type {
   RemoteExecutionHttpRequest,
   RemoteExecutionHttpResponse,
 } from './remoteExecutionHttpTransport';
+export type {
+  RemoteExecutionArtifactRecovery,
+  RemoteExecutionReconnectResult,
+  RemoteExecutionRecoveryPlan,
+} from './remoteExecutionRecovery';
+export type {
+  RemoteExecutionRegionalRecoveryAssessment,
+  RemoteExecutionRegionalRecoveryCheckpoint,
+  RemoteExecutionRegionalRecoveryCoordinator,
+  RemoteExecutionRegionalRecoveryLease,
+  RemoteExecutionRegionalRecoveryProbe,
+  RemoteExecutionRegionalRecoveryReadyMode,
+  RemoteExecutionRegionalTerminalCheckpoint,
+  RemoteExecutionRegionalTrafficAuthority,
+  RemoteExecutionRegionalTrafficCutoverEvidence,
+  RemoteExecutionRegionalTrafficCutoverResult,
+  RemoteExecutionRegionalTrafficGate,
+  RemoteExecutionRegionalTrafficPermit,
+  RemoteExecutionRegionalTrafficState,
+} from './remoteExecutionRegionalRecovery';
 export type {
   CreateRemoteExecutionProviderOptions,
   ResolveRemoteExecutionSnapshot,

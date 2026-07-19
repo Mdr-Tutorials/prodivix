@@ -1,5 +1,6 @@
 import {
   createExecutionNetworkTrace,
+  normalizeExecutionSourceTraces,
   RUNTIME_ZONES,
   type ExecutionEnvironmentSnapshotRef,
   type ExecutionEnvironmentResolutionLease,
@@ -107,7 +108,7 @@ export type DataOperationAdapterDescriptor = Readonly<{
   runtimeZones: readonly RuntimeZone[];
   modes: readonly ('mock' | 'live')[];
   capabilities: readonly (
-    'network' | 'environment-binding' | 'idempotency-key'
+    'network' | 'environment-binding' | 'idempotency-key' | 'stream'
   )[];
 }>;
 
@@ -126,9 +127,19 @@ export type DataOperationAdapterResult = Readonly<{
   page?: DataPageSnapshot;
 }>;
 
+export type DataOperationAdapterStream = Readonly<{
+  events: AsyncIterable<DataJsonValue>;
+  close(reason?: string): void | Promise<void>;
+}>;
+
+export type DataOperationAdapterStreamInput = DataOperationAdapterInput;
+
 export type DataOperationAdapter = Readonly<{
   descriptor: DataOperationAdapterDescriptor;
   invoke(input: DataOperationAdapterInput): Promise<DataOperationAdapterResult>;
+  openStream?(
+    input: DataOperationAdapterStreamInput
+  ): Promise<DataOperationAdapterStream>;
 }>;
 
 export type DataOperationAdapterRegistry = Readonly<{
@@ -329,6 +340,7 @@ export const createDataOperationInvocation = (
     throw new TypeError('Data invocation runtime zone is unsupported.');
   if (input.mode !== 'mock' && input.mode !== 'live')
     throw new TypeError('Data invocation mode is unsupported.');
+  const sourceTrace = normalizeExecutionSourceTraces(input.sourceTrace);
   return Object.freeze({
     invocationId: normalized(input.invocationId, 'Data invocationId'),
     sequence: input.sequence,
@@ -357,9 +369,7 @@ export const createDataOperationInvocation = (
     ...(trigger ? { trigger } : {}),
     input: cloneDataJsonValue(input.input),
     ...(input.environment ? { environment: input.environment } : {}),
-    ...(input.sourceTrace
-      ? { sourceTrace: Object.freeze([...input.sourceTrace]) }
-      : {}),
+    ...(sourceTrace ? { sourceTrace } : {}),
   });
 };
 
@@ -444,7 +454,8 @@ const descriptor = (
       (capability) =>
         capability !== 'network' &&
         capability !== 'environment-binding' &&
-        capability !== 'idempotency-key'
+        capability !== 'idempotency-key' &&
+        capability !== 'stream'
     )
   )
     throw new TypeError('Data adapter capability is unsupported.');
@@ -474,6 +485,17 @@ export const createDataOperationAdapterRegistry =
         if (typeof adapter.invoke !== 'function')
           throw new TypeError('Data adapter invoke must be a function.');
         const normalizedDescriptor = descriptor(adapter.descriptor);
+        const declaresStream =
+          normalizedDescriptor.capabilities.includes('stream');
+        const acceptsSubscription =
+          normalizedDescriptor.operationKinds.includes('subscription');
+        if (
+          declaresStream !== Boolean(adapter.openStream) ||
+          declaresStream !== acceptsSubscription
+        )
+          throw new TypeError(
+            'Data adapter stream capability, subscription kind, and openStream contract must be declared together.'
+          );
         if (adapters.has(normalizedDescriptor.id))
           throw new TypeError(
             `Duplicate Data adapter: ${normalizedDescriptor.id}.`
@@ -481,6 +503,7 @@ export const createDataOperationAdapterRegistry =
         const registered = Object.freeze({
           descriptor: normalizedDescriptor,
           invoke: adapter.invoke,
+          ...(adapter.openStream ? { openStream: adapter.openStream } : {}),
         });
         adapters.set(normalizedDescriptor.id, registered);
         return () => {
@@ -618,6 +641,10 @@ export const executeDataOperation = async (
     input.document.operationsById[input.invocation.operation.operationId];
   if (!operation)
     throw new Error('Data runtime operation does not exist in the document.');
+  if (operation.kind === 'subscription')
+    throw new Error(
+      'Subscription operations require the bounded Data stream session runtime.'
+    );
   const source = input.document.source;
   if (source.runtimeZone !== input.invocation.runtimeZone)
     throw new Error('Data source runtime zone does not match invocation.');

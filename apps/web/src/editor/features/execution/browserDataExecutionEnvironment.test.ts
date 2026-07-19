@@ -246,7 +246,7 @@ describe('Browser Data execution composition', () => {
     environment.dispose();
   });
 
-  it('denies Browser Test live Data unless explicitly enabled', () => {
+  it('keeps Browser Test permanently mock-only', () => {
     const environment = createBrowserTestDataExecutionEnvironment({
       mock: { fixtureSetId: 'empty', fixtures: [] },
     });
@@ -271,7 +271,13 @@ describe('Browser Data execution composition', () => {
         lifecycleChannel: createDataLifecycleChannel(),
         signal: new AbortController().signal,
       })
-    ).toThrow(/denies live mode/u);
+    ).toThrow(/mock-only/u);
+    expect(() =>
+      createBrowserTestDataExecutionEnvironment({
+        mock: { fixtureSetId: 'empty', fixtures: [] },
+        environmentResolution: {} as never,
+      })
+    ).toThrow(/rejects environment resolution/u);
   });
 
   it('dispatches typed query input and suppresses unchanged Browser activations', async () => {

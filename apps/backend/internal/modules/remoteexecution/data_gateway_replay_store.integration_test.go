@@ -127,8 +127,12 @@ func recordDataGatewayReplayExecution(t *testing.T, store *Store, executionID st
 	if err := store.RecordExecution(ctx, ExecutionAuthority{
 		ExecutionID:        executionID,
 		WorkspaceID:        "postgres-replay-workspace",
-		OwnerID:            "postgres-replay-owner",
+		PrincipalID:        "postgres-replay-owner",
 		SessionID:          "postgres-replay-session-" + executionID,
+		Permissions:        cloneExecutionPermissions(workspaceOwnerExecutionPermissions),
+		ProviderID:         "prodivix.remote.preview",
+		Profile:            "preview",
+		RuntimeZone:        "client",
 		SnapshotID:         "snapshot-" + executionID,
 		PartitionRevisions: map[string]string{"workspace": "1"},
 	}); err != nil {

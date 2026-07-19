@@ -45,7 +45,10 @@ export type CompilePIRReactDocumentInput = Readonly<{
   moduleIdByDocumentId: Readonly<Record<string, string>>;
   moduleNameByDocumentId: Readonly<Record<string, string>>;
   dataOperationKindsByDocumentId: Readonly<
-    Record<string, Readonly<Record<string, 'query' | 'mutation'>>>
+    Record<
+      string,
+      Readonly<Record<string, 'query' | 'mutation' | 'subscription'>>
+    >
   >;
   adapter?: TargetAdapter;
   packageResolver?: PackageResolverOptions;

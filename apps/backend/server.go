@@ -53,11 +53,16 @@ func NewServer(cfg backendconfig.Config) (*Server, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("disable untrusted proxy headers: %w", err)
 	}
+	modules, err := backendapp.NewRuntimeModules(db, cfg.TokenTTL, cfg)
+	if err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	server := &Server{
 		cfg:     cfg,
 		db:      db,
 		router:  router,
-		modules: backendapp.NewRuntimeModules(db, cfg.TokenTTL, cfg),
+		modules: modules,
 	}
 	router.Use(backendmiddleware.CORS(cfg.AllowedOrigins))
 	server.registerRoutes()

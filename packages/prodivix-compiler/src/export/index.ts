@@ -85,6 +85,13 @@ export {
   createReactViteScaffoldContributions,
 } from '#src/export/presets/reactVite';
 export {
+  VUE_VITE_DEPENDENCIES,
+  VUE_VITE_DEV_DEPENDENCIES,
+  VUE_VITE_PACKAGE_MANAGER,
+  createVueViteExportPreset,
+  createVueViteScaffoldContributions,
+} from '#src/export/presets/vueVite';
+export {
   createStyleImportIntents,
   planExportStyleSheets,
 } from '#src/export/stylePlanner';

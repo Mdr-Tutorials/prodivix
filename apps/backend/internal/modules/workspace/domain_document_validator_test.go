@@ -73,6 +73,43 @@ func TestStandaloneDomainDocumentValidation(t *testing.T) {
 			content:      `{"wireVersion":1,"source":{"id":"catalog","adapterId":"rest","runtimeZone":"server","bindingsById":{"catalog-api-key":{"kind":"secret-ref","reference":{"bindingId":"catalog-api-key"}}},"configurationByKey":{"baseUrl":{"kind":"literal","value":"https://example.test"},"authorization":{"kind":"secret-ref","reference":{"bindingId":"catalog-api-key"}}}},"schemasById":{"product-list":{"id":"product-list","schema":{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"array"}}},"operationsById":{"list-products":{"id":"list-products","kind":"query","outputSchemaId":"product-list","configurationByKey":{},"policies":{}}}}`,
 		},
 		{
+			name:         "data source OpenAPI import provenance",
+			documentType: WorkspaceDocumentTypeDataSource,
+			content:      `{"wireVersion":1,"source":{"id":"catalog","adapterId":"core.http","runtimeZone":"server","bindingsById":{},"configurationByKey":{"baseUrl":{"kind":"literal","value":"https://example.test"}}},"schemasById":{"product-list":{"id":"product-list","schema":{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"array"}}},"operationsById":{"list-products":{"id":"list-products","kind":"query","outputSchemaId":"product-list","configurationByKey":{"method":{"kind":"literal","value":"GET"},"path":{"kind":"literal","value":"/products"}},"policies":{}}},"importProvenanceById":{"catalog":{"id":"catalog","kind":"openapi-3.1","externalDocumentId":"https://example.test/openapi.json","sourceDigest":"sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","sourceImportedDigest":"sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","schemasByExternalId":{"#/components/schemas/ProductList":{"targetId":"product-list","importedDigest":"sha256-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}},"operationsByExternalId":{"operation:listProducts":{"targetId":"list-products","importedDigest":"sha256-dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}}}}}`,
+		},
+		{
+			name:         "data source GraphQL import provenance",
+			documentType: WorkspaceDocumentTypeDataSource,
+			content:      `{"wireVersion":1,"source":{"id":"catalog","adapterId":"core.graphql","runtimeZone":"client","bindingsById":{},"configurationByKey":{}},"schemasById":{"products":{"id":"products","schema":{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"array"}}},"operationsById":{"list-products":{"id":"list-products","kind":"query","outputSchemaId":"products","configurationByKey":{},"policies":{}}},"importProvenanceById":{"catalog":{"id":"catalog","kind":"graphql-sdl","externalDocumentId":"catalog.graphql","sourceDigest":"sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","sourceImportedDigest":"sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","schemasByExternalId":{},"operationsByExternalId":{"query:ListProducts":{"targetId":"list-products","importedDigest":"sha256-dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}}}}}`,
+		},
+		{
+			name:         "data source AsyncAPI import provenance",
+			documentType: WorkspaceDocumentTypeDataSource,
+			content:      `{"wireVersion":1,"source":{"id":"events","adapterId":"core.asyncapi","runtimeZone":"client","bindingsById":{},"configurationByKey":{}},"schemasById":{"receipt":{"id":"receipt","schema":{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}}},"operationsById":{"publish-order":{"id":"publish-order","kind":"mutation","outputSchemaId":"receipt","configurationByKey":{},"policies":{}}},"importProvenanceById":{"events":{"id":"events","kind":"asyncapi-3.0","externalDocumentId":"events.asyncapi.json","sourceDigest":"sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","sourceImportedDigest":"sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","schemasByExternalId":{},"operationsByExternalId":{"operation:publishOrder":{"targetId":"publish-order","importedDigest":"sha256-dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}}}}}`,
+		},
+		{
+			name:         "data source subscription current",
+			documentType: WorkspaceDocumentTypeDataSource,
+			content:      `{"wireVersion":1,"source":{"id":"events","adapterId":"core.graphql","runtimeZone":"edge","bindingsById":{},"configurationByKey":{}},"schemasById":{"event":{"id":"event","schema":true}},"operationsById":{"watch":{"id":"watch","kind":"subscription","outputSchemaId":"event","configurationByKey":{},"policies":{}}}}`,
+		},
+		{
+			name:         "data source subscription rejects finite policies",
+			documentType: WorkspaceDocumentTypeDataSource,
+			content:      `{"wireVersion":1,"source":{"id":"events","adapterId":"core.graphql","runtimeZone":"edge","bindingsById":{},"configurationByKey":{}},"schemasById":{"event":{"id":"event","schema":true}},"operationsById":{"watch":{"id":"watch","kind":"subscription","outputSchemaId":"event","configurationByKey":{},"policies":{"retry":{"maxAttempts":1,"backoff":"fixed","initialDelayMs":0}}}}}`,
+			wantError:    ErrDataSourceValidationFailed,
+		},
+		{
+			name:         "data source mutation invocation key current",
+			documentType: WorkspaceDocumentTypeDataSource,
+			content:      `{"wireVersion":1,"source":{"id":"catalog","adapterId":"core.http","runtimeZone":"server","bindingsById":{},"configurationByKey":{}},"schemasById":{"product":{"id":"product","schema":true}},"operationsById":{"create-product":{"id":"create-product","kind":"mutation","outputSchemaId":"product","configurationByKey":{},"policies":{"retry":{"maxAttempts":2,"backoff":"fixed","initialDelayMs":10},"idempotency":{"kind":"invocation-key"}}}}}`,
+		},
+		{
+			name:         "data source rejects import provenance target drift",
+			documentType: WorkspaceDocumentTypeDataSource,
+			content:      `{"wireVersion":1,"source":{"id":"catalog","adapterId":"core.http","runtimeZone":"server","bindingsById":{},"configurationByKey":{}},"schemasById":{"product-list":{"id":"product-list","schema":true}},"operationsById":{"list-products":{"id":"list-products","kind":"query","outputSchemaId":"product-list","configurationByKey":{},"policies":{}}},"importProvenanceById":{"catalog":{"id":"catalog","kind":"openapi-3.1","externalDocumentId":"catalog","sourceDigest":"sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","sourceImportedDigest":"sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","schemasByExternalId":{"schema:missing":{"targetId":"missing","importedDigest":"sha256-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}},"operationsByExternalId":{}}}}`,
+			wantError:    ErrDataSourceValidationFailed,
+		},
+		{
 			name:         "data source rejects value-bearing secret refs",
 			documentType: WorkspaceDocumentTypeDataSource,
 			content:      `{"wireVersion":1,"source":{"id":"catalog","adapterId":"rest","runtimeZone":"server","bindingsById":{"api-key":{"kind":"secret-ref","reference":{"bindingId":"api-key"},"value":"plaintext"}},"configurationByKey":{}},"schemasById":{"product-list":{"id":"product-list","schema":true}},"operationsById":{"list-products":{"id":"list-products","kind":"query","outputSchemaId":"product-list","configurationByKey":{},"policies":{}}}}`,
@@ -163,7 +200,7 @@ func TestStandaloneDomainPatchPathsUseCurrentCollections(t *testing.T) {
 			t.Fatalf("expected legacy Animation path %s to be rejected", path)
 		}
 	}
-	for _, path := range []string{"/source/adapterId", "/schemasById/product", "/operationsById/list-products/policies"} {
+	for _, path := range []string{"/source/adapterId", "/schemasById/product", "/operationsById/list-products/policies", "/importProvenanceById/catalog/sourceDigest"} {
 		if err := validateWorkspaceDataSourcePatchPath(path); err != nil {
 			t.Fatalf("expected Data source path %s to be allowed: %v", path, err)
 		}

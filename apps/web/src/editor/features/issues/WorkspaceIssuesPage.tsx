@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   buildDiagnosticPresentation,
   queryDiagnosticIssues,
@@ -57,28 +57,69 @@ const preferredSurfaceForIssue = (
   if (issue.diagnostic.domain === 'animation') return 'animation' as const;
   if (issue.diagnostic.domain === 'nodegraph') return 'nodegraph' as const;
   if (issue.diagnostic.domain === 'code') return 'resources' as const;
+  if (issue.diagnostic.domain === 'data') return 'resources' as const;
   return undefined;
+};
+
+export const matchesDataIssueTarget = (
+  issue: DiagnosticIssue,
+  documentId: string | undefined,
+  operationId: string | undefined
+): boolean => {
+  if (!documentId) return issue.diagnostic.domain === 'data';
+  const target = issue.diagnostic.targetRef;
+  if (!target) return false;
+  if (target.kind === 'data-source') {
+    return !operationId && target.documentId === documentId;
+  }
+  if (target.kind !== 'data-operation') return false;
+  return (
+    target.documentId === documentId &&
+    (!operationId || target.operationId === operationId)
+  );
 };
 
 export function WorkspaceIssuesPage() {
   const { t } = useTranslation('editor');
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const collection = useWorkspaceIssuesStore((state) => state.collection);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<StatusFilter>('open');
   const [severity, setSeverity] = useState<SeverityFilter>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const dataDomain = searchParams.get('domain') === 'data';
+  const dataDocumentId = dataDomain
+    ? (searchParams.get('documentId') ?? undefined)
+    : undefined;
+  const dataOperationId = dataDomain
+    ? (searchParams.get('operationId') ?? undefined)
+    : undefined;
 
   const issues = useMemo(() => {
     if (!collection) return [];
-    return queryDiagnosticIssues(collection, {
+    const queried = queryDiagnosticIssues(collection, {
       statuses: statusQuery(status),
       severities: severity === 'all' ? undefined : [severity],
+      domains: dataDomain ? ['data'] : undefined,
       text: search,
     });
-  }, [collection, search, severity, status]);
+    return dataDomain
+      ? queried.filter((issue) =>
+          matchesDataIssueTarget(issue, dataDocumentId, dataOperationId)
+        )
+      : queried;
+  }, [
+    collection,
+    dataDocumentId,
+    dataDomain,
+    dataOperationId,
+    search,
+    severity,
+    status,
+  ]);
   const openIssues = useMemo(
     () =>
       collection
@@ -189,6 +230,22 @@ export function WorkspaceIssuesPage() {
           <option value="warning">{t('issues.severity.warning')}</option>
           <option value="info">{t('issues.severity.info')}</option>
         </select>
+        {dataDomain ? (
+          <button
+            type="button"
+            className="max-w-80 truncate rounded-lg border border-(--border-subtle) bg-(--bg-raised) px-3 py-2 text-left text-xs text-(--text-secondary)"
+            title={`${dataDocumentId ?? 'data'}${dataOperationId ? `#${dataOperationId}` : ''}`}
+            onClick={() => {
+              setSearchParams({});
+              setSelectedId(null);
+            }}
+          >
+            {t('issues.filters.dataTarget', {
+              target: `${dataDocumentId ?? 'data'}${dataOperationId ? `#${dataOperationId}` : ''}`,
+            })}{' '}
+            ×
+          </button>
+        ) : null}
       </section>
 
       <section className="grid min-h-0 flex-1 grid-cols-[minmax(320px,0.9fr)_minmax(380px,1.1fr)]">

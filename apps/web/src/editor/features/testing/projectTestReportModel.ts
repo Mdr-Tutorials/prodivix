@@ -3,13 +3,22 @@ import {
   readExecutionTestReportValue,
   type ExecutionSessionSnapshot,
   type ExecutionTestReport,
+  type ExecutionSourceTrace,
 } from '@prodivix/runtime-core';
+import { resolveExecutionPrimarySourceTrace } from '@/editor/features/execution/executionSourceTraceModel';
 
 export type ProjectTestReportPresentation = Readonly<{
   report: ExecutionTestReport;
   jobId: string;
+  providerId: string;
   snapshotId: string;
 }>;
+
+/** Test reports never guess between multiple generated/root/helper owners. */
+export const resolveProjectTestPrimarySourceTrace = (
+  sourceTrace: readonly ExecutionSourceTrace[] | undefined
+): ExecutionSourceTrace | undefined =>
+  resolveExecutionPrimarySourceTrace(sourceTrace);
 
 /** Reads the latest normalized report from canonical bounded session events. */
 export const createProjectTestReportPresentation = (
@@ -36,6 +45,7 @@ export const createProjectTestReportPresentation = (
     return Object.freeze({
       report,
       jobId: record.jobId,
+      providerId: record.providerId,
       snapshotId: record.snapshotId,
     });
   }

@@ -9,6 +9,7 @@ import {
 import { REMOTE_EXECUTION_SERVER_AUTHORITY_FORMAT } from '@prodivix/runtime-remote';
 import { createPostgresRemoteExecutionRepository } from './postgresExecutionRepository';
 import { createPostgresRemoteExecutionSnapshotStore } from './postgresSnapshotStore';
+import { createPostgresRemoteExecutionTerminalStateStore } from './postgresTerminalStateStore';
 import { migrateRemoteExecutionPostgres } from './schema';
 
 const databaseUrl = process.env.PRODIVIX_REMOTE_POSTGRES_TEST_URL;
@@ -138,6 +139,65 @@ integration('remote execution PostgreSQL integration', () => {
       'quota-exceeded',
     ]);
     await expect(repository.countActive('owner-1')).resolves.toBe(1);
+  });
+
+  it('stores opaque Terminal state with atomic revision CAS and bounded expiry lookup', async () => {
+    const snapshots = createPostgresRemoteExecutionSnapshotStore(pool);
+    const repository = createPostgresRemoteExecutionRepository(pool);
+    const terminals = createPostgresRemoteExecutionTerminalStateStore(pool);
+    await snapshots.put('owner-1', snapshot, 1_000);
+    await repository.createOrGet({
+      ownerId: 'owner-1',
+      identityKey: 'terminal-identity',
+      request: request('terminal-request'),
+      snapshotId: snapshot.workspace.snapshotId,
+      snapshotDigest: snapshot.contentDigest,
+      provider,
+      executionId: 'terminal-execution',
+      createdAt: 1_000,
+      maximumActiveExecutions: 1,
+    });
+    const initial = Object.freeze({
+      executionId: 'terminal-execution',
+      terminalSessionId: 'terminal-session',
+      revision: 1,
+      expiresAt: 2_000,
+      sealedState: Uint8Array.from([1, 2, 3, 4]),
+    });
+    await expect(terminals.create(initial, 1)).resolves.toBe('created');
+    await expect(terminals.create(initial, 1)).resolves.toBe(
+      'identity-conflict'
+    );
+    await expect(
+      terminals.get('terminal-execution', 'terminal-session')
+    ).resolves.toEqual(initial);
+
+    const updates = await Promise.all([
+      terminals.compareAndSwap(1, {
+        ...initial,
+        revision: 2,
+        expiresAt: 3_000,
+        sealedState: Uint8Array.from([5, 6, 7]),
+      }),
+      terminals.compareAndSwap(1, {
+        ...initial,
+        revision: 2,
+        expiresAt: 4_000,
+        sealedState: Uint8Array.from([8, 9, 10]),
+      }),
+    ]);
+    expect(updates.sort()).toEqual([false, true]);
+    const current = await terminals.getByExecution('terminal-execution');
+    expect(current).toMatchObject({ revision: 2 });
+    expect([3_000, 4_000]).toContain(current?.expiresAt);
+    await expect(terminals.listExpired(2_999, 10)).resolves.toEqual([]);
+    await expect(terminals.listExpired(4_000, 10)).resolves.toHaveLength(1);
+    await expect(
+      terminals.delete('terminal-execution', 'terminal-session', 1)
+    ).resolves.toBe(false);
+    await expect(
+      terminals.delete('terminal-execution', 'terminal-session', 2)
+    ).resolves.toBe(true);
   });
 
   it('atomically persists, claims and revokes server authority outside the execution record', async () => {
@@ -278,6 +338,59 @@ integration('remote execution PostgreSQL integration', () => {
         now: 2_012,
       })
     ).resolves.toBeUndefined();
+  });
+
+  it('atomically fails an exhausted worker recovery before claiming queued work', async () => {
+    const store = createPostgresRemoteExecutionSnapshotStore(pool);
+    const repository = createPostgresRemoteExecutionRepository(pool);
+    await store.put('owner-1', snapshot, 1_000);
+    for (const sequence of [1, 2]) {
+      await repository.createOrGet({
+        ownerId: 'owner-1',
+        identityKey: `recovery-identity-${sequence}`,
+        request: request(`recovery-request-${sequence}`),
+        snapshotId: snapshot.workspace.snapshotId,
+        snapshotDigest: snapshot.contentDigest,
+        provider,
+        executionId: `recovery-execution-${sequence}`,
+        createdAt: 1_000 + sequence,
+        maximumActiveExecutions: 4,
+      });
+    }
+    const first = await repository.claimNext({
+      workerId: 'worker-1',
+      providerId: provider.id,
+      leaseToken: 'recovery-lease-1',
+      now: 2_000,
+      leaseDurationMs: 10,
+      maximumAttempts: 1,
+    });
+    await repository.transition({
+      executionId: first!.execution.record.executionId,
+      workerId: first!.lease.workerId,
+      leaseToken: first!.lease.token,
+      status: 'running',
+      now: 2_001,
+    });
+
+    const next = await repository.claimNext({
+      workerId: 'worker-2',
+      providerId: provider.id,
+      leaseToken: 'recovery-lease-2',
+      now: 2_011,
+      leaseDurationMs: 100,
+      maximumAttempts: 1,
+    });
+
+    expect(next?.execution.record.executionId).toBe('recovery-execution-2');
+    const exhausted = await repository.get('recovery-execution-1');
+    expect(exhausted?.record.status).toBe('failed');
+    expect(exhausted?.lease).toBeUndefined();
+    expect(exhausted?.events.at(-1)?.event).toMatchObject({
+      kind: 'state',
+      reason: 'worker-recovery-exhausted',
+      snapshot: { status: 'failed' },
+    });
   });
 
   it('rolls back execution creation when the snapshot foreign key is absent', async () => {

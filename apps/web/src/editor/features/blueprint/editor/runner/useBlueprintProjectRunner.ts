@@ -9,7 +9,10 @@ import {
   materializeWorkspaceBinaryAssets,
   type ExecutionFilesystemArtifactReference,
 } from '@/editor/features/execution';
-import { createBlueprintProjectRunPlan } from './blueprintProjectRunPlan';
+import {
+  createBlueprintProjectRunPlan,
+  type BlueprintProjectRunTarget,
+} from './blueprintProjectRunPlan';
 import {
   acquireBlueprintProjectRunner,
   BlueprintProjectCancellationPendingError,
@@ -27,6 +30,7 @@ export type BlueprintProjectRunnerState = Readonly<{
   message?: string;
   diagnostics: readonly CompileDiagnostic[];
   provider: BlueprintProjectRunProvider;
+  target: BlueprintProjectRunTarget;
   filesystemChanges?: ExecutionFilesystemArtifactReference;
 }>;
 
@@ -34,13 +38,15 @@ const INITIAL_STATE: BlueprintProjectRunnerState = Object.freeze({
   status: 'idle',
   diagnostics: Object.freeze([]),
   provider: 'browser',
+  target: 'react-vite',
 });
 
 export const useBlueprintProjectRunner = (
   workspace: WorkspaceSnapshot | undefined,
   enabled: boolean,
   provider: BlueprintProjectRunProvider = 'browser',
-  accessToken?: string | null
+  accessToken?: string | null,
+  target: BlueprintProjectRunTarget = 'react-vite'
 ) => {
   const workspaceId = workspace?.id;
   const [retryRevision, setRetryRevision] = useState(0);
@@ -64,7 +70,10 @@ export const useBlueprintProjectRunner = (
     setState((previous) => ({
       status: 'compiling',
       provider,
-      ...(previous.provider === provider && previous.previewUrl
+      target,
+      ...(previous.provider === provider &&
+      previous.target === target &&
+      previous.previewUrl
         ? { previewUrl: previous.previewUrl }
         : {}),
       message: 'Compiling the canonical Workspace.',
@@ -82,7 +91,8 @@ export const useBlueprintProjectRunner = (
         createBlueprintProjectRunPlan(
           activeWorkspace,
           provider,
-          assetMaterializations
+          assetMaterializations,
+          target
         )
       )
       .then(async (plan) => {
@@ -96,6 +106,7 @@ export const useBlueprintProjectRunner = (
               'Project compilation was blocked.',
             diagnostics: plan.diagnostics,
             provider,
+            target,
           }));
           return;
         }
@@ -153,6 +164,8 @@ export const useBlueprintProjectRunner = (
                 ...previous,
                 filesystemChanges: Object.freeze({
                   executionId: job.id,
+                  jobId: event.jobId,
+                  providerId: job.getSnapshot().providerId,
                   artifactId,
                   snapshotDigest,
                   workspaceSnapshotId,
@@ -203,6 +216,7 @@ export const useBlueprintProjectRunner = (
           message: error instanceof Error ? error.message : String(error),
           diagnostics: Object.freeze([]),
           provider,
+          target,
         }));
       });
 
@@ -210,7 +224,7 @@ export const useBlueprintProjectRunner = (
       active = false;
       unsubscribe();
     };
-  }, [accessToken, enabled, provider, retryRevision, workspace]);
+  }, [accessToken, enabled, provider, retryRevision, target, workspace]);
 
   const retry = useCallback(() => {
     if (state.status === 'cancelling') return;

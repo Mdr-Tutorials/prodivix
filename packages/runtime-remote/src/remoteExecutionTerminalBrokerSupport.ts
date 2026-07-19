@@ -88,6 +88,7 @@ export const normalizeRemoteExecutionTerminalIdentifier = (
     typeof value !== 'string' ||
     !value ||
     value !== value.trim() ||
+    value.includes('\0') ||
     value.length > 4_096
   )
     throw new RemoteExecutionTerminalBrokerError(
@@ -110,6 +111,17 @@ export const normalizeRemoteExecutionTerminalPositiveInteger = (
 export const createRemoteExecutionTerminalTokenDigest = (
   value: string
 ): string => bytesToHex(sha256(utf8ToBytes(value)));
+
+export const remoteExecutionTerminalDigestEqual = (
+  left: string,
+  right: string
+): boolean => {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1)
+    difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  return difference === 0;
+};
 
 export const hasRemoteExecutionTerminalScope = (
   principal: RemoteExecutionPrincipal

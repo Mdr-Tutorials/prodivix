@@ -7,6 +7,9 @@ import {
   readBlueprintProjectConsoleBridgeMessage,
   readBlueprintProjectNetworkBridgeMessage,
   readBlueprintRemoteDataBridgeMessage,
+  readBlueprintRemoteDataStreamCancellation,
+  readBlueprintRemoteDataStreamOpen,
+  readBlueprintRemoteDataStreamPull,
   readBlueprintRemoteServerFunctionBridgeCancellation,
   readBlueprintRemoteServerFunctionBridgeMessage,
 } from '@/editor/features/blueprint/editor/runner/blueprintProjectNetworkBridge';
@@ -61,6 +64,7 @@ describe('Blueprint project Network bridge', () => {
       requestId: 'invocation-1:1',
       documentId: 'data-1',
       operationId: 'list',
+      adapterId: 'core.http',
       invocationId: 'invocation-1',
       sequence: 2,
       attempt: 1,
@@ -117,6 +121,68 @@ describe('Blueprint project Network bridge', () => {
         value: { ...value, authorization: 'secret-canary' },
       })
     ).toBeUndefined();
+  });
+
+  it('accepts subscription open/cancel only from the same opaque Remote frame', () => {
+    const previewUrl =
+      'https://0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef.preview.example.test/';
+    const value = {
+      type: 'prodivix.execution-data-stream-open.v1',
+      requestId: 'stream-1:stream',
+      documentId: 'data-events',
+      operationId: 'watch',
+      adapterId: 'core.graphql',
+      invocationId: 'stream-1',
+      sequence: 1,
+      attempt: 1,
+      input: {},
+    };
+    expect(
+      readBlueprintRemoteDataStreamOpen({
+        provider: 'remote',
+        previewUrl,
+        messageOrigin: 'null',
+        value,
+      })
+    ).toEqual(value);
+    expect(
+      readBlueprintRemoteDataStreamOpen({
+        provider: 'remote',
+        previewUrl,
+        messageOrigin: 'https://attacker.example',
+        value,
+      })
+    ).toBeUndefined();
+    expect(
+      readBlueprintRemoteDataStreamCancellation({
+        provider: 'remote',
+        previewUrl,
+        messageOrigin: 'null',
+        value: {
+          type: 'prodivix.execution-data-stream-cancel.v1',
+          requestId: value.requestId,
+        },
+      })
+    ).toEqual({
+      type: 'prodivix.execution-data-stream-cancel.v1',
+      requestId: value.requestId,
+    });
+    expect(
+      readBlueprintRemoteDataStreamPull({
+        provider: 'remote',
+        previewUrl,
+        messageOrigin: 'null',
+        value: {
+          type: 'prodivix.execution-data-stream-pull.v1',
+          requestId: value.requestId,
+          cursor: 0,
+        },
+      })
+    ).toEqual({
+      type: 'prodivix.execution-data-stream-pull.v1',
+      requestId: value.requestId,
+      cursor: 0,
+    });
   });
 
   it('accepts Server Function input but rejects session material at the Remote frame boundary', () => {

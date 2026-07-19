@@ -26,8 +26,12 @@ func TestServerFunctionLiveMutationPostgreSQLGate(t *testing.T) {
 	if err := store.RecordExecution(ctx, ExecutionAuthority{
 		ExecutionID:        executionID,
 		WorkspaceID:        "postgres-replay-workspace",
-		OwnerID:            "postgres-replay-owner",
+		PrincipalID:        "postgres-replay-owner",
 		SessionID:          "postgres-server-session",
+		Permissions:        cloneExecutionPermissions(workspaceOwnerExecutionPermissions),
+		ProviderID:         "prodivix.remote.server-function",
+		Profile:            "production",
+		RuntimeZone:        "server",
 		SnapshotID:         "snapshot-server-mutation",
 		PartitionRevisions: map[string]string{"workspace": "1", "document:code-auth:content": "7"},
 	}); err != nil {
@@ -92,7 +96,8 @@ func TestServerFunctionLiveMutationPostgreSQLGate(t *testing.T) {
 	recordCapacityExecution := func(executionID string) {
 		t.Helper()
 		if err := store.RecordExecution(ctx, ExecutionAuthority{
-			ExecutionID: executionID, WorkspaceID: "postgres-replay-workspace", OwnerID: "postgres-replay-owner", SessionID: "postgres-server-session",
+			ExecutionID: executionID, WorkspaceID: "postgres-replay-workspace", PrincipalID: "postgres-replay-owner", SessionID: "postgres-server-session", Permissions: cloneExecutionPermissions(workspaceOwnerExecutionPermissions),
+			ProviderID: "prodivix.remote.server-function", Profile: "production", RuntimeZone: "server",
 			SnapshotID: "snapshot-" + executionID, PartitionRevisions: map[string]string{"workspace": "1", "document:code-auth:content": "7"},
 		}); err != nil {
 			t.Fatalf("record capacity execution %q: %v", executionID, err)

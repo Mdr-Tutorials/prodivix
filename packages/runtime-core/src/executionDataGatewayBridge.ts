@@ -33,6 +33,7 @@ export type ExecutionDataGatewayInvocation = Readonly<{
   requestId: string;
   documentId: string;
   operationId: string;
+  adapterId: 'core.http' | 'core.graphql' | 'core.asyncapi';
   invocationId: string;
   sequence: number;
   attempt: number;
@@ -112,7 +113,7 @@ const correlationMatches = (
   trace.runtimeZone !== 'worker' &&
   trace.runtimeZone !== 'build' &&
   trace.mode === 'live' &&
-  trace.adapter === 'core.http' &&
+  trace.adapter === invocation.adapterId &&
   trace.correlation?.kind === 'data-operation' &&
   trace.correlation.documentId === invocation.documentId &&
   trace.correlation.operationId === invocation.operationId &&
@@ -129,6 +130,7 @@ export const readExecutionDataGatewayBridgeRequest = (
     'requestId',
     'documentId',
     'operationId',
+    'adapterId',
     'invocationId',
     'sequence',
     'attempt',
@@ -139,6 +141,7 @@ export const readExecutionDataGatewayBridgeRequest = (
   const requestId = identifier(record.requestId);
   const documentId = identifier(record.documentId);
   const operationId = identifier(record.operationId);
+  const adapterId = identifier(record.adapterId);
   const invocationId = identifier(record.invocationId);
   const sequence = integer(record.sequence, 0);
   const attempt = integer(record.attempt, 1);
@@ -147,6 +150,8 @@ export const readExecutionDataGatewayBridgeRequest = (
     !requestId ||
     !documentId ||
     !operationId ||
+    !adapterId ||
+    !['core.http', 'core.graphql', 'core.asyncapi'].includes(adapterId) ||
     !invocationId ||
     sequence === undefined ||
     attempt === undefined ||
@@ -159,6 +164,7 @@ export const readExecutionDataGatewayBridgeRequest = (
     requestId,
     documentId,
     operationId,
+    adapterId: adapterId as ExecutionDataGatewayInvocation['adapterId'],
     invocationId,
     sequence,
     attempt,

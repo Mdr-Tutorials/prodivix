@@ -6,8 +6,10 @@ import { materializeWorkspaceBinaryAssets } from '@/editor/features/execution';
 import { selectWorkspace, useEditorStore } from '@/editor/store/useEditorStore';
 import {
   generateWorkspaceReactViteBundle,
+  generateWorkspaceVueViteBundle,
   type ReactExportBundle,
   type ReactExportFile,
+  type VueExportBundle,
 } from '@prodivix/prodivix-compiler';
 import {
   projectWorkspaceToProdivixFiles,
@@ -29,7 +31,7 @@ import { resolveZipFilePayload } from './exportZip';
 import './ExportCode.scss';
 
 const resolveReactExportLanguage = (
-  file: ReactExportFile
+  file: ReactExportFile | VueExportBundle['files'][number]
 ): ExportCodeFile['language'] => {
   if (file.language === 'json') return 'json';
   if (file.language === 'html') return 'html';
@@ -49,7 +51,9 @@ const resolveReactExportLanguage = (
   return resolveProjectFileLanguage(file.path);
 };
 
-const reactExportFileToCodeFile = (file: ReactExportFile): ExportCodeFile => {
+const exportFileToCodeFile = (
+  file: ReactExportFile | VueExportBundle['files'][number]
+): ExportCodeFile => {
   const binaryContents =
     file.contents instanceof Uint8Array ? file.contents : undefined;
   const textContents =
@@ -80,6 +84,7 @@ export function ExportCode() {
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ExportTab>('vfs');
   const [activeReactFile, setActiveReactFile] = useState('');
+  const [activeVueFile, setActiveVueFile] = useState('');
   const [activeVfsFile, setActiveVfsFile] = useState('');
   const [expandedFolders, setExpandedFolders] = useState<
     Record<string, boolean>
@@ -87,9 +92,11 @@ export function ExportCode() {
   const [reactBundle, setReactBundle] = useState<ReactExportBundle | null>(
     null
   );
+  const [vueBundle, setVueBundle] = useState<VueExportBundle | null>(null);
 
   useEffect(() => {
     setReactBundle(null);
+    setVueBundle(null);
     if (!workspaceSnapshot) return;
     const controller = new AbortController();
     let active = true;
@@ -105,6 +112,12 @@ export function ExportCode() {
             projectName: projectName?.trim() || workspaceSnapshot.name,
             packageResolver: { strategy: 'npm' },
             codegenPolicySnapshot,
+            assetMaterializations,
+          })
+        );
+        setVueBundle(
+          generateWorkspaceVueViteBundle(workspaceSnapshot, {
+            projectName: projectName?.trim() || workspaceSnapshot.name,
             assetMaterializations,
           })
         );
@@ -147,6 +160,22 @@ export function ExportCode() {
           dependencies: [],
           target: { framework: 'react', preset: 'vite' },
         });
+        setVueBundle({
+          entryFilePath: 'error.ts',
+          type: 'project',
+          files: [],
+          diagnostics: [
+            {
+              code: 'WKS-EXPORT-UNEXPECTED',
+              severity: 'error',
+              source: 'export',
+              message,
+              path: '/',
+            },
+          ],
+          dependencies: [],
+          target: { framework: 'vue', preset: 'vite' },
+        });
       });
     return () => {
       active = false;
@@ -155,12 +184,20 @@ export function ExportCode() {
   }, [codegenPolicySnapshot, projectName, t, token, workspaceSnapshot]);
 
   const reactProjectFiles = useMemo<ExportCodeFile[]>(
-    () => reactBundle?.files.map(reactExportFileToCodeFile) ?? [],
+    () => reactBundle?.files.map(exportFileToCodeFile) ?? [],
     [reactBundle?.files]
+  );
+  const vueProjectFiles = useMemo<ExportCodeFile[]>(
+    () => vueBundle?.files.map(exportFileToCodeFile) ?? [],
+    [vueBundle?.files]
   );
   const reactFileTree = useMemo(
     () => buildFileTree(reactProjectFiles),
     [reactProjectFiles]
+  );
+  const vueFileTree = useMemo(
+    () => buildFileTree(vueProjectFiles),
+    [vueProjectFiles]
   );
   const vfsProjection = useMemo<
     { files: ExportCodeFile[]; issues: WorkspaceProjectionIssue[] } | undefined
@@ -192,6 +229,15 @@ export function ExportCode() {
       ),
     [reactMainDiagnostics]
   );
+  const vueMainDiagnostics = useMemo(
+    () => vueBundle?.diagnostics ?? [],
+    [vueBundle?.diagnostics]
+  );
+  const hasBlockingVueDiagnostics = useMemo(
+    () =>
+      vueMainDiagnostics.some((diagnostic) => diagnostic.severity === 'error'),
+    [vueMainDiagnostics]
+  );
   const vfsFileTree = useMemo(
     () => buildFileTree(vfsProjectFiles),
     [vfsProjectFiles]
@@ -203,6 +249,13 @@ export function ExportCode() {
     [activeReactFile, reactProjectFiles]
   );
   const activeReactFileContent = activeReactFileRecord?.content ?? '';
+  const activeVueFileRecord = useMemo(
+    () =>
+      vueProjectFiles.find((file) => file.path === activeVueFile) ??
+      vueProjectFiles[0],
+    [activeVueFile, vueProjectFiles]
+  );
+  const activeVueFileContent = activeVueFileRecord?.content ?? '';
   const activeVfsFileRecord = useMemo(
     () =>
       vfsProjectFiles.find((file) => file.path === activeVfsFile) ??
@@ -210,13 +263,15 @@ export function ExportCode() {
     [activeVfsFile, vfsProjectFiles]
   );
   const activeVfsFileContent = activeVfsFileRecord?.content ?? '';
-  const reactZipBaseName = useMemo(() => {
+  const projectZipBaseName = useMemo(() => {
     const nameSource =
       projectName?.trim() ||
       workspaceSnapshot?.name?.trim() ||
-      'prodivix-react-export';
-    return sanitizeExportFileName(nameSource);
-  }, [projectName, workspaceSnapshot?.name]);
+      `prodivix-${activeTab === 'vue' ? 'vue' : 'react'}-export`;
+    return sanitizeExportFileName(
+      `${nameSource}-${activeTab === 'vue' ? 'vue' : 'react'}`
+    );
+  }, [activeTab, projectName, workspaceSnapshot?.name]);
 
   useEffect(() => {
     if (!reactProjectFiles.length) {
@@ -238,6 +293,25 @@ export function ExportCode() {
   }, [activeReactFile, reactBundle?.entryFilePath, reactProjectFiles]);
 
   useEffect(() => {
+    if (!vueProjectFiles.length) {
+      setActiveVueFile('');
+      return;
+    }
+    const hasActiveFile = vueProjectFiles.some(
+      (file) => file.path === activeVueFile
+    );
+    if (hasActiveFile) return;
+    if (
+      vueBundle?.entryFilePath &&
+      vueProjectFiles.some((file) => file.path === vueBundle.entryFilePath)
+    ) {
+      setActiveVueFile(vueBundle.entryFilePath);
+      return;
+    }
+    setActiveVueFile(vueProjectFiles[0].path);
+  }, [activeVueFile, vueBundle?.entryFilePath, vueProjectFiles]);
+
+  useEffect(() => {
     if (!vfsProjectFiles.length) {
       setActiveVfsFile('');
       return;
@@ -250,39 +324,65 @@ export function ExportCode() {
   }, [activeVfsFile, vfsProjectFiles]);
 
   const activeCode =
-    activeTab === 'vfs' ? activeVfsFileContent : activeReactFileContent;
-  const activeFiles = activeTab === 'vfs' ? vfsProjectFiles : reactProjectFiles;
+    activeTab === 'vfs'
+      ? activeVfsFileContent
+      : activeTab === 'vue'
+        ? activeVueFileContent
+        : activeReactFileContent;
+  const activeFiles =
+    activeTab === 'vfs'
+      ? vfsProjectFiles
+      : activeTab === 'vue'
+        ? vueProjectFiles
+        : reactProjectFiles;
   const activeTitle =
     activeTab === 'vfs'
       ? t('vfs.title', { defaultValue: 'VFS' })
-      : t('react.title', { defaultValue: 'React' });
+      : activeTab === 'vue'
+        ? t('vue.title', { defaultValue: 'Vue' })
+        : t('react.title', { defaultValue: 'React' });
   const activeDescription =
     activeTab === 'vfs'
       ? t('vfs.description', {
           defaultValue: '当前 Workspace VFS 的完整文件树',
         })
-      : t('react.description', {
-          defaultValue: '基于当前 PIR 生成的 React 项目代码（含 public/*）',
-        });
+      : activeTab === 'vue'
+        ? t('vue.description', {
+            defaultValue:
+              '基于当前 PIR/Route/Auth/Server/Asset contract 生成的 Vue 项目代码',
+          })
+        : t('react.description', {
+            defaultValue: '基于当前 PIR 生成的 React 项目代码（含 public/*）',
+          });
   const activeEmpty =
     activeTab === 'vfs'
       ? t('vfs.empty', {
           defaultValue: '暂无 Workspace VFS 文件',
         })
-      : t('react.empty', {
-          defaultValue: '暂无 React 代码（先生成 PIR）',
-        });
+      : activeTab === 'vue'
+        ? t('vue.empty', {
+            defaultValue: '暂无 Vue 代码（先生成 PIR）',
+          })
+        : t('react.empty', {
+            defaultValue: '暂无 React 代码（先生成 PIR）',
+          });
   const exportViewOptions: Array<{ value: ExportTab; label: string }> = [
     { value: 'react', label: t('tabs.react', { defaultValue: 'React' }) },
+    { value: 'vue', label: t('tabs.vue', { defaultValue: 'Vue' }) },
     { value: 'vfs', label: t('tabs.vfs', { defaultValue: 'VFS' }) },
   ];
 
   useEffect(() => {
     setCopied(false);
-  }, [activeReactFile, activeTab, activeVfsFile]);
+  }, [activeReactFile, activeTab, activeVfsFile, activeVueFile]);
 
   useEffect(() => {
-    const files = activeTab === 'vfs' ? vfsProjectFiles : reactProjectFiles;
+    const files =
+      activeTab === 'vfs'
+        ? vfsProjectFiles
+        : activeTab === 'vue'
+          ? vueProjectFiles
+          : reactProjectFiles;
     if (!files.length) {
       setExpandedFolders({});
       return;
@@ -295,7 +395,7 @@ export function ExportCode() {
       }
     });
     setExpandedFolders(next);
-  }, [activeTab, reactProjectFiles, vfsProjectFiles]);
+  }, [activeTab, reactProjectFiles, vfsProjectFiles, vueProjectFiles]);
 
   const toggleFolder = (path: string) => {
     setExpandedFolders((current) => ({
@@ -311,14 +411,16 @@ export function ExportCode() {
     window.setTimeout(() => setCopied(false), 900);
   };
 
-  const downloadReactZip = async () => {
-    if (!reactProjectFiles.length) return;
+  const downloadProjectZip = async () => {
+    const projectFiles =
+      activeTab === 'vue' ? vueProjectFiles : reactProjectFiles;
+    if (!projectFiles.length) return;
     setDownloadingZip(true);
     try {
       const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
-      const rootFolder = zip.folder(reactZipBaseName) ?? zip;
-      reactProjectFiles.forEach((file) => {
+      const rootFolder = zip.folder(projectZipBaseName) ?? zip;
+      projectFiles.forEach((file) => {
         const payload = resolveZipFilePayload(file);
         if (payload instanceof Uint8Array) {
           rootFolder.file(file.path, payload, { binary: true });
@@ -330,7 +432,7 @@ export function ExportCode() {
       const downloadUrl = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = downloadUrl;
-      anchor.download = `${reactZipBaseName}.zip`;
+      anchor.download = `${projectZipBaseName}.zip`;
       document.body.append(anchor);
       anchor.click();
       anchor.remove();
@@ -366,8 +468,10 @@ export function ExportCode() {
         viewOptions={exportViewOptions}
         titleLabel={t('title', { defaultValue: '导出代码' })}
         downloadingZip={downloadingZip}
-        canDownloadReactZip={
-          Boolean(reactProjectFiles.length) && !hasBlockingReactDiagnostics
+        canDownloadZip={
+          activeTab === 'vue'
+            ? Boolean(vueProjectFiles.length) && !hasBlockingVueDiagnostics
+            : Boolean(reactProjectFiles.length) && !hasBlockingReactDiagnostics
         }
         downloadingLabel={t('downloading', {
           defaultValue: 'Downloading...',
@@ -377,13 +481,22 @@ export function ExportCode() {
         })}
         onOpenViewMenuChange={setViewMenuOpen}
         onSelectTab={setActiveTab}
-        onDownloadReactZip={downloadReactZip}
+        onDownloadZip={downloadProjectZip}
       />
 
       <div className="ExportCodeBody">
         {activeTab === 'react' && reactMainDiagnostics.length ? (
           <div className="mb-2 rounded-md border border-amber-300/60 bg-amber-100/40 px-2 py-1 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-100">
             {reactMainDiagnostics.map((item) => (
+              <p key={`${item.code}:${item.path}`} className="m-0">
+                [{item.severity}] {item.code}: {item.message}
+              </p>
+            ))}
+          </div>
+        ) : null}
+        {activeTab === 'vue' && vueMainDiagnostics.length ? (
+          <div className="mb-2 rounded-md border border-amber-300/60 bg-amber-100/40 px-2 py-1 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-100">
+            {vueMainDiagnostics.map((item) => (
               <p key={`${item.code}:${item.path}`} className="m-0">
                 [{item.severity}] {item.code}: {item.message}
               </p>
@@ -428,6 +541,21 @@ export function ExportCode() {
               activeReactFileContent,
               resolveCodeViewerLanguage(activeReactFileRecord?.language),
               hasBlockingReactDiagnostics
+            )}
+          </div>
+        ) : activeTab === 'vue' && vueProjectFiles.length ? (
+          <div className="flex h-full min-h-0 gap-2">
+            <ExportFileTree
+              nodes={vueFileTree}
+              activeFilePath={activeVueFile}
+              expandedFolders={expandedFolders}
+              onToggleFolder={toggleFolder}
+              onSelectFile={setActiveVueFile}
+            />
+            {renderCodePreview(
+              activeVueFileContent,
+              resolveCodeViewerLanguage(activeVueFileRecord?.language),
+              hasBlockingVueDiagnostics
             )}
           </div>
         ) : (

@@ -1,6 +1,8 @@
 import {
+  createExecutionNetworkTrace,
   createExecutionTestReport,
   createExecutionRequest,
+  toExecutionNetworkTraceValue,
   toExecutionTestReportValue,
   type ExecutionJobEvent,
   type ExecutionJobStateEvent,
@@ -15,6 +17,7 @@ import {
   toServerFunctionInvocationTraceValue,
 } from '@prodivix/server-runtime';
 import { describe, expect, it, vi } from 'vitest';
+import { RemoteExecutionClientError } from './remoteExecutionClient';
 import {
   createRemoteFixtureSnapshot,
   createRemoteServerFunctionFixtureRequest,
@@ -496,6 +499,123 @@ describe('remote ExecutionProvider conformance', () => {
     expect(job.provider).toBe(remoteBuildExecutionProviderDescriptor);
   });
 
+  it('reconnects the same execution and replays from the last confirmed cursor', async () => {
+    const initial = record('build-reconnect', 'running', 4);
+    const events: ExecutionJobEvent[] = [
+      stateEvent(initial, 1, 'queued'),
+      stateEvent(initial, 2, 'running', 'queued'),
+      {
+        kind: 'artifact',
+        jobId: initial.executionId,
+        sequence: 3,
+        emittedAt: 1_003,
+        artifact: {
+          artifactId: 'bundle-reconnect',
+          kind: 'bundle',
+          mediaType: 'application/vnd.prodivix.execution-build-bundle+json',
+          sourceTrace: [
+            { sourceRef: { kind: 'workspace', workspaceId: 'workspace-1' } },
+          ],
+          metadata: { snapshotDigest: initial.snapshotDigest },
+        },
+      },
+      stateEvent(initial, 4, 'succeeded', 'running'),
+    ];
+    const stableClient = clientFor({ initial, events });
+    let disconnected = true;
+    const readEvents = vi.fn(async (input) => {
+      if (disconnected) {
+        disconnected = false;
+        throw new RemoteExecutionClientError(
+          { code: 'unavailable', message: 'disconnected', retryable: true },
+          'events.read'
+        );
+      }
+      return stableClient.readEvents(input);
+    });
+    const provider = createRemoteBuildExecutionProvider({
+      client: Object.freeze({ ...stableClient, readEvents }),
+      resolveSnapshot: () => ({
+        kind: 'upload',
+        snapshot: createRemoteFixtureSnapshot(),
+      }),
+      delay: async () => undefined,
+      maximumReconnectAttempts: 2,
+    });
+
+    const job = await provider.start(request('build-reconnect'));
+    await expect(job.completion).resolves.toMatchObject({
+      status: 'succeeded',
+      artifacts: [{ artifactId: 'bundle-reconnect' }],
+    });
+    expect(readEvents).toHaveBeenCalledTimes(3);
+    expect(readEvents.mock.calls.map(([call]) => call.afterCursor)).toEqual([
+      0, 0, 0,
+    ]);
+  });
+
+  it('surfaces authorization loss as an explicit restore-access recovery', async () => {
+    const initial = record('build-authorization-loss', 'running', 0);
+    const stableClient = clientFor({ initial, events: [] });
+    const provider = createRemoteBuildExecutionProvider({
+      client: Object.freeze({
+        ...stableClient,
+        readEvents: async () => {
+          throw new RemoteExecutionClientError(
+            { code: 'unauthorized', message: 'expired', retryable: false },
+            'events.read'
+          );
+        },
+      }),
+      resolveSnapshot: () => ({
+        kind: 'upload',
+        snapshot: createRemoteFixtureSnapshot(),
+      }),
+      delay: async () => undefined,
+    });
+
+    const job = await provider.start(request('build-authorization-loss'));
+    await expect(job.completion).resolves.toMatchObject({
+      status: 'failed',
+      failure: {
+        code: 'REMOTE_AUTHORIZATION_REQUIRED',
+        retryable: false,
+      },
+      diagnostics: [{ code: 'EXE-4011' }],
+    });
+  });
+
+  it('projects network and binding policy denial as non-retryable repair paths', async () => {
+    for (const [reason, code] of [
+      ['network-policy-denied', 'REMOTE_NETWORK_POLICY_DENIED'],
+      ['secret-resolution-denied', 'REMOTE_PERMISSION_DENIED'],
+    ] as const) {
+      const initial = record(`build-${reason}`, 'running', 3);
+      const events: ExecutionJobEvent[] = [
+        stateEvent(initial, 1, 'queued'),
+        stateEvent(initial, 2, 'running', 'queued'),
+        {
+          ...stateEvent(initial, 3, 'failed', 'running'),
+          reason,
+        },
+      ];
+      const provider = createRemoteBuildExecutionProvider({
+        client: clientFor({ initial, events }),
+        resolveSnapshot: () => ({
+          kind: 'upload',
+          snapshot: createRemoteFixtureSnapshot(),
+        }),
+        delay: async () => undefined,
+      });
+
+      const job = await provider.start(request(`build-${reason}`));
+      await expect(job.completion).resolves.toMatchObject({
+        status: 'failed',
+        failure: { code, retryable: false },
+      });
+    }
+  });
+
   it('projects a redaction-safe diagnostic when protected output was blocked', async () => {
     const initial = record('build-secret-leak', 'running', 3);
     const failed = stateEvent(initial, 3, 'failed', 'running');
@@ -768,65 +888,66 @@ describe('remote ExecutionProvider conformance', () => {
       ...buildRecord,
       provider: remoteTestExecutionProviderDescriptor,
     };
+    const reportId = `test-report:${initial.executionId}`;
+    const sourceTrace = [
+      {
+        sourceRef: {
+          kind: 'workspace' as const,
+          workspaceId: 'workspace-1',
+        },
+      },
+    ];
+    const report = createExecutionTestReport({
+      reportId,
+      tool: { name: 'vitest' },
+      completedAt: 1_003,
+      files: [
+        {
+          fileId: 'src/App.test.tsx',
+          path: 'src/App.test.tsx',
+          status: 'passed',
+          cases: [
+            {
+              caseId: 'src/App.test.tsx#1',
+              name: 'renders',
+              status: 'passed',
+            },
+          ],
+        },
+      ],
+    });
     const events: ExecutionJobEvent[] = [
       stateEvent(initial, 1, 'queued'),
       stateEvent(initial, 2, 'running', 'queued'),
       {
-        kind: 'trace',
+        kind: 'artifact',
         jobId: initial.executionId,
         sequence: 3,
         emittedAt: 1_003,
-        trace: {
-          traceId: `test:${initial.executionId}`,
-          spanId: `test-report:${initial.executionId}`,
-          name: 'test.report',
-          phase: 'event',
-          detail: toExecutionTestReportValue(
-            createExecutionTestReport({
-              reportId: 'report-1',
-              tool: { name: 'vitest' },
-              completedAt: 1_003,
-              files: [
-                {
-                  fileId: 'src/App.test.tsx',
-                  path: 'src/App.test.tsx',
-                  status: 'passed',
-                  cases: [
-                    {
-                      caseId: 'src/App.test.tsx#1',
-                      name: 'renders',
-                      status: 'passed',
-                    },
-                  ],
-                },
-              ],
-            })
-          ),
-          sourceTrace: [
-            {
-              sourceRef: { kind: 'workspace', workspaceId: 'workspace-1' },
-            },
-          ],
-        },
-      },
-      {
-        kind: 'artifact',
-        jobId: initial.executionId,
-        sequence: 4,
-        emittedAt: 1_004,
         artifact: {
-          artifactId: 'test-report',
+          artifactId: reportId,
           kind: 'report',
           mediaType: 'application/vnd.prodivix.test-report+json',
-          sourceTrace: [
-            {
-              sourceRef: { kind: 'workspace', workspaceId: 'workspace-1' },
-            },
-          ],
+          sourceTrace,
           metadata: {
+            reportId,
             status: 'passed',
             snapshotDigest: initial.snapshotDigest,
           },
+        },
+      },
+      {
+        kind: 'trace',
+        jobId: initial.executionId,
+        sequence: 4,
+        emittedAt: 1_004,
+        trace: {
+          traceId: `test:${initial.executionId}`,
+          spanId: reportId,
+          name: 'test.report',
+          phase: 'event',
+          detail: toExecutionTestReportValue(report),
+          sourceTrace,
         },
       },
       stateEvent(initial, 5, 'succeeded', 'running'),
@@ -879,6 +1000,106 @@ describe('remote ExecutionProvider conformance', () => {
     });
   });
 
+  it('rejects a Remote Test environment before snapshot resolution or create', async () => {
+    const initial: RemoteExecutionRecord = {
+      ...record('test-live-environment', 'queued', 0),
+      provider: remoteTestExecutionProviderDescriptor,
+    };
+    const resolveSnapshot = vi.fn(() => ({
+      kind: 'upload' as const,
+      snapshot: createRemoteFixtureSnapshot(),
+    }));
+    const provider = createRemoteTestExecutionProvider({
+      client: clientFor({ initial, events: [] }),
+      resolveSnapshot,
+      delay: async () => undefined,
+    });
+    const liveRequest = createExecutionRequest({
+      requestId: 'test-live-environment',
+      profile: 'test',
+      runtimeZone: 'test',
+      workspace: {
+        workspaceId: 'workspace-1',
+        snapshotId: 'snapshot-1',
+        partitionRevisions: { workspace: '1' },
+      },
+      environment: {
+        environmentId: 'environment-1',
+        revision: 'revision-1',
+        mode: 'live',
+      },
+      invocation: {
+        kind: 'test',
+        targetRef: { kind: 'workspace', workspaceId: 'workspace-1' },
+      },
+      requiredCapabilities: ['artifacts', 'filesystem', 'test'],
+    });
+
+    await expect(provider.start(liveRequest)).rejects.toThrow(/mock-only/iu);
+    expect(resolveSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when a Remote Test event claims live runtime network access', async () => {
+    const initial: RemoteExecutionRecord = {
+      ...record('test-live-network', 'running', 4),
+      provider: remoteTestExecutionProviderDescriptor,
+    };
+    const network = createExecutionNetworkTrace({
+      requestId: 'test-live-network-request',
+      phase: 'runtime',
+      runtimeZone: 'test',
+      mode: 'live',
+      adapter: 'data-http',
+      method: 'GET',
+      sanitizedUrl: 'https://api.example.test/',
+      protocol: 'https',
+      startedAt: 1_002,
+      completedAt: 1_003,
+      outcome: 'allowed',
+      status: 200,
+      correlation: {
+        kind: 'data-operation',
+        documentId: 'data-1',
+        operationId: 'list-items',
+        invocationId: 'invocation-1',
+        sequence: 0,
+        attempt: 1,
+      },
+    });
+    const events: ExecutionJobEvent[] = [
+      stateEvent(initial, 1, 'queued'),
+      stateEvent(initial, 2, 'running', 'queued'),
+      {
+        kind: 'trace',
+        jobId: initial.executionId,
+        sequence: 3,
+        emittedAt: 1_003,
+        trace: {
+          traceId: `network:${initial.executionId}`,
+          spanId: network.requestId,
+          name: 'network.request',
+          phase: 'event',
+          detail: toExecutionNetworkTraceValue(network),
+        },
+      },
+      stateEvent(initial, 4, 'failed', 'running'),
+    ];
+    const provider = createRemoteTestExecutionProvider({
+      client: clientFor({ initial, events }),
+      resolveSnapshot: () => ({
+        kind: 'upload',
+        snapshot: createRemoteFixtureSnapshot(),
+      }),
+      delay: async () => undefined,
+    });
+
+    const job = await provider.start(testRequest('test-live-network'));
+    await expect(job.completion).resolves.toMatchObject({
+      status: 'failed',
+      failure: { code: 'REMOTE_EXECUTION_SYNC_FAILED' },
+    });
+  });
+
   it('preserves a failed canonical report when Remote Test fails', async () => {
     const buildRecord = record('test-failed', 'running', 5);
     const initial: RemoteExecutionRecord = {
@@ -893,8 +1114,9 @@ describe('remote ExecutionProvider conformance', () => {
         },
       },
     ];
+    const reportId = `test-report:${initial.executionId}`;
     const failedReport = createExecutionTestReport({
-      reportId: 'report-failed',
+      reportId,
       tool: { name: 'vitest' },
       files: [
         {
@@ -916,33 +1138,34 @@ describe('remote ExecutionProvider conformance', () => {
       stateEvent(initial, 1, 'queued'),
       stateEvent(initial, 2, 'running', 'queued'),
       {
-        kind: 'trace',
+        kind: 'artifact',
         jobId: initial.executionId,
         sequence: 3,
         emittedAt: 1_003,
-        trace: {
-          traceId: `test:${initial.executionId}`,
-          spanId: `test-report:${initial.executionId}`,
-          name: 'test.report',
-          phase: 'event',
-          detail: toExecutionTestReportValue(failedReport),
-          sourceTrace,
-        },
-      },
-      {
-        kind: 'artifact',
-        jobId: initial.executionId,
-        sequence: 4,
-        emittedAt: 1_004,
         artifact: {
-          artifactId: 'test-report-failed',
+          artifactId: reportId,
           kind: 'report',
           mediaType: 'application/vnd.prodivix.test-report+json',
           sourceTrace,
           metadata: {
+            reportId,
             status: 'failed',
             snapshotDigest: initial.snapshotDigest,
           },
+        },
+      },
+      {
+        kind: 'trace',
+        jobId: initial.executionId,
+        sequence: 4,
+        emittedAt: 1_004,
+        trace: {
+          traceId: `test:${initial.executionId}`,
+          spanId: reportId,
+          name: 'test.report',
+          phase: 'event',
+          detail: toExecutionTestReportValue(failedReport),
+          sourceTrace,
         },
       },
       stateEvent(initial, 5, 'failed', 'running'),

@@ -22,6 +22,7 @@ import {
 import type { RemoteExecutionTerminalClient } from '@prodivix/runtime-remote';
 import type { WorkspaceSnapshot } from '@prodivix/workspace';
 import { ExecutionFilesystemChangesPanel } from './ExecutionFilesystemChangesPanel';
+import { ExecutionTerminalEmulatorSurface } from './ExecutionTerminalEmulatorSurface';
 import type { ExecutionFilesystemArtifactReference } from './executionFilesystemChanges.types';
 import { executionSessionCoordinator } from './executionSessionEnvironment';
 import {
@@ -30,13 +31,21 @@ import {
   type ExecutionConsoleDiagnostic,
   type ExecutionConsoleFilter,
 } from './executionConsoleModel';
-import { createExecutionNetworkEntries } from './executionNetworkModel';
+import {
+  createExecutionNetworkEntries,
+  filterExecutionNetworkEntries,
+  type ExecutionNetworkEntry,
+  type ExecutionNetworkOperationFilter,
+} from './executionNetworkModel';
+import { useExecutionCenterNavigationStore } from './executionCenterNavigation';
 import {
   createExecutionServerFunctionEntries,
   type ExecutionServerFunctionEntry,
-  type ExecutionServerFunctionSourceNavigationInput,
-  type ExecutionServerFunctionSourceNavigationResult,
 } from './executionServerFunctionModel';
+import type {
+  ExecutionSourceNavigationInput,
+  ExecutionSourceNavigationResult,
+} from './executionSourceTraceModel';
 import { useExecutionSession } from './useExecutionSession';
 import { useExecutionFilesystemChanges } from './useExecutionFilesystemChanges';
 import { useRemoteExecutionTerminal } from './useRemoteExecutionTerminal';
@@ -56,8 +65,9 @@ type ExecutionCenterProps = Readonly<{
   onReloadPreview?(): void;
   onOpenPreview?(): void;
   onOpenSourceTrace?(
-    input: ExecutionServerFunctionSourceNavigationInput
-  ): ExecutionServerFunctionSourceNavigationResult;
+    input: ExecutionSourceNavigationInput
+  ): ExecutionSourceNavigationResult;
+  onOpenDataOperation?(target: ExecutionNetworkOperationFilter): void;
 }>;
 
 export type ExecutionCenterStatus =
@@ -110,6 +120,7 @@ export function ExecutionCenter({
   onReloadPreview,
   onOpenPreview,
   onOpenSourceTrace,
+  onOpenDataOperation,
 }: ExecutionCenterProps) {
   const { t } = useTranslation('editor');
   const session = useExecutionSession(sessionId);
@@ -117,6 +128,8 @@ export function ExecutionCenter({
   const [surface, setSurface] = useState<
     'console' | 'terminal' | 'network' | 'server' | 'files'
   >('console');
+  const [networkFilter, setNetworkFilter] =
+    useState<ExecutionNetworkOperationFilter>();
   const [filter, setFilter] = useState<ExecutionConsoleFilter>('all');
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>(
     'idle'
@@ -124,13 +137,13 @@ export function ExecutionCenter({
   const [sourceNavigationFailure, setSourceNavigationFailure] = useState<
     Readonly<{
       entryId: string;
+      surface: 'console' | 'network' | 'server' | 'files';
       reason: Extract<
-        ExecutionServerFunctionSourceNavigationResult,
+        ExecutionSourceNavigationResult,
         { status: 'unavailable' }
       >['reason'];
     }>
   >();
-  const [terminalInput, setTerminalInput] = useState('');
   const outputRef = useRef<HTMLDivElement | null>(null);
   const effectiveStatus = status ?? session?.status ?? 'idle';
   const consoleView = useMemo(
@@ -146,6 +159,16 @@ export function ExecutionCenter({
   const networkEntries = useMemo(
     () => createExecutionNetworkEntries(session),
     [session]
+  );
+  const visibleNetworkEntries = useMemo(
+    () => filterExecutionNetworkEntries(networkEntries, networkFilter),
+    [networkEntries, networkFilter]
+  );
+  const navigationRequest = useExecutionCenterNavigationStore(
+    (state) => state.request
+  );
+  const consumeNavigationRequest = useExecutionCenterNavigationStore(
+    (state) => state.consume
   );
   const serverFunctionEntries = useMemo(
     () => createExecutionServerFunctionEntries(session),
@@ -170,6 +193,25 @@ export function ExecutionCenter({
     ...(workspace ? { workspace } : {}),
     readonly: workspaceReadonly,
   });
+
+  useEffect(() => {
+    if (
+      !navigationRequest ||
+      !workspace ||
+      navigationRequest.workspaceId !== workspace.id
+    ) {
+      return;
+    }
+    setCollapsed(false);
+    setSurface('network');
+    setNetworkFilter(
+      Object.freeze({
+        documentId: navigationRequest.documentId,
+        operationId: navigationRequest.operationId,
+      })
+    );
+    consumeNavigationRequest(navigationRequest.id);
+  }, [consumeNavigationRequest, navigationRequest, workspace]);
   const terminalMessage =
     terminalAvailability.status === 'unavailable'
       ? terminalAvailability.reason === 'no-active-execution'
@@ -201,10 +243,11 @@ export function ExecutionCenter({
     collapsed,
     lines.length,
     filesystem.entries.length,
-    networkEntries.length,
+    visibleNetworkEntries.length,
     serverFunctionEntries.length,
     surface,
-    terminal.view.records.length,
+    terminal.emulator.latestOutputCursor,
+    terminal.emulator.lines.length,
   ]);
 
   useEffect(() => {
@@ -258,58 +301,130 @@ export function ExecutionCenter({
     }
   };
 
-  const submitTerminalInput = async () => {
-    if (!terminalInput) return;
-    const accepted = await terminal.send(`${terminalInput}\n`);
-    if (accepted) setTerminalInput('');
-  };
-
-  const openServerFunctionSource = (entry: ExecutionServerFunctionEntry) => {
-    if (!onOpenSourceTrace || !entry.primarySourceTrace) return;
-    let result: ExecutionServerFunctionSourceNavigationResult;
+  const openSourceTrace = (
+    entryId: string,
+    entrySurface: 'console' | 'network' | 'server' | 'files',
+    input: ExecutionSourceNavigationInput
+  ) => {
+    if (!onOpenSourceTrace) return;
+    let result: ExecutionSourceNavigationResult;
     try {
-      result = onOpenSourceTrace({
-        jobId: entry.jobId,
-        providerId: entry.providerId,
-        snapshotId: entry.snapshotId,
-        sourceTrace: entry.primarySourceTrace,
-      });
+      result = onOpenSourceTrace(input);
     } catch {
       result = { status: 'unavailable', reason: 'source-unavailable' };
     }
     setSourceNavigationFailure(
       result.status === 'unavailable'
-        ? { entryId: entry.id, reason: result.reason }
+        ? { entryId, surface: entrySurface, reason: result.reason }
         : undefined
     );
   };
 
+  const openServerFunctionSource = (entry: ExecutionServerFunctionEntry) => {
+    if (!entry.primarySourceTrace) return;
+    openSourceTrace(entry.id, 'server', {
+      jobId: entry.jobId,
+      providerId: entry.providerId,
+      snapshotId: entry.snapshotId,
+      sourceTrace: entry.primarySourceTrace,
+    });
+  };
+
+  const openNetworkSource = (entry: ExecutionNetworkEntry) => {
+    if (!entry.primarySourceTrace) return;
+    openSourceTrace(entry.id, 'network', {
+      jobId: entry.jobId,
+      providerId: entry.providerId,
+      snapshotId: entry.snapshotId,
+      sourceTrace: entry.primarySourceTrace,
+    });
+  };
+
+  const openConsoleSource = (line: (typeof lines)[number]) => {
+    if (!line.primarySourceTrace || !line.correlation) return;
+    openSourceTrace(line.id, 'console', {
+      jobId: line.correlation.jobId,
+      providerId: line.correlation.providerId,
+      snapshotId: line.correlation.snapshotId,
+      sourceTrace: line.primarySourceTrace,
+    });
+  };
+
+  const openFilesystemSource = (entry: (typeof filesystem.entries)[number]) => {
+    if (!entry.primarySourceTrace || !filesystemArtifact) return;
+    openSourceTrace(entry.changeId, 'files', {
+      jobId: filesystemArtifact.jobId,
+      providerId: filesystemArtifact.providerId,
+      snapshotId: filesystemArtifact.workspaceSnapshotId,
+      sourceTrace: entry.primarySourceTrace,
+    });
+  };
+
   const visibleSourceNavigationFailure =
     sourceNavigationFailure &&
-    serverFunctionEntries.some(
-      (entry) => entry.id === sourceNavigationFailure.entryId
-    )
+    sourceNavigationFailure.surface === surface &&
+    ((surface === 'console' &&
+      lines.some((line) => line.id === sourceNavigationFailure.entryId)) ||
+      (surface === 'server' &&
+        serverFunctionEntries.some(
+          (entry) => entry.id === sourceNavigationFailure.entryId
+        )) ||
+      (surface === 'network' &&
+        visibleNetworkEntries.some(
+          (entry) => entry.id === sourceNavigationFailure.entryId
+        )) ||
+      (surface === 'files' &&
+        filesystem.entries.some(
+          (entry) => entry.changeId === sourceNavigationFailure.entryId
+        )))
       ? sourceNavigationFailure.reason
       : undefined;
+
+  const quotaRecovery = diagnostics?.some(
+    (diagnostic) => diagnostic.code === 'EXE-4291'
+  );
+  const workerRecoveryExhausted =
+    session?.terminal?.failure?.code === 'REMOTE_WORKER_RECOVERY_EXHAUSTED';
+  const authorizationRequired =
+    session?.terminal?.failure?.code === 'REMOTE_AUTHORIZATION_REQUIRED';
+  const permissionDenied =
+    session?.terminal?.failure?.code === 'REMOTE_PERMISSION_DENIED';
+  const networkPolicyDenied =
+    session?.terminal?.failure?.code === 'REMOTE_NETWORK_POLICY_DENIED';
 
   const recoveryMessage =
     effectiveStatus === 'cancelling' || recovery.status === 'waiting'
       ? t('execution.recovery.waiting')
-      : recovery.status === 'blocked'
-        ? t('execution.recovery.identityConflict')
-        : recovery.status === 'restart'
-          ? recovery.requiresChange
-            ? t('execution.recovery.requiresChange', {
-                code: recovery.failureCode ?? 'execution-failed',
-              })
-            : t('execution.recovery.newRequest')
-          : effectiveStatus === 'blocked'
-            ? t('execution.recovery.compileBlocked')
-            : effectiveStatus === 'failed' ||
-                effectiveStatus === 'cancelled' ||
-                effectiveStatus === 'timed-out'
-              ? t('execution.recovery.newRequest')
-              : undefined;
+      : quotaRecovery
+        ? t('execution.recovery.quota')
+        : workerRecoveryExhausted
+          ? t('execution.recovery.workerExhausted')
+          : filesystem.recovery === 'new-request'
+            ? t('execution.recovery.artifactUnavailable')
+            : authorizationRequired
+              ? t('execution.recovery.authorizationRequired')
+              : permissionDenied
+                ? t('execution.recovery.permissionDenied')
+                : networkPolicyDenied
+                  ? t('execution.recovery.networkPolicyDenied')
+                  : recovery.status === 'blocked'
+                    ? t('execution.recovery.identityConflict')
+                    : effectiveStatus === 'cancelled'
+                      ? t('execution.recovery.cancelled')
+                      : effectiveStatus === 'timed-out'
+                        ? t('execution.recovery.timedOut')
+                        : recovery.status === 'restart'
+                          ? recovery.requiresChange
+                            ? t('execution.recovery.requiresChange', {
+                                code:
+                                  recovery.failureCode ?? 'execution-failed',
+                              })
+                            : t('execution.recovery.newRequest')
+                          : effectiveStatus === 'blocked'
+                            ? t('execution.recovery.compileBlocked')
+                            : effectiveStatus === 'failed'
+                              ? t('execution.recovery.newRequest')
+                              : undefined;
   const restartDisabled =
     effectiveStatus === 'cancelling' || effectiveStatus === 'compiling';
 
@@ -473,6 +588,16 @@ export function ExecutionCenter({
                   )
                 )
               : null}
+            {surface === 'network' && networkFilter ? (
+              <button
+                type="button"
+                className="ml-1 max-w-64 truncate rounded-md bg-(--bg-raised) px-2 py-1 text-[10px] text-(--text-primary)"
+                title={`${networkFilter.documentId}#${networkFilter.operationId}`}
+                onClick={() => setNetworkFilter(undefined)}
+              >
+                {networkFilter.operationId} ×
+              </button>
+            ) : null}
             {surface === 'terminal' ? (
               <span className="ml-auto text-[10px] text-(--text-muted)">
                 {terminalAvailability.status === 'available'
@@ -488,7 +613,7 @@ export function ExecutionCenter({
                     surface === 'console'
                       ? lines.length
                       : surface === 'network'
-                        ? networkEntries.length
+                        ? visibleNetworkEntries.length
                         : surface === 'server'
                           ? serverFunctionEntries.length
                           : filesystem.entries.length,
@@ -520,11 +645,23 @@ export function ExecutionCenter({
             ref={outputRef}
             className="min-h-0 flex-1 overflow-auto bg-(--bg-panel) px-3 py-2 font-mono text-[10px] leading-4"
           >
+            {visibleSourceNavigationFailure ? (
+              <div
+                role="status"
+                className="mb-1 text-[10px] text-(--warning-color)"
+              >
+                {t(
+                  visibleSourceNavigationFailure === 'snapshot-stale'
+                    ? 'execution.sourceNavigation.snapshotStale'
+                    : 'execution.sourceNavigation.sourceUnavailable'
+                )}
+              </div>
+            ) : null}
             {surface === 'console' && lines.length ? (
               lines.map((line) => (
                 <div
                   key={line.id}
-                  className="grid grid-cols-[76px_82px_1fr] gap-2 py-0.5"
+                  className="grid grid-cols-[76px_82px_minmax(0,1fr)_28px] items-start gap-2 py-0.5"
                 >
                   <span className="text-(--text-muted) tabular-nums">
                     {formatConsoleTime(line.recordedAt)}
@@ -552,6 +689,21 @@ export function ExecutionCenter({
                       </span>
                     ) : null}
                   </span>
+                  {line.primarySourceTrace &&
+                  line.correlation &&
+                  onOpenSourceTrace ? (
+                    <button
+                      type="button"
+                      className={iconButtonClass}
+                      onClick={() => openConsoleSource(line)}
+                      title={t('execution.openSource')}
+                      aria-label={t('execution.openSource')}
+                    >
+                      <LocateFixed size={13} />
+                    </button>
+                  ) : (
+                    <span />
+                  )}
                 </div>
               ))
             ) : surface === 'terminal' &&
@@ -604,71 +756,48 @@ export function ExecutionCenter({
               </div>
             ) : surface === 'terminal' ? (
               <div className="flex min-h-full flex-col">
-                <div className="min-h-0 flex-1 break-words whitespace-pre-wrap">
-                  {terminal.view.gap ? (
-                    <div className="mb-1 text-(--warning-color)">
-                      {t('execution.terminal.outputGap')}
-                    </div>
-                  ) : null}
-                  {terminal.view.records.length ? (
-                    terminal.view.records.map((record) => (
-                      <span
-                        key={record.cursor}
-                        className={
-                          record.stream === 'stderr'
-                            ? 'text-(--danger-color)'
-                            : 'text-(--text-secondary)'
-                        }
-                      >
-                        {record.data}
-                        {record.redacted || record.truncated ? (
-                          <span className="ml-1 text-[9px] text-(--warning-color)">
-                            {record.redacted
-                              ? t('execution.redacted')
-                              : t('execution.truncated')}
-                          </span>
-                        ) : null}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-(--text-muted)">
-                      {t(
-                        terminal.view.phase === 'opening'
-                          ? 'execution.terminal.opening'
-                          : 'execution.terminal.noOutput'
-                      )}
-                    </span>
-                  )}
-                  {terminal.view.error ? (
-                    <div className="mt-1 text-(--warning-color)">
-                      {t(`execution.terminal.error.${terminal.view.error}`)}
-                    </div>
-                  ) : null}
-                </div>
-                <form
-                  className="sticky bottom-0 mt-2 flex items-center gap-1.5 border-t border-(--border-subtle) bg-(--bg-panel) pt-1.5 font-sans"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void submitTerminalInput();
-                  }}
-                >
-                  <input
-                    className="min-w-0 flex-1 rounded-md border border-(--border-default) bg-(--bg-canvas) px-2 py-1 font-mono text-[10px] text-(--text-primary) outline-none placeholder:text-(--text-muted) focus:border-(--border-strong)"
-                    aria-label={t('execution.terminal.inputPlaceholder')}
-                    placeholder={t('execution.terminal.inputPlaceholder')}
-                    value={terminalInput}
-                    disabled={terminal.view.phase !== 'open'}
-                    onChange={(event) => setTerminalInput(event.target.value)}
+                {terminal.view.gap ? (
+                  <div className="mb-1 text-(--warning-color)">
+                    {t('execution.terminal.outputGap')}
+                  </div>
+                ) : null}
+                {terminal.emulator.metrics.redactedRecords ||
+                terminal.emulator.metrics.truncatedRecords ? (
+                  <div className="mb-1 text-(--warning-color)">
+                    {t('execution.terminal.protectedOutput', {
+                      redacted: terminal.emulator.metrics.redactedRecords,
+                      truncated: terminal.emulator.metrics.truncatedRecords,
+                    })}
+                  </div>
+                ) : null}
+                <div className="min-h-0 flex-1">
+                  <ExecutionTerminalEmulatorSurface
+                    snapshot={terminal.emulator}
+                    connected={terminal.view.phase === 'open'}
+                    inputLabel={t('execution.terminal.inputLabel')}
+                    keyboardHelp={t('execution.terminal.keyboardHelp')}
+                    pasteRejectedMessage={t('execution.terminal.pasteTooLarge')}
+                    emptyMessage={t(
+                      terminal.view.phase === 'opening'
+                        ? 'execution.terminal.opening'
+                        : 'execution.terminal.noOutput'
+                    )}
+                    onInput={terminal.send}
+                    onInterrupt={terminal.interrupt}
                   />
-                  <button
-                    type="submit"
-                    className="rounded-md border border-(--border-default) px-2 py-1 text-[10px] text-(--text-primary) hover:bg-(--bg-raised) disabled:cursor-not-allowed disabled:opacity-40"
-                    disabled={
-                      terminal.view.phase !== 'open' || !terminalInput.length
-                    }
-                  >
-                    {t('execution.terminal.send')}
-                  </button>
+                </div>
+                {terminal.view.error ? (
+                  <div role="status" className="mt-1 text-(--warning-color)">
+                    {t(`execution.terminal.error.${terminal.view.error}`)}
+                  </div>
+                ) : null}
+                <div className="sticky bottom-0 mt-2 flex items-center gap-1.5 border-t border-(--border-subtle) bg-(--bg-panel) pt-1.5 font-sans">
+                  <span className="min-w-0 flex-1 truncate text-[10px] text-(--text-muted)">
+                    {terminal.emulator.title ||
+                      t('execution.terminal.keyboardHint')}{' '}
+                    · {terminal.emulator.size.columns}×
+                    {terminal.emulator.size.rows}
+                  </span>
                   <button
                     type="button"
                     className="rounded-md border border-(--border-default) px-2 py-1 text-[10px] text-(--text-secondary) hover:bg-(--bg-raised) disabled:cursor-not-allowed disabled:opacity-40"
@@ -684,22 +813,10 @@ export function ExecutionCenter({
                   >
                     {t('execution.terminal.close')}
                   </button>
-                </form>
+                </div>
               </div>
             ) : surface === 'server' && serverFunctionEntries.length ? (
               <div className="space-y-1">
-                {visibleSourceNavigationFailure ? (
-                  <div
-                    role="status"
-                    className="text-[10px] text-(--warning-color)"
-                  >
-                    {t(
-                      visibleSourceNavigationFailure === 'snapshot-stale'
-                        ? 'execution.sourceNavigation.snapshotStale'
-                        : 'execution.sourceNavigation.sourceUnavailable'
-                    )}
-                  </div>
-                ) : null}
                 {serverFunctionEntries.map((entry) => (
                   <div
                     key={entry.id}
@@ -747,38 +864,75 @@ export function ExecutionCenter({
                 ))}
               </div>
             ) : surface === 'files' ? (
-              <ExecutionFilesystemChangesPanel controller={filesystem} />
-            ) : surface === 'network' && networkEntries.length ? (
-              networkEntries.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="grid grid-cols-[72px_minmax(160px,1fr)_72px_64px] gap-2 py-0.5"
-                >
-                  <span className="truncate text-(--text-secondary)">
-                    {entry.trace.correlation
-                      ? `${entry.trace.method} · ${entry.trace.correlation.operationId}`
-                      : entry.trace.method}
-                  </span>
-                  <span
-                    className="truncate text-(--text-secondary)"
-                    title={entry.trace.sanitizedUrl}
+              <ExecutionFilesystemChangesPanel
+                controller={filesystem}
+                onOpenSource={
+                  onOpenSourceTrace ? openFilesystemSource : undefined
+                }
+              />
+            ) : surface === 'network' && visibleNetworkEntries.length ? (
+              <div className="space-y-1">
+                {visibleNetworkEntries.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="grid grid-cols-[72px_minmax(160px,1fr)_72px_64px_52px] items-center gap-2 py-0.5"
                   >
-                    {entry.trace.sanitizedUrl}
-                  </span>
-                  <span
-                    className={
-                      entry.trace.outcome === 'allowed'
-                        ? 'text-(--text-muted)'
-                        : 'text-(--danger-color)'
-                    }
-                  >
-                    {entry.trace.status ?? entry.trace.outcome}
-                  </span>
-                  <span className="text-right text-(--text-muted)">
-                    {entry.trace.durationMs} ms
-                  </span>
-                </div>
-              ))
+                    <span className="truncate text-(--text-secondary)">
+                      {entry.trace.correlation
+                        ? `${entry.trace.method} · ${entry.trace.correlation.operationId}`
+                        : entry.trace.method}
+                    </span>
+                    <span
+                      className="truncate text-(--text-secondary)"
+                      title={entry.trace.sanitizedUrl}
+                    >
+                      {entry.trace.sanitizedUrl}
+                    </span>
+                    <span
+                      className={
+                        entry.trace.outcome === 'allowed'
+                          ? 'text-(--text-muted)'
+                          : 'text-(--danger-color)'
+                      }
+                    >
+                      {entry.trace.status ?? entry.trace.outcome}
+                    </span>
+                    <span className="text-right text-(--text-muted)">
+                      {entry.trace.durationMs} ms
+                    </span>
+                    <span className="flex items-center gap-0.5">
+                      {entry.primarySourceTrace && onOpenSourceTrace ? (
+                        <button
+                          type="button"
+                          className={iconButtonClass}
+                          title={t('execution.openSource')}
+                          aria-label={t('execution.openSource')}
+                          onClick={() => openNetworkSource(entry)}
+                        >
+                          <LocateFixed size={13} />
+                        </button>
+                      ) : null}
+                      {entry.trace.correlation?.kind === 'data-operation' &&
+                      onOpenDataOperation ? (
+                        <button
+                          type="button"
+                          className={iconButtonClass}
+                          title={t('execution.openDataInspector')}
+                          aria-label={t('execution.openDataInspector')}
+                          onClick={() =>
+                            onOpenDataOperation({
+                              documentId: entry.trace.correlation!.documentId,
+                              operationId: entry.trace.correlation!.operationId,
+                            })
+                          }
+                        >
+                          <ExternalLink size={13} />
+                        </button>
+                      ) : null}
+                    </span>
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="flex h-full items-center justify-center text-(--text-muted)">
                 {t(

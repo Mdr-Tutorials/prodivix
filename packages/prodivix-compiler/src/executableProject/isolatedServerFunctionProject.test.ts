@@ -36,7 +36,7 @@ const workspace = (
   options: {
     auth?: Readonly<Record<string, string>>;
     effect?: 'read' | 'mutation';
-    kind?: 'route-loader' | 'route-guard';
+    kind?: 'function' | 'route-loader' | 'route-guard' | 'route-action';
     adapterId?: string;
     authProviderId?: string;
     includeAuthConfig?: boolean;
@@ -493,10 +493,277 @@ describe('isolated Server Function executable project', () => {
     );
   });
 
-  it('runs a declared Secret through one-shot useSecret without projecting material', async () => {
+  it('runs one exact workspace.write whole-file proposal inside the bounded import graph', async () => {
+    const replacement = `export const punctuation = '?';\n`;
+    const candidate = importedWorkspace();
+    const rootDocument = candidate.docsById['code-greeting'];
+    if (!rootDocument || rootDocument.type !== 'code')
+      throw new TypeError('Mutation fixture root is missing.');
+    const result = generateWorkspaceIsolatedServerFunctionExecutableProject(
+      {
+        ...candidate,
+        docsById: {
+          ...candidate.docsById,
+          'code-greeting': {
+            ...rootDocument,
+            content: {
+              ...rootDocument.content,
+              source: `import { greeting } from './lib/greeting.ts';
+export const loadGreeting = async (input: { name: string }, context: { replaceProjectSource?: (mutation: { artifactId: string; source: string }) => Promise<void> }) => {
+  await context.replaceProjectSource?.({ artifactId: 'code-punctuation-helper', source: ${JSON.stringify(replacement)} });
+  return { kind: 'value' as const, value: { message: greeting(input.name) } };
+};`,
+              metadata: {
+                'prodivix.serverRuntime': {
+                  schemaVersion: '1.0',
+                  functionsByExport: {
+                    loadGreeting: {
+                      kind: 'function',
+                      runtimeZone: 'server',
+                      adapterId: 'prodivix.code-export',
+                      effect: 'mutation',
+                      auth: {
+                        kind: 'permission',
+                        permissionId: 'workspace.write',
+                      },
+                      idempotency: { kind: 'invocation-key' },
+                      inputSchema: {
+                        type: 'object',
+                        additionalProperties: false,
+                        required: ['name'],
+                        properties: { name: { type: 'string' } },
+                      },
+                      outputSchema: {
+                        type: 'object',
+                        additionalProperties: false,
+                        required: ['message'],
+                        properties: { message: { type: 'string' } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          'auth-config': {
+            id: 'auth-config',
+            type: 'project-config',
+            path: '/config/auth.json',
+            contentRev: 1,
+            metaRev: 1,
+            content: {
+              kind: 'config',
+              value: {
+                schemaVersion: '1.0',
+                providerId: 'prodivix-product-session',
+                permissionIds: ['workspace.write'],
+              },
+            },
+          },
+        },
+        treeById: {
+          ...candidate.treeById,
+          root: {
+            ...candidate.treeById.root!,
+            children: [...candidate.treeById.root!.children, 'config-dir'],
+          },
+          'config-dir': {
+            id: 'config-dir',
+            kind: 'dir',
+            name: 'config',
+            parentId: 'root',
+            children: ['auth-config-node'],
+          },
+          'auth-config-node': {
+            id: 'auth-config-node',
+            kind: 'doc',
+            name: 'auth.json',
+            parentId: 'config-dir',
+            docId: 'auth-config',
+          },
+        },
+      },
+      { functionRef }
+    );
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') return;
+    const mutationFiles = result.snapshot.files.filter((file) =>
+      file.path.startsWith('src/.prodivix-project-source/')
+    );
+    expect(mutationFiles).toHaveLength(3);
+    const target = mutationFiles.find(
+      (file) =>
+        file.sourceTrace?.[0]?.sourceRef.kind === 'code-artifact' &&
+        file.sourceTrace[0].sourceRef.artifactId === 'code-punctuation-helper'
+    );
+    expect(target?.contents).toBe(`export const punctuation = '!';`);
+    expect(result.snapshot.capabilityRequirements.production).not.toContain(
+      'environment-binding'
+    );
+    const root = await mkdtemp(join(process.cwd(), '.isolated-write-runtime-'));
+    temporaryRoots.push(root);
+    for (const file of projectExecutableProjectRuntimeFiles(
+      result.snapshot,
+      'production'
+    )) {
+      const path = join(root, ...file.path.split('/'));
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, file.contents);
+    }
+    const bridgeRequest = Object.freeze({
+      type: 'prodivix.execution-server-function-gateway-request.v1' as const,
+      requestId: 'source-mutation:1',
+      invocationId: 'source-mutation',
+      attempt: 1,
+      functionRef,
+      input: Object.freeze({ name: 'Prodivix' }),
+    });
+    await mkdir(join(root, '.prodivix'), { recursive: true });
+    await writeFile(
+      join(root, '.prodivix', 'server-function-invocation.json'),
+      JSON.stringify(bridgeRequest)
+    );
+    const authorityPath = join(
+      root,
+      ...ISOLATED_SERVER_FUNCTION_AUTHORITY_PATH.split('/')
+    );
+    await writeFile(
+      authorityPath,
+      JSON.stringify({
+        format: ISOLATED_SERVER_FUNCTION_AUTHORITY_FORMAT,
+        workspaceId: result.snapshot.workspace.workspaceId,
+        snapshotId: result.snapshot.workspace.snapshotId,
+        principal: {
+          providerId: 'prodivix-product-session',
+          principalId: 'owner-1',
+        },
+        permissions: ['workspace.owner', 'workspace.read', 'workspace.write'],
+        expiresAt: Date.now() + 60_000,
+      })
+    );
+    await execFileAsync(
+      process.execPath,
+      [result.snapshot.serverFunctionPlan!.entrypointFilePath],
+      { cwd: root, windowsHide: true }
+    );
+    await expect(readFile(authorityPath, 'utf8')).rejects.toThrow();
+    expect(await readFile(join(root, ...target!.path.split('/')), 'utf8')).toBe(
+      replacement
+    );
+    const response = JSON.parse(
+      await readFile(
+        join(root, '.prodivix', 'server-function-result.json'),
+        'utf8'
+      )
+    ) as { ok?: unknown; result?: unknown };
+    expect(response).toMatchObject({
+      ok: true,
+      result: { kind: 'value', value: { message: 'Hello Prodivix!' } },
+    });
+    expect(JSON.stringify(response)).not.toContain(replacement);
+  });
+
+  it.each([
+    {
+      label: 'missing proposal',
+      code: 'SVR_SOURCE_MUTATION_REQUIRED',
+      implementation: `export const loadGreeting = async (input: { name: string }) => ({ kind: 'value' as const, value: { message: input.name } });`,
+    },
+    {
+      label: 'unknown artifact',
+      code: 'SVR_SOURCE_MUTATION_INVALID',
+      implementation: `export const loadGreeting = async (_input: unknown, context: { replaceProjectSource: (mutation: { artifactId: string; source: string }) => Promise<void> }) => {
+  await context.replaceProjectSource({ artifactId: 'outside-import-graph', source: 'export {};' });
+  return { kind: 'value' as const, value: { message: 'unreachable' } };
+};`,
+    },
+    {
+      label: 'second proposal',
+      code: 'SVR_SOURCE_MUTATION_INVALID',
+      implementation: `export const loadGreeting = async (_input: unknown, context: { replaceProjectSource: (mutation: { artifactId: string; source: string }) => Promise<void> }) => {
+  await context.replaceProjectSource({ artifactId: 'code-greeting', source: 'export const first = true;' });
+  await context.replaceProjectSource({ artifactId: 'code-greeting', source: 'export const second = true;' });
+  return { kind: 'value' as const, value: { message: 'unreachable' } };
+};`,
+    },
+  ])(
+    'fails $label closed inside the generated one-shot runner',
+    async ({ code, implementation }) => {
+      const result = generateWorkspaceIsolatedServerFunctionExecutableProject(
+        workspace({
+          auth: { kind: 'permission', permissionId: 'workspace.write' },
+          permissionIds: ['workspace.write'],
+          effect: 'mutation',
+          kind: 'function',
+          source: implementation,
+        }),
+        { functionRef }
+      );
+      expect(result.status).toBe('ready');
+      if (result.status !== 'ready') return;
+      const root = await mkdtemp(
+        join(process.cwd(), '.isolated-invalid-write-runtime-')
+      );
+      temporaryRoots.push(root);
+      for (const file of projectExecutableProjectRuntimeFiles(
+        result.snapshot,
+        'production'
+      )) {
+        const path = join(root, ...file.path.split('/'));
+        await mkdir(dirname(path), { recursive: true });
+        await writeFile(path, file.contents);
+      }
+      await mkdir(join(root, '.prodivix'), { recursive: true });
+      await writeFile(
+        join(root, '.prodivix', 'server-function-invocation.json'),
+        JSON.stringify({
+          type: 'prodivix.execution-server-function-gateway-request.v1',
+          requestId: 'invalid-source-mutation:1',
+          invocationId: 'invalid-source-mutation',
+          attempt: 1,
+          functionRef,
+          input: { name: 'Ada' },
+        })
+      );
+      await writeFile(
+        join(root, ...ISOLATED_SERVER_FUNCTION_AUTHORITY_PATH.split('/')),
+        JSON.stringify({
+          format: ISOLATED_SERVER_FUNCTION_AUTHORITY_FORMAT,
+          workspaceId: result.snapshot.workspace.workspaceId,
+          snapshotId: result.snapshot.workspace.snapshotId,
+          principal: {
+            providerId: 'prodivix-product-session',
+            principalId: 'owner-1',
+          },
+          permissions: ['workspace.write'],
+          expiresAt: Date.now() + 60_000,
+        })
+      );
+      await execFileAsync(
+        process.execPath,
+        [result.snapshot.serverFunctionPlan!.entrypointFilePath],
+        { cwd: root, windowsHide: true }
+      );
+      expect(
+        JSON.parse(
+          await readFile(
+            join(root, '.prodivix', 'server-function-result.json'),
+            'utf8'
+          )
+        )
+      ).toMatchObject({
+        ok: false,
+        error: { code, retryable: false },
+      });
+    }
+  );
+
+  it('requires workspace.read authority and runs its declared Secret through one-shot useSecret', async () => {
     const secretCanary = 'isolated-secret-canary-value';
     const result = generateWorkspaceIsolatedServerFunctionExecutableProject(
       workspace({
+        auth: { kind: 'permission', permissionId: 'workspace.read' },
+        permissionIds: ['workspace.read'],
         environment: {
           secretsByField: {
             signingKey: { bindingId: 'webhook-signing-key' },
@@ -540,6 +807,25 @@ describe('isolated Server Function executable project', () => {
       join(root, '.prodivix', 'server-function-invocation.json'),
       JSON.stringify(bridgeRequest)
     );
+    const authorityPath = join(
+      root,
+      ...ISOLATED_SERVER_FUNCTION_AUTHORITY_PATH.split('/')
+    );
+    await writeFile(
+      authorityPath,
+      JSON.stringify({
+        format: ISOLATED_SERVER_FUNCTION_AUTHORITY_FORMAT,
+        workspaceId: result.snapshot.workspace.workspaceId,
+        snapshotId: result.snapshot.workspace.snapshotId,
+        principal: {
+          providerId: 'prodivix-product-session',
+          principalId: 'reader-1',
+        },
+        permissions: ['workspace.owner', 'workspace.read'],
+        expiresAt: Date.now() + 60_000,
+      }),
+      { mode: 0o600 }
+    );
     const secretPath = join(
       root,
       ...ISOLATED_SERVER_FUNCTION_SECRET_MATERIAL_PATH.split('/')
@@ -556,6 +842,7 @@ describe('isolated Server Function executable project', () => {
       [result.snapshot.serverFunctionPlan!.entrypointFilePath],
       { cwd: root, windowsHide: true }
     );
+    await expect(readFile(authorityPath, 'utf8')).rejects.toThrow();
     await expect(readFile(secretPath, 'utf8')).rejects.toThrow();
     const responseText = await readFile(
       join(root, '.prodivix', 'server-function-result.json'),
@@ -630,7 +917,7 @@ describe('isolated Server Function executable project', () => {
     }
   });
 
-  it('keeps mutation and arbitrary adapters closed', () => {
+  it('keeps unsupported mutation shapes and arbitrary adapters closed', () => {
     const cases = [
       {
         candidate: workspace({ effect: 'mutation' }),
@@ -643,18 +930,6 @@ describe('isolated Server Function executable project', () => {
       {
         candidate: workspace({
           auth: { kind: 'permission', permissionId: 'workspace.write' },
-        }),
-        code: 'WKS-EXPORT-SERVER-ISOLATED-POLICY-UNSUPPORTED',
-      },
-      {
-        candidate: workspace({
-          auth: { kind: 'permission', permissionId: 'workspace.read' },
-          permissionIds: ['workspace.read'],
-          environment: {
-            secretsByField: {
-              signingKey: { bindingId: 'webhook-signing-key' },
-            },
-          },
         }),
         code: 'WKS-EXPORT-SERVER-ISOLATED-POLICY-UNSUPPORTED',
       },

@@ -2,6 +2,8 @@ import { utf8ToBytes } from '@noble/hashes/utils.js';
 import { redactExecutionConsoleText } from './executionConsole';
 import {
   EXECUTION_TERMINAL_LIMITS,
+  EXECUTION_TERMINAL_CHECKPOINT_FORMAT,
+  EXECUTION_TERMINAL_CHECKPOINT_VERSION,
   createFingerprintSalt,
   createInputFingerprint,
   freezeSnapshot,
@@ -23,6 +25,7 @@ import {
   type ExecutionTerminalSnapshot,
   type InputFingerprint,
 } from './executionTerminal';
+import { restoreExecutionTerminalCheckpoint } from './executionTerminalCheckpoint';
 import { normalizeExecutionTerminalControllerConfiguration } from './executionTerminalControllerSupport';
 
 /**
@@ -43,7 +46,20 @@ export const createExecutionTerminalController = (
     maximumOutputChunkBytes,
     initialSize,
   } = normalizeExecutionTerminalControllerConfiguration(input);
-  let lastTimestamp = Number.NEGATIVE_INFINITY;
+  const restored = input.checkpoint
+    ? restoreExecutionTerminalCheckpoint({
+        checkpoint: input.checkpoint,
+        terminalSessionId,
+        executionId,
+        jobId,
+        provider: input.provider,
+        capability: input.capability,
+        maximumOutputRecords,
+        maximumRetainedOutputBytes,
+        maximumInputFingerprints,
+      })
+    : undefined;
+  let lastTimestamp = restored?.snapshot.updatedAt ?? Number.NEGATIVE_INFINITY;
   const readTimestamp = (): number => {
     const current = normalizeTimestamp(
       (input.now ?? Date.now)(),
@@ -52,44 +68,71 @@ export const createExecutionTerminalController = (
     lastTimestamp = Math.max(lastTimestamp, current);
     return lastTimestamp;
   };
-  const openedAt = readTimestamp();
-  const leaseExpiresAt = normalizeTimestamp(
+  const initializedAt = readTimestamp();
+  const grantExpiresAt = normalizeTimestamp(
     input.grant.expiresAt,
     'Execution terminal grant expiry'
   );
-  if (leaseExpiresAt <= openedAt)
+  if (restored?.snapshot.status !== 'closed' && grantExpiresAt <= initializedAt)
     throw new TypeError('Execution terminal grant must be unexpired.');
+  if (
+    restored?.snapshot.status !== 'closed' &&
+    restored &&
+    grantExpiresAt < restored.snapshot.leaseExpiresAt
+  )
+    throw new TypeError(
+      'Execution terminal restored grant must not shorten the active lease.'
+    );
 
-  const retainedOutputs: ExecutionTerminalOutputRecord[] = [];
-  const inputFingerprints = new Map<number, InputFingerprint>();
+  const retainedOutputs: ExecutionTerminalOutputRecord[] = [
+    ...(restored?.retainedOutputs ?? []),
+  ];
+  const inputFingerprints = new Map<number, InputFingerprint>(
+    (restored?.inputFingerprints ?? []).map((fingerprint) => [
+      fingerprint.clientSequence,
+      fingerprint,
+    ])
+  );
   const subscribers = new Set<ExecutionTerminalListener>();
-  const fingerprintSalt = createFingerprintSalt();
+  const fingerprintSalt = restored?.fingerprintSalt ?? createFingerprintSalt();
   let operationTail: Promise<void> = Promise.resolve();
   let forcedCloseRequested = false;
-  let outputCursor = 0;
-  let retainedOutputBytes = 0;
-  let droppedOutputRecords = 0;
-  let droppedOutputBytes = 0;
-  let snapshot = freezeSnapshot({
-    terminalSessionId,
-    executionId,
-    jobId,
-    providerId: input.provider.id,
-    providerVersion: input.provider.version,
-    capability: input.capability,
-    status: 'open',
-    revision: 1,
-    size: initialSize,
-    openedAt,
-    updatedAt: openedAt,
-    leaseExpiresAt,
-    latestOutputCursor: 0,
-    earliestRetainedOutputCursor: 0,
-    retainedOutputBytes: 0,
-    droppedOutputRecords: 0,
-    droppedOutputBytes: 0,
-    latestClientSequence: 0,
-  });
+  let outputCursor = restored?.snapshot.latestOutputCursor ?? 0;
+  let retainedOutputBytes = restored?.snapshot.retainedOutputBytes ?? 0;
+  let droppedOutputRecords = restored?.snapshot.droppedOutputRecords ?? 0;
+  let droppedOutputBytes = restored?.snapshot.droppedOutputBytes ?? 0;
+  let snapshot = restored?.snapshot
+    ? freezeSnapshot({
+        ...restored.snapshot,
+        ...(restored.snapshot.status !== 'closed' &&
+        grantExpiresAt > restored.snapshot.leaseExpiresAt
+          ? {
+              leaseExpiresAt: grantExpiresAt,
+              revision: restored.snapshot.revision + 1,
+              updatedAt: initializedAt,
+            }
+          : {}),
+      })
+    : freezeSnapshot({
+        terminalSessionId,
+        executionId,
+        jobId,
+        providerId: input.provider.id,
+        providerVersion: input.provider.version,
+        capability: input.capability,
+        status: 'open',
+        revision: 1,
+        size: initialSize,
+        openedAt: initializedAt,
+        updatedAt: initializedAt,
+        leaseExpiresAt: grantExpiresAt,
+        latestOutputCursor: 0,
+        earliestRetainedOutputCursor: 0,
+        retainedOutputBytes: 0,
+        droppedOutputRecords: 0,
+        droppedOutputBytes: 0,
+        latestClientSequence: 0,
+      });
 
   const reportSubscriberError = (error: unknown): void => {
     try {
@@ -161,7 +204,7 @@ export const createExecutionTerminalController = (
 
   const expireLease = (): boolean => {
     if (snapshot.status === 'closed') return true;
-    if (readTimestamp() < leaseExpiresAt) return false;
+    if (readTimestamp() < snapshot.leaseExpiresAt) return false;
     closeFromProvider('lease-expired');
     requestForcedClose('lease-expired');
     return true;
@@ -354,6 +397,25 @@ export const createExecutionTerminalController = (
 
   return Object.freeze({
     session,
+    createCheckpoint: () => {
+      if (snapshot.status === 'closing')
+        throw new TypeError(
+          'Execution terminal cannot checkpoint a transient closing state.'
+        );
+      return Object.freeze({
+        format: EXECUTION_TERMINAL_CHECKPOINT_FORMAT,
+        version: EXECUTION_TERMINAL_CHECKPOINT_VERSION,
+        limits: Object.freeze({
+          maximumOutputRecords,
+          maximumRetainedOutputBytes,
+          maximumInputFingerprints,
+        }),
+        snapshot,
+        retainedOutputs: Object.freeze([...retainedOutputs]),
+        inputFingerprints: Object.freeze([...inputFingerprints.values()]),
+        fingerprintSalt,
+      });
+    },
     renewGrant: (grant) => {
       if (
         normalizeIdentifier(

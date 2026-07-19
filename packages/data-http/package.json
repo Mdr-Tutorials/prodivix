@@ -24,6 +24,7 @@
     "typecheck": "tsc -b tsconfig.test.json --pretty false"
   },
   "dependencies": {
+    "@noble/hashes": "^2.2.0",
     "@prodivix/data": "workspace:*",
     "@prodivix/runtime-core": "workspace:*"
   },

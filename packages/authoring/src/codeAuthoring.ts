@@ -19,7 +19,7 @@ export type CodeAuthoringPresentation =
   'compact' | 'maximized' | 'workspace' | 'embedded';
 
 export type CodeAuthoringOriginSurface =
-  AuthoringSurface | 'code-workspace' | 'resources';
+  AuthoringSurface | 'code-workspace' | 'execution-center' | 'resources';
 
 export type CodeAuthoringOrigin = Readonly<{
   surface: CodeAuthoringOriginSurface;

@@ -73,6 +73,33 @@ describe('Project Test Data target planning', () => {
     expect(previewProvision?.contents).not.toContain('test-principal');
   });
 
+  it('selects the Vue/Vite PIR/Auth/Server product target without changing Test provider policy', () => {
+    const plan = createProjectTestExecutionPlan(
+      createServerRuntimeTestWorkspace('route-loader'),
+      { target: 'vue-vite' }
+    );
+    expect(
+      plan.status,
+      plan.status === 'blocked' ? JSON.stringify(plan.diagnostics) : ''
+    ).toBe('ready');
+    if (plan.status !== 'ready') return;
+    expect(plan.snapshot.target).toEqual({
+      presetId: 'vue-vite',
+      framework: 'vue',
+      runtime: 'vite',
+    });
+    expect(plan.request.profile).toBe('test');
+    expect(plan.request.requiredCapabilities).not.toContain('server-function');
+    expect(
+      plan.snapshot.files.some(
+        ({ path }) => path === 'src/prodivix-pir-runtime.ts'
+      )
+    ).toBe(true);
+    expect(plan.snapshot.serverRuntimeMockProvision).toMatchObject({
+      fixtureSetId: 'workspace-auth-default',
+    });
+  });
+
   it('requires explicit mutation fixtures and projects them into the Test snapshot', () => {
     const workspace = createServerRuntimeTestWorkspace('route-action');
     const missing = createProjectTestExecutionPlan(workspace);

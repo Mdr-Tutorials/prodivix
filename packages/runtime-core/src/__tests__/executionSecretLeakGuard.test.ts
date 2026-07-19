@@ -82,6 +82,30 @@ describe('execution Secret leak guard', () => {
     expect(output.some((entry) => entry.redacted)).toBe(true);
   });
 
+  it('restores the sensitive cross-chunk suffix only from a strict checkpoint', () => {
+    const first = createExecutionSecretTextStreamRedactor({
+      secretValues: [canary],
+    });
+    expect(first.push('visible:secret-').value).toBe('visible:');
+    const checkpoint = JSON.parse(JSON.stringify(first.createCheckpoint()));
+    const restored = createExecutionSecretTextStreamRedactor({
+      secretValues: [canary],
+      checkpoint,
+    });
+    const output = restored.push('canary-7f31c8:tail');
+    expect(output).toEqual({
+      value: `${EXECUTION_SECRET_REDACTION_MARKER}:tail`,
+      redacted: true,
+    });
+    expect(JSON.stringify(output)).not.toContain(canary);
+    expect(() =>
+      createExecutionSecretTextStreamRedactor({
+        secretValues: [canary],
+        checkpoint: { ...checkpoint, pending: 'unrelated' },
+      })
+    ).toThrow(/checkpoint is invalid/u);
+  });
+
   it('fails closed on getters without evaluating them', () => {
     let evaluated = false;
     const value = Object.defineProperty({}, 'unsafe', {

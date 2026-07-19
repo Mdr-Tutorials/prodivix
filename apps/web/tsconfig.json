@@ -13,6 +13,8 @@
       "@prodivix/authoring": ["../../packages/authoring/src"],
       "@prodivix/code-language": ["../../packages/code-language/src"],
       "@prodivix/data": ["../../packages/data/src"],
+      "@prodivix/data-asyncapi": ["../../packages/data-asyncapi/src"],
+      "@prodivix/data-graphql": ["../../packages/data-graphql/src"],
       "@prodivix/data-http": ["../../packages/data-http/src"],
       "@prodivix/data-mock": ["../../packages/data-mock/src"],
       "@prodivix/diagnostics": ["../../packages/diagnostics/src"],
@@ -70,6 +72,12 @@
     },
     {
       "path": "../../packages/data"
+    },
+    {
+      "path": "../../packages/data-asyncapi"
+    },
+    {
+      "path": "../../packages/data-graphql"
     },
     {
       "path": "../../packages/data-http"

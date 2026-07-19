@@ -477,7 +477,51 @@ func RunMigrations(ctx context.Context, db *sql.DB) error {
 			remaining_count INTEGER NOT NULL,
 			occurred_at TIMESTAMPTZ NOT NULL,
 			CONSTRAINT execution_environment_key_rotation_audit_count_check CHECK (rewrapped_count BETWEEN 1 AND 256 AND migrated_legacy_count BETWEEN 0 AND rewrapped_count AND remaining_count >= 0)
-		)`,
+			)`,
+		},
+	}, {
+		version: 9,
+		name:    "workspace-execution-viewer-role",
+		statements: []string{
+			`CREATE TABLE IF NOT EXISTS workspace_execution_role_grants (
+			workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+			principal_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			role TEXT NOT NULL,
+			granted_by TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			PRIMARY KEY (workspace_id, principal_id),
+			CONSTRAINT workspace_execution_role_grants_role_check CHECK (role = 'viewer'),
+			CONSTRAINT workspace_execution_role_grants_not_self_check CHECK (principal_id <> granted_by)
+			)`,
+			`CREATE INDEX IF NOT EXISTS idx_workspace_execution_role_grants_principal ON workspace_execution_role_grants(principal_id, workspace_id)`,
+			`ALTER TABLE remote_execution_grants RENAME COLUMN owner_id TO principal_id`,
+			`DROP INDEX IF EXISTS idx_remote_execution_grants_owner`,
+			`CREATE INDEX IF NOT EXISTS idx_remote_execution_grants_principal ON remote_execution_grants(principal_id, created_at DESC)`,
+			`ALTER TABLE remote_execution_grants ADD COLUMN IF NOT EXISTS permissions_json JSONB NOT NULL DEFAULT '["workspace.owner","workspace.read","workspace.write"]'::jsonb`,
+			`ALTER TABLE remote_execution_grants
+			ALTER COLUMN permissions_json DROP DEFAULT,
+			DROP CONSTRAINT IF EXISTS remote_execution_grants_permissions_check,
+			ADD CONSTRAINT remote_execution_grants_permissions_check CHECK (
+				permissions_json = '["workspace.read"]'::jsonb
+				OR permissions_json = '["workspace.owner","workspace.read","workspace.write"]'::jsonb
+			)`,
+		},
+	}, {
+		version: 10,
+		name:    "remote-execution-class-authority",
+		statements: []string{
+			`ALTER TABLE remote_execution_grants ADD COLUMN IF NOT EXISTS provider_id TEXT`,
+			`ALTER TABLE remote_execution_grants ADD COLUMN IF NOT EXISTS profile TEXT`,
+			`ALTER TABLE remote_execution_grants ADD COLUMN IF NOT EXISTS runtime_zone TEXT`,
+			`ALTER TABLE remote_execution_grants
+			DROP CONSTRAINT IF EXISTS remote_execution_grants_execution_class_check,
+			ADD CONSTRAINT remote_execution_grants_execution_class_check CHECK (
+				(provider_id IS NULL AND profile IS NULL AND runtime_zone IS NULL)
+				OR (provider_id = 'prodivix.remote.preview' AND profile = 'preview' AND runtime_zone = 'client')
+				OR (provider_id = 'prodivix.remote.test' AND profile = 'test' AND runtime_zone = 'test')
+				OR (provider_id = 'prodivix.remote.build' AND profile = 'build' AND runtime_zone = 'build')
+				OR (provider_id = 'prodivix.remote.server-function' AND profile = 'production' AND runtime_zone = 'server')
+			)`,
 		},
 	}}
 

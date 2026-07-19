@@ -203,3 +203,91 @@ func TestEnvironmentSecretKeyRotationPostgreSQLGate(t *testing.T) {
 		t.Fatalf("retired key unexpectedly resolved a rotated Secret: %v", err)
 	}
 }
+
+func TestEnvironmentSecretAWSKMSMigrationPostgreSQLGate(t *testing.T) {
+	database := openEnvironmentKeyRotationPostgreSQL(t)
+	now := time.Now().UTC()
+	seedEnvironmentKeyRotationWorkspace(t, database, now)
+	oldKey := encodedKey(0x11)
+	oldStore := NewStoreWithKeyRing(database, "", "key-static-old", map[string]string{"key-static-old": oldKey})
+	secrets := map[string]string{
+		"binding-a": "managed-kms-postgres-canary-a",
+		"binding-b": "managed-kms-postgres-canary-b",
+	}
+	snapshot, err := oldStore.PutSnapshot(t.Context(), PutSnapshotInput{
+		Principal:   PrincipalSession{PrincipalID: "rotation-owner", SessionID: "rotation-session"},
+		WorkspaceID: "rotation-workspace", EnvironmentID: "managed-kms-environment", Mode: "live", PublicBindings: map[string]any{}, Secrets: secrets,
+	})
+	if err != nil {
+		t.Fatalf("create static-key environment snapshot: %v", err)
+	}
+	originalCiphertexts := map[string]string{}
+	rows, err := database.Query(`SELECT binding_id, encode(ciphertext, 'hex') FROM execution_environment_secret_materials WHERE environment_id=$1 AND revision=$2`, snapshot.EnvironmentID, snapshot.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var bindingID, ciphertext string
+		if err := rows.Scan(&bindingID, &ciphertext); err != nil {
+			t.Fatal(err)
+		}
+		originalCiphertexts[bindingID] = ciphertext
+	}
+	_ = rows.Close()
+
+	staticKMS, err := newStaticKeyRingKMS("key-static-old", map[string]string{"key-static-old": oldKey})
+	if err != nil {
+		t.Fatal(err)
+	}
+	managedClient := newMemoryAWSKMSClient()
+	managedKMS, err := newAWSKMS("key-cloud-active", map[string]string{"key-cloud-active": newAWSKMSKeyARN}, managedClient, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	managedStore := newStoreWithKMS(database, "", managedKMS, nil, staticKMS)
+	result, err := managedStore.RotateSecretMaterials(t.Context(), SecretKeyRotationPolicy{BatchSize: 8})
+	if err != nil {
+		t.Fatalf("migrate static envelopes to managed KMS: %v", err)
+	}
+	if result.ActiveKeyID != "key-cloud-active" || result.RewrappedMaterials != len(secrets) || result.RemainingMaterials != 0 {
+		t.Fatalf("unexpected managed KMS migration result: %#v", result)
+	}
+
+	var migratedCount, unchangedCiphertextCount, metadataCount int
+	if err := database.QueryRow(`SELECT COUNT(*), COUNT(*) FILTER (WHERE encode(ciphertext, 'hex') = CASE binding_id WHEN 'binding-a' THEN $1 WHEN 'binding-b' THEN $2 END), COUNT(*) FILTER (WHERE octet_length(wrapped_key_nonce)=32) FROM execution_environment_secret_materials WHERE environment_id=$3 AND revision=$4 AND key_provider=$5 AND key_id=$6`,
+		originalCiphertexts["binding-a"], originalCiphertexts["binding-b"], snapshot.EnvironmentID, snapshot.Revision, awsKMSProviderID, "key-cloud-active").Scan(&migratedCount, &unchangedCiphertextCount, &metadataCount); err != nil {
+		t.Fatal(err)
+	}
+	if migratedCount != len(secrets) || unchangedCiphertextCount != len(secrets) || metadataCount != len(secrets) {
+		t.Fatalf("managed KMS migration changed Secret ciphertext or lost provider metadata: migrated=%d unchanged=%d metadata=%d", migratedCount, unchangedCiphertextCount, metadataCount)
+	}
+	var auditProvider, auditKeyID string
+	var auditRewrapped, auditRemaining int
+	if err := database.QueryRow(`SELECT active_key_provider, active_key_id, rewrapped_count, remaining_count FROM execution_environment_key_rotation_audit ORDER BY id DESC LIMIT 1`).Scan(&auditProvider, &auditKeyID, &auditRewrapped, &auditRemaining); err != nil {
+		t.Fatal(err)
+	}
+	if auditProvider != awsKMSProviderID || auditKeyID != "key-cloud-active" || auditRewrapped != len(secrets) || auditRemaining != 0 {
+		t.Fatalf("managed KMS aggregate audit is invalid: provider=%q key=%q rewrapped=%d remaining=%d", auditProvider, auditKeyID, auditRewrapped, auditRemaining)
+	}
+
+	grant, err := managedStore.IssueGrant(t.Context(), IssueGrantInput{
+		Principal:   PrincipalSession{PrincipalID: "rotation-owner", SessionID: "rotation-session"},
+		WorkspaceID: snapshot.WorkspaceID, EnvironmentID: snapshot.EnvironmentID, Revision: snapshot.Revision,
+		ProviderID: "managed-kms-provider", ProviderIsolation: "remote-isolated", ExecutionClass: "isolated-runner", RuntimeZone: "server",
+		PurposeKind: "server-function", ResourceID: "managed-kms/read", SecretBindings: []SecretBindingGrant{{BindingID: "binding-a", Field: "key"}}, ExpiresAt: time.Now().UTC().Add(time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("issue managed KMS post-migration grant: %v", err)
+	}
+	var resolved string
+	err = managedStore.UseSecret(t.Context(), UseSecretInput{
+		GrantID: grant.GrantID, Principal: grant.Principal, WorkspaceID: grant.WorkspaceID, EnvironmentID: grant.EnvironmentID, Revision: grant.Revision,
+		ProviderID: grant.ProviderID, PurposeKind: grant.PurposeKind, ResourceID: grant.ResourceID, BindingID: "binding-a", Field: "key",
+	}, func(material []byte) error {
+		resolved = string(material)
+		return nil
+	})
+	if err != nil || resolved != secrets["binding-a"] {
+		t.Fatalf("managed KMS envelope could not resolve after PostgreSQL migration: resolved=%q err=%v", resolved, err)
+	}
+}

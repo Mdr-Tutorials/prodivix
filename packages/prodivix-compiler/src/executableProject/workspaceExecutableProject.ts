@@ -14,7 +14,10 @@ import {
   generateWorkspaceReactViteBundle,
   type WorkspaceReactViteCompileOptions,
 } from '#src/react/workspaceProject';
-import { analyzeWorkspaceDataRuntimeTarget } from '#src/react/workspaceDataRuntimeTarget';
+import {
+  analyzeWorkspaceDataRuntimeTarget,
+  PROVIDER_MOCK_DATA_RUNTIME_TARGET,
+} from '#src/react/workspaceDataRuntimeTarget';
 
 export type WorkspaceExecutableProjectResult =
   | Readonly<{
@@ -31,7 +34,7 @@ export type GenerateWorkspaceExecutableProjectOptions =
 
 type PackageManagerName = 'npm' | 'pnpm' | 'yarn' | 'bun';
 
-const readPackageManager = (
+export const readPackageManager = (
   files: readonly Readonly<{ path: string; contents: string | Uint8Array }>[]
 ): PackageManagerName => {
   const packageFile = files.find((file) => file.path === 'package.json');
@@ -50,14 +53,14 @@ const readPackageManager = (
   }
 };
 
-const readLockFilePath = (
+export const readLockFilePath = (
   files: readonly Readonly<{ path: string }>[]
 ): string | undefined =>
   ['pnpm-lock.yaml', 'package-lock.json', 'yarn.lock', 'bun.lock'].find(
     (path) => files.some((file) => file.path === path)
   );
 
-const packageManagerCommand = (
+export const packageManagerCommand = (
   packageManager: PackageManagerName,
   args: readonly string[]
 ): ExecutableProjectCommand =>
@@ -71,7 +74,7 @@ const packageManagerCommand = (
         args: Object.freeze([packageManager, ...args]),
       });
 
-const packageManagerRunArguments = (
+export const packageManagerRunArguments = (
   packageManager: PackageManagerName,
   script: string,
   args: readonly string[] = []
@@ -106,7 +109,7 @@ const executionTargetRef = (
   }
 };
 
-const executionSourceTrace = (
+export const executionSourceTrace = (
   trace: ExportSourceTrace,
   workspaceId: string
 ): ExecutionSourceTrace =>
@@ -160,7 +163,10 @@ export const generateWorkspaceReactViteExecutableProject = (
 ): WorkspaceExecutableProjectResult => {
   const dataRuntime = analyzeWorkspaceDataRuntimeTarget(
     workspace,
-    options.dataRuntimeTarget
+    options.dataRuntimeTarget ??
+      (options.dataMockProvision
+        ? PROVIDER_MOCK_DATA_RUNTIME_TARGET
+        : undefined)
   );
   const bundle = generateWorkspaceReactViteBundle(workspace, options);
   const serverRuntimeMetadata = bundle.metadata?.serverRuntime as
@@ -227,6 +233,10 @@ export const generateWorkspaceReactViteExecutableProject = (
           : []),
         'filesystem',
         ...(requiresLiveDataNetwork ? (['network'] as const) : []),
+        ...(!options.dataMockProvision &&
+        dataRuntime.requirements.requiresDataStream
+          ? (['data-stream'] as const)
+          : []),
         ...(requiresServerFunctionGateway
           ? (['server-function'] as const)
           : []),

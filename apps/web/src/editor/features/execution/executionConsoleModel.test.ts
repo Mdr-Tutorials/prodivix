@@ -82,6 +82,11 @@ describe('execution Console model', () => {
       message: 'created item',
       detail: '[{"id":"item-1"}]',
       redacted: true,
+      correlation: {
+        jobId: 'job-1',
+        providerId: 'provider-1',
+        snapshotId: 'snapshot-1',
+      },
     });
 
     const errors = createExecutionConsoleView({ session, filter: 'errors' });

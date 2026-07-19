@@ -112,7 +112,7 @@ func (store *Store) RotateSecretMaterials(ctx context.Context, rawPolicy SecretK
 			}
 			result.MigratedLegacy++
 		} else if row.Algorithm.Valid && row.KeyProvider.Valid && row.KeyID.Valid && len(row.WrappedKeyNonce) > 0 && len(row.WrappedKey) > 0 {
-			rotated, err = store.envelopeCipher.rewrap(ctx, storedSecretEnvelope{
+			rotated, err = store.rewrapSecretEnvelope(ctx, storedSecretEnvelope{
 				Algorithm: row.Algorithm.String, KeyProvider: row.KeyProvider.String, KeyID: row.KeyID.String,
 				WrappedKeyNonce: row.WrappedKeyNonce, WrappedKey: row.WrappedKey, Nonce: row.Nonce, Ciphertext: row.Ciphertext,
 			}, additionalData)

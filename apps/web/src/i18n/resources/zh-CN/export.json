@@ -6,6 +6,12 @@
     "empty": "暂无 React 代码（先生成 PIR）",
     "error": "React 代码生成失败"
   },
+  "vue": {
+    "title": "Vue",
+    "description": "基于当前 PIR、Route、Auth、Server Runtime、Data 与 Asset contract 生成的 Vue 项目",
+    "empty": "暂无 Vue 项目（先创建 PIR 路由）",
+    "error": "Vue 代码生成失败"
+  },
   "vfs": {
     "title": "VFS",
     "description": "当前 Workspace VFS 的完整文件树",

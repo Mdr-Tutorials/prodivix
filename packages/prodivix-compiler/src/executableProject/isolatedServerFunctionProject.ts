@@ -17,6 +17,9 @@ import {
   ISOLATED_SERVER_FUNCTION_SECRET_MATERIAL_PATH,
   ISOLATED_SERVER_FUNCTION_SECRET_MAX_FIELDS,
   ISOLATED_SERVER_FUNCTION_SECRET_MAX_MATERIAL_BYTES,
+  ISOLATED_SERVER_FUNCTION_SOURCE_MUTATION_DIRECTORY,
+  ISOLATED_SERVER_FUNCTION_SOURCE_MUTATION_MAX_BYTES,
+  isIsolatedServerFunctionProjectSourceMutationDefinition,
   isSupportedIsolatedServerFunctionDefinition,
   PRODIVIX_PRODUCT_SESSION_AUTH_PROVIDER_ID,
   resolveServerFunctionDefinition,
@@ -66,6 +69,10 @@ const createRunnerSource = (input: {
   snapshotId: string;
   functionRef: ServerFunctionReference;
   definition: ServerFunctionProfileEntry;
+  sourceMutationTargets: readonly Readonly<{
+    artifactId: string;
+    path: string;
+  }>[];
 }): string => {
   const configuration = JSON.stringify({
     workspaceId: input.workspaceId,
@@ -77,6 +84,7 @@ const createRunnerSource = (input: {
     resultFilePath: DEFAULT_EXECUTABLE_PROJECT_SERVER_FUNCTION_RESULT_PATH,
     authorityFilePath: ISOLATED_SERVER_FUNCTION_AUTHORITY_PATH,
     secretMaterialFilePath: ISOLATED_SERVER_FUNCTION_SECRET_MATERIAL_PATH,
+    sourceMutationTargets: input.sourceMutationTargets,
   });
   return `import { readFile, rm, writeFile } from 'node:fs/promises';
 import Ajv2020 from 'ajv/dist/2020.js';
@@ -90,6 +98,7 @@ const maximumAuthorityPermissions = ${ISOLATED_SERVER_FUNCTION_AUTHORITY_MAX_PER
 const secretMaterialType = '${ISOLATED_SERVER_FUNCTION_SECRET_MATERIAL_FORMAT}';
 const maximumSecretFields = ${ISOLATED_SERVER_FUNCTION_SECRET_MAX_FIELDS};
 const maximumSecretMaterialBytes = ${ISOLATED_SERVER_FUNCTION_SECRET_MAX_MATERIAL_BYTES};
+const maximumSourceMutationBytes = ${ISOLATED_SERVER_FUNCTION_SOURCE_MUTATION_MAX_BYTES};
 
 class RuntimeFailure extends Error {
   constructor(code) {
@@ -295,6 +304,21 @@ try {
         }
       }
     : undefined;
+  let sourceMutationCompleted = false;
+  const replaceProjectSource = configuration.sourceMutationTargets.length
+    ? async (mutation) => {
+        const record = exactRecord(mutation, ['artifactId', 'source']);
+        const target = record && configuration.sourceMutationTargets.find(
+          (candidate) => candidate.artifactId === record.artifactId
+        );
+        if (sourceMutationCompleted || !record || !target ||
+          typeof record.source !== 'string' || record.source.includes('\0') ||
+          Buffer.byteLength(record.source, 'utf8') > maximumSourceMutationBytes)
+          throw new RuntimeFailure('SVR_SOURCE_MUTATION_INVALID');
+        await writeFile(target.path, record.source, { flag: 'w' });
+        sourceMutationCompleted = true;
+      }
+    : undefined;
   validate(configuration.definition.inputSchema, request.input, 'SVR_INPUT_INVALID');
   const module = await import('./function.mjs');
   const implementation = module[configuration.functionRef.exportName];
@@ -308,7 +332,10 @@ try {
       functionRef: configuration.functionRef,
       ...(principal ? { principal } : {}),
       ...(useSecret ? { useSecret } : {}),
+      ...(replaceProjectSource ? { replaceProjectSource } : {}),
     })));
+    if (replaceProjectSource && !sourceMutationCompleted)
+      throw new RuntimeFailure('SVR_SOURCE_MUTATION_REQUIRED');
     if (containsSecretMaterial(result, secretMaterials)) throw new RuntimeFailure('SVR_SECRET_OUTPUT_LEAK');
   } finally {
     secretMaterials.fill('');
@@ -327,6 +354,50 @@ try {
 `;
 };
 
+const createSourceMutationFiles = (
+  workspace: WorkspaceSnapshot,
+  moduleDocumentIds: readonly string[]
+): Readonly<{
+  files: readonly Readonly<{
+    path: string;
+    contents: string;
+    sourceTrace: readonly ExecutionSourceTrace[];
+  }>[];
+  targets: readonly Readonly<{ artifactId: string; path: string }>[];
+}> => {
+  const targets = moduleDocumentIds.map((artifactId, index) => {
+    const document = workspace.docsById[artifactId];
+    if (
+      !document ||
+      document.type !== 'code' ||
+      !isWorkspaceCodeDocumentContent(document.content) ||
+      (document.content.language !== 'ts' && document.content.language !== 'js')
+    )
+      throw new TypeError('Isolated source mutation target disappeared.');
+    return Object.freeze({
+      artifactId,
+      path: `${ISOLATED_SERVER_FUNCTION_SOURCE_MUTATION_DIRECTORY}/module-${String(
+        index + 1
+      ).padStart(3, '0')}.${document.content.language}`,
+    });
+  });
+  return Object.freeze({
+    targets: Object.freeze(targets),
+    files: Object.freeze(
+      targets.map(({ artifactId, path }) => {
+        const document = workspace.docsById[artifactId]!;
+        if (!isWorkspaceCodeDocumentContent(document.content))
+          throw new TypeError('Isolated source mutation target is invalid.');
+        return Object.freeze({
+          path,
+          contents: document.content.source,
+          sourceTrace: sourceTrace(workspace, artifactId),
+        });
+      })
+    ),
+  });
+};
+
 const sourceTrace = (
   workspace: WorkspaceSnapshot,
   artifactId: string
@@ -340,7 +411,7 @@ const sourceTrace = (
   ]);
 };
 
-/** Compiles one exact public/read code export and its bounded canonical import graph. */
+/** Compiles one exact read or fenced source-mutation export and its bounded import graph. */
 export const generateWorkspaceIsolatedServerFunctionExecutableProject = (
   workspace: WorkspaceSnapshot,
   options: GenerateIsolatedServerFunctionExecutableProjectOptions
@@ -392,7 +463,7 @@ export const generateWorkspaceIsolatedServerFunctionExecutableProject = (
       diagnostics: Object.freeze([
         diagnostic(
           'WKS-EXPORT-SERVER-ISOLATED-POLICY-UNSUPPORTED',
-          'The isolated target accepts only public, authenticated, workspace.owner, or Secret-free workspace.read permission read/server prodivix.code-export functions.',
+          'The isolated target accepts only public, authenticated, workspace.owner, or workspace.read permission reads, plus Secret-free invocation-key workspace.write project-source mutations, on server prodivix.code-export functions.',
           path
         ),
       ]),
@@ -475,6 +546,10 @@ export const generateWorkspaceIsolatedServerFunctionExecutableProject = (
         ),
       ]),
     });
+  const sourceMutation =
+    isIsolatedServerFunctionProjectSourceMutationDefinition(definition)
+      ? createSourceMutationFiles(workspace, importGraph.moduleDocumentIds)
+      : Object.freeze({ files: Object.freeze([]), targets: Object.freeze([]) });
   const { reference: _reference, ...profileEntry } = definition;
   const manifest = runtimeManifest(
     definition.reference.exportName,
@@ -506,10 +581,12 @@ export const generateWorkspaceIsolatedServerFunctionExecutableProject = (
           snapshotId: workspaceRef.snapshotId,
           functionRef: definition.reference,
           definition: profileEntry,
+          sourceMutationTargets: sourceMutation.targets,
         }),
         sourceTrace: traces,
       }),
       ...importGraph.files,
+      ...sourceMutation.files,
     ]),
     dependencyPlan: { manifestFilePath: generatedPackagePath },
     entrypoints: Object.freeze([

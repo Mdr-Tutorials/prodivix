@@ -23,8 +23,11 @@ import {
   ISOLATED_SERVER_FUNCTION_AUTHORITY_PATH,
   ISOLATED_SERVER_FUNCTION_SECRET_MATERIAL_FORMAT,
   ISOLATED_SERVER_FUNCTION_SECRET_MATERIAL_PATH,
+  ISOLATED_SERVER_FUNCTION_SOURCE_MUTATION_DIRECTORY,
+  ISOLATED_SERVER_FUNCTION_SOURCE_MUTATION_MAX_BYTES,
   ISOLATED_SERVER_FUNCTION_RESULT_MEDIA_TYPE,
   readIsolatedServerFunctionPlan,
+  readIsolatedServerFunctionExecutionContext,
   readIsolatedServerFunctionExecutionResponse,
 } from '@prodivix/server-runtime';
 import {
@@ -198,9 +201,10 @@ if (JSON.stringify(Object.keys(authority).sort()) !== JSON.stringify(['expiresAt
   authority.format !== 'prodivix.isolated-server-function-authority.v1' ||
   authority.workspaceId !== 'workspace-gate-server-function' ||
   authority.snapshotId !== 'snapshot-gate-server-function' ||
-  JSON.stringify(authority.permissions) !== JSON.stringify(['workspace.owner']) ||
+  JSON.stringify(authority.permissions) !== JSON.stringify(['workspace.owner', 'workspace.read', 'workspace.write']) ||
+  !authority.permissions.includes('workspace.read') ||
   authority.expiresAt <= Date.now())
-  throw new TypeError('Server Function Gate authority is invalid.');
+  throw new TypeError('workspace.read + Secret Server Function Gate authority is invalid.');
 if (secretMaterial.format !== 'prodivix.isolated-server-function-secret-material.v1' ||
   JSON.stringify(Object.keys(secretMaterial.fields ?? {})) !== JSON.stringify(['signingKey']) ||
   typeof secretMaterial.fields.signingKey !== 'string' || !secretMaterial.fields.signingKey)
@@ -241,7 +245,7 @@ if (JSON.stringify(Object.keys(authority).sort()) !== JSON.stringify(['expiresAt
   authority.format !== 'prodivix.isolated-server-function-authority.v1' ||
   authority.workspaceId !== 'workspace-gate-server-function-read' ||
   authority.snapshotId !== 'snapshot-gate-server-function-read' ||
-  JSON.stringify(authority.permissions) !== JSON.stringify(['workspace.owner', 'workspace.read']) ||
+  JSON.stringify(authority.permissions) !== JSON.stringify(['workspace.read']) ||
   !authority.permissions.includes('workspace.read') ||
   authority.expiresAt <= Date.now())
   throw new TypeError('workspace.read Server Function Gate authority is invalid.');
@@ -253,6 +257,59 @@ const validateInput = new Ajv2020({ strict: true }).compile({
 if (!validateInput(request.input)) throw new TypeError('workspace.read Server Function Gate input is invalid.');
 const { getWorkspaceLabel } = await import('./function.mjs');
 const result = await getWorkspaceLabel(request.input, Object.freeze({ principal: authority.principal }));
+fs.mkdirSync('/workspace/.prodivix', { recursive: true });
+fs.writeFileSync('/workspace/.prodivix/server-function-result.json', JSON.stringify({
+  type: 'prodivix.execution-server-function-gateway-response.v1',
+  requestId: request.requestId,
+  ok: true,
+  result,
+}));
+`;
+
+const isolatedSourceMutationTargetPath = `${ISOLATED_SERVER_FUNCTION_SOURCE_MUTATION_DIRECTORY}/module-002.ts`;
+const isolatedSourceMutationInitialSource =
+  "export const rootlessProjectValue = 'before';\n";
+const isolatedSourceMutationReplacementSource =
+  "export const rootlessProjectValue = 'after';\n";
+const isolatedSourceMutationServerFunctionSource = String.raw`
+import fs from 'node:fs';
+import Ajv2020 from 'ajv/dist/2020.js';
+const request = JSON.parse(fs.readFileSync('/workspace/.prodivix/server-function-invocation.json', 'utf8'));
+const authorityPath = '/workspace/.prodivix/server-function-authority.json';
+const authority = JSON.parse(fs.readFileSync(authorityPath, 'utf8'));
+fs.rmSync(authorityPath);
+if (JSON.stringify(Object.keys(authority).sort()) !== JSON.stringify(['expiresAt', 'format', 'permissions', 'principal', 'snapshotId', 'workspaceId']) ||
+  JSON.stringify(Object.keys(authority.principal ?? {}).sort()) !== JSON.stringify(['principalId', 'providerId']) ||
+  authority.format !== 'prodivix.isolated-server-function-authority.v1' ||
+  authority.workspaceId !== 'workspace-gate-server-function-write' ||
+  authority.snapshotId !== 'snapshot-gate-server-function-write' ||
+  JSON.stringify(authority.permissions) !== JSON.stringify(['workspace.owner', 'workspace.read', 'workspace.write']) ||
+  !authority.permissions.includes('workspace.write') ||
+  authority.expiresAt <= Date.now())
+  throw new TypeError('workspace.write Server Function Gate authority is invalid.');
+if (fs.existsSync('/workspace/.prodivix/server-function-secrets.json'))
+  throw new TypeError('workspace.write unexpectedly received Secret material.');
+const validateInput = new Ajv2020({ strict: true }).compile({
+  type: 'object', required: ['source'], properties: { source: { type: 'string' } }, additionalProperties: false,
+});
+if (!validateInput(request.input)) throw new TypeError('workspace.write Server Function Gate input is invalid.');
+let mutationCompleted = false;
+const replaceProjectSource = async (mutation) => {
+  if (mutationCompleted ||
+    JSON.stringify(Object.keys(mutation ?? {}).sort()) !== JSON.stringify(['artifactId', 'source']) ||
+    mutation.artifactId !== 'code-rootless-source-target' ||
+    typeof mutation.source !== 'string' || mutation.source.includes('\0') ||
+    Buffer.byteLength(mutation.source, 'utf8') > ${ISOLATED_SERVER_FUNCTION_SOURCE_MUTATION_MAX_BYTES})
+    throw new TypeError('workspace.write project-source mutation is invalid.');
+  fs.writeFileSync('/workspace/${isolatedSourceMutationTargetPath}', mutation.source, 'utf8');
+  mutationCompleted = true;
+};
+const { replaceRootlessProjectSource } = await import('./function.mjs');
+const result = await replaceRootlessProjectSource(
+  request.input,
+  Object.freeze({ principal: authority.principal, replaceProjectSource }),
+);
+if (!mutationCompleted) throw new TypeError('workspace.write source mutation is required.');
 fs.mkdirSync('/workspace/.prodivix', { recursive: true });
 fs.writeFileSync('/workspace/.prodivix/server-function-result.json', JSON.stringify({
   type: 'prodivix.execution-server-function-gateway-response.v1',
@@ -451,7 +508,7 @@ const isolatedServerFunctionFixture = () => {
             runtimeZone: 'server',
             adapterId: 'prodivix.code-export',
             effect: 'read',
-            auth: { kind: 'permission', permissionId: 'workspace.owner' },
+            auth: { kind: 'permission', permissionId: 'workspace.read' },
             inputSchema: {
               type: 'object',
               required: ['name'],
@@ -510,7 +567,7 @@ const isolatedServerFunctionFixture = () => {
         providerId: 'prodivix-product-session',
         principalId: 'user-1',
       },
-      permissions: ['workspace.owner'],
+      permissions: ['workspace.owner', 'workspace.read', 'workspace.write'],
       expiresAt: Date.now() + 60_000,
     }),
     secrets: {
@@ -658,25 +715,245 @@ const isolatedWorkspaceReadServerFunctionFixture = () => {
         providerId: 'prodivix-product-session',
         principalId: 'user-1',
       },
-      permissions: ['workspace.owner', 'workspace.read'],
+      permissions: ['workspace.read'],
       expiresAt: Date.now() + 60_000,
     }),
   });
 };
 
+const isolatedSourceMutationServerFunctionFixture = () => {
+  const base = isolatedServerFunctionFixture().snapshot;
+  const functionRef = Object.freeze({
+    artifactId: 'code-rootless-source-mutation-action',
+    exportName: 'replaceRootlessProjectSource',
+  });
+  const targetArtifactId = 'code-rootless-source-target';
+  const workspace = Object.freeze({
+    workspaceId: 'workspace-gate-server-function-write',
+    snapshotId: 'snapshot-gate-server-function-write',
+    partitionRevisions: Object.freeze({
+      workspace: '1',
+      route: '1',
+      [`document:${functionRef.artifactId}:content`]: '1',
+      [`document:${functionRef.artifactId}:meta`]: '1',
+      [`document:${targetArtifactId}:content`]: '1',
+      [`document:${targetArtifactId}:meta`]: '1',
+    }),
+  });
+  const sourceTrace = [
+    {
+      sourceRef: {
+        kind: 'code-artifact' as const,
+        artifactId: targetArtifactId,
+      },
+    },
+  ];
+  const mutationSnapshot = createExecutableProjectSnapshot({
+    workspace,
+    target: base.target,
+    files: [
+      ...base.files.map((file) => {
+        if (file.path === 'src/.prodivix/server-runtime/invoke.mjs')
+          return {
+            ...file,
+            contents: isolatedSourceMutationServerFunctionSource,
+            sourceTrace: [
+              {
+                sourceRef: {
+                  kind: 'code-artifact' as const,
+                  artifactId: functionRef.artifactId,
+                },
+              },
+            ],
+          };
+        if (file.path === 'src/.prodivix/server-runtime/function.mjs')
+          return {
+            ...file,
+            contents:
+              "import { rootlessProjectValue } from './modules/module-001.mjs';\nexport const replaceRootlessProjectSource = async (input, context) => { await context.replaceProjectSource({ artifactId: 'code-rootless-source-target', source: input.source }); return { kind: 'value', value: { updated: rootlessProjectValue === 'before' } }; };\n",
+            sourceTrace: [
+              {
+                sourceRef: {
+                  kind: 'code-artifact' as const,
+                  artifactId: functionRef.artifactId,
+                },
+              },
+            ],
+          };
+        if (file.path === 'src/.prodivix/server-runtime/modules/module-001.mjs')
+          return {
+            ...file,
+            contents: "export const rootlessProjectValue = 'before';\n",
+            sourceTrace,
+          };
+        return file;
+      }),
+      {
+        path: isolatedSourceMutationTargetPath,
+        contents: isolatedSourceMutationInitialSource,
+        sourceTrace,
+      },
+    ],
+    dependencyPlan: {
+      manifestFilePath: base.dependencyPlan.manifestFilePath,
+      ...(base.dependencyPlan.lockFilePath
+        ? { lockFilePath: base.dependencyPlan.lockFilePath }
+        : {}),
+    },
+    entrypoints: base.entrypoints,
+    capabilityRequirements: {
+      ...base.capabilityRequirements,
+      production: base.capabilityRequirements.production.filter(
+        (capability) => capability !== 'environment-binding'
+      ),
+    },
+    publicBuildConfiguration: base.publicBuildConfiguration,
+    resourceHints: base.resourceHints,
+    cacheHints: base.cacheHints,
+    installCommand: base.installCommand,
+    previewCommand: base.previewCommand,
+    buildCommand: base.buildCommand,
+    previewPlan: base.previewPlan,
+    buildPlan: base.buildPlan,
+    testPlan: base.testPlan,
+    serverFunctionPlan: {
+      ...base.serverFunctionPlan!,
+      functionRef,
+      runtimeManifest: {
+        schemaVersion: '1.0',
+        functionsByExport: {
+          replaceRootlessProjectSource: {
+            kind: 'route-action',
+            runtimeZone: 'server',
+            adapterId: 'prodivix.code-export',
+            effect: 'mutation',
+            auth: { kind: 'permission', permissionId: 'workspace.write' },
+            inputSchema: {
+              type: 'object',
+              required: ['source'],
+              properties: { source: { type: 'string' } },
+              additionalProperties: false,
+            },
+            outputSchema: {
+              type: 'object',
+              required: ['updated'],
+              properties: { updated: { const: true } },
+              additionalProperties: false,
+            },
+            idempotency: { kind: 'invocation-key' },
+          },
+        },
+      },
+    },
+  });
+  const request = createExecutionRequest({
+    requestId: 'remote-gate-server-function-write',
+    profile: 'production',
+    runtimeZone: 'server',
+    workspace: mutationSnapshot.workspace,
+    invocation: {
+      kind: 'code',
+      targetRef: { kind: 'code-artifact', artifactId: functionRef.artifactId },
+      entrypoint: functionRef.exportName,
+      input: {
+        type: EXECUTION_SERVER_FUNCTION_BRIDGE_REQUEST_TYPE,
+        requestId: 'gate-server-function-write:1',
+        invocationId: 'gate-server-function-write',
+        attempt: 1,
+        functionRef,
+        input: { source: isolatedSourceMutationReplacementSource },
+      },
+    },
+    requiredCapabilities: ['server-function'],
+  });
+  return Object.freeze({
+    snapshot: mutationSnapshot,
+    request,
+    authority: createIsolatedServerFunctionAuthority({
+      workspaceId: workspace.workspaceId,
+      snapshotId: workspace.snapshotId,
+      principal: {
+        providerId: 'prodivix-product-session',
+        principalId: 'user-1',
+      },
+      permissions: ['workspace.owner', 'workspace.read', 'workspace.write'],
+      expiresAt: Date.now() + 60_000,
+    }),
+    actionArtifactId: functionRef.artifactId,
+    targetArtifactId,
+  });
+};
+
 if (snapshotContractOnly) {
-  const fixture = isolatedWorkspaceReadServerFunctionFixture();
-  const plan = readIsolatedServerFunctionPlan(
-    fixture.snapshot.serverFunctionPlan
+  const readSecretFixture = isolatedServerFunctionFixture();
+  const readSecretPlan = readIsolatedServerFunctionPlan(
+    readSecretFixture.snapshot.serverFunctionPlan
   );
   if (
-    !plan ||
-    plan.definition.auth.kind !== 'permission' ||
-    plan.definition.auth.permissionId !== 'workspace.read' ||
-    plan.definition.environment !== undefined
+    !readSecretPlan ||
+    readSecretPlan.definition.auth.kind !== 'permission' ||
+    readSecretPlan.definition.auth.permissionId !== 'workspace.read' ||
+    !readSecretPlan.definition.environment ||
+    !readSecretFixture.snapshot.capabilityRequirements.production.includes(
+      'environment-binding'
+    ) ||
+    readIsolatedServerFunctionExecutionContext(
+      readSecretFixture.request,
+      readSecretFixture.snapshot.serverFunctionPlan,
+      { ...readSecretFixture.authority, permissions: ['workspace.owner'] }
+    ) !== undefined
+  )
+    throw new Error(
+      'Rootless workspace.read + Secret snapshot contract is invalid.'
+    );
+  const readFixture = isolatedWorkspaceReadServerFunctionFixture();
+  const readPlan = readIsolatedServerFunctionPlan(
+    readFixture.snapshot.serverFunctionPlan
+  );
+  if (
+    !readPlan ||
+    readPlan.definition.auth.kind !== 'permission' ||
+    readPlan.definition.auth.permissionId !== 'workspace.read' ||
+    readPlan.definition.environment !== undefined ||
+    JSON.stringify(readFixture.authority.permissions) !==
+      JSON.stringify(['workspace.read']) ||
+    !readIsolatedServerFunctionExecutionContext(
+      readFixture.request,
+      readFixture.snapshot.serverFunctionPlan,
+      readFixture.authority
+    )
   )
     throw new Error('Rootless workspace.read snapshot contract is invalid.');
-  process.stdout.write(`${fixture.snapshot.contentDigest}\n`);
+  const mutationFixture = isolatedSourceMutationServerFunctionFixture();
+  const mutationPlan = readIsolatedServerFunctionPlan(
+    mutationFixture.snapshot.serverFunctionPlan
+  );
+  if (
+    !mutationPlan ||
+    mutationPlan.definition.kind !== 'route-action' ||
+    mutationPlan.definition.effect !== 'mutation' ||
+    mutationPlan.definition.auth.kind !== 'permission' ||
+    mutationPlan.definition.auth.permissionId !== 'workspace.write' ||
+    mutationPlan.definition.idempotency?.kind !== 'invocation-key' ||
+    mutationPlan.definition.environment !== undefined ||
+    readIsolatedServerFunctionExecutionContext(
+      mutationFixture.request,
+      mutationFixture.snapshot.serverFunctionPlan,
+      {
+        ...mutationFixture.authority,
+        permissions: readFixture.authority.permissions,
+      }
+    ) !== undefined ||
+    !mutationFixture.snapshot.files.some(
+      ({ path, sourceTrace: traces }) =>
+        path === isolatedSourceMutationTargetPath &&
+        traces?.length === 1 &&
+        traces[0]?.sourceRef.kind === 'code-artifact' &&
+        traces[0].sourceRef.artifactId === mutationFixture.targetArtifactId
+    )
+  )
+    throw new Error('Rootless workspace.write snapshot contract is invalid.');
+  process.stdout.write(`${mutationFixture.snapshot.contentDigest}\n`);
   process.exit(0);
 }
 
@@ -1022,8 +1299,10 @@ const testArtifacts = requireExecutionArtifacts(
   'Rootless Test probe'
 );
 if (
+  testArtifacts.primary.artifactId !== 'test-report:gate-test' ||
   testArtifacts.primary.kind !== 'report' ||
   testArtifacts.primary.mediaType !== EXECUTION_TEST_REPORT_MEDIA_TYPE ||
+  testArtifacts.primary.metadata?.reportId !== 'test-report:gate-test' ||
   testArtifacts.primary.metadata?.status !== 'passed'
 )
   throw new Error(
@@ -1035,6 +1314,7 @@ const testReport = readExecutionTestReportValue(
 );
 if (
   !testReport ||
+  testReport.reportId !== 'test-report:gate-test' ||
   testReport.status !== 'passed' ||
   testReport.summary.passedFiles !== 1 ||
   testReport.summary.passedCases !== 1 ||
@@ -1188,6 +1468,100 @@ if (
 )
   throw new Error('Rootless workspace.read result content is invalid.');
 await assertNoExecutionContainer('gate-server-function-read');
+
+const sourceMutationFixture = isolatedSourceMutationServerFunctionFixture();
+const sourceMutationResult = await sandbox.execute({
+  executionId: 'gate-server-function-write',
+  snapshot: sourceMutationFixture.snapshot,
+  request: sourceMutationFixture.request,
+  serverFunctionAuthority: sourceMutationFixture.authority,
+  profile: 'production',
+  timeoutMs: serverFunctionProbeTimeoutMs,
+  maximumOutputBytes: 256 * 1024,
+  redactValues: [],
+  signal: new AbortController().signal,
+});
+if (sourceMutationResult.status !== 'succeeded')
+  throw new Error(
+    `Rootless workspace.write Server Function probe failed: ${sourceMutationResult.stderr}`
+  );
+if (
+  !sourceMutationResult.networkTraces?.length ||
+  sourceMutationResult.networkTraces.some(
+    (trace) =>
+      trace.sanitizedUrl !== 'https://registry.npmjs.org/' ||
+      trace.outcome !== 'allowed'
+  )
+)
+  throw new Error(
+    'Rootless workspace.write install did not use the sanitized allowlist proxy.'
+  );
+const sourceMutationArtifacts = requireExecutionArtifacts(
+  sourceMutationResult,
+  'Rootless workspace.write Server Function probe'
+);
+const sourceMutationChange = sourceMutationArtifacts.filesystemDiff.changes[0];
+if (
+  sourceMutationArtifacts.filesystemDiff.changes.length !== 1 ||
+  !sourceMutationArtifacts.filesystemDiff.complete ||
+  sourceMutationChange?.kind !== 'modified' ||
+  sourceMutationChange.path !== isolatedSourceMutationTargetPath ||
+  Buffer.from(sourceMutationChange.baseline?.contents ?? []).toString(
+    'utf8'
+  ) !== isolatedSourceMutationInitialSource ||
+  Buffer.from(sourceMutationChange.runtime?.contents ?? []).toString('utf8') !==
+    isolatedSourceMutationReplacementSource ||
+  sourceMutationChange.sourceTrace?.length !== 1 ||
+  sourceMutationChange.sourceTrace[0]?.sourceRef.kind !== 'code-artifact' ||
+  sourceMutationChange.sourceTrace[0].sourceRef.artifactId !==
+    sourceMutationFixture.targetArtifactId
+)
+  throw new Error(
+    'Rootless workspace.write did not produce one exact traced whole-file diff.'
+  );
+if (
+  sourceMutationArtifacts.filesystemDiff.changes.some(({ path }) =>
+    [
+      '.prodivix/server-function-invocation.json',
+      '.prodivix/server-function-result.json',
+      ISOLATED_SERVER_FUNCTION_AUTHORITY_PATH,
+      ISOLATED_SERVER_FUNCTION_SECRET_MATERIAL_PATH,
+    ].includes(path)
+  ) ||
+  sourceMutationArtifacts.primary.mediaType !==
+    ISOLATED_SERVER_FUNCTION_RESULT_MEDIA_TYPE ||
+  !sourceMutationArtifacts.primary.sourceTrace?.some(
+    (trace) =>
+      trace.sourceRef.kind === 'code-artifact' &&
+      trace.sourceRef.artifactId === sourceMutationFixture.actionArtifactId
+  ) ||
+  !sourceMutationArtifacts.primary.sourceTrace?.some(
+    (trace) =>
+      trace.sourceRef.kind === 'code-artifact' &&
+      trace.sourceRef.artifactId === sourceMutationFixture.targetArtifactId
+  )
+)
+  throw new Error(
+    'Rootless workspace.write transport or SourceTrace boundary is invalid.'
+  );
+const sourceMutationResponse = readIsolatedServerFunctionExecutionResponse(
+  JSON.parse(
+    Buffer.from(sourceMutationArtifacts.primary.contents).toString('utf8')
+  ) as unknown,
+  sourceMutationFixture.request,
+  sourceMutationFixture.snapshot.serverFunctionPlan
+);
+if (
+  !sourceMutationResponse?.ok ||
+  sourceMutationResponse.result.kind !== 'value' ||
+  JSON.stringify(sourceMutationResponse.result.value) !==
+    JSON.stringify({ updated: true }) ||
+  JSON.stringify(sourceMutationResponse).includes(
+    isolatedSourceMutationReplacementSource
+  )
+)
+  throw new Error('Rootless workspace.write result content is invalid.');
+await assertNoExecutionContainer('gate-server-function-write');
 
 const goldenSnapshot = decodeRemoteExecutableProjectSnapshot(
   JSON.parse(
@@ -1437,6 +1811,8 @@ const evidence = Object.freeze({
     metadata: serverFunctionArtifacts.primary.metadata,
     sourceTraceCount: serverFunctionArtifacts.primary.sourceTrace?.length ?? 0,
     result: serverFunctionResponse,
+    requiredPermission: 'workspace.read',
+    secretMaterial: 'one-shot-consumed',
     installNetworkTraceCount: serverFunctionResult.networkTraces.length,
     runtimeNetwork: 'none-verified',
   },
@@ -1447,6 +1823,26 @@ const evidence = Object.freeze({
     metadata: workspaceReadArtifacts.primary.metadata,
     sourceTraceCount: workspaceReadArtifacts.primary.sourceTrace?.length ?? 0,
     result: workspaceReadResponse,
+    secretMaterial: 'none-verified',
+    installNetworkTraceCount: sourceMutationResult.networkTraces.length,
+    runtimeNetwork: 'none-verified',
+  },
+  workspaceWriteSourceMutationArtifact: {
+    artifactId: sourceMutationArtifacts.primary.artifactId,
+    mediaType: sourceMutationArtifacts.primary.mediaType,
+    size: sourceMutationArtifacts.primary.contents.byteLength,
+    metadata: sourceMutationArtifacts.primary.metadata,
+    sourceTraceCount: sourceMutationArtifacts.primary.sourceTrace?.length ?? 0,
+    result: sourceMutationResponse,
+    filesystemDiff: {
+      complete: sourceMutationArtifacts.filesystemDiff.complete,
+      changeCount: sourceMutationArtifacts.filesystemDiff.changes.length,
+      changeId: sourceMutationChange!.changeId,
+      kind: sourceMutationChange!.kind,
+      path: sourceMutationChange!.path,
+      baselineSize: sourceMutationChange!.baseline?.size,
+      runtimeSize: sourceMutationChange!.runtime?.size,
+    },
     secretMaterial: 'none-verified',
     runtimeNetwork: 'none-verified',
   },

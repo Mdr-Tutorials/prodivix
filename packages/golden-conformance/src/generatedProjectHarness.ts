@@ -4,8 +4,14 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { chromium, type Browser, type Page } from '@playwright/test';
-import type { ReactExportBundle } from '@prodivix/prodivix-compiler';
 import { build, transformWithOxc } from 'vite';
+
+export type GoldenGeneratedProjectBundle = Readonly<{
+  files: readonly Readonly<{
+    path: string;
+    contents: string | Uint8Array;
+  }>[];
+}>;
 
 export type GoldenBuildEvidence = Readonly<{
   bundleFileCount: number;
@@ -68,7 +74,7 @@ const resolveSafeOutputPath = (root: string, filePath: string): string => {
 
 const writeBundle = async (
   root: string,
-  bundle: ReactExportBundle
+  bundle: GoldenGeneratedProjectBundle
 ): Promise<void> => {
   for (const file of bundle.files) {
     const target = resolveSafeOutputPath(root, file.path);
@@ -94,7 +100,7 @@ const countRollupOutputs = (
   );
 
 const transformGeneratedModules = async (
-  bundle: ReactExportBundle
+  bundle: GoldenGeneratedProjectBundle
 ): Promise<number> => {
   const extensions = [
     '.cjs',
@@ -164,7 +170,9 @@ const runPnpm = async (
   });
 };
 
-const readBundlePackageManager = (bundle: ReactExportBundle): string => {
+const readBundlePackageManager = (
+  bundle: GoldenGeneratedProjectBundle
+): string => {
   const packageFile = bundle.files.find(({ path }) => path === 'package.json');
   if (!packageFile || typeof packageFile.contents !== 'string') {
     throw new Error('Golden standalone export has no package.json.');
@@ -385,7 +393,7 @@ const collectGoldenBrowserGpuEvidence = async (
 
 /** Syntax-checks every generated module and builds the reachable graph without a server. */
 export const buildGoldenExportBundle = async (
-  bundle: ReactExportBundle
+  bundle: GoldenGeneratedProjectBundle
 ): Promise<GoldenBuildEvidence> => {
   const root = await mkdtemp(join(tmpdir(), 'prodivix-golden-'));
   try {
@@ -416,7 +424,7 @@ export const buildGoldenExportBundle = async (
 
 /** Verifies the generated bundle as an independent package without a server. */
 export const verifyGoldenStandaloneProject = async (
-  bundle: ReactExportBundle
+  bundle: GoldenGeneratedProjectBundle
 ): Promise<GoldenStandaloneProjectEvidence> => {
   const root = await mkdtemp(join(tmpdir(), 'prodivix-golden-standalone-'));
   try {
@@ -438,7 +446,7 @@ export const verifyGoldenStandaloneProject = async (
  * real browser origin for runtime and GPU capability evidence.
  */
 export const verifyGoldenBrowserProject = async (
-  bundle: ReactExportBundle,
+  bundle: GoldenGeneratedProjectBundle,
   options: VerifyGoldenBrowserProjectOptions
 ): Promise<GoldenBrowserProjectEvidence> => {
   if (

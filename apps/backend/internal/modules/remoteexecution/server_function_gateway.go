@@ -649,7 +649,7 @@ func (gateway *ServerFunctionGateway) Invoke(ctx context.Context, principal Serv
 		return nil, ErrServerFunctionDenied
 	}
 	authority, err := gateway.store.GetExecutionAuthority(ctx, principal.PrincipalID, principal.SessionID, executionID)
-	if err != nil || authority.OwnerID != principal.PrincipalID || authority.SessionID != principal.SessionID {
+	if err != nil || authority.PrincipalID != principal.PrincipalID || authority.SessionID != principal.SessionID {
 		return nil, ErrServerFunctionDenied
 	}
 	contents, err := gateway.store.GetCodeDocument(ctx, *authority, invocation.FunctionRef.ArtifactID)
@@ -664,7 +664,14 @@ func (gateway *ServerFunctionGateway) Invoke(ctx context.Context, principal Serv
 		return nil, ErrServerFunctionDenied
 	}
 	if entry.Auth.Kind == "permission" {
-		if err := gateway.store.VerifyWorkspaceOwner(ctx, principal.PrincipalID, authority.WorkspaceID); err != nil {
+		if !hasWorkspaceExecutionPermission(authority.Permissions, entry.Auth.PermissionID) {
+			return nil, ErrServerFunctionDenied
+		}
+		if entry.Auth.PermissionID == workspaceOwnerPermissionID {
+			if err := gateway.store.VerifyWorkspaceOwner(ctx, principal.PrincipalID, authority.WorkspaceID); err != nil {
+				return nil, ErrServerFunctionDenied
+			}
+		} else {
 			return nil, ErrServerFunctionDenied
 		}
 	}

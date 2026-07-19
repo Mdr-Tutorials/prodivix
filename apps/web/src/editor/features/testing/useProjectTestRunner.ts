@@ -13,6 +13,7 @@ import {
   getProjectTestExecutionSessionId,
   startProjectTests,
   stopProjectTests,
+  type ProjectTestExecutionProvider,
 } from './projectTestExecutionClient';
 import { createProjectTestReportPresentation } from './projectTestReportModel';
 
@@ -34,6 +35,9 @@ export const useProjectTestRunner = (
     readonly CompileDiagnostic[]
   >(Object.freeze([]));
   const [preflightMessage, setPreflightMessage] = useState<string>();
+  const [provider, setProvider] =
+    useState<ProjectTestExecutionProvider>('browser');
+  const [target, setTarget] = useState<'react-vite' | 'vue-vite'>('react-vite');
   const presentation = useMemo(
     () => createProjectTestReportPresentation(session),
     [session]
@@ -72,6 +76,7 @@ export const useProjectTestRunner = (
       });
       const plan = createProjectTestExecutionPlan(workspace, {
         assetMaterializations,
+        target,
       });
       if (plan.status === 'blocked') {
         await stopProjectTests('Workspace test compilation was blocked.');
@@ -83,7 +88,10 @@ export const useProjectTestRunner = (
         );
         return;
       }
-      await startProjectTests(plan.snapshot, plan.request);
+      await startProjectTests(plan.snapshot, plan.request, {
+        provider,
+        accessToken: token,
+      });
       setPreflightStatus('idle');
     } catch (error) {
       setPreflightStatus('blocked');
@@ -91,7 +99,7 @@ export const useProjectTestRunner = (
         error instanceof Error ? error.message : String(error)
       );
     }
-  }, [token, workspace]);
+  }, [provider, target, token, workspace]);
 
   const stop = useCallback(async () => {
     await executionSessionCoordinator.cancel(sessionId, {
@@ -109,8 +117,16 @@ export const useProjectTestRunner = (
     report: preflightStatus === 'idle' ? presentation?.report : undefined,
     reportSnapshotId:
       preflightStatus === 'idle' ? presentation?.snapshotId : undefined,
+    reportJobId: preflightStatus === 'idle' ? presentation?.jobId : undefined,
+    reportProviderId:
+      preflightStatus === 'idle' ? presentation?.providerId : undefined,
     diagnostics: preflightDiagnostics,
     message: preflightMessage ?? sessionMessage,
+    provider,
+    setProvider,
+    target,
+    setTarget,
+    remoteAvailable: Boolean(token?.trim()),
     run,
     stop,
   });

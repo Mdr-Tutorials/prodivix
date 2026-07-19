@@ -41,7 +41,8 @@ const principal = (
 const createHarness = (
   maximumActiveExecutions = 4,
   secretValues: readonly string[] = [],
-  providers: readonly ExecutionProviderDescriptor[] = [remoteFixtureProvider]
+  providers: readonly ExecutionProviderDescriptor[] = [remoteFixtureProvider],
+  maximumWorkerAttempts = 3
 ) => {
   let currentTime = 1_000;
   let executionSequence = 0;
@@ -65,6 +66,7 @@ const createHarness = (
     now: () => currentTime,
     createExecutionId: () => `execution-${++executionSequence}`,
     createLeaseToken: () => `lease-${++leaseSequence}`,
+    maximumWorkerAttempts,
     outputGuard: createExecutionSecretLeakGuard({ secretValues }),
   });
   return {
@@ -768,6 +770,47 @@ describe('remote execution control plane conformance', () => {
         leaseDurationMs: 100,
       })
     ).resolves.toBeUndefined();
+  });
+
+  it('fails an exhausted worker recovery and continues with the next queued execution', async () => {
+    const { controlPlane, repository, setTime } = createHarness(
+      4,
+      [],
+      [remoteFixtureProvider],
+      1
+    );
+    const first = await start(controlPlane, 'request-1');
+    const firstClaim = await controlPlane.claimNext({
+      workerId: 'worker-1',
+      providerId: remoteFixtureProvider.id,
+      leaseDurationMs: 10,
+    });
+    await controlPlane.transition({
+      executionId: first.execution.executionId,
+      workerId: 'worker-1',
+      leaseToken: firstClaim!.lease.token,
+      status: 'running',
+    });
+    const second = await start(controlPlane, 'request-2');
+
+    setTime(1_011);
+    const next = await controlPlane.claimNext({
+      workerId: 'worker-2',
+      providerId: remoteFixtureProvider.id,
+      leaseDurationMs: 100,
+    });
+
+    expect(next?.execution.record.executionId).toBe(
+      second.execution.executionId
+    );
+    const exhausted = await repository.get(first.execution.executionId);
+    expect(exhausted?.record.status).toBe('failed');
+    expect(exhausted?.lease).toBeUndefined();
+    expect(exhausted?.events.at(-1)?.event).toMatchObject({
+      kind: 'state',
+      reason: 'worker-recovery-exhausted',
+      snapshot: { status: 'failed' },
+    });
   });
 
   it('makes cancellation idempotent and prevents terminal resurrection', async () => {

@@ -39,14 +39,15 @@ func (store *Store) GetExecutionAuthorityForSecretBroker(ctx context.Context, ex
 	defer cancel()
 	var authority ExecutionAuthority
 	var storedSession sql.NullString
-	var partitionRevisionsJSON []byte
+	var permissionsJSON, partitionRevisionsJSON []byte
 	var environmentID, environmentRevision, environmentMode sql.NullString
-	err := store.db.QueryRowContext(ctx, `SELECT execution_id, workspace_id, owner_id, session_id, snapshot_id, partition_revisions_json, environment_id, environment_revision, environment_mode
+	err := store.db.QueryRowContext(ctx, `SELECT execution_id, workspace_id, principal_id, session_id, permissions_json, snapshot_id, partition_revisions_json, environment_id, environment_revision, environment_mode
 FROM remote_execution_grants WHERE execution_id = $1`, strings.TrimSpace(executionID)).Scan(
 		&authority.ExecutionID,
 		&authority.WorkspaceID,
-		&authority.OwnerID,
+		&authority.PrincipalID,
 		&storedSession,
+		&permissionsJSON,
 		&authority.SnapshotID,
 		&partitionRevisionsJSON,
 		&environmentID,
@@ -60,9 +61,14 @@ FROM remote_execution_grants WHERE execution_id = $1`, strings.TrimSpace(executi
 		return nil, err
 	}
 	authority.SessionID = storedSession.String
-	if authority.SessionID == "" || json.Unmarshal(partitionRevisionsJSON, &authority.PartitionRevisions) != nil || len(authority.PartitionRevisions) == 0 {
+	if authority.SessionID == "" || json.Unmarshal(permissionsJSON, &authority.Permissions) != nil || json.Unmarshal(partitionRevisionsJSON, &authority.PartitionRevisions) != nil || len(authority.PartitionRevisions) == 0 {
 		return nil, ErrExecutionAuthorityConflict
 	}
+	permissions, validPermissions := canonicalWorkspaceExecutionPermissions(authority.Permissions)
+	if !validPermissions {
+		return nil, ErrExecutionAuthorityConflict
+	}
+	authority.Permissions = permissions
 	if environmentID.Valid || environmentRevision.Valid || environmentMode.Valid {
 		if !environmentID.Valid || !environmentRevision.Valid || !environmentMode.Valid {
 			return nil, ErrExecutionAuthorityConflict

@@ -65,7 +65,7 @@ func (environment *fakeServerFunctionEnvironment) RevokeGrant(_ context.Context,
 }
 
 func (store *fakeServerFunctionStore) VerifyWorkspaceOwner(_ context.Context, ownerID string, workspaceID string) error {
-	if store.permissionErr != nil || store.authority == nil || store.authority.OwnerID != ownerID || store.authority.WorkspaceID != workspaceID {
+	if store.permissionErr != nil || store.authority == nil || store.authority.PrincipalID != ownerID || store.authority.WorkspaceID != workspaceID {
 		return ErrExecutionNotFound
 	}
 	return nil
@@ -128,10 +128,14 @@ func (store *fakeServerFunctionHandlerStore) ApplyServerFunctionExecutionStateMu
 }
 
 func (store *fakeServerFunctionStore) GetExecutionAuthority(_ context.Context, ownerID string, sessionID string, executionID string) (*ExecutionAuthority, error) {
-	if store.err != nil || store.authority == nil || store.authority.ExecutionID != executionID || store.authority.OwnerID != ownerID || store.authority.SessionID != sessionID {
+	if store.err != nil || store.authority == nil || store.authority.ExecutionID != executionID || store.authority.PrincipalID != ownerID || store.authority.SessionID != sessionID {
 		return nil, ErrExecutionNotFound
 	}
-	return store.authority, nil
+	authority := *store.authority
+	if authority.Permissions == nil {
+		authority.Permissions = cloneExecutionPermissions(workspaceOwnerExecutionPermissions)
+	}
+	return &authority, nil
 }
 
 func (store *fakeServerFunctionStore) GetCodeDocument(_ context.Context, authority ExecutionAuthority, documentID string) ([]byte, error) {
@@ -305,7 +309,7 @@ func serverFunctionTestGateway(document []byte) (*ServerFunctionGateway, *fakeSe
 		authority: &ExecutionAuthority{
 			ExecutionID: "execution-1",
 			WorkspaceID: "workspace-1",
-			OwnerID:     "user-1",
+			PrincipalID: "user-1",
 			SessionID:   "session-server-only",
 			SnapshotID:  "snapshot-1",
 			PartitionRevisions: map[string]string{
@@ -459,7 +463,7 @@ func TestServerFunctionHTTPRouteWiresEnvironmentStoreWithoutSecretProjection(t *
 		lastAuthority: ExecutionAuthority{
 			ExecutionID: "execution-1",
 			WorkspaceID: "workspace-1",
-			OwnerID:     "user-1",
+			PrincipalID: "user-1",
 			SessionID:   "session-server-only",
 			SnapshotID:  "snapshot-1",
 			PartitionRevisions: map[string]string{
@@ -517,7 +521,7 @@ func TestServerFunctionHTTPRouteIsAuthenticatedBoundedAndNoStore(t *testing.T) {
 		lastAuthority: ExecutionAuthority{
 			ExecutionID: "execution-1",
 			WorkspaceID: "workspace-1",
-			OwnerID:     "user-1",
+			PrincipalID: "user-1",
 			SessionID:   "session-server-only",
 			SnapshotID:  "snapshot-1",
 			PartitionRevisions: map[string]string{
@@ -590,7 +594,7 @@ func TestServerFunctionLiveMutationRequiresOriginIntentAndDurableReplay(t *testi
 		lastAuthority: ExecutionAuthority{
 			ExecutionID: "execution-1",
 			WorkspaceID: "workspace-1",
-			OwnerID:     "user-1",
+			PrincipalID: "user-1",
 			SessionID:   "session-server-only",
 			SnapshotID:  "snapshot-1",
 			PartitionRevisions: map[string]string{
@@ -747,6 +751,29 @@ func TestServerFunctionGatewayAllowsExactWorkspaceOwnerGuard(t *testing.T) {
 	result, err := gateway.Invoke(t.Context(), serverFunctionPrincipal(), "execution-1", serverFunctionInvocation("guardWorkspace"))
 	if err != nil || result.Result.Kind != "allow" {
 		t.Fatalf("expected allow result, got result=%+v err=%v", result, err)
+	}
+}
+
+func TestServerFunctionGatewayKeepsReadOnlyExecutionOutOfOwnerAdapter(t *testing.T) {
+	principalGateway, principalStore := serverFunctionTestGateway(currentPrincipalCodeDocument())
+	principalStore.authority.Permissions = []string{workspaceReadPermissionID}
+	if result, err := principalGateway.Invoke(t.Context(), serverFunctionPrincipal(), "execution-1", serverFunctionInvocation("loadPrincipal")); err != nil || result.Result.Kind != "value" {
+		t.Fatalf("read-only authenticated projection was rejected: result=%+v err=%v", result, err)
+	}
+
+	document := serverFunctionDocumentFixture(
+		"guardWorkspace",
+		"route-guard",
+		"core.auth.require-workspace-owner",
+		`{"kind":"permission","permissionId":"workspace.owner"}`,
+		`true`,
+		`true`,
+	)
+	ownerGateway, ownerStore := serverFunctionTestGateway(document)
+	ownerStore.authority.Permissions = []string{workspaceReadPermissionID}
+	result, err := ownerGateway.Invoke(t.Context(), serverFunctionPrincipal(), "execution-1", serverFunctionInvocation("guardWorkspace"))
+	if result != nil || !errors.Is(err, ErrServerFunctionDenied) {
+		t.Fatalf("read-only execution reached the owner adapter: result=%+v err=%v", result, err)
 	}
 }
 

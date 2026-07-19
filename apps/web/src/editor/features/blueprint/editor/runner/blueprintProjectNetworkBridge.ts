@@ -1,9 +1,15 @@
 import {
   readExecutionDataGatewayBridgeRequest,
+  readExecutionDataStreamCancellation,
+  readExecutionDataStreamOpenRequest,
+  readExecutionDataStreamPull,
   readExecutionConsoleBridgeMessage,
   readExecutionNetworkBridgeMessage,
   type ExecutionConsoleBridgeMessage,
   type ExecutionDataGatewayBridgeRequest,
+  type ExecutionDataStreamCancellation,
+  type ExecutionDataStreamOpenRequest,
+  type ExecutionDataStreamPull,
   type ExecutionNetworkTrace,
 } from '@prodivix/runtime-core';
 import type { BlueprintProjectRunProvider } from '@/editor/features/blueprint/editor/runner/blueprintProjectRunnerClient';
@@ -82,6 +88,40 @@ export const readBlueprintRemoteDataBridgeMessage = (input: {
   if (input.provider !== 'remote' || !acceptsPreviewMessageOrigin(input))
     return undefined;
   return readExecutionDataGatewayBridgeRequest(input.value);
+};
+
+/** Accepts subscription open only from the sandboxed active Remote preview frame. */
+export const readBlueprintRemoteDataStreamOpen = (input: {
+  provider: BlueprintProjectRunProvider;
+  previewUrl: string;
+  messageOrigin: string;
+  value: unknown;
+}): ExecutionDataStreamOpenRequest | undefined => {
+  if (input.provider !== 'remote' || !acceptsPreviewMessageOrigin(input))
+    return undefined;
+  return readExecutionDataStreamOpenRequest(input.value);
+};
+
+export const readBlueprintRemoteDataStreamCancellation = (input: {
+  provider: BlueprintProjectRunProvider;
+  previewUrl: string;
+  messageOrigin: string;
+  value: unknown;
+}): ExecutionDataStreamCancellation | undefined => {
+  if (input.provider !== 'remote' || !acceptsPreviewMessageOrigin(input))
+    return undefined;
+  return readExecutionDataStreamCancellation(input.value);
+};
+
+export const readBlueprintRemoteDataStreamPull = (input: {
+  provider: BlueprintProjectRunProvider;
+  previewUrl: string;
+  messageOrigin: string;
+  value: unknown;
+}): ExecutionDataStreamPull | undefined => {
+  if (input.provider !== 'remote' || !acceptsPreviewMessageOrigin(input))
+    return undefined;
+  return readExecutionDataStreamPull(input.value);
 };
 
 /** Accepts value-only Server Function requests only from the active Remote capability frame. */

@@ -32,6 +32,7 @@ export const REMOTE_EXECUTION_TERMINAL_LIMITS = Object.freeze({
   maximumCommands: 256,
   maximumCommandBytes: 256 * 1024,
   maximumOutputFingerprints: 1_000,
+  maximumWorkerOutputIdLength: 256,
   maximumWorkerReadCommands: 64,
   maximumSessions: 1_000,
   maximumSessionsPerExecution: 1,
@@ -180,8 +181,8 @@ export type RemoteExecutionTerminalBroker = Readonly<{
   closeExecution(
     executionId: string,
     reason?: ExecutionTerminalCloseReason
-  ): number;
-  sweepExpired(): number;
+  ): Promise<number>;
+  sweepExpired(): Promise<number>;
 }>;
 
 export type RemoteExecutionTerminalTransportRequest = Readonly<{

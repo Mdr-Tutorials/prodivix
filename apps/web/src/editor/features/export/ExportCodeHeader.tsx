@@ -10,12 +10,12 @@ type ExportCodeHeaderProps = {
   viewOptions: Array<{ value: ExportTab; label: string }>;
   titleLabel: string;
   downloadingZip: boolean;
-  canDownloadReactZip: boolean;
+  canDownloadZip: boolean;
   downloadingLabel: string;
   downloadZipLabel: string;
   onOpenViewMenuChange: (open: boolean) => void;
   onSelectTab: (tab: ExportTab) => void;
-  onDownloadReactZip: () => void;
+  onDownloadZip: () => void;
 };
 
 export function ExportCodeHeader({
@@ -26,12 +26,12 @@ export function ExportCodeHeader({
   viewOptions,
   titleLabel,
   downloadingZip,
-  canDownloadReactZip,
+  canDownloadZip,
   downloadingLabel,
   downloadZipLabel,
   onOpenViewMenuChange,
   onSelectTab,
-  onDownloadReactZip,
+  onDownloadZip,
 }: ExportCodeHeaderProps) {
   const downloadLabel = downloadingZip ? downloadingLabel : downloadZipLabel;
 
@@ -80,14 +80,14 @@ export function ExportCodeHeader({
         <p>{description}</p>
       </div>
       <div className="ExportCodeActions">
-        {activeTab === 'react' ? (
+        {activeTab === 'react' || activeTab === 'vue' ? (
           <button
             type="button"
             className="ExportCodeIconButton"
             aria-label={downloadLabel}
             title={downloadLabel}
-            disabled={!canDownloadReactZip || downloadingZip}
-            onClick={onDownloadReactZip}
+            disabled={!canDownloadZip || downloadingZip}
+            onClick={onDownloadZip}
           >
             <Download size={15} aria-hidden="true" />
           </button>

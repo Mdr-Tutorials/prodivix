@@ -178,7 +178,7 @@ describe('Remote execution Terminal broker', () => {
       })
     ).rejects.toMatchObject({ code: 'access-expired' });
 
-    expect(broker.closeExecution('execution-1')).toBe(1);
+    await expect(broker.closeExecution('execution-1')).resolves.toBe(1);
     await expect(
       broker.read({
         accessToken: resumed.access.token,
@@ -188,7 +188,7 @@ describe('Remote execution Terminal broker', () => {
       })
     ).rejects.toBeInstanceOf(RemoteExecutionTerminalBrokerError);
     clock = resumed.access.expiresAt + 1;
-    expect(broker.sweepExpired()).toBe(1);
+    await expect(broker.sweepExpired()).resolves.toBe(1);
   });
 
   it('rejects principal, lease, and output identity drift', async () => {
@@ -300,7 +300,7 @@ describe('Remote execution Terminal broker', () => {
     expect(text).not.toContain('stdout-secret');
 
     clock = execution.lease!.expiresAt + 1;
-    expect(broker.sweepExpired()).toBe(1);
+    await expect(broker.sweepExpired()).resolves.toBe(1);
     await expect(
       broker.read({
         accessToken: opened.access.token,
