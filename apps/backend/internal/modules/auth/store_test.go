@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"regexp"
 	"testing"
@@ -63,6 +64,28 @@ WHERE token = $1 AND expires_at > NOW()`)
 	session, ok := NewSessionStore(db).Get(token)
 	if !ok || session == nil || session.Token != token {
 		t.Fatalf("unexpected session: %#v, %v", session, ok)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSessionStoreRejectsAStoredDigestAsBearerToken(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	storedDigest := sessionTokenDigest("client-secret")
+	query := regexp.QuoteMeta(`SELECT id, user_id, created_at, expires_at
+FROM sessions
+WHERE token = $1 AND expires_at > NOW()`)
+	mock.ExpectQuery(query).
+		WithArgs(sessionTokenDigest(storedDigest)).
+		WillReturnError(sql.ErrNoRows)
+
+	if session, ok := NewSessionStore(db).Get(storedDigest); ok || session != nil {
+		t.Fatalf("stored digest authenticated as a bearer token: %#v", session)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

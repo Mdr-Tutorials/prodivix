@@ -12,6 +12,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const maxWorkspaceSettingsCommitRequestBytes int64 = 1024 * 1024
+
 func decodeWorkspaceSettingsCommitRequest(c *gin.Context) (WorkspaceSettingsCommitRequest, error) {
 	var request WorkspaceSettingsCommitRequest
 	decoder := json.NewDecoder(c.Request.Body)
@@ -39,8 +41,19 @@ func (handler *Handler) HandleCommitWorkspaceSettings(c *gin.Context) {
 	if !handler.requireWorkspaceOwner(c, user.ID, workspaceID) {
 		return
 	}
+	c.Request.Body = http.MaxBytesReader(
+		c.Writer,
+		c.Request.Body,
+		maxWorkspaceSettingsCommitRequestBytes,
+	)
 	request, err := decodeWorkspaceSettingsCommitRequest(c)
 	if err != nil {
+		var maxBytesError *http.MaxBytesError
+		if errors.As(err, &maxBytesError) {
+			failure := NewRequestFailure(http.StatusRequestEntityTooLarge, ErrorInvalidPayload, "Workspace settings commit payload is too large.", nil)
+			c.JSON(failure.Status, failure.Payload)
+			return
+		}
 		failure := NewRequestFailure(
 			http.StatusBadRequest,
 			ErrorInvalidPayload,

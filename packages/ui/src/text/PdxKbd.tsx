@@ -1,5 +1,6 @@
 import './PdxKbd.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import { Keyboard } from 'lucide-react';
 import type React from 'react';
 
@@ -41,7 +42,7 @@ function PdxKbd({
   const resolvedIcon = icon ?? <Keyboard size={12} aria-hidden="true" />;
   const fullClassName =
     `PdxKbd ${size} ${texture} ${tone} ${bordered ? 'Bordered' : 'Borderless'} ${filled ? 'Filled' : 'Unfilled'} ${shouldRenderIcon ? 'WithIcon' : ''} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
   const Element = Component as React.ElementType;
 
   return (

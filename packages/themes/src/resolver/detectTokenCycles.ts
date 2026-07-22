@@ -54,7 +54,11 @@ const visit = (
     return;
   }
 
-  const value = tokens[path] ?? fallbackTokens[path];
+  const value = Object.hasOwn(tokens, path)
+    ? tokens[path]
+    : Object.hasOwn(fallbackTokens, path)
+      ? fallbackTokens[path]
+      : undefined;
 
   if (value === undefined) {
     return;

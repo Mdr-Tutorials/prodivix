@@ -1,4 +1,8 @@
-import type { NodeGraphDocument, NodeGraphPort } from '@prodivix/nodegraph';
+import {
+  createNodeGraphExecutorCodeSlotId,
+  type NodeGraphDocument,
+  type NodeGraphPort,
+} from '@prodivix/nodegraph';
 import type { Edge, Node } from '@xyflow/react';
 import type { GraphNodeData } from './GraphNode';
 import { createNode } from './nodeGraphEditorModel';
@@ -267,6 +271,7 @@ export const createStarterNodeGraphCanvas = (): Readonly<{
 
 export const cloneNodeGraphDocument = (
   source: NodeGraphDocument,
+  targetDocumentId: string,
   createId: () => string = createNodeId
 ): NodeGraphDocument => {
   const nodeIds = new Map(
@@ -290,6 +295,17 @@ export const cloneNodeGraphDocument = (
         ...node,
         id: nodeIds.get(node.id)!,
         data,
+        ...(node.executor
+          ? {
+              executor: {
+                ...node.executor,
+                slotId: createNodeGraphExecutorCodeSlotId(
+                  targetDocumentId,
+                  nodeIds.get(node.id)!
+                ),
+              },
+            }
+          : {}),
       };
     }),
     edges: source.edges.map((edge) => ({

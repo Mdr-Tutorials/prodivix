@@ -97,6 +97,42 @@ describe('GraphQL Data import proposal', () => {
     );
   });
 
+  it('projects diamond-shaped input graphs with linear shared definitions', () => {
+    const inputTypes = Array.from({ length: 33 }, (_, index) =>
+      index === 32
+        ? `input T${index} { leaf: String }`
+        : `input T${index} { a: T${index + 1}, b: T${index + 1} }`
+    ).join('\n');
+    const proposal = propose({
+      bundle: {
+        schema: `${inputTypes}\ntype Query { ping(input: T0): String }`,
+        operations: [
+          {
+            document: 'query Diamond($value: T0) { ping(input: $value) }',
+            operationName: 'Diamond',
+          },
+        ],
+      },
+    });
+
+    expect(proposal.status, JSON.stringify(proposal.issues)).toBe('ready');
+    if (proposal.status !== 'ready') return;
+    const schema = proposal.document.schemasById['diamond-input']?.schema;
+    const variableSchema =
+      schema && typeof schema === 'object'
+        ? schema.properties?.value
+        : undefined;
+    expect(variableSchema).toMatchObject({
+      anyOf: [{ $ref: '#/$defs/T0' }, { type: 'null' }],
+    });
+    expect(
+      schema && typeof schema === 'object'
+        ? Object.keys(schema.$defs ?? {})
+        : []
+    ).toHaveLength(33);
+    expect(JSON.stringify(schema).length).toBeLessThan(20_000);
+  });
+
   it('requires exact impact approval for an upstream schema/operation change', () => {
     const initial = propose();
     expect(initial.status).toBe('ready');

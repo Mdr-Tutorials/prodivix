@@ -1,6 +1,7 @@
 import './PdxRichTextEditor.scss';
 import type { PdxComponent } from '@prodivix/shared';
 import { getVisibleTextMetrics } from '@prodivix/shared/safety';
+import { getDataAttributes } from '../foundation/component';
 import {
   Bold,
   Eraser,
@@ -179,7 +180,7 @@ function PdxRichTextEditor({
 
   const fullClassName =
     `PdxRichTextEditor ${disabled ? 'Disabled' : ''} ${readOnly ? 'ReadOnly' : ''} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   return (
     <div

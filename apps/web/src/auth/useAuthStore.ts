@@ -50,8 +50,12 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         expiresAt: state.expiresAt,
       }),
-      onRehydrateStorage: () => (state) => {
-        if (!state) return;
+      onRehydrateStorage: () => (state, error) => {
+        if (!state) {
+          if (error) localStorage.removeItem('prodivix-auth-session');
+          queueMicrotask(() => useAuthStore.setState({ hasHydrated: true }));
+          return;
+        }
         state.setHasHydrated(true);
         if (
           !state.token ||

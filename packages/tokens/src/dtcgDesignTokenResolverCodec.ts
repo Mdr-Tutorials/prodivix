@@ -562,6 +562,24 @@ const parseResolutionOrder = (
   }
   const result: DesignTokenResolverOrderEntry[] = [];
   const orderNames = new Set<string>();
+  const topLevelDefinitionNames = new Set(
+    [...sets, ...modifiers].map((definition) =>
+      definition.name.toLocaleLowerCase('en-US')
+    )
+  );
+  const reserveOrderName = (name: string, path: string): boolean => {
+    const foldedName = name.toLocaleLowerCase('en-US');
+    if (orderNames.has(foldedName)) {
+      appendIssue(issues, {
+        code: DESIGN_TOKEN_RESOLVER_DECODE_ISSUE_CODES.orderInvalid,
+        path,
+        message: 'resolutionOrder names must be unique without regard to case.',
+      });
+      return false;
+    }
+    orderNames.add(foldedName);
+    return true;
+  };
   value.forEach((entry, index) => {
     const path = `/resolutionOrder/${index}`;
     if (!isRecord(entry)) {
@@ -599,6 +617,7 @@ const parseResolutionOrder = (
           });
           return;
         }
+        if (!reserveOrderName(existing.name, `${path}/$ref`)) return;
         const definition = reference.overrides
           ? parseSet(
               existing.name,
@@ -628,6 +647,7 @@ const parseResolutionOrder = (
         });
         return;
       }
+      if (!reserveOrderName(existing.name, `${path}/$ref`)) return;
       const definition = reference.overrides
         ? parseModifier(
             existing.name,
@@ -664,16 +684,16 @@ const parseResolutionOrder = (
       return;
     }
     const foldedName = name.toLocaleLowerCase('en-US');
-    if (orderNames.has(foldedName)) {
+    if (topLevelDefinitionNames.has(foldedName)) {
       appendIssue(issues, {
         code: DESIGN_TOKEN_RESOLVER_DECODE_ISSUE_CODES.orderInvalid,
         path: `${path}/name`,
         message:
-          'Inline resolutionOrder names must be unique without regard to case.',
+          'Inline resolutionOrder names must not shadow top-level definitions.',
       });
       return;
     }
-    orderNames.add(foldedName);
+    if (!reserveOrderName(name, `${path}/name`)) return;
     if (type === 'set') {
       result.push(
         Object.freeze({
@@ -715,12 +735,13 @@ const collectSetTargets = (
   );
 
 const validateReferences = (
-  sets: readonly DesignTokenResolverSet[],
-  modifiers: readonly DesignTokenResolverModifier[],
+  knownSets: readonly DesignTokenResolverSet[],
+  setsToValidate: readonly DesignTokenResolverSet[],
+  modifiersToValidate: readonly DesignTokenResolverModifier[],
   issues: DesignTokenResolverDecodeIssue[]
 ): void => {
   const setNames = new Map(
-    sets.map((set) => [set.name.toLocaleLowerCase('en-US'), set.name])
+    knownSets.map((set) => [set.name.toLocaleLowerCase('en-US'), set.name])
   );
   const validateSources = (
     sources: readonly DesignTokenResolverSource[],
@@ -749,13 +770,13 @@ const validateReferences = (
       }
     });
   };
-  sets.forEach((set) =>
+  setsToValidate.forEach((set) =>
     validateSources(
       set.sources,
       `/sets/${escapePointerSegment(set.name)}/sources`
     )
   );
-  modifiers.forEach((modifier) =>
+  modifiersToValidate.forEach((modifier) =>
     modifier.contexts.forEach((context) =>
       validateSources(
         context.sources,
@@ -765,7 +786,7 @@ const validateReferences = (
   );
 
   const graph = new Map(
-    sets.map((set) => [
+    knownSets.map((set) => [
       set.name.toLocaleLowerCase('en-US'),
       collectSetTargets(set.sources).map((name) =>
         name.toLocaleLowerCase('en-US')
@@ -876,20 +897,17 @@ export const decodeDtcgDesignTokenResolverDocument = (
     issues
   );
   validateReferences(
+    parsedSets.definitions,
     [
       ...parsedSets.definitions,
       ...resolutionOrder.flatMap((entry) =>
-        entry.kind === 'set' && entry.declaration === 'inline'
-          ? [entry.definition]
-          : []
+        entry.kind === 'set' ? [entry.definition] : []
       ),
     ],
     [
       ...parsedModifiers.definitions,
       ...resolutionOrder.flatMap((entry) =>
-        entry.kind === 'modifier' && entry.declaration === 'inline'
-          ? [entry.definition]
-          : []
+        entry.kind === 'modifier' ? [entry.definition] : []
       ),
     ],
     issues

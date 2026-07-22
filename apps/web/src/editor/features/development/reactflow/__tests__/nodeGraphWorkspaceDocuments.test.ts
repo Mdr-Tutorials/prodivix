@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Node, Edge } from '@xyflow/react';
+import { createNodeGraphExecutorCodeSlotId } from '@prodivix/nodegraph';
 import type { WorkspaceSnapshot } from '@prodivix/workspace';
 import type { GraphNodeData } from '../GraphNode';
 import {
@@ -173,7 +174,9 @@ describe('standalone NodeGraph Workspace documents', () => {
       [{ id: 'edge', source: 'group', target: 'child' }]
     );
     const ids = ['next-group', 'next-child', 'next-edge'];
-    const duplicated = cloneNodeGraphDocument(source, () => ids.shift()!);
+    const duplicated = cloneNodeGraphDocument(source, 'graph-copy', () =>
+      ids.shift()!
+    );
     const restored = toNodeGraphCanvasNodes(duplicated);
 
     expect(duplicated.edges[0]).toMatchObject({
@@ -185,6 +188,36 @@ describe('standalone NodeGraph Workspace documents', () => {
       id: 'next-child',
       parentId: 'next-group',
       data: { groupBoxId: 'next-group' },
+    });
+  });
+
+  it('rebases executor slot identities onto the duplicated graph', () => {
+    const source = {
+      version: 1 as const,
+      nodes: [
+        {
+          id: 'code-node',
+          data: {},
+          executor: {
+            slotId: createNodeGraphExecutorCodeSlotId(
+              'graph-source',
+              'code-node'
+            ),
+            reference: { artifactId: 'artifact-executor' },
+          },
+        },
+      ],
+      edges: [],
+    };
+    const ids = ['next-code-node'];
+
+    const duplicated = cloneNodeGraphDocument(source, 'graph-copy', () =>
+      ids.shift()!
+    );
+
+    expect(duplicated.nodes[0]!.executor).toEqual({
+      slotId: createNodeGraphExecutorCodeSlotId('graph-copy', 'next-code-node'),
+      reference: { artifactId: 'artifact-executor' },
     });
   });
 });

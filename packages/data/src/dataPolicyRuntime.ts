@@ -56,10 +56,13 @@ export class DataPaginationRuntimeError extends Error {
 const MAX_DATA_RETRY_ATTEMPTS = 10;
 const MAX_DATA_RETRY_DELAY_MS = 5 * 60_000;
 
+const abortReason = (signal: DataOperationAbortSignal): unknown =>
+  signal.reason ?? new Error('Data operation was aborted.');
+
 export const defaultDataOperationScheduler: DataOperationScheduler =
   Object.freeze({
     wait(delayMs, signal) {
-      if (signal.aborted) return Promise.reject(signal.reason);
+      if (signal.aborted) return Promise.reject(abortReason(signal));
       return new Promise((resolve, reject) => {
         const timers = globalThis as unknown as {
           setTimeout(callback: () => void, delay: number): unknown;
@@ -68,7 +71,7 @@ export const defaultDataOperationScheduler: DataOperationScheduler =
         const onAbort = () => {
           timers.clearTimeout(timer);
           signal.removeEventListener('abort', onAbort);
-          reject(signal.reason);
+          reject(abortReason(signal));
         };
         const timer = timers.setTimeout(() => {
           signal.removeEventListener('abort', onAbort);

@@ -315,8 +315,8 @@ try {
           typeof record.source !== 'string' || record.source.includes('\0') ||
           Buffer.byteLength(record.source, 'utf8') > maximumSourceMutationBytes)
           throw new RuntimeFailure('SVR_SOURCE_MUTATION_INVALID');
-        await writeFile(target.path, record.source, { flag: 'w' });
         sourceMutationCompleted = true;
+        await writeFile(target.path, record.source, { flag: 'w' });
       }
     : undefined;
   validate(configuration.definition.inputSchema, request.input, 'SVR_INPUT_INVALID');

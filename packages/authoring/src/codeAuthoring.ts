@@ -338,7 +338,8 @@ export const beginCodeAuthoringSessionSave = (
   session: CodeAuthoringSession,
   artifactId = session.activeArtifactId
 ): CodeAuthoringSession =>
-  artifactId
+  artifactId &&
+  (!session.savingArtifactId || session.savingArtifactId === artifactId)
     ? Object.freeze({
         ...session,
         savingArtifactId: artifactId,
@@ -355,8 +356,9 @@ export const completeCodeAuthoringSessionSave = (
   const canonical = freezeArtifactSnapshot(saved);
   return Object.freeze({
     ...session,
-    savingArtifactId: undefined,
-    error: undefined,
+    ...(session.savingArtifactId === saved.artifactId
+      ? { savingArtifactId: undefined, error: undefined }
+      : {}),
     draftsByArtifactId: Object.freeze({
       ...session.draftsByArtifactId,
       [saved.artifactId]: freezeDraft({
@@ -375,7 +377,10 @@ export const setCodeAuthoringSessionError = (
 ): CodeAuthoringSession =>
   Object.freeze({
     ...session,
-    savingArtifactId: undefined,
+    savingArtifactId:
+      message && artifactId === session.savingArtifactId
+        ? undefined
+        : session.savingArtifactId,
     error: message
       ? Object.freeze({ message, ...(artifactId ? { artifactId } : {}) })
       : undefined,

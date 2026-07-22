@@ -1,5 +1,8 @@
 import { normalizeBaseURL } from '@prodivix/shared/safety';
-import type { ProdivixAiFetch } from './openAICompatibleProvider';
+import {
+  readOpenAICompatibleJsonResponse,
+  type ProdivixAiFetch,
+} from './openAICompatibleProvider';
 
 export interface DiscoverOpenAICompatibleModelsOptions {
   baseURL: string;
@@ -54,7 +57,7 @@ export const discoverOpenAICompatibleModels = async ({
     );
   }
 
-  const body = await response.json();
+  const body = await readOpenAICompatibleJsonResponse(response);
   return readModelList(body)
     .map(normalizeModel)
     .filter((model): model is ProdivixAiDiscoveredModel => model !== null);

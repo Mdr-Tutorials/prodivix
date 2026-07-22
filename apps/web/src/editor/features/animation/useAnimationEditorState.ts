@@ -61,12 +61,16 @@ export const useAnimationEditorState = ({
   const animationIdFactory = useRef(createBrowserAnimationIdFactory()).current;
   const [animation, setAnimation] =
     useState<AnimationDefinition>(persistedAnimation);
+  const [persistenceDiagnostic, setPersistenceDiagnostic] = useState<
+    string | undefined
+  >();
   const currentSignature = useMemo(
     () => serializeAnimationDefinition(animation),
     [animation]
   );
   const currentSignatureRef = useRef(currentSignature);
   const committedSignatureRef = useRef(currentSignature);
+  const pendingSignatureCountsRef = useRef(new Map<string, number>());
   const suppressNextPersistenceRef = useRef(false);
   const persistenceChainRef = useRef(Promise.resolve());
 
@@ -75,19 +79,36 @@ export const useAnimationEditorState = ({
       nextAnimation: AnimationDefinition,
       nextSignature: string
     ): Promise<boolean> => {
+      const pendingSignatureCounts = pendingSignatureCountsRef.current;
+      pendingSignatureCounts.set(
+        nextSignature,
+        (pendingSignatureCounts.get(nextSignature) ?? 0) + 1
+      );
       const execution = persistenceChainRef.current.then(async () => {
         const state = useEditorStore.getState();
         const currentWorkspace = state.workspace;
-        if (!currentWorkspace) return false;
+        if (!currentWorkspace) {
+          setPersistenceDiagnostic('The current Workspace is unavailable.');
+          return false;
+        }
         const document = selectWorkspaceAnimationDocument(
           currentWorkspace,
           animationDocumentId
         );
-        if (document?.status !== 'valid') return false;
+        if (document?.status !== 'valid') {
+          setPersistenceDiagnostic(
+            'The Animation document cannot be saved in its current state.'
+          );
+          return false;
+        }
         const existingSignature = serializeAnimationDefinition(
           document.decodedContent
         );
-        if (existingSignature === nextSignature) return true;
+        if (existingSignature === nextSignature) {
+          committedSignatureRef.current = nextSignature;
+          setPersistenceDiagnostic(undefined);
+          return true;
+        }
         const command = createWorkspaceAnimationDocumentUpdateCommand({
           workspace: currentWorkspace,
           documentId: animationDocumentId,
@@ -96,7 +117,12 @@ export const useAnimationEditorState = ({
           mergeKey: 'animation-definition',
           label: 'Update animation',
         });
-        if (!command) return false;
+        if (!command) {
+          setPersistenceDiagnostic(
+            'The Animation update could not be represented as a Workspace command.'
+          );
+          return false;
+        }
         const outcome = await dispatchWorkspaceAuthoringOperation({
           workspace: currentWorkspace,
           readonly: state.workspaceReadonly,
@@ -107,18 +133,39 @@ export const useAnimationEditorState = ({
             '[animation] workspace operation rejected',
             outcome.message
           );
+          setPersistenceDiagnostic(
+            outcome.message || 'The Animation update was rejected.'
+          );
           return false;
         }
+        committedSignatureRef.current = nextSignature;
+        setPersistenceDiagnostic(undefined);
         return true;
       });
-      persistenceChainRef.current = execution.then(
+      const guardedExecution = execution
+        .catch((error: unknown) => {
+          console.warn('[animation] workspace operation failed', error);
+          setPersistenceDiagnostic(
+            error instanceof Error
+              ? error.message
+              : 'The Animation update could not be saved.'
+          );
+          return false;
+        })
+        .finally(() => {
+          const remaining =
+            (pendingSignatureCountsRef.current.get(nextSignature) ?? 1) - 1;
+          if (remaining > 0) {
+            pendingSignatureCountsRef.current.set(nextSignature, remaining);
+          } else {
+            pendingSignatureCountsRef.current.delete(nextSignature);
+          }
+        });
+      persistenceChainRef.current = guardedExecution.then(
         () => undefined,
         () => undefined
       );
-      return execution.catch((error: unknown) => {
-        console.warn('[animation] workspace operation failed', error);
-        return false;
-      });
+      return guardedExecution;
     },
     [animationDocumentId]
   );
@@ -138,6 +185,9 @@ export const useAnimationEditorState = ({
     if (nextSignature === committedSignatureRef.current) {
       return;
     }
+    if (pendingSignatureCountsRef.current.has(nextSignature)) {
+      return;
+    }
 
     suppressNextPersistenceRef.current = true;
     setAnimation(nextAnimation);
@@ -151,7 +201,6 @@ export const useAnimationEditorState = ({
       return;
     }
     if (currentSignature === committedSignatureRef.current) return;
-    committedSignatureRef.current = currentSignature;
     void scheduleAnimationPersistence(animation, currentSignature);
   }, [
     animation,
@@ -581,14 +630,15 @@ export const useAnimationEditorState = ({
     : 0;
 
   const setCursorMs = useCallback(
-    (value: number) => {
-      if (!activeTimeline) return;
+    (value: number, targetDurationMs?: number) => {
+      const durationMs = targetDurationMs ?? activeTimeline?.durationMs;
+      if (!durationMs) return;
       setCursorDraftMs((prev) => {
-        const clamped = clampMs(value, activeTimeline.durationMs);
+        const clamped = clampMs(value, durationMs);
         return prev === clamped ? prev : clamped;
       });
     },
-    [activeTimeline]
+    [activeTimeline?.durationMs]
   );
 
   const setZoom = useCallback((nextZoom: number) => {
@@ -1240,6 +1290,7 @@ export const useAnimationEditorState = ({
     updateSvgPrimitiveType,
     activeTimelineDisplayName,
     canRemoveSvgFilter,
+    persistenceDiagnostic,
     flushPendingPersistence,
   };
 };

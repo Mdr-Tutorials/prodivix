@@ -8,6 +8,7 @@ import {
   EXECUTION_NETWORK_TRACE_NAME,
   toExecutionNetworkTraceValue,
   type ExecutionSessionStatus,
+  type ExecutionJob,
 } from '..';
 
 const descriptor = createExecutionProviderDescriptor({
@@ -239,5 +240,48 @@ describe('execution session', () => {
         observedAt: 4,
       })
     ).toEqual({ status: 'stale-job' });
+  });
+
+  it('turns a rejected provider completion into a terminal failed session', async () => {
+    const controller = createExecutionJobController({
+      jobId: 'rejected-completion-job',
+      provider: descriptor,
+      request: createExecutionRequest({
+        requestId: 'rejected-completion-request',
+        profile: 'test',
+        runtimeZone: 'test',
+        workspace: { workspaceId: 'workspace', snapshotId: 'snapshot' },
+        invocation: {
+          kind: 'test',
+          targetRef: { kind: 'workspace', workspaceId: 'workspace' },
+        },
+      }),
+    });
+    const providerError = new Error('provider completion crashed');
+    const job: ExecutionJob = {
+      ...controller.job,
+      completion: Promise.reject(providerError),
+    };
+    const reported: unknown[] = [];
+    const coordinator = createExecutionSessionCoordinator({
+      now: () => 500,
+      onSubscriberError: (error) => reported.push(error),
+    });
+
+    coordinator.activate({ sessionId: 'rejected-completion', job });
+    await Promise.resolve();
+
+    expect(reported).toEqual([providerError]);
+    expect(coordinator.getSnapshot('rejected-completion')).toMatchObject({
+      status: 'failed',
+      terminal: {
+        status: 'failed',
+        failure: {
+          code: 'EXECUTION_PROVIDER_COMPLETION_REJECTED',
+          message: 'provider completion crashed',
+          retryable: true,
+        },
+      },
+    });
   });
 });

@@ -420,7 +420,18 @@ const collectSymbols = (input: {
     ) {
       continue;
     }
-    const nameIndex = nextIdentifierIndex(input.tokens, index + 1, [
+    let declarationStart = index + 1;
+    if (input.tokens[declarationStart]?.lexeme === '<') {
+      const templateEnd = findMatchingToken(
+        input.tokens,
+        declarationStart,
+        '<',
+        '>'
+      );
+      if (templateEnd < 0) continue;
+      declarationStart = templateEnd + 1;
+    }
+    const nameIndex = nextIdentifierIndex(input.tokens, declarationStart, [
       ':',
       '=',
       ';',

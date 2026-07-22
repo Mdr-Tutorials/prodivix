@@ -1,5 +1,6 @@
 import './PdxRegionPicker.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import { useEffect, useState } from 'react';
 import type React from 'react';
 
@@ -120,7 +121,7 @@ function PdxRegionPicker({
 
   const fullClassName =
     `PdxRegionPicker ${size} ${state} ${disabled ? 'Disabled' : ''} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   return (
     <div
@@ -138,6 +139,7 @@ function PdxRegionPicker({
       {description && <div className="PdxFieldDescription">{description}</div>}
       <div className="PdxRegionPickerControls">
         <select
+          aria-label={`${label ?? 'Region'} province`}
           className="PdxRegionPickerSelect"
           disabled={disabled}
           value={currentValue.province || ''}
@@ -151,6 +153,7 @@ function PdxRegionPicker({
           ))}
         </select>
         <select
+          aria-label={`${label ?? 'Region'} city`}
           className="PdxRegionPickerSelect"
           disabled={disabled || !currentValue.province}
           value={currentValue.city || ''}
@@ -164,6 +167,7 @@ function PdxRegionPicker({
           ))}
         </select>
         <select
+          aria-label={`${label ?? 'Region'} district`}
           className="PdxRegionPickerSelect"
           disabled={disabled || !currentValue.city}
           value={currentValue.district || ''}

@@ -1,6 +1,7 @@
 import './PdxImage.scss';
 import React from 'react';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 
 interface PdxImageSpecificProps {
   src: string;
@@ -33,7 +34,7 @@ function PdxImage({
   const fullClassName =
     `PdxImage ${size} ${fit} ${shape} ${className || ''}`.trim();
 
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   return (
     <img

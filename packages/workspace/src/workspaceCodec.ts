@@ -741,8 +741,10 @@ export const applyWorkspaceMutation = (
     requestedActiveDocumentId && docsById[requestedActiveDocumentId]
       ? requestedActiveDocumentId
       : resolveCanonicalWorkspaceDocumentId(Object.values(docsById));
+  const workspaceWithoutActiveDocument = { ...workspace };
+  delete workspaceWithoutActiveDocument.activeDocumentId;
   const nextWorkspace: WorkspaceSnapshot = {
-    ...workspace,
+    ...workspaceWithoutActiveDocument,
     workspaceRev: mutation.workspaceRev,
     routeRev: mutation.routeRev,
     opSeq: mutation.opSeq,

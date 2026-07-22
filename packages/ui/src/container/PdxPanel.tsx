@@ -65,15 +65,16 @@ function PdxPanel({
       style={style as React.CSSProperties | undefined}
       {...getDataAttributes(dataAttributes)}
     >
-      {title && collapsible && (
+      {collapsible && (
         <button
           aria-controls={contentId}
           aria-expanded={!isCollapsed}
+          aria-label={title ? undefined : 'Toggle panel'}
           className="PdxPanelHeader PdxPanelHeaderButton"
           onClick={handleToggle}
           type="button"
         >
-          <span className="PdxPanelTitle">{title}</span>
+          {title && <span className="PdxPanelTitle">{title}</span>}
           <ChevronDown
             aria-hidden="true"
             className="PdxPanelToggleIcon"

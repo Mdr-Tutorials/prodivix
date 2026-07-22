@@ -82,14 +82,8 @@ export function InspectorTriggerItem({ item }: { item: TriggerEntry }) {
   const selectedGraphId = useMemo(() => {
     const rawGraphId =
       typeof item.params.graphId === 'string' ? item.params.graphId.trim() : '';
-    if (
-      rawGraphId &&
-      graphOptions.some((option: { id: string }) => option.id === rawGraphId)
-    ) {
-      return rawGraphId;
-    }
-    return graphOptions[0]?.id ?? '';
-  }, [graphOptions, item.params.graphId]);
+    return rawGraphId;
+  }, [item.params.graphId]);
   const stateValue =
     typeof item.params.state === 'string'
       ? item.params.state
@@ -112,7 +106,7 @@ export function InspectorTriggerItem({ item }: { item: TriggerEntry }) {
           documentId: dataOperation.documentId,
           operationId: dataOperation.operationId,
         }
-      : dataMutationOptions[0]?.reference;
+      : undefined;
   const dataInput =
     item.params.input &&
     typeof item.params.input === 'object' &&
@@ -120,43 +114,6 @@ export function InspectorTriggerItem({ item }: { item: TriggerEntry }) {
       ? (item.params
           .input as import('@prodivix/data').DataOperationInputBinding)
       : undefined;
-
-  useEffect(() => {
-    if (!editable) return;
-    if (actionValue !== 'executeGraph') return;
-    if (graphMode !== 'existing') return;
-    const rawGraphId =
-      typeof item.params.graphId === 'string' ? item.params.graphId.trim() : '';
-    const nextGraphOption = graphOptions.find(
-      (option: { id: string; label: string }) => option.id === selectedGraphId
-    );
-    const rawGraphName =
-      typeof item.params.graphName === 'string'
-        ? item.params.graphName.trim()
-        : '';
-    const nextGraphName = nextGraphOption?.label ?? '';
-    if (rawGraphId === selectedGraphId && rawGraphName === nextGraphName) {
-      return;
-    }
-    updateTrigger(item.key, (currentEvent) => ({
-      ...currentEvent,
-      params: {
-        ...(currentEvent.params ?? {}),
-        graphId: selectedGraphId,
-        graphName: nextGraphName,
-      },
-    }));
-  }, [
-    actionValue,
-    graphMode,
-    graphOptions,
-    item.key,
-    item.params.graphId,
-    item.params.graphName,
-    selectedGraphId,
-    updateTrigger,
-    editable,
-  ]);
 
   return (
     <div className="grid gap-1.5" data-testid={`inspector-trigger-${item.key}`}>

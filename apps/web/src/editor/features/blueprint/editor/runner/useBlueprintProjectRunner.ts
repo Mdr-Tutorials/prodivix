@@ -127,7 +127,8 @@ export const useBlueprintProjectRunner = (
         });
         if (!active) {
           await stopBlueprintProject(
-            'Run surface changed before startup completed.'
+            'Run surface changed before startup completed.',
+            { expectedJobId: job.id }
           );
           return;
         }

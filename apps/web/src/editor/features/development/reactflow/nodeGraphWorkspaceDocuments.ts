@@ -57,14 +57,16 @@ const WINDOWS_RESERVED_FILE_STEM = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
  * readable. NodeGraph display input never becomes a filesystem path verbatim.
  */
 export const toSafeNodeGraphFileStem = (value: string): string => {
-  const normalized = value
+  const canonical = value
     .normalize('NFKC')
     .trim()
     .toLocaleLowerCase('en-US')
     .replace(/[^\p{L}\p{N}]+/gu, '-')
     .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
+    .replace(/^-|-$/g, '');
+  const normalized = Array.from(canonical)
     .slice(0, 48)
+    .join('')
     .replace(/-+$/g, '');
   const stem = normalized || 'untitled';
   return WINDOWS_RESERVED_FILE_STEM.test(stem) ? `graph-${stem}` : stem;
@@ -87,13 +89,13 @@ export const createAvailableNodeGraphPath = (input: {
   const usedPaths = new Set(
     Object.values(input.workspace.docsById)
       .filter((document) => document.id !== input.excludeDocumentId)
-      .map((document) => document.path.toLocaleLowerCase())
+      .map((document) => document.path.toLowerCase())
   );
   let suffix = 1;
   while (true) {
     const name = suffix === 1 ? baseName : `${baseName}-${suffix}`;
     const path = `${directory}/${name}${GRAPH_FILE_SUFFIX}`;
-    if (!usedPaths.has(path.toLocaleLowerCase())) return { name, path };
+    if (!usedPaths.has(path.toLowerCase())) return { name, path };
     suffix += 1;
   }
 };

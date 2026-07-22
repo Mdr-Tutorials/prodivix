@@ -1,5 +1,6 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import type { Edge, Node } from '@xyflow/react';
+import { createNodeGraphExecutorCodeSlotId } from '@prodivix/nodegraph';
 import type { GraphNodeData, GraphNodeKind } from './GraphNode';
 import {
   type ConnectionValidationReason,
@@ -36,6 +37,7 @@ type UseNodeGraphNodeActionsParams = {
     noMatchingOutput: string;
   };
   menu: ContextMenuState;
+  documentId?: string;
   nodes: Node<GraphNodeData>[];
   setEdges: Dispatch<SetStateAction<Edge[]>>;
   setHint: Dispatch<SetStateAction<string | null>>;
@@ -49,6 +51,7 @@ export const useNodeGraphNodeActions = ({
   groupAutoLayoutById,
   hintText,
   menu,
+  documentId,
   nodes,
   setEdges,
   setHint,
@@ -145,15 +148,27 @@ export const useNodeGraphNodeActions = ({
     setNodes((current) => {
       const target = current.find((node) => node.id === menu.nodeId);
       if (!target) return current;
+      const copyId = createNodeId();
       const copy = {
         ...target,
-        id: createNodeId(),
+        id: copyId,
         position: { x: target.position.x + 36, y: target.position.y + 36 },
+        data: target.data.executor
+          ? {
+              ...target.data,
+              executor: {
+                ...target.data.executor,
+                slotId: documentId
+                  ? createNodeGraphExecutorCodeSlotId(documentId, copyId)
+                  : `${target.data.executor.slotId}:copy:${copyId}`,
+              },
+            }
+          : target.data,
       };
       return [...current, copy];
     });
     closeMenu();
-  }, [closeMenu, menu, setNodes]);
+  }, [closeMenu, documentId, menu, setNodes]);
 
   const detachNodeFromBox = useCallback(() => {
     if (!menu || menu.kind !== 'node') return;

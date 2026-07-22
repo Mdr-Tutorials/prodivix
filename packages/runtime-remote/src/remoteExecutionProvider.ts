@@ -817,7 +817,7 @@ const synchronize = async (
               ...event.artifact,
               uri: artifact.uri,
             });
-            if (JSON.stringify(artifact) !== JSON.stringify(expectedProjection))
+            if (canonicalJson(artifact) !== canonicalJson(expectedProjection))
               throw new RemoteExecutionRecoveryRequiredError(
                 'Remote artifact materialization may only add its runtime URI.',
                 'events.read'

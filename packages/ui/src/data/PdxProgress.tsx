@@ -1,5 +1,6 @@
 import './PdxProgress.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import type React from 'react';
 
 interface PdxProgressSpecificProps {
@@ -27,7 +28,7 @@ function PdxProgress({
   const clampedValue = Math.min(100, Math.max(0, value));
   const fullClassName =
     `PdxProgress ${size} ${status} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   return (
     <div

@@ -107,10 +107,16 @@ export class LlmGateway {
   async run(task: LlmTaskRequest): Promise<LlmTaskResult> {
     const startedAt = this.now();
     const traceId = this.createId();
-    const allowedTools = this.tools.pick(task.allowedTools);
-    const context = { task, traceId, startedAt, allowedTools };
+    let context: GatewayRunContext = {
+      task,
+      traceId,
+      startedAt,
+      allowedTools: [],
+    };
 
     try {
+      const allowedTools = this.tools.pick(task.allowedTools);
+      context = { task, traceId, startedAt, allowedTools };
       const providerResult = await this.provider.generate({
         task,
         tools: allowedTools,
@@ -127,8 +133,12 @@ export class LlmGateway {
   async *stream(task: LlmTaskRequest): AsyncIterable<LlmStreamEvent> {
     const startedAt = this.now();
     const traceId = this.createId();
-    const allowedTools = this.tools.pick(task.allowedTools);
-    const context = { task, traceId, startedAt, allowedTools };
+    let context: GatewayRunContext = {
+      task,
+      traceId,
+      startedAt,
+      allowedTools: [],
+    };
 
     yield {
       type: 'started',
@@ -136,6 +146,17 @@ export class LlmGateway {
       traceId,
       providerId: this.provider.id,
     };
+
+    let allowedTools: readonly LlmToolDefinition[];
+    try {
+      allowedTools = this.tools.pick(task.allowedTools);
+      context = { task, traceId, startedAt, allowedTools };
+    } catch (error) {
+      const result = await this.createFailureResult(context, error);
+      yield { type: 'diagnostic', diagnostic: result.diagnostics[0]! };
+      yield { type: 'completed', result };
+      return;
+    }
 
     if (!this.provider.stream) {
       try {
@@ -218,6 +239,16 @@ export class LlmGateway {
     }
   }
 
+  private async appendTrace(
+    trace: Parameters<LlmTraceStore['append']>[0]
+  ): Promise<void> {
+    try {
+      await this.traceStore?.append(trace);
+    } catch {
+      // Trace persistence is observational and cannot change the task result.
+    }
+  }
+
   private async createSuccessResult(
     context: GatewayRunContext,
     providerResult: UnwrappedProviderResult
@@ -227,7 +258,7 @@ export class LlmGateway {
 
     this.assertOutputChannel(task, output);
 
-    await this.traceStore?.append({
+    await this.appendTrace({
       id: traceId,
       taskId: task.id,
       userIntent: task.intent,
@@ -269,7 +300,7 @@ export class LlmGateway {
       message: error instanceof Error ? error.message : 'LLM provider failed.',
     };
 
-    await this.traceStore?.append({
+    await this.appendTrace({
       id: traceId,
       taskId: task.id,
       userIntent: task.intent,

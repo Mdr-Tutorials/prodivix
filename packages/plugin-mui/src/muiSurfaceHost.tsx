@@ -58,7 +58,8 @@ const createStyleLease = (
       container: styleContainer,
     });
     let disposed = false;
-    let registration: ReturnType<OfficialReactSurfaceHost['registerCleanup']>;
+    let registration:
+      ReturnType<OfficialReactSurfaceHost['registerCleanup']> | undefined;
     const cleanup = () => {
       if (disposed) return;
       disposed = true;
@@ -66,16 +67,25 @@ const createStyleLease = (
       resources?.delete(styleContainer);
       if (resources?.size === 0) resourcesByHost.delete(host);
     };
-    registration = host.registerCleanup(cleanup);
     resource = {
       cache,
       referenceCount: 0,
       dispose: () => {
         cleanup();
-        registration.dispose();
+        registration?.dispose();
       },
     };
     resources.set(styleContainer, resource);
+    try {
+      registration = host.registerCleanup(cleanup);
+    } catch (error) {
+      cleanup();
+      throw error;
+    }
+    if (disposed) {
+      registration.dispose();
+      throw new Error('Official React surface style lease is unavailable.');
+    }
   }
   resource.referenceCount += 1;
   let released = false;

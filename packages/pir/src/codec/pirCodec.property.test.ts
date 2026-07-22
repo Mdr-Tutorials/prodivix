@@ -277,6 +277,23 @@ describe('PIR wire codec properties', () => {
     );
   });
 
+  it('fails closed on inputs beyond the bounded JSON nesting depth', () => {
+    let value: unknown = createMutableWire();
+    for (let depth = 0; depth < 140; depth += 1) {
+      value = { nested: value };
+    }
+
+    expect(decodePirDocument(value)).toMatchObject({
+      ok: false,
+      issues: [
+        expect.objectContaining({
+          code: 'PIR_WIRE_INVALID',
+          message: expect.stringMatching(/nesting depth/u),
+        }),
+      ],
+    });
+  });
+
   it('keeps wire schema versions out of the PIR domain model', () => {
     const wire = JSON.parse(encodePirDocument(createValidDocument()));
     expect(tryNormalizePirDocument(wire as PIRDocument)).toMatchObject({

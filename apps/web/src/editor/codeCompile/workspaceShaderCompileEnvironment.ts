@@ -91,29 +91,41 @@ const compileSnapshot = async (
     return session;
   };
 
-  const artifacts = await Promise.all(
-    configuredArtifacts.map(async (artifact) => {
-      const session = getSession(artifact);
-      const result = session
-        ? await (
-            await session
-          ).compile({
-            artifactId: artifact.id,
-            expectedSnapshotIdentity: snapshotIdentity,
-          })
-        : Object.freeze({
-            status: 'unavailable' as const,
-            snapshotIdentity,
-            reason: `No compiler is registered for ${artifact.language}/${artifact.shaderCompileProfile.target}.`,
-          });
-      return Object.freeze({
-        artifact,
-        profile: artifact.shaderCompileProfile,
-        result,
-      });
-    })
-  );
-  for (const session of await Promise.all(sessions.values())) session.dispose();
+  let artifacts: WorkspaceShaderCompileArtifactSnapshot[];
+  try {
+    artifacts = await Promise.all(
+      configuredArtifacts.map(async (artifact) => {
+        const session = getSession(artifact);
+        const result = session
+          ? await (
+              await session
+            ).compile({
+              artifactId: artifact.id,
+              expectedSnapshotIdentity: snapshotIdentity,
+            })
+          : Object.freeze({
+              status: 'unavailable' as const,
+              snapshotIdentity,
+              reason: `No compiler is registered for ${artifact.language}/${artifact.shaderCompileProfile.target}.`,
+            });
+        return Object.freeze({
+          artifact,
+          profile: artifact.shaderCompileProfile,
+          result,
+        });
+      })
+    );
+  } finally {
+    const openedSessions = await Promise.allSettled(sessions.values());
+    await Promise.allSettled(
+      openedSessions
+        .filter(
+          (result): result is PromiseFulfilledResult<ShaderCompileSession> =>
+            result.status === 'fulfilled'
+        )
+        .map(({ value }) => Promise.resolve(value.dispose()))
+    );
+  }
   const orderedArtifacts = Object.freeze(
     artifacts.sort(
       (left, right) =>
@@ -146,5 +158,10 @@ export const compileWorkspaceShaders = (
   if (cached) return cached;
   const promise = compileSnapshot(workspace);
   rememberSnapshot(key, promise);
+  void promise.catch(() => {
+    if (snapshotPromiseByKey.get(key) === promise) {
+      snapshotPromiseByKey.delete(key);
+    }
+  });
   return promise;
 };

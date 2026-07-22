@@ -267,7 +267,11 @@ func (handler *Handler) HandleTerminalOpen(c *gin.Context) {
 		backendresponse.Error(c, http.StatusBadGateway, "EXE-5001", "Remote Terminal response exceeded its limit.")
 		return
 	}
-	if response.StatusCode >= 200 && response.StatusCode < 300 && (!validTerminalSessionResponse(responseBody, executionID, "", time.Now()) || bytes.Contains(responseBody, []byte(handler.clientToken))) {
+	if handler.remoteResponseContainsAuthority(responseBody) {
+		backendresponse.Error(c, http.StatusBadGateway, "EXE-5001", "Remote Terminal service returned an unsafe response.")
+		return
+	}
+	if response.StatusCode >= 200 && response.StatusCode < 300 && !validTerminalSessionResponse(responseBody, executionID, "", time.Now()) {
 		backendresponse.Error(c, http.StatusBadGateway, "EXE-5001", "Remote Terminal service returned an invalid session.")
 		return
 	}
@@ -296,7 +300,11 @@ func (handler *Handler) HandleTerminalResume(c *gin.Context) {
 		backendresponse.Error(c, http.StatusBadGateway, "EXE-5001", "Remote Terminal response exceeded its limit.")
 		return
 	}
-	if response.StatusCode >= 200 && response.StatusCode < 300 && (!validTerminalSessionResponse(responseBody, executionID, terminalSessionID, time.Now()) || bytes.Contains(responseBody, []byte(handler.clientToken))) {
+	if handler.remoteResponseContainsAuthority(responseBody) {
+		backendresponse.Error(c, http.StatusBadGateway, "EXE-5001", "Remote Terminal service returned an unsafe response.")
+		return
+	}
+	if response.StatusCode >= 200 && response.StatusCode < 300 && !validTerminalSessionResponse(responseBody, executionID, terminalSessionID, time.Now()) {
 		backendresponse.Error(c, http.StatusBadGateway, "EXE-5001", "Remote Terminal service returned an invalid session.")
 		return
 	}
@@ -333,7 +341,11 @@ func (handler *Handler) HandleTerminalAction(c *gin.Context) {
 		backendresponse.Error(c, http.StatusBadGateway, "EXE-5001", "Remote Terminal response exceeded its limit.")
 		return
 	}
-	if response.StatusCode >= 200 && response.StatusCode < 300 && (!validTerminalActionResponse(action, responseBody, executionID, terminalSessionID) || bytes.Contains(responseBody, []byte(handler.clientToken)) || bytes.Contains(responseBody, []byte(terminalToken))) {
+	if handler.remoteResponseContainsAuthority(responseBody, terminalToken) {
+		backendresponse.Error(c, http.StatusBadGateway, "EXE-5001", "Remote Terminal service returned an unsafe response.")
+		return
+	}
+	if response.StatusCode >= 200 && response.StatusCode < 300 && !validTerminalActionResponse(action, responseBody, executionID, terminalSessionID) {
 		backendresponse.Error(c, http.StatusBadGateway, "EXE-5001", "Remote Terminal service returned an invalid response.")
 		return
 	}

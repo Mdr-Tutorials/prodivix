@@ -46,6 +46,7 @@ export type WorkspaceOutboxRecord = Readonly<{
   id: string;
   workspaceId: string;
   causalOrderId: string;
+  causalSequence?: number;
   request: unknown;
   createdAt: number;
   updatedAt: number;
@@ -124,10 +125,22 @@ const compareUnicodeCodePoints = (left: string, right: string): number => {
 const compareEntries = (
   left: WorkspaceOutboxRecord,
   right: WorkspaceOutboxRecord
-): number =>
-  left.createdAt - right.createdAt ||
-  compareUnicodeCodePoints(left.causalOrderId, right.causalOrderId) ||
-  compareUnicodeCodePoints(left.id, right.id);
+): number => {
+  if (
+    left.workspaceId === right.workspaceId &&
+    (left.causalSequence !== undefined || right.causalSequence !== undefined)
+  ) {
+    const sequenceDifference =
+      (left.causalSequence ?? Number.MIN_SAFE_INTEGER) -
+      (right.causalSequence ?? Number.MIN_SAFE_INTEGER);
+    if (sequenceDifference !== 0) return sequenceDifference;
+  }
+  return (
+    left.createdAt - right.createdAt ||
+    compareUnicodeCodePoints(left.causalOrderId, right.causalOrderId) ||
+    compareUnicodeCodePoints(left.id, right.id)
+  );
+};
 
 /** Preserves queue position when rebase or conflict resolution replaces an operation. */
 export const inheritWorkspaceOutboxCausalOrder = <
@@ -139,6 +152,9 @@ export const inheritWorkspaceOutboxCausalOrder = <
   ({
     ...replacement,
     causalOrderId: current.causalOrderId,
+    ...(current.causalSequence === undefined
+      ? {}
+      : { causalSequence: current.causalSequence }),
     createdAt: current.createdAt,
     attemptCount: current.attemptCount,
   }) as TEntry;
@@ -417,7 +433,18 @@ export const createMemoryWorkspaceOutboxStore = <
       ) {
         throw new Error('Workspace outbox operation id was reused.');
       }
-      if (!existing) entries.set(entry.id, entry);
+      if (!existing) {
+        const maximumSequence = Math.max(
+          0,
+          ...[...entries.values()]
+            .filter((candidate) => candidate.workspaceId === entry.workspaceId)
+            .map((candidate) => candidate.causalSequence ?? 0)
+        );
+        entries.set(entry.id, {
+          ...entry,
+          causalSequence: entry.causalSequence ?? maximumSequence + 1,
+        });
+      }
     },
     get: async (entryId) => entries.get(entryId) ?? null,
     list,

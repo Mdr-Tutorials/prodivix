@@ -315,6 +315,16 @@ const resolveAggregateStatus = (
   return 'modified';
 };
 
+const resolveSideStatus = (
+  changes: readonly WorkspaceSemanticChange[]
+): Exclude<NodeGraphDiffStatus, 'conflict-local' | 'conflict-remote'> => {
+  if (!changes.length) return 'unchanged';
+  const kinds = new Set(changes.map((change) => change.kind));
+  if (kinds.size === 1 && kinds.has('add')) return 'added';
+  if (kinds.size === 1 && kinds.has('delete')) return 'deleted';
+  return 'modified';
+};
+
 const resolveAggregateResolution = (
   aggregate: EntityAggregate,
   resolutions: Readonly<Record<string, WorkspaceConflictResolutionChoice>>
@@ -498,7 +508,8 @@ const createNodePresentation = (
   position: { x: number; y: number },
   status: NodeGraphDiffStatus,
   aggregate: EntityAggregate,
-  resolutions: Readonly<Record<string, WorkspaceConflictResolutionChoice>>
+  resolutions: Readonly<Record<string, WorkspaceConflictResolutionChoice>>,
+  deletedOnSide = false
 ): NodeGraphDiffNodePresentation => {
   const conflictIds = uniqueSorted(
     aggregate.conflicts.map((conflict) => conflict.id)
@@ -514,7 +525,9 @@ const createNodePresentation = (
     ...(conflictIds.length ? { conflictIds } : {}),
     description: resolveNodeDescription(record),
     entityId,
-    label: resolveNodeLabel(record, entityId),
+    label: deletedOnSide
+      ? `${resolveNodeLabel(record, entityId)} (deleted)`
+      : resolveNodeLabel(record, entityId),
     nodeKind: resolveNodeKind(record),
     position,
     resolution: resolveAggregateResolution(aggregate, resolutions),
@@ -564,7 +577,8 @@ const buildNodePresentations = (
           localPosition,
           'conflict-local',
           aggregate,
-          resolutions
+          resolutions,
+          wholeEntityState(aggregate, 'local')?.present === false
         ),
         createNodePresentation(
           entityId,
@@ -572,7 +586,8 @@ const buildNodePresentations = (
           remotePosition,
           'conflict-remote',
           aggregate,
-          resolutions
+          resolutions,
+          wholeEntityState(aggregate, 'remote')?.present === false
         )
       );
       return;
@@ -620,17 +635,19 @@ const createEdgePresentation = (
   status: NodeGraphDiffStatus,
   aggregate: EntityAggregate,
   resolutions: Readonly<Record<string, WorkspaceConflictResolutionChoice>>,
-  conflictedNodeIds: ReadonlySet<string>
+  conflictedNodeIds: ReadonlySet<string>,
+  endpointSide?: ChangeSide
 ): NodeGraphDiffEdgePresentation | undefined => {
   const sourceId = resolveEdgeEndpoint(record, 'source');
   const targetId = resolveEdgeEndpoint(record, 'target');
   if (!sourceId || !targetId) return undefined;
   const side =
-    status === 'conflict-local'
+    endpointSide ??
+    (status === 'conflict-local'
       ? 'local'
       : status === 'conflict-remote'
         ? 'remote'
-        : undefined;
+        : undefined);
   const endpointVisualId = (nodeId: string) =>
     `node:${nodeId}${
       conflictedNodeIds.has(nodeId) ? `::${side ?? 'remote'}` : ''
@@ -708,20 +725,28 @@ const buildEdgePresentations = (
       resolveEdgeEndpoint(record, 'source'),
       resolveEdgeEndpoint(record, 'target'),
     ].some((nodeId) => nodeId && conflictedNodeIds.has(nodeId));
-    if (status === 'unchanged' && touchesConflict) {
-      return (['conflict-local', 'conflict-remote'] as const).flatMap(
-        (side) => {
-          const edge = createEdgePresentation(
-            entityId,
-            record,
-            side,
-            aggregate,
-            resolutions,
-            conflictedNodeIds
-          );
-          return edge ? [edge] : [];
-        }
-      );
+    if (touchesConflict) {
+      return (['local', 'remote'] as const).flatMap((side) => {
+        const deletedOnSide =
+          wholeEntityState(aggregate, side)?.present === false;
+        const sideRecord = deletedOnSide
+          ? (records.base ?? records.candidate ?? record)
+          : side === 'local'
+            ? (records.local ?? records.base ?? records.candidate ?? record)
+            : (records.remote ?? records.base ?? records.candidate ?? record);
+        const edge = createEdgePresentation(
+          entityId,
+          sideRecord,
+          resolveSideStatus(
+            side === 'local' ? aggregate.localChanges : aggregate.remoteChanges
+          ),
+          aggregate,
+          resolutions,
+          conflictedNodeIds,
+          side
+        );
+        return edge ? [edge] : [];
+      });
     }
     const edge = createEdgePresentation(
       entityId,

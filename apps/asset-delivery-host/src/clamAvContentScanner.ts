@@ -1,4 +1,3 @@
-import { once } from 'node:events';
 import { createConnection, type Socket } from 'node:net';
 import {
   BinaryAssetScannerUnavailableError,
@@ -46,7 +45,29 @@ const writeWithBackpressure = async (
     throw new BinaryAssetScannerUnavailableError('connection');
   }
   if (!socket.write(contents)) {
-    await once(socket, 'drain');
+    await new Promise<void>((resolve, reject) => {
+      const cleanup = (): void => {
+        socket.off('drain', onDrain);
+        socket.off('close', onClose);
+        socket.off('error', onError);
+      };
+      const onDrain = (): void => {
+        cleanup();
+        resolve();
+      };
+      const onClose = (): void => {
+        cleanup();
+        reject(new BinaryAssetScannerUnavailableError('connection'));
+      };
+      const onError = (): void => {
+        cleanup();
+        reject(new BinaryAssetScannerUnavailableError('connection'));
+      };
+      socket.once('drain', onDrain);
+      socket.once('close', onClose);
+      socket.once('error', onError);
+      if (socket.destroyed) onClose();
+    });
   }
 };
 

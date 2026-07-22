@@ -145,6 +145,7 @@ export const decodeRemoteExecutionTerminalWorkerReadResult = (
   });
   if (
     result.acknowledgedCommandCursor > result.latestCommandCursor ||
+    (result.hasMore && result.commands.length === 0) ||
     result.commands.some(
       (command, index) =>
         command.terminalSessionId !== result.terminalSessionId ||

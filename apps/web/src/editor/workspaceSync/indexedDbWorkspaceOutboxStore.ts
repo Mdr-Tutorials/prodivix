@@ -31,6 +31,9 @@ export const decodeStoredWorkspaceOutboxEntry = (
     !entry.workspaceId ||
     typeof entry.causalOrderId !== 'string' ||
     !entry.causalOrderId ||
+    (entry.causalSequence !== undefined &&
+      (!Number.isSafeInteger(entry.causalSequence) ||
+        entry.causalSequence <= 0)) ||
     entry.baseSnapshot?.id !== entry.workspaceId ||
     getWorkspaceOperationId(entry.operation) !== entry.id ||
     getWorkspaceOperationId(entry.request?.operation) !== entry.id ||

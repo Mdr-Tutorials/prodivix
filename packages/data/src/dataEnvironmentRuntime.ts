@@ -9,6 +9,7 @@ import type {
 } from '@prodivix/runtime-core';
 import type { DataOperation, DataSourceDefinition } from './data.types';
 import type { DataOperationInvocation } from './dataRuntime';
+import { compareDataText } from './dataJsonRuntime';
 
 export const DATA_ENVIRONMENT_RUNTIME_ERROR_CODES = Object.freeze({
   referenceRequired: 'DATA_ENVIRONMENT_REFERENCE_REQUIRED',
@@ -67,7 +68,7 @@ const bindingRequests = (
               ]
         )
       )
-      .sort((left, right) => left.field.localeCompare(right.field))
+      .sort((left, right) => compareDataText(left.field, right.field))
   );
 
 /** Resolves exact Data configuration bindings without adding an async boundary to environment-free execution. */

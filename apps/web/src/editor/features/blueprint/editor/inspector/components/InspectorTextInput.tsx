@@ -4,6 +4,8 @@ type InspectorTextInputProps = {
   placeholder?: string;
   disabled?: boolean;
   inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
+  onBlur?: React.FocusEventHandler<HTMLInputElement>;
+  onFocus?: React.FocusEventHandler<HTMLInputElement>;
 };
 
 export function InspectorTextInput({
@@ -12,6 +14,8 @@ export function InspectorTextInput({
   placeholder,
   disabled = false,
   inputMode,
+  onBlur,
+  onFocus,
 }: InspectorTextInputProps) {
   return (
     <input
@@ -21,6 +25,8 @@ export function InspectorTextInput({
       disabled={disabled}
       inputMode={inputMode}
       onChange={(event) => onChange(event.target.value)}
+      onBlur={onBlur}
+      onFocus={onFocus}
     />
   );
 }

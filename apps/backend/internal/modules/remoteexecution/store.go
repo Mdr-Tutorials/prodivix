@@ -128,15 +128,36 @@ func (store *Store) GrantWorkspaceExecutionRole(ctx context.Context, ownerID str
 	}
 	ctx, cancel := withTimeout(ctx)
 	defer cancel()
-	result, err := store.db.ExecContext(ctx, `INSERT INTO workspace_execution_role_grants (workspace_id, principal_id, role, granted_by, granted_at)
-SELECT w.id, u.id, $4, w.owner_id, NOW()
-FROM workspaces w
-JOIN users u ON u.id = $3
-WHERE w.id = $1 AND w.owner_id = $2 AND u.id <> w.owner_id
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var workspaceMarker int
+	if err := tx.QueryRowContext(ctx, `SELECT 1 FROM workspaces WHERE id = $1 AND owner_id = $2 FOR UPDATE`, workspaceID, ownerID).Scan(&workspaceMarker); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrExecutionNotFound
+		}
+		return err
+	}
+	var grantCount int
+	var principalAlreadyGranted bool
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(BOOL_OR(principal_id = $2), FALSE)
+FROM workspace_execution_role_grants
+WHERE workspace_id = $1`, workspaceID, principalID).Scan(&grantCount, &principalAlreadyGranted); err != nil {
+		return err
+	}
+	if grantCount >= 256 && !principalAlreadyGranted {
+		return ErrExecutionAuthorityConflict
+	}
+	result, err := tx.ExecContext(ctx, `INSERT INTO workspace_execution_role_grants (workspace_id, principal_id, role, granted_by, granted_at)
+SELECT $1, u.id, $4, $2, NOW()
+FROM users u
+WHERE u.id = $3 AND u.id <> $2
 ON CONFLICT (workspace_id, principal_id) DO UPDATE
 SET role = EXCLUDED.role,
 	granted_by = EXCLUDED.granted_by,
-		granted_at = EXCLUDED.granted_at`, workspaceID, ownerID, principalID, role)
+	granted_at = EXCLUDED.granted_at`, workspaceID, ownerID, principalID, role)
 	if err != nil {
 		return err
 	}
@@ -147,7 +168,7 @@ SET role = EXCLUDED.role,
 	if rows != 1 {
 		return ErrExecutionNotFound
 	}
-	return nil
+	return tx.Commit()
 }
 
 // GrantWorkspaceExecutionViewer remains as a compatibility helper for the

@@ -135,14 +135,22 @@ describe('execution provider conformance', () => {
         targetRef: { kind: 'workspace', workspaceId: 'workspace-1' },
       },
     });
+    const controller = createExecutionJobController({
+      jobId: 'replaced-request-job',
+      request: Object.freeze({ ...request }),
+      provider: descriptor,
+    });
+    let cancelCalls = 0;
+    const job = {
+      ...controller.job,
+      cancel: async () => {
+        cancelCalls += 1;
+        return Object.freeze({ status: 'accepted' as const });
+      },
+    };
     const provider: ExecutionProvider = {
       descriptor,
-      start: async (canonicalRequest) =>
-        createExecutionJobController({
-          jobId: 'replaced-request-job',
-          request: Object.freeze({ ...canonicalRequest }),
-          provider: descriptor,
-        }).job,
+      start: async () => job,
     };
     const registry = createExecutionProviderRegistry();
     registry.register(provider);
@@ -150,5 +158,6 @@ describe('execution provider conformance', () => {
     await expect(registry.start(descriptor.id, request)).rejects.toThrow(
       ExecutionProviderContractError
     );
+    expect(cancelCalls).toBe(1);
   });
 });

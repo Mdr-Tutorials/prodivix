@@ -132,6 +132,7 @@ type RuntimeControl = {
   terminate?: (reasonCode: string) => void;
   permissionNotifications: Array<PermissionSnapshot | undefined>;
   disposePermissionSubscription?: () => void;
+  onActivate?: () => void | Promise<void>;
 };
 
 const createRuntimeControl = (): RuntimeControl => ({
@@ -252,6 +253,7 @@ const createHarness = (
         control.runtimeArtifact = input.runtimeArtifact;
         const staged = stageRuntimeContribution(control, input);
         if (!staged.ok) return staged;
+        await control.onActivate?.();
         if (control.mode === 'failure') {
           return pluginHostFailure([
             createPluginDiagnostic(
@@ -461,6 +463,44 @@ describe('Plugin Host lifecycle', () => {
     expect(firstResult.ok).toBe(true);
     expect(secondResult.ok).toBe(true);
     expect(harness.control.activationCount).toBe(1);
+  });
+
+  it('retries the complete activation transaction after a registry conflict', async () => {
+    const harness = createHarness();
+    await harness.host.discover(harness.source);
+    const concurrentManifest = createManifest(false);
+    concurrentManifest.id = '@prodivix/plugin-host-concurrent-test';
+    const concurrentSource = {
+      ...createSource(concurrentManifest),
+      installationId: 'installation-2',
+    };
+    harness.control.onActivate = async () => {
+      harness.control.onActivate = undefined;
+      const discovered = await harness.host.discover(concurrentSource);
+      expect(discovered.ok).toBe(true);
+    };
+
+    const activated = await harness.host.activate(harness.manifest.id, {
+      type: 'manual',
+    });
+
+    expect(activated.ok).toBe(true);
+    expect(harness.control.activationCount).toBe(2);
+    expect(harness.control.deactivationReasons).toEqual([
+      'activation-rollback',
+    ]);
+    expect(harness.control.disposedRuntimeContributionCount).toBe(1);
+    expect(
+      harness.host.contributions
+        .list('paletteContribution')
+        .map(
+          ({ identity }) => `${identity.pluginId}/${identity.contributionId}`
+        )
+    ).toEqual([
+      '@prodivix/plugin-host-concurrent-test/static.palette',
+      '@prodivix/plugin-host-test/static.palette',
+      '@prodivix/plugin-host-test/runtime.palette',
+    ]);
   });
 
   it('rolls back runtime contributions when activation fails', async () => {

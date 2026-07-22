@@ -1,5 +1,6 @@
 import './PdxStatistic.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import type React from 'react';
 
@@ -29,13 +30,17 @@ function PdxStatistic({
   id,
   dataAttributes = {},
 }: PdxStatisticProps) {
+  const normalizedPrecision =
+    precision !== undefined && Number.isFinite(precision)
+      ? Math.min(100, Math.max(0, Math.trunc(precision)))
+      : undefined;
   const formattedValue =
-    typeof value === 'number' && precision !== undefined
-      ? value.toFixed(precision)
+    typeof value === 'number' && normalizedPrecision !== undefined
+      ? value.toFixed(normalizedPrecision)
       : value;
 
   const fullClassName = `PdxStatistic ${trend || ''} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   return (
     <div

@@ -144,3 +144,20 @@ func TestTerminalGatewayBlocksCredentialEchoAndInvalidSessionEnvelope(t *testing
 		t.Fatalf("credential echo reached Terminal client: status=%d body=%s", readResponse.Code, readResponse.Body.String())
 	}
 }
+
+func TestTerminalGatewayBlocksServiceCredentialEchoInErrorResponse(t *testing.T) {
+	handler, _, closeServer := terminalHandlerFixture(t, http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		response.Header().Set("Content-Type", "application/json")
+		response.WriteHeader(http.StatusInternalServerError)
+		_, _ = io.WriteString(response, `{"error":"invalid bearer service-token"}`)
+	}))
+	defer closeServer()
+
+	request := httptest.NewRequest(http.MethodPost, "/api/remote-executions/execution-1/terminal-sessions", strings.NewReader(`{"size":{"columns":80,"rows":24}}`))
+	response := httptest.NewRecorder()
+	testRouter(handler, "user-1").ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadGateway || strings.Contains(response.Body.String(), "service-token") {
+		t.Fatalf("credential-bearing error reached client: status=%d body=%s", response.Code, response.Body.String())
+	}
+}

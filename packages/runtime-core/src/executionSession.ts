@@ -470,21 +470,54 @@ export const createExecutionSessionCoordinator = (
     if (sessions.get(sessionId) === internal)
       internal.unsubscribe = unsubscribe;
     else unsubscribe();
-    void activation.job.completion.then((result) => {
-      if (sessions.get(sessionId) !== internal) return;
-      const terminal = createSessionTerminal(result);
-      internal.snapshot = Object.freeze({
-        ...internal.snapshot,
-        revision: internal.snapshot.revision + 1,
-        status: terminal.status,
-        terminal,
-        updatedAt: Math.max(
-          internal.snapshot.updatedAt ?? terminal.completedAt,
-          terminal.completedAt
-        ),
-      });
-      publish(sessionId, internal.snapshot);
-    });
+    void activation.job.completion.then(
+      (result) => {
+        if (sessions.get(sessionId) !== internal) return;
+        const terminal = createSessionTerminal(result);
+        internal.snapshot = Object.freeze({
+          ...internal.snapshot,
+          revision: internal.snapshot.revision + 1,
+          status: terminal.status,
+          terminal,
+          updatedAt: Math.max(
+            internal.snapshot.updatedAt ?? terminal.completedAt,
+            terminal.completedAt
+          ),
+        });
+        publish(sessionId, internal.snapshot);
+      },
+      (error) => {
+        reportSubscriberError(error);
+        if (sessions.get(sessionId) !== internal) return;
+        const completedAt = (input.now ?? Date.now)();
+        const terminal: ExecutionSessionTerminal = Object.freeze({
+          jobId: activation.job.id,
+          requestId: activation.job.request.requestId,
+          providerId: activation.job.provider.id,
+          status: 'failed',
+          completedAt,
+          failure: Object.freeze({
+            code: 'EXECUTION_PROVIDER_COMPLETION_REJECTED',
+            message:
+              error instanceof Error
+                ? error.message
+                : 'Execution provider completion was rejected.',
+            retryable: true,
+          }),
+        });
+        internal.snapshot = Object.freeze({
+          ...internal.snapshot,
+          revision: internal.snapshot.revision + 1,
+          status: 'failed',
+          terminal,
+          updatedAt: Math.max(
+            internal.snapshot.updatedAt ?? completedAt,
+            completedAt
+          ),
+        });
+        publish(sessionId, internal.snapshot);
+      }
+    );
     return internal.snapshot;
   };
 

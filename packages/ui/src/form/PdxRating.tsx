@@ -1,5 +1,6 @@
 import './PdxRating.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import { Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type React from 'react';
@@ -59,7 +60,7 @@ function PdxRating({
 
   const fullClassName =
     `PdxRating ${size} ${disabled ? 'Disabled' : ''} ${readOnly ? 'ReadOnly' : ''} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   return (
     <div

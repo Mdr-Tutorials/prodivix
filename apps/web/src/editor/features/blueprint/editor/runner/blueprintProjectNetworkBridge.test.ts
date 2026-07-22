@@ -72,7 +72,7 @@ describe('Blueprint project Network bridge', () => {
     ).toBeUndefined();
   });
 
-  it('accepts Data invocation only from the opaque active Remote frame contract', () => {
+  it('accepts Data invocation only from the exact active Remote capability origin', () => {
     const value = {
       type: 'prodivix.execution-data-gateway-request.v1',
       requestId: 'invocation-1:1',
@@ -84,12 +84,14 @@ describe('Blueprint project Network bridge', () => {
       attempt: 1,
       input: { page: 1 },
     };
+    const previewUrl =
+      'https://0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef.preview.example.test/';
+    const previewOrigin = new URL(previewUrl).origin;
     expect(
       readBlueprintRemoteDataBridgeMessage({
         provider: 'remote',
-        previewUrl:
-          'https://0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef.preview.example.test/',
-        messageOrigin: 'null',
+        previewUrl,
+        messageOrigin: previewOrigin,
         value,
       })
     ).toEqual(value);
@@ -129,17 +131,17 @@ describe('Blueprint project Network bridge', () => {
     expect(
       readBlueprintRemoteDataBridgeMessage({
         provider: 'remote',
-        previewUrl:
-          'https://0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef.preview.example.test/',
-        messageOrigin: 'null',
+        previewUrl,
+        messageOrigin: previewOrigin,
         value: { ...value, authorization: 'secret-canary' },
       })
     ).toBeUndefined();
   });
 
-  it('accepts subscription open/cancel only from the same opaque Remote frame', () => {
+  it('accepts subscription open/cancel only from the same Remote capability origin', () => {
     const previewUrl =
       'https://0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef.preview.example.test/';
+    const previewOrigin = new URL(previewUrl).origin;
     const value = {
       type: 'prodivix.execution-data-stream-open.v1',
       requestId: 'stream-1:stream',
@@ -155,7 +157,7 @@ describe('Blueprint project Network bridge', () => {
       readBlueprintRemoteDataStreamOpen({
         provider: 'remote',
         previewUrl,
-        messageOrigin: 'null',
+        messageOrigin: previewOrigin,
         value,
       })
     ).toEqual(value);
@@ -171,7 +173,7 @@ describe('Blueprint project Network bridge', () => {
       readBlueprintRemoteDataStreamCancellation({
         provider: 'remote',
         previewUrl,
-        messageOrigin: 'null',
+        messageOrigin: previewOrigin,
         value: {
           type: 'prodivix.execution-data-stream-cancel.v1',
           requestId: value.requestId,
@@ -185,7 +187,7 @@ describe('Blueprint project Network bridge', () => {
       readBlueprintRemoteDataStreamPull({
         provider: 'remote',
         previewUrl,
-        messageOrigin: 'null',
+        messageOrigin: previewOrigin,
         value: {
           type: 'prodivix.execution-data-stream-pull.v1',
           requestId: value.requestId,
@@ -213,11 +215,12 @@ describe('Blueprint project Network bridge', () => {
     };
     const previewUrl =
       'https://0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef.preview.example.test/';
+    const previewOrigin = new URL(previewUrl).origin;
     expect(
       readBlueprintRemoteServerFunctionBridgeMessage({
         provider: 'remote',
         previewUrl,
-        messageOrigin: 'null',
+        messageOrigin: previewOrigin,
         value,
       })
     ).toEqual(value);
@@ -233,7 +236,7 @@ describe('Blueprint project Network bridge', () => {
       readBlueprintRemoteServerFunctionBridgeMessage({
         provider: 'remote',
         previewUrl,
-        messageOrigin: 'null',
+        messageOrigin: previewOrigin,
         value: { ...value, sessionId: 'server-only' },
       })
     ).toBeUndefined();
@@ -246,7 +249,7 @@ describe('Blueprint project Network bridge', () => {
       readBlueprintRemoteServerFunctionBridgeCancellation({
         provider: 'remote',
         previewUrl,
-        messageOrigin: 'null',
+        messageOrigin: previewOrigin,
         value: cancellation,
       })
     ).toEqual(cancellation);
@@ -260,7 +263,7 @@ describe('Blueprint project Network bridge', () => {
     ).toBeUndefined();
   });
 
-  it('accepts structured Console messages from exact Browser and opaque Remote origins', () => {
+  it('accepts structured Console messages from exact Browser and Remote capability origins', () => {
     const value = {
       type: 'prodivix.execution-console-bridge.v1',
       messageId: 'frame-1:1',
@@ -284,12 +287,13 @@ describe('Blueprint project Network bridge', () => {
       messageId: 'frame-1:1',
       log: { category: 'application', message: 'created item' },
     });
+    const remotePreviewUrl =
+      'https://0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef.preview.example.test/';
     expect(
       readBlueprintProjectConsoleBridgeMessage({
         provider: 'remote',
-        previewUrl:
-          'https://0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef.preview.example.test/',
-        messageOrigin: 'null',
+        previewUrl: remotePreviewUrl,
+        messageOrigin: new URL(remotePreviewUrl).origin,
         value,
       })
     ).toMatchObject({ messageId: 'frame-1:1' });

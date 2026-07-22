@@ -42,6 +42,26 @@ export const readCssValue = (value: unknown) => {
   return undefined;
 };
 
+const isUnitlessLineHeight = (value: unknown) =>
+  typeof value === 'number' ||
+  (typeof value === 'string' && /^-?\d+(?:\.\d+)?$/.test(value.trim()));
+
+export const readLineHeightValue = (value: unknown) => {
+  if (typeof value === 'number') return String(value);
+  return readCssValue(value);
+};
+
+export const toLineHeightCssValue = (
+  value: string | number | undefined,
+  currentValue: unknown
+) => {
+  if (value === undefined) return '';
+  if (typeof value !== 'number') return value;
+  return currentValue === undefined || isUnitlessLineHeight(currentValue)
+    ? String(value)
+    : `${value}px`;
+};
+
 export const readGridColumnCount = (value: unknown) => {
   const template = readString(value);
   if (!template) return undefined;
@@ -126,15 +146,24 @@ export const toBoxSpacingShorthand = (spacing: BoxSpacing) => {
   const right = spacing.right.trim();
   const bottom = spacing.bottom.trim();
   const left = spacing.left.trim();
-  const all = [top, right, bottom, left];
-  if (all.every((item) => !item)) return '';
-  if (all.some((item) => !item)) {
-    return all.filter(Boolean).join(' ');
+  const raw = [top, right, bottom, left];
+  if (raw.every((item) => !item)) return '';
+  const [normalizedTop, normalizedRight, normalizedBottom, normalizedLeft] =
+    raw.map((item) => item || '0');
+  const all = [
+    normalizedTop,
+    normalizedRight,
+    normalizedBottom,
+    normalizedLeft,
+  ];
+  if (all[0] === all[1] && all[0] === all[2] && all[0] === all[3]) {
+    return all[0];
   }
-  if (top === right && top === bottom && top === left) return top;
-  if (top === bottom && right === left) return `${top} ${right}`;
-  if (right === left) return `${top} ${right} ${bottom}`;
-  return `${top} ${right} ${bottom} ${left}`;
+  if (all[0] === all[2] && all[1] === all[3]) {
+    return `${all[0]} ${all[1]}`;
+  }
+  if (all[1] === all[3]) return `${all[0]} ${all[1]} ${all[2]}`;
+  return all.join(' ');
 };
 
 export const getSpacingValue = (

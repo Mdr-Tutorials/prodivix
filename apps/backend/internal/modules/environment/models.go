@@ -8,6 +8,7 @@ import (
 
 var (
 	ErrUnavailable      = errors.New("environment Secret store is unavailable")
+	ErrInvalid          = errors.New("execution environment is invalid")
 	ErrNotFound         = errors.New("execution environment not found")
 	ErrRevisionConflict = errors.New("execution environment revision conflict")
 	ErrPermissionDenied = errors.New("environment resolution permission denied")

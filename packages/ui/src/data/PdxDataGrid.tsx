@@ -1,6 +1,8 @@
 import './PdxDataGrid.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import type React from 'react';
+import { renderUnknownCellValue } from './renderUnknownCellValue';
 
 export interface PdxDataGridColumn<T = Record<string, unknown>> {
   key: string;
@@ -49,7 +51,7 @@ function PdxDataGrid<T extends Record<string, unknown>>({
 
   const fullClassName =
     `PdxDataGrid ${striped ? 'Striped' : ''} ${bordered ? 'Bordered' : ''} ${hoverable ? 'Hoverable' : ''} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   const getRowKey = (record: T, index: number) => {
     if (typeof rowKey === 'function') {
@@ -124,7 +126,7 @@ function PdxDataGrid<T extends Record<string, unknown>>({
               >
                 {column.render
                   ? column.render(value, record, index)
-                  : (value as React.ReactNode)}
+                  : renderUnknownCellValue(value)}
               </div>
             );
           })}

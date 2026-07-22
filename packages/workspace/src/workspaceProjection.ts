@@ -32,7 +32,8 @@ export type WorkspaceProjectionIssueCode =
   | 'WKS_PROJECTION_FILE_MISSING'
   | 'WKS_PROJECTION_JSON_INVALID'
   | 'WKS_PROJECTION_MANIFEST_INVALID'
-  | 'WKS_PROJECTION_DOCUMENT_MISSING';
+  | 'WKS_PROJECTION_DOCUMENT_MISSING'
+  | 'WKS_PROJECTION_PATH_CONFLICT';
 
 export type WorkspaceProjectionIssue = {
   code: WorkspaceProjectionIssueCode;
@@ -99,13 +100,25 @@ const toProdivixSourcePath = (path: string): string => {
 };
 
 const createSourceFileMap = (
-  files: WorkspaceSourceFile[]
+  files: WorkspaceSourceFile[],
+  issues: WorkspaceProjectionIssue[]
 ): Map<string, WorkspaceSourceFile> => {
   const filesByPath = new Map<string, WorkspaceSourceFile>();
   files.forEach((file) => {
     const normalized = normalizeSourcePath(file.path);
-    filesByPath.set(normalized, file);
-    filesByPath.set(toProdivixSourcePath(normalized), file);
+    const aliases = new Set([normalized, toProdivixSourcePath(normalized)]);
+    for (const alias of aliases) {
+      const existing = filesByPath.get(alias);
+      if (existing && existing !== file) {
+        issues.push({
+          code: 'WKS_PROJECTION_PATH_CONFLICT',
+          path: alias,
+          message: 'Workspace projection contains colliding source paths.',
+        });
+        continue;
+      }
+      filesByPath.set(alias, file);
+    }
   });
   return filesByPath;
 };
@@ -282,9 +295,34 @@ export const projectWorkspaceToProdivixFiles = (
     });
   });
 
+  const paths = new Set<string>();
+  const conflictingFile = files.find((file) => {
+    const path = normalizeSourcePath(file.path);
+    if (paths.has(path)) return true;
+    paths.add(path);
+    return false;
+  });
+  if (conflictingFile) {
+    return {
+      ok: false,
+      issues: [
+        {
+          code: 'WKS_PROJECTION_PATH_CONFLICT',
+          path: conflictingFile.path,
+          message: 'Workspace documents project to the same source path.',
+          ...(conflictingFile.documentId
+            ? { documentId: conflictingFile.documentId }
+            : {}),
+        },
+      ],
+    };
+  }
+
   return {
     ok: true,
-    files: files.sort((left, right) => left.path.localeCompare(right.path)),
+    files: files.sort((left, right) =>
+      left.path < right.path ? -1 : left.path > right.path ? 1 : 0
+    ),
   };
 };
 
@@ -292,7 +330,8 @@ export const readWorkspaceFromProdivixFiles = (
   files: WorkspaceSourceFile[]
 ): WorkspaceProjectionReadResult => {
   const issues: WorkspaceProjectionIssue[] = [];
-  const filesByPath = createSourceFileMap(files);
+  const filesByPath = createSourceFileMap(files, issues);
+  if (issues.length) return { ok: false, issues };
 
   const manifest = parseJsonFile<WorkspaceManifest>(
     filesByPath.get(WORKSPACE_MANIFEST_PATH),

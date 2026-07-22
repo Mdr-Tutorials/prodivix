@@ -114,7 +114,7 @@ export const readIsolatedServerFunctionSecretMaterial = (
     entries.some(
       ([field, material], index) =>
         !authorityPermissionId(field) ||
-        (index > 0 && entries[index - 1]![0].localeCompare(field) >= 0) ||
+        (index > 0 && entries[index - 1]![0] >= field) ||
         typeof material !== 'string' ||
         material.length < 1 ||
         utf8ByteLength(material) >
@@ -174,9 +174,7 @@ const readAuthorityPermissions = (
     permissions.some(
       (permission, index) =>
         index > 0 &&
-        (permissions[index - 1] as string).localeCompare(
-          permission as string
-        ) >= 0
+        (permissions[index - 1] as string) >= (permission as string)
     )
   )
     return undefined;

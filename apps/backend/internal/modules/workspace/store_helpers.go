@@ -1,13 +1,14 @@
 package workspace
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
-	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -305,7 +306,15 @@ func normalizeJSONDocument(payload json.RawMessage, fallback json.RawMessage) (j
 		return fallback, nil
 	}
 	var decoded any
-	if err := json.Unmarshal(payload, &decoded); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.UseNumber()
+	if err := decoder.Decode(&decoded); err != nil {
+		return nil, err
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return nil, errors.New("JSON document must contain exactly one value")
+		}
 		return nil, err
 	}
 	normalized, err := json.Marshal(decoded)
@@ -497,15 +506,13 @@ func validateWorkspaceCodeDocument(payload json.RawMessage) error {
 		return err
 	}
 	language, ok := document["language"].(string)
-	if !ok || strings.TrimSpace(language) == "" {
+	if !ok || strings.TrimSpace(language) == "" || language != strings.TrimSpace(language) {
 		return errors.New("code document language is required")
 	}
-	source, ok := document["source"].(string)
+	_, ok = document["source"].(string)
 	if !ok {
 		return errors.New("code document source must be a string")
 	}
-	document["language"] = strings.TrimSpace(language)
-	document["source"] = source
 	if metadata, exists := document["metadata"]; exists {
 		if _, ok := metadata.(map[string]any); !ok {
 			return errors.New("code document metadata must be an object")
@@ -517,13 +524,13 @@ func validateWorkspaceCodeDocument(payload json.RawMessage) error {
 func jsonBytesEqual(left json.RawMessage, right json.RawMessage) bool {
 	var leftValue any
 	var rightValue any
-	if err := json.Unmarshal(left, &leftValue); err != nil {
+	if err := decodeJSONValue(left, &leftValue); err != nil {
 		return false
 	}
-	if err := json.Unmarshal(right, &rightValue); err != nil {
+	if err := decodeJSONValue(right, &rightValue); err != nil {
 		return false
 	}
-	return reflect.DeepEqual(leftValue, rightValue)
+	return jsonDeepEqual(leftValue, rightValue)
 }
 
 func withStoreTimeout(ctx context.Context) (context.Context, context.CancelFunc) {

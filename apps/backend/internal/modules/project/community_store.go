@@ -37,10 +37,11 @@ func (store *ProjectStore) ListPublic(options CommunityListOptions) ([]Community
 	argIndex := 1
 
 	if keyword := strings.TrimSpace(options.Keyword); keyword != "" {
-		pattern := "%" + keyword + "%"
+		escapedKeyword := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(keyword)
+		pattern := "%" + escapedKeyword + "%"
 		clauses = append(
 			clauses,
-			fmt.Sprintf("(p.name ILIKE $%d OR p.description ILIKE $%d OR u.name ILIKE $%d)", argIndex, argIndex, argIndex),
+			fmt.Sprintf(`(p.name ILIKE $%d ESCAPE '\' OR p.description ILIKE $%d ESCAPE '\' OR u.name ILIKE $%d ESCAPE '\')`, argIndex, argIndex, argIndex),
 		)
 		args = append(args, pattern)
 		argIndex++

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { RotateCcw, Save } from 'lucide-react';
 import type { PIRComponentContract } from '@prodivix/pir';
 import type { WorkspaceComponentDefinitionSummary } from '@/editor/features/component/model/workspaceComponentAuthoringModel';
@@ -63,10 +63,37 @@ export function ComponentContractEditor({
   onSave,
 }: ComponentContractEditorProps) {
   const [draft, setDraft] = useState(definition.contract);
+  const [stale, setStale] = useState(false);
+  const documentIdRef = useRef(definition.documentId);
+  const acceptedContractSignatureRef = useRef(
+    JSON.stringify(definition.contract)
+  );
+  const definitionSignature = JSON.stringify(definition.contract);
 
   useEffect(() => {
-    setDraft(definition.contract);
-  }, [definition.contract, definition.documentId]);
+    if (documentIdRef.current !== definition.documentId) {
+      documentIdRef.current = definition.documentId;
+      acceptedContractSignatureRef.current = definitionSignature;
+      setDraft(definition.contract);
+      setStale(false);
+      return;
+    }
+    if (acceptedContractSignatureRef.current === definitionSignature) return;
+    const previousAcceptedSignature = acceptedContractSignatureRef.current;
+    acceptedContractSignatureRef.current = definitionSignature;
+    setDraft((current) => {
+      const currentSignature = JSON.stringify(current);
+      if (
+        currentSignature !== previousAcceptedSignature &&
+        currentSignature !== definitionSignature
+      ) {
+        setStale(true);
+        return current;
+      }
+      setStale(false);
+      return definition.contract;
+    });
+  }, [definition.contract, definition.documentId, definitionSignature]);
 
   const dirty = useMemo(
     () => JSON.stringify(draft) !== JSON.stringify(definition.contract),
@@ -99,7 +126,10 @@ export function ComponentContractEditor({
             type="button"
             className="inline-flex items-center gap-1.5 rounded-lg border border-(--border-subtle) bg-transparent px-3 py-2 text-xs hover:bg-(--bg-raised) disabled:cursor-not-allowed disabled:opacity-40"
             disabled={disabled || !dirty}
-            onClick={() => setDraft(definition.contract)}
+            onClick={() => {
+              setDraft(definition.contract);
+              setStale(false);
+            }}
           >
             <RotateCcw size={13} /> Revert
           </button>
@@ -117,6 +147,13 @@ export function ComponentContractEditor({
       {draftIssue && (
         <p className="m-0 rounded-lg border border-(--border-subtle) bg-(--bg-panel) px-3 py-2 text-xs text-(--text-secondary)">
           {draftIssue}
+        </p>
+      )}
+      {stale && (
+        <p className="m-0 rounded-lg border border-(--border-subtle) bg-(--bg-panel) px-3 py-2 text-xs text-(--text-secondary)">
+          The saved contract changed while this draft was being edited. Your
+          draft was preserved; review it before saving or revert to load the
+          latest contract.
         </p>
       )}
       {readonly && (

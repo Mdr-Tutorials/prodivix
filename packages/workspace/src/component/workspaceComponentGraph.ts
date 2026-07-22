@@ -434,10 +434,8 @@ const validateTargetsAndContracts = (
       });
       continue;
     }
-    const targetRead = decodeWorkspacePirDocument(targetWorkspaceDocument, {
-      workspaceId: snapshot.id,
-    });
-    if (targetRead.status !== 'valid') {
+    const target = decodedById.get(edge.targetDocumentId)?.document;
+    if (!target) {
       addIssue(issues, {
         ...issueBase,
         code: WORKSPACE_COMPONENT_GRAPH_ISSUE_CODES.targetInvalid,
@@ -446,7 +444,6 @@ const validateTargetsAndContracts = (
       });
       continue;
     }
-    const target = targetRead.decodedContent;
     if (!target.componentContract) {
       addIssue(issues, {
         ...issueBase,

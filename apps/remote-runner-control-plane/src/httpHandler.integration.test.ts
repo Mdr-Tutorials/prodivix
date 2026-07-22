@@ -25,6 +25,7 @@ import {
   REMOTE_EXECUTION_SERVER_AUTHORITY_FORMAT,
   REMOTE_EXECUTION_SECRET_ENVELOPE_ALGORITHM,
   REMOTE_EXECUTION_SECRET_ENVELOPE_FORMAT,
+  REMOTE_EXECUTION_MAXIMUM_LEASE_DURATION_MS,
 } from '@prodivix/runtime-remote';
 import {
   createRemoteExecutionHttpHandler,
@@ -192,6 +193,26 @@ describe('remote runner control-plane HTTP integration', () => {
     const response = await fetch(`${baseUrl}/healthz`);
     await expect(response.json()).resolves.toEqual({ status: 'ok' });
     expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('rejects worker lease durations above the policy bound', async () => {
+    const response = await fetch(`${baseUrl}/internal/v1/claims`, {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer worker-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        workerId: 'worker-1',
+        providerId: provider.id,
+        leaseDurationMs: REMOTE_EXECUTION_MAXIMUM_LEASE_DURATION_MS + 1,
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: { code: 'invalid-request' },
+    });
   });
 
   it('runs the versioned Remote client through the authenticated HTTP boundary', async () => {

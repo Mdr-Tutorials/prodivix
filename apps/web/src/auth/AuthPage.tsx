@@ -32,6 +32,7 @@ export const AuthPage = () => {
   const [mode, setMode] = useState<AuthMode>('login');
   const [isLoading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [registerForm, setRegisterForm] = useState({
     name: '',
@@ -50,6 +51,7 @@ export const AuthPage = () => {
 
   const submitLogin = async () => {
     setError(null);
+    setNotice(null);
     setLoading(true);
     try {
       const response = await authApi.login({
@@ -67,16 +69,21 @@ export const AuthPage = () => {
 
   const submitRegister = async () => {
     setError(null);
+    setNotice(null);
     setLoading(true);
     try {
-      const response = await authApi.register({
+      await authApi.register({
         name: registerForm.name.trim(),
         email: registerForm.email.trim(),
         password: registerForm.password,
         description: registerForm.description.trim(),
       });
-      setSession(response.token, response.user, response.expiresAt);
-      navigate('/profile');
+      setLoginForm((current) => ({
+        ...current,
+        email: registerForm.email.trim(),
+      }));
+      setMode('login');
+      setNotice(t('registration.accepted'));
     } catch (err) {
       setError(formatError(err));
     } finally {
@@ -271,12 +278,14 @@ export const AuthPage = () => {
           className="grid gap-3.5 rounded-[18px] border border-black/8 bg-(--bg-canvas) shadow-[0_18px_36px_rgba(0,0,0,0.12)] dark:border-(--border-default) dark:bg-(--bg-panel) dark:shadow-[0_24px_44px_rgba(0,0,0,0.55)]"
         >
           {error && <PdxMessage type="Danger" text={error} />}
+          {notice && <PdxMessage type="Success" text={notice} />}
           <PdxTabs
             items={tabs}
             activeKey={mode}
             onActiveKeyChange={(key) => {
               setMode(key as AuthMode);
               setError(null);
+              setNotice(null);
             }}
           />
           <div className="mt-1 flex items-center justify-between gap-3 text-xs text-(--text-muted)">

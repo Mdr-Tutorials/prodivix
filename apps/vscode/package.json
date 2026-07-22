@@ -11,7 +11,7 @@
     "Debuggers"
   ],
   "activationEvents": [],
-  "main": "./out/index.js",
+  "main": "./dist/extension.js",
   "contributes": {
     "languages": [
       {
@@ -23,7 +23,7 @@
         "extensions": [
           ".pir.json"
         ],
-        "configuration": "./language/pir.language-configuration.json"
+        "configuration": "./src/language/pir.language-configuration.json"
       }
     ],
     "commands": [
@@ -36,7 +36,7 @@
       {
         "type": "prodivix",
         "label": "Pdx Debug",
-        "program": "../../packages/vscode-debugger/lib/debugAdapter.js"
+        "program": "./dist/debugAdapter.js"
       }
     ]
   },

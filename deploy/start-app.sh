@@ -17,6 +17,7 @@ DEFAULT_POSTGRES_USER="postgres"
 DEFAULT_POSTGRES_DB="prodivix"
 DEFAULT_TOKEN_TTL="24h"
 DEFAULT_TZ="UTC"
+PLACEHOLDER_POSTGRES_PASSWORD="replace-with-a-random-password"
 
 ASSUME_YES="false"
 SKIP_PULL="false"
@@ -233,11 +234,20 @@ backend_port="$(prompt "Backend API port" "${current_backend_port:-$DEFAULT_BACK
 postgres_port="$(prompt "Postgres host bind" "${current_postgres_port:-$DEFAULT_POSTGRES_PORT}")"
 postgres_user="$(prompt "Postgres user" "${current_postgres_user:-$DEFAULT_POSTGRES_USER}")"
 
-if [[ -z "$current_postgres_password" || "$current_postgres_password" == "postgres" ]]; then
+if [[ -z "$current_postgres_password" || "$current_postgres_password" == "postgres" || "$current_postgres_password" == "$PLACEHOLDER_POSTGRES_PASSWORD" ]]; then
   generated_password="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32 || true)"
-  current_postgres_password="${generated_password:-change-me-$(date +%s)}"
+  if [[ ${#generated_password} -ne 32 ]]; then
+    echo "Could not generate a secure Postgres password." >&2
+    exit 1
+  fi
+  current_postgres_password="$generated_password"
 fi
 postgres_password="$(prompt_secret "Postgres password [hidden, press Enter to keep/generate]: " "$current_postgres_password")"
+if [[ ! "$postgres_password" =~ ^[A-Za-z0-9._~!@%+=:,/-]+$ ]]; then
+  echo "Postgres password contains characters that cannot be represented safely in the deployment .env file." >&2
+  echo "Use letters, digits, or one of . _ ~ ! @ % + = : , / -." >&2
+  exit 1
+fi
 
 postgres_db="$(prompt "Postgres database" "${current_postgres_db:-$DEFAULT_POSTGRES_DB}")"
 allowed_origins="$(prompt "Allowed browser origins" "$current_allowed_origins")"

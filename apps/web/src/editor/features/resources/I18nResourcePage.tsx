@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
 import { useEditorStore } from '@/editor/store/useEditorStore';
@@ -32,11 +32,66 @@ import {
   RESOURCE_ROOTS,
 } from './workspaceResourceDocuments';
 import {
+  createLatestResourceValuePersistenceController,
+  type LatestResourceValuePersistenceController,
+} from './latestResourceValuePersistence';
+import {
   createWorkspaceProjectConfigDocumentContent,
   type WorkspaceSnapshot,
 } from '@prodivix/workspace';
 
 const EMPTY_WORKSPACE_DOCUMENTS: WorkspaceSnapshot['docsById'] = {};
+
+const readCurrentI18nResourceValue = (): WorkspaceI18nResourceValue =>
+  buildI18nResourceValueFromWorkspace(
+    useEditorStore.getState().workspace?.docsById ?? EMPTY_WORKSPACE_DOCUMENTS
+  );
+
+const persistI18nResourceValue = async (
+  value: WorkspaceI18nResourceValue
+): Promise<void> => {
+  const editor = useEditorStore.getState();
+  const workspace = editor.workspace;
+  if (!workspace || editor.workspaceReadonly) {
+    throw new Error(
+      editor.workspaceReadonly
+        ? 'This Workspace is read-only.'
+        : 'No Workspace is loaded.'
+    );
+  }
+  const existing = getWorkspaceI18nResourceDocument(workspace.docsById);
+  if (existing) {
+    const command = createWorkspaceResourceValueUpdateCommand({
+      workspaceId: workspace.id,
+      document: existing,
+      value,
+      label: 'Update i18n resources',
+    });
+    if (!command) return;
+    const outcome = await dispatchWorkspaceAuthoringOperation({
+      workspace,
+      readonly: editor.workspaceReadonly,
+      operation: { kind: 'command', command },
+    });
+    if (outcome.status === 'rejected') throw new Error(outcome.message);
+    return;
+  }
+  const outcome = await dispatchWorkspaceVfsAuthoringIntent({
+    workspace,
+    readonly: editor.workspaceReadonly,
+    request: createWorkspaceResourceDocumentRequest({
+      workspaceRev: workspace.workspaceRev,
+      documentId: createWorkspaceResourceDocumentId(
+        'i18n_config',
+        RESOURCE_ROOTS.i18n
+      ),
+      path: RESOURCE_ROOTS.i18n,
+      type: 'project-config',
+      content: createWorkspaceProjectConfigDocumentContent(value),
+    }),
+  });
+  if (outcome.status === 'rejected') throw new Error(outcome.message);
+};
 
 type I18nResourcePageProps = {
   embedded?: boolean;
@@ -92,15 +147,28 @@ export function I18nResourcePage({ embedded = false }: I18nResourcePageProps) {
   const { t } = useTranslation('editor');
   const { projectId } = useParams();
   const workspace = useEditorStore((state) => state.workspace);
-  const workspaceReadonly = useEditorStore((state) => state.workspaceReadonly);
-  const workspaceId = workspace?.id;
-  const workspaceRev = workspace?.workspaceRev;
   const workspaceDocumentsById =
     workspace?.docsById ?? EMPTY_WORKSPACE_DOCUMENTS;
-  const resourceValue = useMemo(
+  const workspaceResourceValue = useMemo(
     () => buildI18nResourceValueFromWorkspace(workspaceDocumentsById),
     [workspaceDocumentsById]
   );
+  const [resourceValue, setResourceValue] = useState(workspaceResourceValue);
+  const persistenceControllerRef =
+    useRef<LatestResourceValuePersistenceController<WorkspaceI18nResourceValue> | null>(
+      null
+    );
+  if (persistenceControllerRef.current === null) {
+    persistenceControllerRef.current =
+      createLatestResourceValuePersistenceController<WorkspaceI18nResourceValue>(
+        {
+          initialValue: workspaceResourceValue,
+          persist: persistI18nResourceValue,
+          readExternal: readCurrentI18nResourceValue,
+          onValue: (value) => setResourceValue(value),
+        }
+      );
+  }
   const store = resourceValue.store;
   const reviewedMap = resourceValue.reviewedMap;
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -114,6 +182,12 @@ export function I18nResourcePage({ embedded = false }: I18nResourcePageProps) {
     createInitialSelection(projectId, resourceValue.store)
   );
   const fileInputId = 'resource-i18n-import-json';
+
+  useEffect(() => {
+    persistenceControllerRef.current?.syncExternal(workspaceResourceValue);
+  }, [workspaceResourceValue]);
+
+  useEffect(() => () => persistenceControllerRef.current?.dispose(), []);
 
   const locales = useMemo(() => Object.keys(store), [store]);
   const sourceNamespaces = useMemo(
@@ -181,50 +255,10 @@ export function I18nResourcePage({ embedded = false }: I18nResourcePageProps) {
     );
   }, [projectId, selection]);
 
-  const persistI18nResourceValue = async (
-    value: WorkspaceI18nResourceValue
-  ) => {
-    if (!workspace || workspaceReadonly || !workspaceId || !workspaceRev) {
-      return;
-    }
-    const existing = getWorkspaceI18nResourceDocument(workspaceDocumentsById);
-    if (existing) {
-      const command = createWorkspaceResourceValueUpdateCommand({
-        workspaceId,
-        document: existing,
-        value,
-        label: 'Update i18n resources',
-      });
-      if (!command) return;
-      const outcome = await dispatchWorkspaceAuthoringOperation({
-        workspace,
-        readonly: workspaceReadonly,
-        operation: { kind: 'command', command },
-      });
-      if (outcome.status === 'rejected') throw new Error(outcome.message);
-      return;
-    }
-    const outcome = await dispatchWorkspaceVfsAuthoringIntent({
-      workspace,
-      readonly: workspaceReadonly,
-      request: createWorkspaceResourceDocumentRequest({
-        workspaceRev,
-        documentId: createWorkspaceResourceDocumentId(
-          'i18n_config',
-          RESOURCE_ROOTS.i18n
-        ),
-        path: RESOURCE_ROOTS.i18n,
-        type: 'project-config',
-        content: createWorkspaceProjectConfigDocumentContent(value),
-      }),
-    });
-    if (outcome.status === 'rejected') throw new Error(outcome.message);
-  };
-
   const updateI18nResourceValue = (
     updater: (current: WorkspaceI18nResourceValue) => WorkspaceI18nResourceValue
   ) => {
-    void persistI18nResourceValue(updater(resourceValue));
+    persistenceControllerRef.current?.update(updater);
   };
 
   useEffect(() => {
@@ -406,22 +440,43 @@ export function I18nResourcePage({ embedded = false }: I18nResourcePageProps) {
   const importLocale = async (file: File) => {
     try {
       const raw = await file.text();
-      const parsed = JSON.parse(raw) as Record<string, Record<string, string>>;
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new TypeError('Expected a namespace object.');
+      }
+      const importedLocale: Record<string, Record<string, string>> = {};
+      for (const [namespace, values] of Object.entries(parsed)) {
+        if (!values || typeof values !== 'object' || Array.isArray(values)) {
+          throw new TypeError(
+            `Namespace ${namespace} must contain a string map.`
+          );
+        }
+        const entries = Object.entries(values);
+        if (entries.some(([, value]) => typeof value !== 'string')) {
+          throw new TypeError(
+            `Namespace ${namespace} must contain only string values.`
+          );
+        }
+        importedLocale[namespace] = Object.fromEntries(
+          entries as [string, string][]
+        );
+      }
       updateI18nResourceValue((current) => ({
         ...current,
         store: {
           ...current.store,
-          [selection.targetLocale]: Object.fromEntries(
-            Object.entries(parsed).map(([namespace, values]) => [
-              namespace,
-              Object.fromEntries(
-                Object.entries(values).map(([key, value]) => [
-                  key,
-                  typeof value === 'string' ? value : String(value ?? ''),
-                ])
-              ),
-            ])
-          ),
+          [selection.targetLocale]: {
+            ...(current.store[selection.targetLocale] ?? {}),
+            ...Object.fromEntries(
+              Object.entries(importedLocale).map(([namespace, values]) => [
+                namespace,
+                {
+                  ...(current.store[selection.targetLocale]?.[namespace] ?? {}),
+                  ...values,
+                },
+              ])
+            ),
+          },
         },
       }));
     } catch {

@@ -215,6 +215,18 @@ func marshalWorkspaceAssetDigestSet(digests map[string]struct{}) (string, error)
 	return string(payload), nil
 }
 
+func workspaceAssetDigestSetsEqual(left map[string]struct{}, right map[string]struct{}) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for digest := range left {
+		if _, exists := right[digest]; !exists {
+			return false
+		}
+	}
+	return true
+}
+
 // reconcileWorkspaceAssetBlobReferenceRetention runs inside the authoring
 // transaction. Current references clear the orphan clock; a durable
 // dereference starts a fresh retention window instead of deleting bytes.
@@ -233,6 +245,9 @@ func reconcileWorkspaceAssetBlobReferenceRetention(
 	currentDigests, err := workspaceAssetDocumentDigests(currentDocuments)
 	if err != nil {
 		return err
+	}
+	if workspaceAssetDigestSetsEqual(previousDigests, currentDigests) {
+		return nil
 	}
 	if len(currentDigests) > 0 {
 		currentJSON, err := marshalWorkspaceAssetDigestSet(currentDigests)

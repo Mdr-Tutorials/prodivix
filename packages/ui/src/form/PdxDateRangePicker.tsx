@@ -1,5 +1,6 @@
 import './PdxDateRangePicker.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import type React from 'react';
 
 interface PdxDateRangePickerSpecificProps {
@@ -52,7 +53,7 @@ function PdxDateRangePicker({
 }: PdxDateRangePickerProps) {
   const fullClassName =
     `PdxDateRangePicker ${size} ${state} ${disabled ? 'Disabled' : ''} ${readOnly ? 'ReadOnly' : ''} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   const handleStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const next = e.target.value;

@@ -1,5 +1,6 @@
 import './PdxBreadcrumb.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import { ChevronRight } from 'lucide-react';
 import type React from 'react';
 
@@ -26,13 +27,11 @@ function PdxBreadcrumb({
   dataAttributes = {},
 }: PdxBreadcrumbProps) {
   const fullClassName = `PdxBreadcrumb ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
-
   return (
     <nav
       aria-label="Breadcrumb"
       className={fullClassName}
-      {...dataProps}
+      {...getDataAttributes(dataAttributes)}
       id={id}
       style={style as React.CSSProperties}
     >

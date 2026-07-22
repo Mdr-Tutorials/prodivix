@@ -92,8 +92,11 @@ const isCanonicalId = (value: unknown): value is string =>
 const escapeJsonPointerSegment = (value: string) =>
   value.replace(/~/g, '~0').replace(/\//g, '~1');
 
+const compareText = (left: string, right: string): number =>
+  left < right ? -1 : left > right ? 1 : 0;
+
 const sortedEntries = <T>(record: Readonly<Record<string, T>>) =>
-  Object.entries(record).sort(([left], [right]) => left.localeCompare(right));
+  Object.entries(record).sort(([left], [right]) => compareText(left, right));
 
 const addIssue = (
   issues: IssueList,
@@ -355,9 +358,7 @@ const validateComponentContract = (
 };
 
 const validateGraph = (graph: PIRUiGraph, issues: IssueList) => {
-  const nodeIds = Object.keys(graph.nodesById).sort((left, right) =>
-    left.localeCompare(right)
-  );
+  const nodeIds = Object.keys(graph.nodesById).sort(compareText);
   const edgesByOwner = new Map<string, GraphEdge[]>(
     nodeIds.map((nodeId) => [nodeId, []])
   );
@@ -480,9 +481,29 @@ const validateGraph = (graph: PIRUiGraph, issues: IssueList) => {
   }
 
   const states = new Map<string, 'visiting' | 'visited'>();
-  const visitForCycles = (nodeId: string) => {
+  for (const nodeId of nodeIds) {
+    if (states.get(nodeId) !== undefined) continue;
+    const stack: Array<{
+      nodeId: string;
+      edgeIndex: number;
+      edges: readonly GraphEdge[];
+    }> = [
+      {
+        nodeId,
+        edgeIndex: 0,
+        edges: edgesByOwner.get(nodeId) ?? [],
+      },
+    ];
     states.set(nodeId, 'visiting');
-    for (const edge of edgesByOwner.get(nodeId) ?? []) {
+    while (stack.length > 0) {
+      const frame = stack[stack.length - 1]!;
+      const edge = frame.edges[frame.edgeIndex];
+      if (!edge) {
+        states.set(frame.nodeId, 'visited');
+        stack.pop();
+        continue;
+      }
+      frame.edgeIndex += 1;
       const childState = states.get(edge.childId);
       if (childState === 'visiting') {
         addIssue(
@@ -492,26 +513,27 @@ const validateGraph = (graph: PIRUiGraph, issues: IssueList) => {
           `Graph cycle detected at node "${edge.childId}".`
         );
       } else if (childState === undefined) {
-        visitForCycles(edge.childId);
+        states.set(edge.childId, 'visiting');
+        stack.push({
+          nodeId: edge.childId,
+          edgeIndex: 0,
+          edges: edgesByOwner.get(edge.childId) ?? [],
+        });
       }
     }
-    states.set(nodeId, 'visited');
-  };
-
-  for (const nodeId of nodeIds) {
-    if (states.get(nodeId) === undefined) visitForCycles(nodeId);
   }
 
   if (hasOwn(graph.nodesById, graph.rootId)) {
     const reachable = new Set<string>();
-    const visitReachable = (nodeId: string) => {
-      if (reachable.has(nodeId)) return;
+    const pending = [graph.rootId];
+    while (pending.length > 0) {
+      const nodeId = pending.pop()!;
+      if (reachable.has(nodeId)) continue;
       reachable.add(nodeId);
       for (const edge of edgesByOwner.get(nodeId) ?? []) {
-        visitReachable(edge.childId);
+        pending.push(edge.childId);
       }
-    };
-    visitReachable(graph.rootId);
+    }
 
     for (const nodeId of nodeIds) {
       if (reachable.has(nodeId)) continue;
@@ -675,9 +697,7 @@ const validateCollection = (
       'Collection must define an item region.'
     );
   }
-  for (const regionName of Object.keys(regions ?? {}).sort((left, right) =>
-    left.localeCompare(right)
-  )) {
+  for (const regionName of Object.keys(regions ?? {}).sort(compareText)) {
     if (COLLECTION_REGION_NAMES.has(regionName)) continue;
     addIssue(
       issues,
@@ -710,9 +730,7 @@ const validateComponentInstance = (
   ] as const;
 
   for (const [bindingKind, bindings] of bindingMaps) {
-    for (const memberId of Object.keys(bindings).sort((left, right) =>
-      left.localeCompare(right)
-    )) {
+    for (const memberId of Object.keys(bindings).sort(compareText)) {
       if (isNonEmptyString(memberId)) continue;
       addIssue(
         issues,
@@ -724,7 +742,7 @@ const validateComponentInstance = (
   }
 
   for (const regionName of Object.keys(graph.regionsById?.[nodeId] ?? {}).sort(
-    (left, right) => left.localeCompare(right)
+    compareText
   )) {
     if (isNonEmptyString(regionName)) continue;
     addIssue(

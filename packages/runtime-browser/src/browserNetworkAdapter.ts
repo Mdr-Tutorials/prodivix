@@ -58,17 +58,22 @@ export class BrowserNetworkRequestError extends Error {
 }
 
 const privateHostname = (hostname: string): boolean => {
-  const normalized = hostname.toLowerCase().replace(/^\[|\]$/gu, '');
+  const normalized = hostname
+    .toLowerCase()
+    .replace(/^\[|\]$/gu, '')
+    .replace(/\.$/u, '');
+  const ipv6Literal = normalized.includes(':');
   if (
     normalized === 'localhost' ||
     normalized.endsWith('.localhost') ||
     normalized.endsWith('.local') ||
     normalized === '::' ||
     normalized === '::1' ||
-    normalized.startsWith('::ffff:') ||
-    normalized.startsWith('fc') ||
-    normalized.startsWith('fd') ||
-    /^fe[89ab]/u.test(normalized)
+    (ipv6Literal &&
+      (normalized.startsWith('::ffff:') ||
+        normalized.startsWith('fc') ||
+        normalized.startsWith('fd') ||
+        /^fe[89ab]/u.test(normalized)))
   )
     return true;
   const octets = normalized.split('.');
@@ -118,6 +123,75 @@ const requestHeaders = (
     headers.set(normalizedName, value);
   }
   return headers;
+};
+
+const concatenateResponseChunks = (
+  chunks: readonly Uint8Array[],
+  byteLength: number
+): Uint8Array => {
+  const contents = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    contents.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return contents;
+};
+
+const readBoundedResponse = async (
+  response: Response,
+  maximumBytes: number
+): Promise<
+  Readonly<{
+    contents: Uint8Array;
+    responseBytes: number;
+    truncated: boolean;
+  }>
+> => {
+  if (!response.body) {
+    const contents = new Uint8Array(await response.arrayBuffer());
+    return Object.freeze({
+      contents:
+        contents.byteLength > maximumBytes
+          ? contents.slice(0, maximumBytes)
+          : contents,
+      responseBytes: contents.byteLength,
+      truncated: contents.byteLength > maximumBytes,
+    });
+  }
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let retainedBytes = 0;
+  let responseBytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    responseBytes += value.byteLength;
+    const remaining = maximumBytes - retainedBytes;
+    if (remaining > 0) {
+      const accepted =
+        value.byteLength > remaining ? value.slice(0, remaining) : value;
+      chunks.push(accepted);
+      retainedBytes += accepted.byteLength;
+    }
+    if (responseBytes > maximumBytes) {
+      try {
+        await reader.cancel();
+      } catch {
+        // The response is already rejected; cancellation is best effort.
+      }
+      return Object.freeze({
+        contents: concatenateResponseChunks(chunks, retainedBytes),
+        responseBytes,
+        truncated: true,
+      });
+    }
+  }
+  return Object.freeze({
+    contents: concatenateResponseChunks(chunks, retainedBytes),
+    responseBytes,
+    truncated: false,
+  });
 };
 
 /** Performs client-safe fetch while publishing metadata-only traces with origin-level URLs. */
@@ -173,6 +247,13 @@ export const createBrowserNetworkAdapter = (
           ...(request.correlation ? { correlation: request.correlation } : {}),
           ...(request.sourceTrace ? { sourceTrace: request.sourceTrace } : {}),
         });
+      const publishTrace = (value: ReturnType<typeof trace>): void => {
+        try {
+          options.publishTrace?.(value);
+        } catch {
+          // Trace observers cannot alter the network request outcome.
+        }
+      };
       const requestBytes = request.body
         ? new TextEncoder().encode(request.body).byteLength
         : 0;
@@ -187,25 +268,21 @@ export const createBrowserNetworkAdapter = (
           referrerPolicy: 'no-referrer',
           cache: 'no-store',
         });
-        const contents = new Uint8Array(await response.arrayBuffer());
-        const responseBytes = contents.byteLength;
-        const truncated = responseBytes > responseLimit;
-        const accepted = truncated
-          ? contents.slice(0, responseLimit)
-          : contents;
-        const text = new TextDecoder('utf-8', { fatal: true }).decode(accepted);
+        const { contents, responseBytes, truncated } =
+          await readBoundedResponse(response, responseLimit);
         const completedTrace = trace(now(), 'allowed', {
           status: response.status,
           requestBytes,
           responseBytes,
           ...(truncated ? { truncated: true } : {}),
         });
-        options.publishTrace?.(completedTrace);
+        publishTrace(completedTrace);
         if (truncated)
           throw new BrowserNetworkRequestError(
             'Browser Network response exceeded its configured limit.',
             completedTrace
           );
+        const text = new TextDecoder('utf-8', { fatal: true }).decode(contents);
         return Object.freeze({
           status: response.status,
           ok: response.ok,
@@ -215,7 +292,7 @@ export const createBrowserNetworkAdapter = (
       } catch (error) {
         if (error instanceof BrowserNetworkRequestError) throw error;
         const failedTrace = trace(now(), 'failed', { requestBytes });
-        options.publishTrace?.(failedTrace);
+        publishTrace(failedTrace);
         throw new BrowserNetworkRequestError(
           error instanceof Error
             ? error.message

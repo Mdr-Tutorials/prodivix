@@ -54,12 +54,11 @@ export const isCanonicalWorkspaceDocumentPath = (
   ) {
     return false;
   }
-  return value
-    .slice(1)
-    .split('/')
-    .every(
-      (segment) => segment.length > 0 && segment !== '.' && segment !== '..'
-    );
+  const segments = value.slice(1).split('/');
+  if (segments[0]?.toLocaleLowerCase('en-US') === '.prodivix') return false;
+  return segments.every(
+    (segment) => segment.length > 0 && segment !== '.' && segment !== '..'
+  );
 };
 
 const RFC3339_TIMESTAMP =

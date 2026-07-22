@@ -51,6 +51,11 @@ const DEFAULT_BUILD_COMMAND: ExecutableProjectCommand = Object.freeze({
   args: Object.freeze(['run', 'build']),
 });
 
+export const compareExecutableProjectText = (
+  left: string,
+  right: string
+): number => (left < right ? -1 : left > right ? 1 : 0);
+
 const createDefaultTestCommand = (
   reportFilePath: string
 ): ExecutableProjectCommand =>
@@ -163,7 +168,7 @@ const canonicalClone = (value: unknown, label: string, depth = 0): unknown => {
     throw new TypeError(`${label} must contain transport-safe values.`);
   }
   const entries = Object.entries(value).sort(([left], [right]) =>
-    left.localeCompare(right)
+    compareExecutableProjectText(left, right)
   );
   return Object.freeze(
     Object.fromEntries(
@@ -428,7 +433,7 @@ const normalizeDataMockCollections = (
         );
         return Object.freeze({ id, entityIdKey, initialEntities });
       })
-      .sort((left, right) => left.id.localeCompare(right.id))
+      .sort((left, right) => compareExecutableProjectText(left.id, right.id))
   );
 };
 
@@ -465,7 +470,7 @@ export const normalizeExecutableProjectDataMockProvision = (
           `Executable project emulated Data adapter ${index}`
         )
       )
-      .sort()
+      .sort(compareExecutableProjectText)
       .map((adapterId) => {
         if (adapterIds.has(adapterId))
           throw new TypeError(`Duplicate emulated Data adapter: ${adapterId}.`);
@@ -536,7 +541,7 @@ export const normalizeExecutableProjectDataMockProvision = (
           ),
         });
       })
-      .sort((left, right) => left.id.localeCompare(right.id))
+      .sort((left, right) => compareExecutableProjectText(left.id, right.id))
   );
   const provision = Object.freeze({
     fixtureSetId: normalizeBoundedIdentifier(
@@ -586,7 +591,7 @@ const cloneServerRuntimeMockValue = (
   if (!isPlainRecord(value))
     throw new TypeError(`${label} must contain transport-safe values.`);
   const entries = Object.entries(value)
-    .sort(([left], [right]) => left.localeCompare(right))
+    .sort(([left], [right]) => compareExecutableProjectText(left, right))
     .map(([key, entry]) => {
       if (serverRuntimeAuthorityKey(key))
         throw new TypeError(`${label} contains forbidden authority material.`);
@@ -683,7 +688,9 @@ export const normalizeExecutableProjectWorkspaceRef = (
               normalizeIdentifier(key, 'Workspace partition key'),
               normalizeIdentifier(revision, `Workspace partition ${key}`),
             ])
-            .sort(([left], [right]) => left.localeCompare(right))
+            .sort(([left], [right]) =>
+              compareExecutableProjectText(left, right)
+            )
         )
       )
     : undefined;
@@ -801,8 +808,8 @@ export const normalizeExecutableProjectEntrypoints = (
   });
   entrypoints.sort((left, right) =>
     left.kind === right.kind
-      ? left.path.localeCompare(right.path)
-      : left.kind.localeCompare(right.kind)
+      ? compareExecutableProjectText(left.path, right.path)
+      : compareExecutableProjectText(left.kind, right.kind)
   );
   return Object.freeze(entrypoints);
 };
@@ -828,7 +835,7 @@ const normalizeCapabilities = (
     seen.add(capability);
     return capability as ExecutionProviderCapability;
   });
-  capabilities.sort((left, right) => left.localeCompare(right));
+  capabilities.sort(compareExecutableProjectText);
   return Object.freeze(capabilities);
 };
 
@@ -897,7 +904,9 @@ export const normalizeExecutableProjectPublicBuildConfiguration = (
       classification: 'public-build' as const,
     });
   });
-  entries.sort((left, right) => left.name.localeCompare(right.name));
+  entries.sort((left, right) =>
+    compareExecutableProjectText(left.name, right.name)
+  );
   return Object.freeze(entries);
 };
 

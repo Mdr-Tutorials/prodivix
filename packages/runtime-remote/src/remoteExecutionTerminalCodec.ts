@@ -271,6 +271,7 @@ export const decodeRemoteExecutionTerminalReadResult = (
         output.terminalSessionId !== result.terminalSessionId ||
         output.executionId !== result.executionId ||
         output.cursor <= result.afterCursor ||
+        output.cursor > result.latestCursor ||
         (index > 0 && output.cursor <= result.records[index - 1]!.cursor)
     )
   )

@@ -33,6 +33,7 @@ export const useWorkspaceSaveIndicator = (input: {
   useEffect(() => {
     const workspaceId = input.workspaceId;
     let disposed = false;
+    let refreshSequence = 0;
     if (!workspaceId || isLocalProjectId(workspaceId)) {
       setEntries(EMPTY_ENTRIES);
       setReadFailed(false);
@@ -40,13 +41,14 @@ export const useWorkspaceSaveIndicator = (input: {
     }
 
     const refresh = async () => {
+      const sequence = ++refreshSequence;
       try {
         const next = await listWorkspaceOutboxEntries(workspaceId);
-        if (disposed) return;
+        if (disposed || sequence !== refreshSequence) return;
         setEntries(next);
         setReadFailed(false);
       } catch {
-        if (disposed) return;
+        if (disposed || sequence !== refreshSequence) return;
         setReadFailed(true);
       }
     };

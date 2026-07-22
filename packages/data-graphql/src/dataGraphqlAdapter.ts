@@ -1,4 +1,5 @@
 import {
+  compareDataText,
   createDataOperationIdempotencyKey,
   type DataConfigurationValue,
   type DataJsonObject,
@@ -207,7 +208,7 @@ const cloneBoundedJson = (text: string): DataJsonValue => {
     return Object.freeze(
       Object.fromEntries(
         Object.entries(value)
-          .sort(([left], [right]) => left.localeCompare(right))
+          .sort(([left], [right]) => compareDataText(left, right))
           .map(([key, entry]) => [key, visit(entry, depth + 1)])
       )
     );

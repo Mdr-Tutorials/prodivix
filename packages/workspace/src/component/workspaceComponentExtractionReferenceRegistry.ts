@@ -120,11 +120,15 @@ const validateContribution = (
   ) {
     const rewrite = contribution.rewrite;
     if (
-      !rewrite ||
+      !isRecord(rewrite) ||
+      !isRecord(rewrite.publicTarget) ||
+      !isCanonicalText(rewrite.publicTarget.componentDocumentId) ||
       rewrite.publicTarget.componentDocumentId !==
         context.targetComponentDocumentId ||
       !isCanonicalText(rewrite.documentId) ||
+      !Array.isArray(rewrite.forwardOps) ||
       rewrite.forwardOps.length === 0 ||
+      !Array.isArray(rewrite.reverseOps) ||
       rewrite.reverseOps.length === 0
     ) {
       return {

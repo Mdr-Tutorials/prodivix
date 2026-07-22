@@ -24,6 +24,8 @@ import {
   validateBlueprintComposition,
   type BlueprintCompositionIssue,
 } from './composition';
+import { buildLayoutPatternNode } from '@/editor/features/blueprint/layoutPatterns/registry';
+import type { BlueprintInspectorNodeView } from '@/editor/features/blueprint/editor/inspector/projection';
 
 export type PaletteItemSelection = Readonly<{
   variantProps?: Readonly<Record<string, unknown>>;
@@ -189,6 +191,41 @@ const instantiateSingleElement = (
   });
 };
 
+const instantiateLayoutPattern = (
+  doc: PIRDocument,
+  patternId: string,
+  selection: PaletteItemSelection
+): InstantiatedPaletteFragment | null => {
+  const root = buildLayoutPatternNode({
+    patternId,
+    createId: createNodeIdFactory(doc),
+    params: selection.variantProps ? { ...selection.variantProps } : undefined,
+  });
+  if (!root) return null;
+  const nodesById: Record<string, PIRElementNode> = {};
+  const childIdsById: Record<string, readonly string[]> = {};
+  const append = (node: BlueprintInspectorNodeView): void => {
+    nodesById[node.id] = createElementNode({
+      id: node.id,
+      type: node.type,
+      props: node.props,
+      style: node.style,
+      text: node.text,
+    });
+    const children = node.children ?? [];
+    childIdsById[node.id] = Object.freeze(children.map((child) => child.id));
+    children.forEach(append);
+  };
+  append(root);
+  return Object.freeze({
+    rootNodeIds: Object.freeze([root.id]),
+    primaryNodeId: root.id,
+    nodesById: Object.freeze(nodesById),
+    childIdsById: Object.freeze(childIdsById),
+    localToNodeId: Object.freeze({ root: root.id }),
+  });
+};
+
 const instantiateTemplate = (
   doc: PIRDocument,
   palette: PaletteQueryService,
@@ -280,8 +317,18 @@ export const instantiatePaletteItem = (
   palette: PaletteQueryService,
   recipe: PaletteItemCreationRecipe,
   selection: PaletteItemSelection = {}
-): InstantiatedPaletteFragment =>
-  recipe.kind === 'template'
+): InstantiatedPaletteFragment => {
+  const item = palette.getItemById(recipe.itemId);
+  const patternId =
+    recipe.kind === 'native' &&
+    typeof item?.defaultProps?.patternId === 'string'
+      ? item.defaultProps.patternId.trim()
+      : '';
+  const pattern = patternId
+    ? instantiateLayoutPattern(doc, patternId, selection)
+    : null;
+  if (pattern) return pattern;
+  return recipe.kind === 'template'
     ? instantiateTemplate(
         doc,
         palette,
@@ -298,6 +345,7 @@ export const instantiatePaletteItem = (
           : inferRuntimeType(recipe.itemId, palette),
         selection
       );
+};
 
 const findParentPlacement = (
   graph: PIRUiGraph,

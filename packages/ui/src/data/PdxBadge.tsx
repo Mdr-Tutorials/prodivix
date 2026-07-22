@@ -1,5 +1,6 @@
 import './PdxBadge.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import type React from 'react';
 
 interface PdxBadgeSpecificProps {
@@ -29,7 +30,7 @@ function PdxBadge({
   const showBadge = dot || count > 0 || showZero;
 
   const fullClassName = `PdxBadge ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   return (
     <span

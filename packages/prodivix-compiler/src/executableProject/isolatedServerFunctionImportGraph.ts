@@ -198,6 +198,27 @@ const parseStaticImports = (
   );
   const imports: ParsedStaticImport[] = [];
   let unsupported: string | undefined;
+  const isDynamicCodeReference = (node: ts.Expression): boolean => {
+    if (ts.isIdentifier(node)) {
+      return node.text === 'eval' || node.text === 'Function';
+    }
+    if (
+      ts.isPropertyAccessExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'globalThis'
+    ) {
+      return node.name.text === 'eval' || node.name.text === 'Function';
+    }
+    return Boolean(
+      ts.isElementAccessExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'globalThis' &&
+      node.argumentExpression &&
+      ts.isStringLiteralLike(node.argumentExpression) &&
+      (node.argumentExpression.text === 'eval' ||
+        node.argumentExpression.text === 'Function')
+    );
+  };
   const visit = (node: ts.Node): void => {
     if (unsupported) return;
     if (ts.isImportEqualsDeclaration(node) || ts.isImportTypeNode(node)) {
@@ -213,6 +234,14 @@ const parseStaticImports = (
     ) {
       unsupported =
         'Dynamic import and CommonJS require are not allowed in the isolated import graph.';
+      return;
+    }
+    if (
+      (ts.isCallExpression(node) && isDynamicCodeReference(node.expression)) ||
+      (ts.isNewExpression(node) && isDynamicCodeReference(node.expression))
+    ) {
+      unsupported =
+        'eval and Function constructors are not allowed in the isolated import graph.';
       return;
     }
     if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {

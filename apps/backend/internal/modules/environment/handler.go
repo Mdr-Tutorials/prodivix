@@ -71,8 +71,10 @@ func respondStoreError(c *gin.Context, err error) {
 		backendresponse.Error(c, http.StatusNotFound, "ENV-4004", "Execution environment was not found.")
 	case errors.Is(err, ErrRevisionConflict):
 		backendresponse.Error(c, http.StatusConflict, "ENV-4009", "Execution environment revision is stale.")
-	default:
+	case errors.Is(err, ErrInvalid):
 		backendresponse.Error(c, http.StatusUnprocessableEntity, "ENV-4001", "Execution environment is invalid.")
+	default:
+		backendresponse.Error(c, http.StatusServiceUnavailable, "ENV-5001", "Environment Secret store is unavailable.", backendresponse.WithRetryable(true))
 	}
 }
 

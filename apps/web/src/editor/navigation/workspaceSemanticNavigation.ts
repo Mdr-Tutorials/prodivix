@@ -110,6 +110,17 @@ export const navigateToWorkspaceSemanticTarget = (
   const navigationStore = useWorkspaceSemanticNavigationStore.getState();
   navigationStore.clearNavigation();
   const basePath = `/editor/project/${input.projectId}`;
+  const persistCodeSelection = (artifactId: string): void => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(
+        getCodeAuthoringSelectionStorageKey(input.projectId),
+        artifactId
+      );
+    } catch {
+      // Selection restoration is best-effort and must not block navigation.
+    }
+  };
   const finish = (
     route: string,
     location = resolution.location
@@ -131,12 +142,7 @@ export const navigateToWorkspaceSemanticTarget = (
       return unavailable('target-unavailable');
     }
     editor.setActiveDocumentId(artifactId);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(
-        getCodeAuthoringSelectionStorageKey(input.projectId),
-        artifactId
-      );
-    }
+    persistCodeSelection(artifactId);
     return finish(`${basePath}/code`);
   };
 
@@ -156,12 +162,7 @@ export const navigateToWorkspaceSemanticTarget = (
       return unavailable('source-unavailable');
     }
     editor.setActiveDocumentId(document.id);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(
-        getCodeAuthoringSelectionStorageKey(input.projectId),
-        document.id
-      );
-    }
+    persistCodeSelection(document.id);
     navigationStore.requestSurfaceNavigation({
       projectId: input.projectId,
       workspaceId: workspace.id,

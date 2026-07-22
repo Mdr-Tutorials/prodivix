@@ -5,6 +5,7 @@ import type {
   PIRTriggerBinding,
   PIRValueBinding,
 } from '@prodivix/pir';
+import { getNavigateLinkKind } from '@prodivix/router';
 import type { BlueprintInspectorNodeView, InspectorEventView } from './types';
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -163,16 +164,18 @@ const toDataScope = (
   next: Record<string, unknown> | undefined,
   current: PIRDataScope | undefined
 ): PIRDataScope | undefined => {
-  if (!next) return undefined;
-  const source = toBinding(next.source, current?.source);
-  const value = toBinding(next.value, current?.value);
-  const mock = toBinding(next.mock, current?.mock);
+  const nextData = next ?? {};
+  const source = toBinding(nextData.source, current?.source);
+  const value = toBinding(nextData.value, current?.value);
+  const mock = toBinding(nextData.mock, current?.mock);
   const extend = toBindingRecord(
-    isObject(next.extend) ? next.extend : undefined,
+    isObject(nextData.extend) ? nextData.extend : undefined,
     current?.extend
   );
   const pick =
-    typeof next.pick === 'string' && next.pick.trim() ? next.pick : undefined;
+    typeof nextData.pick === 'string' && nextData.pick.trim()
+      ? nextData.pick
+      : undefined;
   const result: PIRDataScope = {
     ...(source ? { source } : {}),
     ...(pick ? { pick } : {}),
@@ -226,7 +229,7 @@ const toEditableTrigger = (
   const destination =
     typeof event.params.to === 'string' ? event.params.to.trim() : '';
   if (!destination) return null;
-  if (/^https:\/\//i.test(destination)) {
+  if (getNavigateLinkKind(destination) === 'external') {
     return { kind: 'open-url', href: destination };
   }
   const routeId =
@@ -251,7 +254,18 @@ const toEvents = (
     }
     const trigger = event.trigger.trim();
     const binding = toEditableTrigger(event);
-    if (trigger && binding) result[trigger] = binding;
+    const occupiedByReadonlyBinding =
+      trigger !== key &&
+      current?.[trigger] !== undefined &&
+      isReadonlyTrigger(current[trigger]);
+    if (
+      trigger &&
+      binding &&
+      !occupiedByReadonlyBinding &&
+      result[trigger] === undefined
+    ) {
+      result[trigger] = binding;
+    }
   }
   for (const [key, binding] of Object.entries(current ?? {})) {
     if (isReadonlyTrigger(binding) && !result[key]) result[key] = binding;

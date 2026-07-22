@@ -119,6 +119,7 @@ export function CommunityDetailPage() {
         publishedPir?.issues[0]?.message ??
           t('detail.error.clone', 'Could not clone this project.')
       );
+      setCloning(false);
       return;
     }
     const fallbackName = t('card.untitled', 'Untitled');

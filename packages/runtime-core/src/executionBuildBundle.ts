@@ -126,7 +126,7 @@ export const decodeExecutionBuildBundle = (
       `Execution build bundle file ${index}`
     );
     const path = normalizeExecutableProjectPath(file.path);
-    if (path.localeCompare(previousPath) <= 0)
+    if (path <= previousPath)
       throw new TypeError(
         'Execution build bundle files must be uniquely sorted by path.'
       );

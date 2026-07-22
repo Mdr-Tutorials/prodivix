@@ -1,5 +1,6 @@
 import './PdxAnchorNavigation.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 
 export interface PdxAnchorItem {
   id: string;
@@ -29,13 +30,11 @@ function PdxAnchorNavigation({
 }: PdxAnchorNavigationProps) {
   const fullClassName =
     `PdxAnchorNavigation ${orientation} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
-
   return (
     <nav
       aria-label="On this page"
       className={fullClassName}
-      {...dataProps}
+      {...getDataAttributes(dataAttributes)}
       id={id}
       style={style as React.CSSProperties}
     >

@@ -527,6 +527,35 @@ func TestGatewayProxiesAuthorizedArtifactWithSafeHeaders(t *testing.T) {
 	}
 }
 
+func TestGatewayBlocksServiceCredentialEchoFromEnvelopeAndArtifact(t *testing.T) {
+	controlPlane := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		response.Header().Set("Content-Type", "application/json")
+		response.WriteHeader(http.StatusInternalServerError)
+		_, _ = io.WriteString(response, `{"error":"Bearer service-token"}`)
+	}))
+	defer controlPlane.Close()
+	store := &fakeGrantStore{
+		workspaceOwner: map[string]string{},
+		executionOwner: map[string]string{"execution-1": "user-1"},
+	}
+	handler := NewHandler(store, backendconfig.RemoteRunnerConfig{
+		BaseURL: controlPlane.URL, ClientToken: "service-token", Timeout: time.Second,
+	}, backendconfig.RemotePreviewHostConfig{})
+
+	envelopeRequest := httptest.NewRequest(http.MethodPost, "/api/remote-executions", bytes.NewReader(envelope("get", map[string]any{"executionId": "execution-1"})))
+	envelopeResponse := httptest.NewRecorder()
+	testRouter(handler, "user-1").ServeHTTP(envelopeResponse, envelopeRequest)
+	artifactRequest := httptest.NewRequest(http.MethodGet, "/api/remote-executions/execution-1/artifacts/artifact-1/content", nil)
+	artifactResponse := httptest.NewRecorder()
+	testRouter(handler, "user-1").ServeHTTP(artifactResponse, artifactRequest)
+
+	for _, response := range []*httptest.ResponseRecorder{envelopeResponse, artifactResponse} {
+		if response.Code != http.StatusBadGateway || strings.Contains(response.Body.String(), "service-token") {
+			t.Fatalf("credential-bearing response reached client: status=%d body=%s", response.Code, response.Body.String())
+		}
+	}
+}
+
 func writePreviewArtifactResolve(response http.ResponseWriter, artifact []byte, digest string) {
 	response.Header().Set("Content-Type", "application/json")
 	_, _ = fmt.Fprintf(response, `{"protocol":"prodivix.remote-execution","version":1,"messageId":"resolve","operation":"artifact.resolve","ok":true,"payload":{"executionId":"execution-1","providerId":"prodivix.remote.preview","artifact":{"artifactId":"preview-1","kind":"bundle","mediaType":"%s","size":%d,"digest":"%s","expiresAt":%d,"authorizationScope":"execution:execution-1","metadata":{"snapshotDigest":"sha256-%s","readiness":"ready","health":"healthy","entryFilePath":"index.html"}}}}`, executionPreviewBundleMediaType, len(artifact), digest, time.Now().Add(time.Minute).UnixMilli(), strings.Repeat("a", 64))

@@ -12,6 +12,7 @@ import {
   decodeRemoteExecutionTerminalSize,
   readRemoteExecutionSecretEnvelope,
   readRemoteExecutionServerAuthority,
+  REMOTE_EXECUTION_MAXIMUM_LEASE_DURATION_MS,
   RemoteExecutionTerminalBrokerError,
   type RemoteExecutionWorkerEvent,
 } from '@prodivix/runtime-remote';
@@ -102,6 +103,19 @@ const json = (
 
 const error = (response: ServerResponse, status: number, code: string): void =>
   json(response, status, { error: { code } });
+
+const decodePathSegment = (value: string): string => {
+  try {
+    return decodeURIComponent(value);
+  } catch (caught) {
+    if (caught instanceof URIError) {
+      throw Object.assign(new Error('path segment is invalid'), {
+        status: 400,
+      });
+    }
+    throw caught;
+  }
+};
 
 const bearer = (request: IncomingMessage): string | undefined => {
   const header = request.headers.authorization;
@@ -203,6 +217,13 @@ const positiveInteger = (value: unknown): number => {
   if (!Number.isSafeInteger(value) || (value as number) < 1)
     throw new TypeError('positive integer required');
   return value as number;
+};
+
+const leaseDuration = (value: unknown): number => {
+  const duration = positiveInteger(value);
+  if (duration > REMOTE_EXECUTION_MAXIMUM_LEASE_DURATION_MS)
+    throw new TypeError('lease duration exceeds policy');
+  return duration;
 };
 
 const nonNegativeInteger = (value: unknown): number => {
@@ -314,8 +335,8 @@ export const createRemoteExecutionHttpHandler = (
         if (!principal) return error(response, 403, 'forbidden');
         const artifact = await options.controlPlane.getArtifact({
           principal,
-          executionId: decodeURIComponent(artifactDownloadMatch[1]!),
-          artifactId: decodeURIComponent(artifactDownloadMatch[2]!),
+          executionId: decodePathSegment(artifactDownloadMatch[1]!),
+          artifactId: decodePathSegment(artifactDownloadMatch[2]!),
         });
         if (!artifact) return error(response, 404, 'not-found');
         response.writeHead(200, {
@@ -364,7 +385,7 @@ export const createRemoteExecutionHttpHandler = (
         );
         const result = await options.terminalBroker.open({
           principal,
-          executionId: decodeURIComponent(terminalOpenMatch[1]!),
+          executionId: decodePathSegment(terminalOpenMatch[1]!),
           size: decodeRemoteExecutionTerminalSize(body.size),
         });
         json(response, 201, result);
@@ -383,8 +404,8 @@ export const createRemoteExecutionHttpHandler = (
         record(await readJson(request, internalLimit), [], []);
         const result = await options.terminalBroker.resume({
           principal,
-          executionId: decodeURIComponent(terminalResumeMatch[1]!),
-          terminalSessionId: decodeURIComponent(terminalResumeMatch[2]!),
+          executionId: decodePathSegment(terminalResumeMatch[1]!),
+          terminalSessionId: decodePathSegment(terminalResumeMatch[2]!),
         });
         json(response, 200, result);
         return;
@@ -397,10 +418,8 @@ export const createRemoteExecutionHttpHandler = (
         if (!options.terminalBroker) return error(response, 503, 'unavailable');
         const accessToken = bearer(request);
         if (!accessToken) return error(response, 401, 'unauthorized');
-        const executionId = decodeURIComponent(terminalOperationMatch[1]!);
-        const terminalSessionId = decodeURIComponent(
-          terminalOperationMatch[2]!
-        );
+        const executionId = decodePathSegment(terminalOperationMatch[1]!);
+        const terminalSessionId = decodePathSegment(terminalOperationMatch[2]!);
         const operation = terminalOperationMatch[3]!;
         const base = { accessToken, executionId, terminalSessionId };
         const value = await readJson(request, internalLimit);
@@ -481,7 +500,7 @@ export const createRemoteExecutionHttpHandler = (
         const claim = await options.controlPlane.claimNext({
           workerId,
           providerId: text(body.providerId),
-          leaseDurationMs: positiveInteger(body.leaseDurationMs),
+          leaseDurationMs: leaseDuration(body.leaseDurationMs),
         });
         json(response, 200, { claim: claim ?? null });
         return;
@@ -506,14 +525,14 @@ export const createRemoteExecutionHttpHandler = (
         )
           return;
         const lease = await options.controlPlane.renewLease({
-          executionId: decodeURIComponent(leaseMatch[1]!),
+          executionId: decodePathSegment(leaseMatch[1]!),
           workerId,
           leaseToken: text(body.leaseToken),
-          leaseDurationMs: positiveInteger(body.leaseDurationMs),
+          leaseDurationMs: leaseDuration(body.leaseDurationMs),
         });
         if (!lease) return error(response, 409, 'lease-rejected');
         const cancellationRequested = await options.isCancellationRequested({
-          executionId: decodeURIComponent(leaseMatch[1]!),
+          executionId: decodePathSegment(leaseMatch[1]!),
           workerId,
           leaseToken: text(body.leaseToken),
         });
@@ -543,7 +562,7 @@ export const createRemoteExecutionHttpHandler = (
         const status = text(body.status);
         if (!statuses.has(status)) throw new TypeError('status is invalid');
         const execution = await options.controlPlane.transition({
-          executionId: decodeURIComponent(transitionMatch[1]!),
+          executionId: decodePathSegment(transitionMatch[1]!),
           workerId,
           leaseToken: text(body.leaseToken),
           status: status as Parameters<
@@ -556,11 +575,18 @@ export const createRemoteExecutionHttpHandler = (
           ['succeeded', 'failed', 'cancelled', 'timed-out'].includes(
             execution.record.status
           )
-        )
-          await options.terminalBroker?.closeExecution(
-            execution.record.executionId,
-            'execution-ended'
-          );
+        ) {
+          try {
+            await options.terminalBroker?.closeExecution(
+              execution.record.executionId,
+              'execution-ended'
+            );
+          } catch {
+            // The terminal sweeper owns eventual cleanup. A best-effort close
+            // must not turn an already committed terminal transition into a
+            // retryable worker failure.
+          }
+        }
         json(response, 200, { execution: execution.record });
         return;
       }
@@ -583,7 +609,7 @@ export const createRemoteExecutionHttpHandler = (
         )
           return;
         const snapshot = await options.resolveClaimedSnapshot({
-          executionId: decodeURIComponent(snapshotMatch[1]!),
+          executionId: decodePathSegment(snapshotMatch[1]!),
           workerId,
           leaseToken: text(body.leaseToken),
         });
@@ -613,7 +639,7 @@ export const createRemoteExecutionHttpHandler = (
           ))
         )
           return;
-        const executionId = decodeURIComponent(secretMatch[1]!);
+        const executionId = decodePathSegment(secretMatch[1]!);
         const envelope = readRemoteExecutionSecretEnvelope(
           await options.resolveClaimedServerFunctionSecrets({
             executionId,
@@ -659,7 +685,7 @@ export const createRemoteExecutionHttpHandler = (
         )
           return;
         const terminal = await options.terminalBroker.readWorkerCommands({
-          executionId: decodeURIComponent(terminalCommandsMatch[1]!),
+          executionId: decodePathSegment(terminalCommandsMatch[1]!),
           workerId,
           leaseToken: text(body.leaseToken),
           acknowledgedCommandCursor: nonNegativeInteger(
@@ -716,7 +742,7 @@ export const createRemoteExecutionHttpHandler = (
         )
           throw new TypeError('terminal output is invalid');
         const result = await options.terminalBroker.publishWorkerOutput({
-          executionId: decodeURIComponent(terminalOutputMatch[1]!),
+          executionId: decodePathSegment(terminalOutputMatch[1]!),
           workerId,
           leaseToken: text(body.leaseToken),
           terminalSessionId: text(body.terminalSessionId),
@@ -755,7 +781,7 @@ export const createRemoteExecutionHttpHandler = (
         if (!terminalCloseReasons.has(reason))
           throw new TypeError('terminal close reason is invalid');
         const closed = await options.terminalBroker.closeFromWorker({
-          executionId: decodeURIComponent(terminalCloseMatch[1]!),
+          executionId: decodePathSegment(terminalCloseMatch[1]!),
           workerId,
           leaseToken: text(body.leaseToken),
           terminalSessionId: text(body.terminalSessionId),
@@ -789,7 +815,7 @@ export const createRemoteExecutionHttpHandler = (
           ))
         )
           return;
-        const executionId = decodeURIComponent(eventsMatch[1]!);
+        const executionId = decodePathSegment(eventsMatch[1]!);
         const rawEvent = record(
           body.event,
           ['kind', 'log', 'diagnostic', 'trace'],
@@ -848,8 +874,8 @@ export const createRemoteExecutionHttpHandler = (
           ))
         )
           return;
-        const executionId = decodeURIComponent(artifactUploadMatch[1]!);
-        const artifactId = decodeURIComponent(artifactUploadMatch[2]!);
+        const executionId = decodePathSegment(artifactUploadMatch[1]!);
+        const artifactId = decodePathSegment(artifactUploadMatch[2]!);
         const size = Number(header(request, 'x-prodivix-artifact-size'));
         const expiresAt = Number(
           header(request, 'x-prodivix-artifact-expires-at')

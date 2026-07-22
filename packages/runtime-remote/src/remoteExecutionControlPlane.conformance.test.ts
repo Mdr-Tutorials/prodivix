@@ -11,6 +11,7 @@ import {
   createRemoteExecutionControlPlane,
   createScopeRemoteExecutionAuthorizationPolicy,
   createStaticRemoteExecutionProviderRouter,
+  REMOTE_EXECUTION_MAXIMUM_LEASE_DURATION_MS,
 } from './remoteExecutionControlPlane';
 import {
   createMemoryRemoteExecutionRepository,
@@ -117,6 +118,17 @@ const start = async (
   });
 
 describe('remote execution control plane conformance', () => {
+  it('rejects lease durations above the canonical safety bound', async () => {
+    const { controlPlane } = createHarness();
+    await expect(
+      controlPlane.claimNext({
+        workerId: 'worker-1',
+        providerId: remoteFixtureProvider.id,
+        leaseDurationMs: REMOTE_EXECUTION_MAXIMUM_LEASE_DURATION_MS + 1,
+      })
+    ).rejects.toThrow(/bounded positive integer/u);
+  });
+
   it('requires authorization and enforces operation scopes', async () => {
     const { controlPlane } = createHarness();
     await expect(

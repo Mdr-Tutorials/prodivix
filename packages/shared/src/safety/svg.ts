@@ -185,8 +185,10 @@ export const sanitizeSvgAttribute = (name: string, value: string) => {
 
 const sanitizeSvgElement = (
   source: Element,
-  document: XMLDocument
+  document: XMLDocument,
+  depth = 0
 ): Element | null => {
+  if (depth > 128) return null;
   const tagName = source.tagName;
   if (!SAFE_SVG_ELEMENTS.has(tagName)) return null;
 
@@ -208,7 +210,7 @@ const sanitizeSvgElement = (
     }
     if (child.nodeType !== Node.ELEMENT_NODE) return;
 
-    const safeChild = sanitizeSvgElement(child as Element, document);
+    const safeChild = sanitizeSvgElement(child as Element, document, depth + 1);
     if (safeChild) output.append(safeChild);
   });
 
@@ -223,16 +225,20 @@ export const sanitizeSvgMarkup = (markup: string) => {
     return null;
   }
 
-  const parser = new DOMParser();
-  const parsed = parser.parseFromString(markup, SVG_MIME_TYPE);
-  if (parsed.querySelector('parsererror')) return null;
+  try {
+    const parser = new DOMParser();
+    const parsed = parser.parseFromString(markup, SVG_MIME_TYPE);
+    if (parsed.querySelector('parsererror')) return null;
 
-  const root = parsed.documentElement;
-  if (!root || root.tagName !== 'svg') return null;
+    const root = parsed.documentElement;
+    if (!root || root.tagName !== 'svg') return null;
 
-  const safeRoot = sanitizeSvgElement(root, parsed);
-  if (!safeRoot) return null;
+    const safeRoot = sanitizeSvgElement(root, parsed);
+    if (!safeRoot) return null;
 
-  const serialized = new XMLSerializer().serializeToString(safeRoot);
-  return serialized.includes('<svg') ? serialized : null;
+    const serialized = new XMLSerializer().serializeToString(safeRoot);
+    return serialized.includes('<svg') ? serialized : null;
+  } catch {
+    return null;
+  }
 };

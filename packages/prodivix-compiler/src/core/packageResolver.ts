@@ -54,7 +54,8 @@ export const resolvePackageImport = (
   if (strategy === 'esm-sh') {
     const base = (options?.esmShBaseUrl ?? 'https://esm.sh').replace(/\/$/, '');
     const versionSuffix = packageVersion ? `@${packageVersion}` : '';
-    const importSource = `${base}/${source}${versionSuffix}`;
+    const packageSubpath = packageName ? source.slice(packageName.length) : '';
+    const importSource = `${base}/${packageName ?? source}${versionSuffix}${packageSubpath}`;
     return {
       importSource,
       packageName,

@@ -92,7 +92,7 @@ const decodeHtmlEntity = (entity: string) => {
   return HTML_ENTITIES[entity] ?? null;
 };
 
-const decodeHtmlEntities = (value: string) => {
+export const decodeHtmlEntities = (value: string) => {
   let output = '';
   let cursor = 0;
 

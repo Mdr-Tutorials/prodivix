@@ -184,6 +184,10 @@ export const NodeGraphEditorContent = () => {
     () => nodes.some((node) => Boolean(node.dragging)),
     [nodes]
   );
+  const canvasContentSignature = useMemo(
+    () => serializeDocument(toCanonicalNodeGraphDocument(nodes, edges)),
+    [edges, nodes]
+  );
 
   useWorkspaceHistoryShortcuts({
     workspaceId,
@@ -272,18 +276,43 @@ export const NodeGraphEditorContent = () => {
     ) {
       return;
     }
-    const preservePositions =
-      hydratedDocumentIdRef.current === activeGraphId ? nodes : [];
+    if (isDraggingNode) return;
+    const sameDocument = hydratedDocumentIdRef.current === activeGraphId;
     hydratedDocumentIdRef.current = activeGraphId;
     hydratedSignatureRef.current = activeContentSignature;
+    if (sameDocument && canvasContentSignature === activeContentSignature) {
+      return;
+    }
     suppressNextCommitRef.current = true;
-    setNodes(toNodeGraphCanvasNodes(activeContent, preservePositions));
-    setEdges(toNodeGraphCanvasEdges(activeContent));
+    setNodes((current) => {
+      const currentById = new Map(current.map((node) => [node.id, node]));
+      return toNodeGraphCanvasNodes(
+        activeContent,
+        sameDocument ? current : []
+      ).map((node) => {
+        const previous = currentById.get(node.id);
+        return previous
+          ? {
+              ...node,
+              selected: previous.selected,
+              dragging: previous.dragging,
+            }
+          : node;
+      });
+    });
+    setEdges((current) => {
+      const currentById = new Map(current.map((edge) => [edge.id, edge]));
+      return toNodeGraphCanvasEdges(activeContent).map((edge) => {
+        const previous = currentById.get(edge.id);
+        return previous ? { ...edge, selected: previous.selected } : edge;
+      });
+    });
   }, [
     activeContent,
     activeContentSignature,
     activeGraphId,
-    nodes,
+    canvasContentSignature,
+    isDraggingNode,
     setEdges,
     setNodes,
   ]);
@@ -383,7 +412,11 @@ export const NodeGraphEditorContent = () => {
       return;
     }
     const nodeId = targetRef.nodeId;
-    if (!nodes.some((node) => node.id === nodeId)) return;
+    if (!nodes.some((node) => node.id === nodeId)) {
+      setHint('The requested NodeGraph target no longer exists.');
+      consumeSemanticNavigation(semanticNavigationRequest.id);
+      return;
+    }
     setNodes((current) =>
       current.map((node) => ({ ...node, selected: node.id === nodeId }))
     );
@@ -395,6 +428,7 @@ export const NodeGraphEditorContent = () => {
     nodes,
     semanticNavigationRequest,
     setActiveDocumentId,
+    setHint,
     setNodes,
     workspaceId,
   ]);
@@ -534,11 +568,14 @@ export const NodeGraphEditorContent = () => {
 
   const onNodesChange = useCallback(
     (changes: Parameters<typeof applyNodeChangesWithGrouping>[0]) => {
-      setNodes((current) =>
-        applyNodeChangesWithGrouping(changes, current, confirmAttachToGroup)
+      const nextNodes = applyNodeChangesWithGrouping(
+        changes,
+        nodes,
+        confirmAttachToGroup
       );
+      setNodes(nextNodes);
     },
-    [confirmAttachToGroup, setNodes]
+    [confirmAttachToGroup, nodes, setNodes]
   );
 
   const closeMenu = useCallback(() => setMenu(null), []);
@@ -584,6 +621,7 @@ export const NodeGraphEditorContent = () => {
       noMatchingOutput: hintText.noMatchingOutput,
     },
     menu,
+    documentId: activeGraphId,
     nodes,
     setEdges,
     setHint,

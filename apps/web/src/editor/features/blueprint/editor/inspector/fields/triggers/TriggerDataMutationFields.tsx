@@ -72,15 +72,16 @@ export function TriggerDataMutationFields({
           }));
         }}
       >
-        {dataMutationOptions.length === 0 ? (
-          <option value="">No mutation available</option>
-        ) : (
-          dataMutationOptions.map((option) => (
-            <option key={option.id} value={operationIdentity(option.reference)}>
-              {option.label} · {option.detail}
-            </option>
-          ))
-        )}
+        <option value="" disabled={dataMutationOptions.length > 0}>
+          {dataMutationOptions.length === 0
+            ? 'No mutation available'
+            : 'Select a mutation'}
+        </option>
+        {dataMutationOptions.map((option) => (
+          <option key={option.id} value={operationIdentity(option.reference)}>
+            {option.label} · {option.detail}
+          </option>
+        ))}
       </select>
       <textarea
         className="min-h-24 w-full resize-y rounded-md border border-(--border-default) bg-transparent p-2 font-mono text-[10px] text-(--text-primary) outline-none"

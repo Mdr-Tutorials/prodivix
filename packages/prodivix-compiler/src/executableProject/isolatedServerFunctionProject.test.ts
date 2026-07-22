@@ -957,6 +957,9 @@ export const loadGreeting = async (input: { name: string }, context: { replacePr
       `/// <reference path="./helper.ts" />\nexport const loadGreeting = () => ({ kind: 'value', value: { message: 'x' } });`,
       `import { missing } from './missing.ts'; export const loadGreeting = () => ({ kind: 'value', value: { message: missing } });`,
       `import { escaped } from '../../outside.ts'; export const loadGreeting = () => ({ kind: 'value', value: { message: escaped } });`,
+      `export const loadGreeting = () => eval("import('node:fs')");`,
+      `export const loadGreeting = () => new Function("return import('node:fs')")();`,
+      `export const loadGreeting = () => globalThis['Function']("return import('node:fs')")();`,
     ];
     for (const source of sources) {
       const result = generateWorkspaceIsolatedServerFunctionExecutableProject(

@@ -16,6 +16,25 @@ type ApiRequestOptions = Omit<RequestInit, 'headers'> & {
   token?: string;
 };
 
+const unauthorizedListeners = new Set<() => void>();
+
+export const subscribeApiUnauthorized = (
+  listener: () => void
+): (() => void) => {
+  unauthorizedListeners.add(listener);
+  return () => unauthorizedListeners.delete(listener);
+};
+
+const publishApiUnauthorized = (): void => {
+  unauthorizedListeners.forEach((listener) => {
+    try {
+      listener();
+    } catch {
+      // Authentication observers cannot alter response decoding.
+    }
+  });
+};
+
 const createHeaders = ({
   defaultHeaders,
   headers,
@@ -32,12 +51,21 @@ const createHeaders = ({
   return mergedHeaders;
 };
 
-const parseResponsePayload = async (response: Response) => {
+const parseResponsePayload = async (response: Response): Promise<unknown> => {
   const contentType = response.headers.get('content-type') || '';
+  const source = await response.text();
+  if (!source) return undefined;
   if (contentType.includes('application/json')) {
-    return response.json();
+    try {
+      return JSON.parse(source) as unknown;
+    } catch (caught) {
+      if (!response.ok) return source;
+      throw new TypeError('API response contains invalid JSON.', {
+        cause: caught,
+      });
+    }
   }
-  return response.text();
+  return source;
 };
 
 const normalizeDomain = (
@@ -109,6 +137,7 @@ export const apiRequest = async <T>(
     ...requestInit,
     headers: createHeaders({ defaultHeaders, headers, token }),
   });
+  if (response.status === 401 && token) publishApiUnauthorized();
 
   if (response.status === 204) {
     return undefined as T;
@@ -131,6 +160,7 @@ export const apiBinaryRequest = async (
     ...requestInit,
     headers: createHeaders({ defaultHeaders, headers, token }),
   });
+  if (response.status === 401 && token) publishApiUnauthorized();
   if (!response.ok) {
     const payload = await parseResponsePayload(response);
     throw toApiError(payload, response);

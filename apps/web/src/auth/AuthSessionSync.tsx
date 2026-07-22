@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { authApi, ApiError } from './authApi';
 import { isAuthSessionExpired, useAuthStore } from './useAuthStore';
-import { isAbortError } from '@/infra/api';
+import { isAbortError, subscribeApiUnauthorized } from '@/infra/api';
 
 export const AuthSessionSync = () => {
   const token = useAuthStore((state) => state.token);
@@ -10,6 +10,8 @@ export const AuthSessionSync = () => {
   const setUser = useAuthStore((state) => state.setUser);
   const clearSession = useAuthStore((state) => state.clearSession);
 
+  useEffect(() => subscribeApiUnauthorized(clearSession), [clearSession]);
+
   useEffect(() => {
     if (!hasHydrated) return;
     if (!token || isAuthSessionExpired(expiresAt)) {
@@ -17,6 +19,13 @@ export const AuthSessionSync = () => {
       return;
     }
     let cancelled = false;
+    const expiresAtMs = expiresAt ? new Date(expiresAt).getTime() : NaN;
+    const expiryTimer = Number.isFinite(expiresAtMs)
+      ? window.setTimeout(
+          clearSession,
+          Math.min(Math.max(0, expiresAtMs - Date.now()) + 1, 2_147_483_647)
+        )
+      : undefined;
     const controller =
       typeof AbortController === 'function' ? new AbortController() : null;
     const requestOptions: RequestInit = controller
@@ -38,6 +47,7 @@ export const AuthSessionSync = () => {
 
     return () => {
       cancelled = true;
+      if (expiryTimer !== undefined) window.clearTimeout(expiryTimer);
       controller?.abort();
     };
   }, [clearSession, expiresAt, hasHydrated, setUser, token]);

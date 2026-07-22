@@ -2,9 +2,12 @@ package workspace
 
 import (
 	"encoding/json"
+	"math/big"
 	"reflect"
 	"strconv"
 )
+
+type canonicalJSONNumber string
 
 func jsonDeepEqual(left any, right any) bool {
 	return reflect.DeepEqual(normalizeJSONNumbers(left), normalizeJSONNumbers(right))
@@ -25,13 +28,10 @@ func normalizeJSONNumbers(value any) any {
 		}
 		return next
 	case json.Number:
-		if integer, err := typed.Int64(); err == nil {
-			return integer
+		if number, ok := new(big.Rat).SetString(typed.String()); ok {
+			return canonicalJSONNumber(number.RatString())
 		}
-		if float, err := typed.Float64(); err == nil {
-			return float
-		}
-		return typed.String()
+		return canonicalJSONNumber(typed.String())
 	default:
 		return typed
 	}

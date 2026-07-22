@@ -250,6 +250,23 @@ export const createRemoteExecutionTerminalBroker = (
     stored.commands.push(next);
   };
 
+  const enqueueCloseCommand = (
+    stored: StoredTerminal,
+    command: RemoteExecutionTerminalCommandInput
+  ): void => {
+    try {
+      enqueueCommand(stored, command);
+    } catch (error) {
+      if (
+        error instanceof RemoteExecutionTerminalBrokerError &&
+        error.code === 'quota-exceeded'
+      ) {
+        return;
+      }
+      throw error;
+    }
+  };
+
   const rotateAccess = (
     stored: StoredTerminal
   ): RemoteExecutionTerminalOpenResult => {
@@ -335,7 +352,7 @@ export const createRemoteExecutionTerminalBroker = (
             signal,
           }),
         requestClose: (reason) =>
-          enqueueCommand(stored, {
+          enqueueCloseCommand(stored, {
             kind: 'close',
             terminalSessionId,
             reason,

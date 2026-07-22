@@ -229,6 +229,7 @@ export const createBrowserProjectRuntimeHost = (
   let activeLease: BrowserProjectRuntimeHostLease | undefined;
   const ownerStopEpochs = new Map<string, number>();
   let serverOwnerId: string | undefined;
+  let serverProcess: BrowserProjectRuntimeHostProcess | undefined;
   let operationTail: Promise<void> = Promise.resolve();
   let disposed = false;
   let disposePromise: Promise<void> | undefined;
@@ -412,7 +413,6 @@ export const createBrowserProjectRuntimeHost = (
     }
     const label = spawnOptions.label?.trim() || command.command;
     let stopRequested = false;
-    if (spawnOptions.kind === 'server') serverOwnerId = ownerId;
     let hostProcess: BrowserProjectRuntimeHostProcess;
     const outputCompletion = consumeOutput(ownerId, label, process);
     hostProcess = Object.freeze({
@@ -425,14 +425,19 @@ export const createBrowserProjectRuntimeHost = (
       },
       wasStopRequested: () => stopRequested,
     });
+    if (spawnOptions.kind === 'server') {
+      serverOwnerId = ownerId;
+      serverProcess = hostProcess;
+    }
     const owned = processesByOwner.get(ownerId) ?? new Set();
     owned.add(hostProcess);
     processesByOwner.set(ownerId, owned);
     void process.exit.finally(() => {
       owned.delete(hostProcess);
       if (!owned.size) processesByOwner.delete(ownerId);
-      if (spawnOptions.kind === 'server' && serverOwnerId === ownerId) {
+      if (spawnOptions.kind === 'server' && serverProcess === hostProcess) {
         serverOwnerId = undefined;
+        serverProcess = undefined;
       }
     });
     return hostProcess;
@@ -608,6 +613,7 @@ export const createBrowserProjectRuntimeHost = (
         activeLease = undefined;
         ownerStopEpochs.clear();
         serverOwnerId = undefined;
+        serverProcess = undefined;
         listeners.clear();
       })();
       return disposePromise;

@@ -83,20 +83,21 @@ export function WorkspaceOutboxEffects() {
   const token = useAuthStore((state) => state.token);
   const workspaceId = useEditorStore((state) => state.workspace?.id);
   const runningRef = useRef(false);
+  const rerunRequestedRef = useRef(false);
   const retryTimerRef = useRef<number | undefined>(undefined);
 
   const run = useCallback(async () => {
-    if (
-      !token ||
-      !workspaceId ||
-      isLocalProjectId(workspaceId) ||
-      runningRef.current
-    ) {
+    if (!token || !workspaceId || isLocalProjectId(workspaceId)) {
+      return;
+    }
+    if (runningRef.current) {
+      rerunRequestedRef.current = true;
       return;
     }
     const resumeBase = useEditorStore.getState().workspace;
     if (!resumeBase || resumeBase.id !== workspaceId) return;
     runningRef.current = true;
+    rerunRequestedRef.current = false;
     if (retryTimerRef.current !== undefined) {
       window.clearTimeout(retryTimerRef.current);
       retryTimerRef.current = undefined;
@@ -174,6 +175,10 @@ export function WorkspaceOutboxEffects() {
       retryTimerRef.current = window.setTimeout(() => void run(), 5_000);
     } finally {
       runningRef.current = false;
+      if (rerunRequestedRef.current) {
+        rerunRequestedRef.current = false;
+        retryTimerRef.current = window.setTimeout(() => void run(), 0);
+      }
     }
   }, [token, workspaceId]);
 

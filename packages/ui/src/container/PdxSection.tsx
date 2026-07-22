@@ -1,5 +1,6 @@
 import './PdxSection.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import type React from 'react';
 
 interface PdxSectionSpecificProps {
@@ -25,21 +26,24 @@ function PdxSection({
   style,
   id,
   dataAttributes = {},
+  onClick,
+  as,
 }: PdxSectionProps) {
   const fullClassName =
     `PdxSection ${size} ${backgroundColor} Padding${padding} ${textAlign} ${fullWidth ? 'FullWidth' : ''} ${className || ''}`.trim();
 
-  const dataProps = { ...dataAttributes };
+  const Component = as ?? 'section';
 
   return (
-    <section
+    <Component
       className={fullClassName}
       style={style as React.CSSProperties}
       id={id}
-      {...dataProps}
+      onClick={onClick}
+      {...getDataAttributes(dataAttributes)}
     >
       {children}
-    </section>
+    </Component>
   );
 }
 

@@ -47,7 +47,7 @@ const server = createServer((request, response) => {
     response.end();
     return;
   }
-  const routeHeaders = headers[route] ?? {
+  const routeHeaders = headers[decodedRoute] ?? {
     'Cache-Control': 'no-store',
     'Cross-Origin-Resource-Policy': 'cross-origin',
     'Referrer-Policy': 'no-referrer',

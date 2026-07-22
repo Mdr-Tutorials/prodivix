@@ -21,7 +21,7 @@ type AnimationEditorTimelinePanelProps = {
   timelines: AnimationTimeline[];
   activeTimelineId?: string;
   cursorMs: number;
-  onCursorChange: (nextMs: number) => void;
+  onCursorChange: (nextMs: number, targetDurationMs?: number) => void;
   selectedTrack?: AnimationEditorTrackRef;
   onSelectTimeline?: (timelineId: string) => void;
   onSelectTrack?: (ref: AnimationEditorTrackRef) => void;
@@ -177,7 +177,7 @@ export const AnimationEditorTimelinePanel = ({
                         percent * maxDurationMs,
                         maxDurationMs
                       );
-                      onCursorChange(nextMs);
+                      onCursorChange(nextMs, row.durationMs);
                       onSelectTimeline?.(row.timelineId);
                       if (row.ref) {
                         onSelectTrack?.(row.ref);
@@ -209,7 +209,7 @@ export const AnimationEditorTimelinePanel = ({
                               style={{ left }}
                               onClick={(event) => {
                                 event.stopPropagation();
-                                onCursorChange(keyframe.atMs);
+                                onCursorChange(keyframe.atMs, row.durationMs);
                                 onSelectTimeline?.(row.timelineId);
                                 if (row.ref) {
                                   onSelectTrack?.(row.ref);

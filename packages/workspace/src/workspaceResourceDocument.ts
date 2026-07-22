@@ -219,6 +219,7 @@ export const createWorkspaceProjectConfigValueUpdateCommand = <TValue>(input: {
   ) {
     return null;
   }
+  if (valuesEqual(input.document.content.value, input.value)) return null;
   return {
     id: input.commandId,
     namespace: 'core.resource',

@@ -42,8 +42,18 @@ function PdxCard({
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!clickable || disabled || !onClick) return;
-    if (event.key !== 'Enter' && event.key !== ' ') return;
+    if (event.key === ' ') {
+      event.preventDefault();
+      return;
+    }
+    if (event.key === 'Enter' && !event.repeat) {
+      event.preventDefault();
+      event.currentTarget.click();
+    }
+  };
 
+  const handleKeyUp = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!clickable || disabled || !onClick || event.key !== ' ') return;
     event.preventDefault();
     event.currentTarget.click();
   };
@@ -55,6 +65,7 @@ function PdxCard({
       id={id}
       onClick={disabled ? undefined : onClick}
       onKeyDown={handleKeyDown}
+      onKeyUp={handleKeyUp}
       role={clickable ? 'button' : undefined}
       style={style as React.CSSProperties | undefined}
       tabIndex={clickable && !disabled ? 0 : undefined}

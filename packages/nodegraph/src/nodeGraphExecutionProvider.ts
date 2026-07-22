@@ -116,7 +116,7 @@ const toExecutionValue = (
     return Object.freeze(
       Object.fromEntries(
         Object.entries(value)
-          .sort(([left], [right]) => left.localeCompare(right))
+          .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
           .map(([key, entry]) => [
             key,
             toExecutionValue(entry, ancestors, depth + 1),
@@ -134,7 +134,7 @@ const toExecutionRecord = (
   Object.freeze(
     Object.fromEntries(
       Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
         .map(([key, entry]) => [key, toExecutionValue(entry)])
     )
   );

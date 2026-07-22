@@ -146,7 +146,7 @@ export const useNodeGraphWorkspaceDocumentManager = ({
           documentId: createdDocumentId,
           path: target.path,
           type: 'pir-graph',
-          content: cloneNodeGraphDocument(sourceContent),
+          content: cloneNodeGraphDocument(sourceContent, createdDocumentId),
         });
       });
       if (applied && createdDocumentId) {
@@ -237,7 +237,17 @@ export const useNodeGraphWorkspaceDocumentManager = ({
         selectNext();
         return;
       }
-      void persistCanvas(nodes, edges).finally(selectNext);
+      void persistCanvas(nodes, edges).then((persisted) => {
+        if (persisted) {
+          selectNext();
+          return;
+        }
+        setHint(
+          t('nodeGraph.hints.saveBeforeSwitch', {
+            defaultValue: 'Save the current graph before switching.',
+          })
+        );
+      });
     },
     [
       activeGraph?.status,
@@ -247,6 +257,8 @@ export const useNodeGraphWorkspaceDocumentManager = ({
       nodes,
       persistCanvas,
       setActiveDocumentId,
+      setHint,
+      t,
     ]
   );
 

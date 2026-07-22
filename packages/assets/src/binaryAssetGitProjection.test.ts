@@ -247,4 +247,29 @@ describe('binary asset Git projection', () => {
       );
     }
   });
+
+  it('rejects reserved repository paths in every path segment', () => {
+    for (const path of [
+      '/nested/.gitattributes',
+      '/public/CON.png',
+      '/public/trailing-dot.',
+      '/public/trailing-space ',
+    ]) {
+      const source = { ...sourceA, path };
+      const result = createBinaryAssetGitProjection({
+        workspaceId: 'workspace-1',
+        workspaceRevision: '42',
+        policy: { kind: 'binary' },
+        sources: [source],
+        materializations: [materializationA],
+      });
+
+      expect(result).toMatchObject({
+        status: 'blocked',
+        diagnostics: expect.arrayContaining([
+          expect.objectContaining({ code: 'AST-1204', path }),
+        ]),
+      });
+    }
+  });
 });

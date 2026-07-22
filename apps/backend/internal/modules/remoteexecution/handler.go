@@ -472,6 +472,17 @@ func (handler *Handler) remoteRequest(ctx context.Context, method string, path s
 	return handler.remoteRequestWithServerAuthority(ctx, method, path, body, contentType, nil)
 }
 
+func (handler *Handler) remoteResponseContainsAuthority(body []byte, additionalTokens ...string) bool {
+	tokens := append([]string{handler.clientToken}, additionalTokens...)
+	for _, token := range tokens {
+		token = strings.TrimSpace(token)
+		if token != "" && bytes.Contains(body, []byte(token)) {
+			return true
+		}
+	}
+	return false
+}
+
 func (handler *Handler) executionServerAuthority(userID string, session *backendauth.AuthenticatedSession, authority envelopeAuthority) (*executionServerAuthority, bool) {
 	if handler == nil || handler.now == nil || session == nil || authority.workspaceID == "" || authority.snapshotID == "" {
 		return nil, false
@@ -570,6 +581,10 @@ func (handler *Handler) HandleEnvelope(c *gin.Context) {
 	responseBody, err := readBoundedBody(response.Body)
 	if err != nil {
 		backendresponse.Error(c, http.StatusBadGateway, "EXE-5001", "Remote execution response exceeded its limit.")
+		return
+	}
+	if handler.remoteResponseContainsAuthority(responseBody) {
+		backendresponse.Error(c, http.StatusBadGateway, "EXE-5001", "Remote execution service returned an unsafe response.")
 		return
 	}
 	if envelope.Operation == "create" && response.StatusCode >= 200 && response.StatusCode < 300 {
@@ -790,16 +805,17 @@ func (handler *Handler) HandleArtifactContent(c *gin.Context) {
 		backendresponse.Error(c, http.StatusBadGateway, "EXE-5001", "Remote artifact exceeded its byte limit.")
 		return
 	}
-	contentType := response.Header.Get("Content-Type")
-	if contentType == "" {
-		contentType = "application/octet-stream"
+	if handler.remoteResponseContainsAuthority(body) {
+		backendresponse.Error(c, http.StatusBadGateway, "EXE-5001", "Remote artifact service returned an unsafe response.")
+		return
 	}
 	c.Header("Cache-Control", "private, no-store")
 	c.Header("X-Content-Type-Options", "nosniff")
+	c.Header("Content-Disposition", "attachment")
 	if etag := response.Header.Get("ETag"); etag != "" {
 		c.Header("ETag", etag)
 	}
-	c.Data(response.StatusCode, contentType, body)
+	c.Data(response.StatusCode, "application/octet-stream", body)
 }
 
 func canonicalArtifactDigest(response *http.Response, body []byte) (string, bool) {
@@ -837,7 +853,7 @@ func (handler *Handler) resolvePreviewArtifact(ctx context.Context, executionID 
 	}
 	defer response.Body.Close()
 	responseBody, err := io.ReadAll(io.LimitReader(response.Body, maximumPreviewHostResponseBytes+1))
-	if err != nil || int64(len(responseBody)) > maximumPreviewHostResponseBytes || response.StatusCode != http.StatusOK {
+	if err != nil || int64(len(responseBody)) > maximumPreviewHostResponseBytes || response.StatusCode != http.StatusOK || handler.remoteResponseContainsAuthority(responseBody) {
 		return nil, errors.New("artifact descriptor is unavailable")
 	}
 	var resolved artifactResolveResponse
@@ -895,7 +911,7 @@ func (handler *Handler) HandlePreviewSession(c *gin.Context) {
 	}
 	defer artifactResponse.Body.Close()
 	artifactBody, err := readBoundedBody(artifactResponse.Body)
-	if err != nil || artifactResponse.StatusCode != http.StatusOK || !previewBundleContentType(artifactResponse) {
+	if err != nil || artifactResponse.StatusCode != http.StatusOK || !previewBundleContentType(artifactResponse) || handler.remoteResponseContainsAuthority(artifactBody) {
 		backendresponse.Error(c, http.StatusBadGateway, "EXE-5001", "Remote Preview artifact is unavailable or invalid.")
 		return
 	}
@@ -922,7 +938,7 @@ func (handler *Handler) HandlePreviewSession(c *gin.Context) {
 	}
 	defer previewResponse.Body.Close()
 	responseBody, err := io.ReadAll(io.LimitReader(previewResponse.Body, maximumPreviewHostResponseBytes+1))
-	if err != nil || int64(len(responseBody)) > maximumPreviewHostResponseBytes || previewResponse.StatusCode != http.StatusCreated {
+	if err != nil || int64(len(responseBody)) > maximumPreviewHostResponseBytes || previewResponse.StatusCode != http.StatusCreated || handler.remoteResponseContainsAuthority(responseBody, handler.previewToken) {
 		backendresponse.Error(c, http.StatusBadGateway, "EXE-5001", "Remote Preview Host rejected the artifact.")
 		return
 	}

@@ -95,8 +95,14 @@ export const createRouteRuntimeCodeSlotProvider = (
 ): CodeSlotProvider => {
   const slots: CodeSlotContract[] = [];
   const bindings: CodeSlotBindingProjection[] = [];
+  const routes = [
+    ...flattenRouteManifest(manifest),
+    ...Object.values(manifest.modules ?? {}).flatMap((module) =>
+      flattenRouteManifest(module.root)
+    ),
+  ];
 
-  for (const route of flattenRouteManifest(manifest)) {
+  for (const route of routes) {
     for (const descriptor of ROUTE_RUNTIME_SLOTS) {
       const slot = createSlot(route.id, descriptor);
       slots.push(slot);
@@ -120,7 +126,7 @@ export const createRouteRuntimeCodeSlotProvider = (
     bindings.map((projection) => [projection.binding.slotId, projection])
   );
   const routeIdBySlotId = new Map<string, string>();
-  flattenRouteManifest(manifest).forEach((route) => {
+  routes.forEach((route) => {
     ROUTE_RUNTIME_SLOTS.forEach(({ key }) => {
       routeIdBySlotId.set(
         createRouteRuntimeCodeSlotId(route.id, key),

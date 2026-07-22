@@ -114,6 +114,8 @@ export const FEEDBACK_GROUP: ComponentGroup = {
       id: 'message',
       name: 'Message',
       preview: <PdxMessage text="Saved" type="Success" />,
+      statusProp: 'type',
+      statusLabel: 'Type',
       statusOptions: MESSAGE_TYPES.map((status) => ({
         id: status,
         label: status,
@@ -143,6 +145,8 @@ export const FEEDBACK_GROUP: ComponentGroup = {
           type="Info"
         />
       ),
+      statusProp: 'type',
+      statusLabel: 'Type',
       statusOptions: NOTIFICATION_TYPES.map((status) => ({
         id: status,
         label: status,

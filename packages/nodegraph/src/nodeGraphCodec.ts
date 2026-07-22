@@ -357,6 +357,7 @@ export const decodeNodeGraphDocument = (
 
   const nodes: NodeGraphNode[] = [];
   const nodeIds = new Set<string>();
+  const executorSlotIds = new Set<string>();
   value.nodes.forEach((candidate, index) => {
     const node = decodeNode(candidate, index, issues);
     if (!node) return;
@@ -367,6 +368,15 @@ export const decodeNodeGraphDocument = (
       });
     }
     nodeIds.add(node.id);
+    if (node.executor) {
+      if (executorSlotIds.has(node.executor.slotId)) {
+        issues.push({
+          path: `/nodes/${index}/executor/slotId`,
+          message: `Duplicate executor slot id: ${node.executor.slotId}`,
+        });
+      }
+      executorSlotIds.add(node.executor.slotId);
+    }
     nodes.push(node);
   });
   const nodesById = new Map(nodes.map((node) => [node.id, node]));

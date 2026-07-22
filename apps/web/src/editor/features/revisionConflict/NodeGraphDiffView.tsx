@@ -467,7 +467,10 @@ export function NodeGraphDiffView({
     () => validateNodeGraphDiffPresentation(nodes, edges),
     [edges, nodes]
   );
-  const summary = useMemo(() => summarizeNodeGraphDiff(nodes), [nodes]);
+  const summary = useMemo(
+    () => summarizeNodeGraphDiff(nodes, edges),
+    [edges, nodes]
+  );
   const flowNodes = useMemo<NodeGraphDiffFlowNode[]>(
     () =>
       nodes.map((presentation) => ({

@@ -1,5 +1,6 @@
 import './PdxTree.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type React from 'react';
@@ -119,7 +120,7 @@ function PdxTree({
   };
 
   const fullClassName = `PdxTree ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   return (
     <div

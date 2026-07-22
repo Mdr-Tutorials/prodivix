@@ -605,7 +605,10 @@ const validateRuntimePage = (
 };
 
 const privateHostname = (hostname: string): boolean => {
-  const normalized = hostname.toLowerCase().replace(/^\[|\]$/gu, '');
+  const normalized = hostname
+    .toLowerCase()
+    .replace(/^\[|\]$/gu, '')
+    .replace(/\.+$/u, '');
   if (
     normalized === 'localhost' || normalized.endsWith('.localhost') ||
     normalized.endsWith('.local') || normalized === '::' || normalized === '::1' ||
@@ -1456,10 +1459,14 @@ const invokeLiveHttp = async (input: Readonly<{
     return invokeRemoteDataGateway(input);
   if (input.document.source.runtimeZone !== 'client')
     throw new DataRuntimeFailure('DATA_STANDALONE_RUNTIME_ZONE_UNAVAILABLE');
-  if (input.document.source.configurationByKey.authorization)
-    literalConfiguration(input.document.source.configurationByKey.authorization);
-  if (input.operation.configurationByKey.authorization)
-    literalConfiguration(input.operation.configurationByKey.authorization);
+  const authorization = input.operation.configurationByKey.authorization ??
+    input.document.source.configurationByKey.authorization;
+  if (authorization)
+    throw new DataRuntimeFailure(
+      authorization.kind === 'environment-ref' || authorization.kind === 'secret-ref'
+        ? 'DATA_STANDALONE_ENVIRONMENT_UNAVAILABLE'
+        : 'DATA_HTTP_CONFIGURATION_INVALID'
+    );
   const baseUrl = literalConfigurationString(input.document.source.configurationByKey.baseUrl);
   const method = literalConfigurationString(input.operation.configurationByKey.method).toUpperCase();
   const path = literalConfigurationString(input.operation.configurationByKey.path);

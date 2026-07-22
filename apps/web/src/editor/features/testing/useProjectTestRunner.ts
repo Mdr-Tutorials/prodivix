@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CompileDiagnostic } from '@prodivix/prodivix-compiler';
 import type { ExecutionJobStatus } from '@prodivix/runtime-core';
 import type { WorkspaceSnapshot } from '@prodivix/workspace';
@@ -38,6 +38,9 @@ export const useProjectTestRunner = (
   const [provider, setProvider] =
     useState<ProjectTestExecutionProvider>('browser');
   const [target, setTarget] = useState<'react-vite' | 'vue-vite'>('react-vite');
+  const preflightAbortControllerRef = useRef<AbortController | undefined>(
+    undefined
+  );
   const presentation = useMemo(
     () => createProjectTestReportPresentation(session),
     [session]
@@ -59,13 +62,22 @@ export const useProjectTestRunner = (
   }, [session]);
 
   useEffect(() => {
+    preflightAbortControllerRef.current?.abort();
+    preflightAbortControllerRef.current = undefined;
     setPreflightStatus('idle');
     setPreflightDiagnostics(Object.freeze([]));
     setPreflightMessage(undefined);
+    return () => {
+      preflightAbortControllerRef.current?.abort();
+      preflightAbortControllerRef.current = undefined;
+    };
   }, [workspace?.id]);
 
   const run = useCallback(async () => {
     if (!workspace) return;
+    preflightAbortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    preflightAbortControllerRef.current = abortController;
     setPreflightStatus('compiling');
     setPreflightDiagnostics(Object.freeze([]));
     setPreflightMessage(undefined);
@@ -73,7 +85,9 @@ export const useProjectTestRunner = (
       const assetMaterializations = await materializeWorkspaceBinaryAssets({
         workspace,
         token,
+        signal: abortController.signal,
       });
+      if (abortController.signal.aborted) return;
       const plan = createProjectTestExecutionPlan(workspace, {
         assetMaterializations,
         target,
@@ -88,20 +102,29 @@ export const useProjectTestRunner = (
         );
         return;
       }
+      if (abortController.signal.aborted) return;
       await startProjectTests(plan.snapshot, plan.request, {
         provider,
         accessToken: token,
       });
-      setPreflightStatus('idle');
+      if (!abortController.signal.aborted) setPreflightStatus('idle');
     } catch (error) {
+      if (abortController.signal.aborted) return;
       setPreflightStatus('blocked');
       setPreflightMessage(
         error instanceof Error ? error.message : String(error)
       );
+    } finally {
+      if (preflightAbortControllerRef.current === abortController) {
+        preflightAbortControllerRef.current = undefined;
+      }
     }
   }, [provider, target, token, workspace]);
 
   const stop = useCallback(async () => {
+    preflightAbortControllerRef.current?.abort();
+    preflightAbortControllerRef.current = undefined;
+    setPreflightStatus('idle');
     await executionSessionCoordinator.cancel(sessionId, {
       reason: 'Workspace test execution stopped by the user.',
     });
@@ -110,7 +133,7 @@ export const useProjectTestRunner = (
   const status: ProjectTestRunnerStatus =
     preflightStatus !== 'idle' ? preflightStatus : (session?.status ?? 'idle');
 
-  return Object.freeze({
+  return {
     sessionId,
     session,
     status,
@@ -129,5 +152,5 @@ export const useProjectTestRunner = (
     remoteAvailable: Boolean(token?.trim()),
     run,
     stop,
-  });
+  };
 };

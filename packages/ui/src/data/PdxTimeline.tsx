@@ -1,5 +1,6 @@
 import './PdxTimeline.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import type React from 'react';
 
 export interface PdxTimelineItem {
@@ -24,7 +25,7 @@ function PdxTimeline({
   dataAttributes = {},
 }: PdxTimelineProps) {
   const fullClassName = `PdxTimeline ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   return (
     <ol

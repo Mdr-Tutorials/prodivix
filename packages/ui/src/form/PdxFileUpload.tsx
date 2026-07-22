@@ -1,5 +1,6 @@
 import './PdxFileUpload.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import { FileText, Upload, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type React from 'react';
@@ -86,7 +87,7 @@ function PdxFileUpload({
 
   const fullClassName =
     `PdxFileUpload ${disabled ? 'Disabled' : ''} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   return (
     <div

@@ -180,7 +180,11 @@ export const createPreviewHttpHandler = (
   const defaultTtlMs = options.defaultTtlMs ?? 10 * 60 * 1_000;
   if (!Number.isSafeInteger(maximumUploadBytes) || maximumUploadBytes < 1)
     throw new TypeError('Preview upload limit must be a positive integer.');
-  if (!Number.isSafeInteger(defaultTtlMs) || defaultTtlMs < 1_000)
+  if (
+    !Number.isSafeInteger(defaultTtlMs) ||
+    defaultTtlMs < 1_000 ||
+    defaultTtlMs % 1_000 !== 0
+  )
     throw new TypeError('Preview default TTL must be at least one second.');
   return async (
     request: IncomingMessage,

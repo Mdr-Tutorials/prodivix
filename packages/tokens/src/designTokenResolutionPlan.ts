@@ -17,14 +17,44 @@ const compareText = (left: string, right: string): number =>
 const expandSources = (
   sources: readonly DesignTokenResolverSource[],
   setsByName: ReadonlyMap<string, DesignTokenResolverSet>,
-  output: DesignTokenResolverSource[]
+  output: DesignTokenResolverSource[],
+  issues: DesignTokenResolutionIssue[],
+  path: string,
+  visiting = new Set<string>()
 ): void => {
-  sources.forEach((source) => {
+  sources.forEach((source, index) => {
     if (source.kind === 'reference' && source.reference.target.kind === 'set') {
-      const set = setsByName.get(
-        normalizeInputName(source.reference.target.setName)
+      const setName = normalizeInputName(source.reference.target.setName);
+      const set = setsByName.get(setName);
+      if (!set) {
+        issues.push(
+          Object.freeze({
+            code: DESIGN_TOKEN_RESOLUTION_ISSUE_CODES.referenceMissing,
+            path: `${path}/${index}`,
+            message: `Set ${source.reference.target.setName} does not exist.`,
+          })
+        );
+        return;
+      }
+      if (visiting.has(setName)) {
+        issues.push(
+          Object.freeze({
+            code: DESIGN_TOKEN_RESOLUTION_ISSUE_CODES.referenceCycle,
+            path: `${path}/${index}`,
+            message: `Set reference ${set.name} forms a cycle.`,
+          })
+        );
+        return;
+      }
+      const nextVisiting = new Set(visiting).add(setName);
+      expandSources(
+        set.sources,
+        setsByName,
+        output,
+        issues,
+        `/sets/${set.name}/sources`,
+        nextVisiting
       );
-      if (set) expandSources(set.sources, setsByName, output);
       return;
     }
     output.push(source);
@@ -132,7 +162,13 @@ export const createDesignTokenResolutionPlan = (
   document.resolutionOrder.forEach((entry) => {
     const sources: DesignTokenResolverSource[] = [];
     if (entry.kind === 'set') {
-      expandSources(entry.definition.sources, setsByName, sources);
+      expandSources(
+        entry.definition.sources,
+        setsByName,
+        sources,
+        issues,
+        `/resolutionOrder/${entry.name}/sources`
+      );
       sources.forEach((source) =>
         orderedSources.push(
           Object.freeze({
@@ -145,12 +181,28 @@ export const createDesignTokenResolutionPlan = (
       );
       return;
     }
-    const contextName = selection[entry.name];
+    const contextName =
+      selection[entry.name] ?? selection[entry.definition.name];
     const context = entry.definition.contexts.find(
       (candidate) => candidate.name === contextName
     );
-    if (!context) return;
-    expandSources(context.sources, setsByName, sources);
+    if (!context) {
+      issues.push(
+        Object.freeze({
+          code: DESIGN_TOKEN_RESOLUTION_ISSUE_CODES.invalidContext,
+          path: `/resolutionOrder/${entry.name}`,
+          message: `Modifier ${entry.name} has no selected context.`,
+        })
+      );
+      return;
+    }
+    expandSources(
+      context.sources,
+      setsByName,
+      sources,
+      issues,
+      `/resolutionOrder/${entry.name}/contexts/${context.name}`
+    );
     sources.forEach((source) =>
       orderedSources.push(
         Object.freeze({
@@ -163,6 +215,19 @@ export const createDesignTokenResolutionPlan = (
       )
     );
   });
+
+  if (issues.length > 0) {
+    return Object.freeze({
+      ok: false,
+      issues: Object.freeze(
+        issues.sort(
+          (left, right) =>
+            compareText(left.path, right.path) ||
+            compareText(left.code, right.code)
+        )
+      ),
+    });
+  }
 
   return Object.freeze({
     ok: true,

@@ -73,6 +73,47 @@ describe('animation domain properties', () => {
     });
   });
 
+  it('repairs unsafe color values and SVG fragment identities', () => {
+    const source = {
+      version: 1 as const,
+      target: { kind: 'pir-document' as const, documentId: 'page-home' },
+      svgFilters: [
+        {
+          id: 'filter) url(//evil.example',
+          primitives: [{ id: 'blur', type: 'feGaussianBlur' as const }],
+        },
+      ],
+      timelines: [
+        {
+          id: 'timeline',
+          name: 'Timeline',
+          durationMs: 1_000,
+          bindings: [
+            {
+              id: 'binding',
+              targetNodeId: 'root',
+              tracks: [
+                {
+                  id: 'color',
+                  kind: 'style' as const,
+                  property: 'color' as const,
+                  keyframes: [{ atMs: 0, value: 'red;} *{visibility:hidden}' }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const normalized = normalizeAnimationDefinition(source)!;
+    expect(normalized.svgFilters?.[0]?.id).toBe('filter-1');
+    expect(
+      normalized.timelines[0]?.bindings[0]?.tracks[0]?.keyframes[0]?.value
+    ).toBe('#111111');
+    expect(validateAnimationDefinition(source)).toMatchObject({ valid: false });
+  });
+
   it('round-trips timeline CodeSlot bindings without embedding source', () => {
     fc.assert(
       fc.property(

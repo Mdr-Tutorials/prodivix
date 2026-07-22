@@ -1,5 +1,6 @@
 import './PdxSidebar.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import type React from 'react';
 
 export interface PdxSidebarItem {
@@ -38,12 +39,12 @@ function PdxSidebar({
 }: PdxSidebarProps) {
   const fullClassName =
     `PdxSidebar ${collapsed ? 'Collapsed' : ''} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const firstCodePoint = (value: string) => Array.from(value)[0] ?? '';
 
   return (
     <aside
       className={fullClassName}
-      {...dataProps}
+      {...getDataAttributes(dataAttributes)}
       id={id}
       style={{
         width: collapsed ? 64 : width,
@@ -56,7 +57,7 @@ function PdxSidebar({
           className="PdxSidebarTitle"
           title={collapsed ? title : undefined}
         >
-          {collapsed ? title.slice(0, 1) : title}
+          {collapsed ? firstCodePoint(title) : title}
         </div>
       )}
       {children ? (
@@ -83,7 +84,7 @@ function PdxSidebar({
                 </span>
               ) : collapsed ? (
                 <span className="PdxSidebarFallbackIcon" aria-hidden="true">
-                  {item.label.slice(0, 1)}
+                  {firstCodePoint(item.label)}
                 </span>
               ) : null}
               {!collapsed && <span>{item.label}</span>}

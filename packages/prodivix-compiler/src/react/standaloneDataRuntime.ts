@@ -609,6 +609,7 @@ export const createWorkspaceDataRuntime = () => {
     const changes: Array<Readonly<{
       key: string;
       before: DataLifecycleSnapshot;
+      after: DataLifecycleSnapshot;
       affectedIndex: number;
     }>> = [];
     for (const [key, tracked] of trackedQueries) {
@@ -638,16 +639,17 @@ export const createWorkspaceDataRuntime = () => {
         if (policy.action === 'delete') next.splice(affectedIndex, 1);
         else next[affectedIndex] = cloneJson(candidate);
       }
-      changes.push(Object.freeze({ key, before, affectedIndex }));
-      snapshots.set(key, Object.freeze({
+      const after = Object.freeze({
         ...before,
         sequence: mutationSequence,
         invocationId,
         value: cloneJson(next),
-      }));
+      });
+      changes.push(Object.freeze({ key, before, after, affectedIndex }));
     }
     if (!changes.length)
       throw new DataRuntimeFailure('DATA_OPTIMISTIC_PROJECTION_MISSING');
+    for (const change of changes) snapshots.set(change.key, change.after);
     publish();
     const settle = (kind: 'commit' | 'rollback', result?: DataRuntimeResult): void => {
       for (const change of changes) {
@@ -891,10 +893,15 @@ export const createWorkspaceDataRuntime = () => {
           invocationId,
           mutationSequence
         );
-        optimistic?.commit(result);
       } catch (error) {
         optimistic?.rollback();
         throw error;
+      }
+      try {
+        optimistic?.commit(result);
+      } catch {
+        // The upstream mutation is already authoritative. Keep the optimistic
+        // projection until the mandatory revalidation below replaces it.
       }
       if (disposed) throw new Error('DATA_RUNTIME_DISPOSED');
       cacheEntries.clear();

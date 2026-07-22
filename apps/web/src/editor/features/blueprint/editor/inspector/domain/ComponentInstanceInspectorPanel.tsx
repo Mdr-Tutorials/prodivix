@@ -244,7 +244,9 @@ function LiteralPropEditor({
         disabled={disabled}
         className={fieldClassName}
         onChange={(event) => {
-          const next = Number(event.target.value);
+          const value = event.target.value.trim();
+          if (!value) return;
+          const next = Number(value);
           if (Number.isFinite(next)) publishLiteral(next);
         }}
       />

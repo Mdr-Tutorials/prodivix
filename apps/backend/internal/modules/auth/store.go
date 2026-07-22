@@ -205,12 +205,6 @@ WHERE token = $1 AND expires_at > NOW()`
 	session := &Session{}
 	var sessionID sql.NullString
 	err := row.Scan(&sessionID, &session.UserID, &session.CreatedAt, &session.ExpiresAt)
-	legacyToken := false
-	if errors.Is(err, sql.ErrNoRows) {
-		row = store.db.QueryRowContext(ctx, query, token)
-		err = row.Scan(&sessionID, &session.UserID, &session.CreatedAt, &session.ExpiresAt)
-		legacyToken = err == nil
-	}
 	if err != nil {
 		return nil, false
 	}
@@ -219,9 +213,6 @@ WHERE token = $1 AND expires_at > NOW()`
 		session.ID = sessionID.String
 	} else {
 		session.ID = legacySessionID(token)
-	}
-	if legacyToken {
-		_, _ = store.db.ExecContext(ctx, `UPDATE sessions SET id = COALESCE(id, $1), token = $2 WHERE token = $3`, session.ID, digest, token)
 	}
 	return session, true
 }
@@ -243,8 +234,8 @@ func (store *SessionStore) Delete(token string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	const query = `DELETE FROM sessions WHERE token = $1 OR token = $2`
-	_, _ = store.db.ExecContext(ctx, query, sessionTokenDigest(token), token)
+	const query = `DELETE FROM sessions WHERE token = $1`
+	_, _ = store.db.ExecContext(ctx, query, sessionTokenDigest(token))
 }
 
 func normalizeEmail(email string) string {

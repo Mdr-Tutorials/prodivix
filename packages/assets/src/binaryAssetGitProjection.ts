@@ -68,20 +68,34 @@ const normalizePolicy = (
   return Object.freeze({ kind: 'git-lfs', minimumBytes: value.minimumBytes });
 };
 
+const compareText = (left: string, right: string): number =>
+  left < right ? -1 : left > right ? 1 : 0;
+
+const windowsReservedSegment =
+  /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu;
+
 const normalizeGitPath = (value: string): string | undefined => {
   if (
     typeof value !== 'string' ||
     value !== value.trim() ||
     !value.startsWith('/') ||
     value.length > BINARY_ASSET_GIT_PROJECTION_LIMITS.maxPathLength ||
-    /[\u0000-\u001f\u007f\\]/u.test(value)
+    /[\u0000-\u001f\u007f\\<>:"|?*]/u.test(value)
   ) {
     return undefined;
   }
   const segments = value.slice(1).split('/');
   if (
     !segments.length ||
-    segments.some((segment) => !segment || segment === '.' || segment === '..')
+    segments.some(
+      (segment) =>
+        !segment ||
+        segment === '.' ||
+        segment === '..' ||
+        segment.toLowerCase() === GIT_ATTRIBUTES_PATH ||
+        /[. ]$/u.test(segment) ||
+        windowsReservedSegment.test(segment)
+    )
   ) {
     return undefined;
   }
@@ -127,12 +141,10 @@ const sortDiagnostics = (
   Object.freeze(
     [...diagnostics].sort(
       (left, right) =>
-        (left.path ?? '').localeCompare(right.path ?? '') ||
-        (left.assetDocumentId ?? '').localeCompare(
-          right.assetDocumentId ?? ''
-        ) ||
-        left.code.localeCompare(right.code) ||
-        left.message.localeCompare(right.message)
+        compareText(left.path ?? '', right.path ?? '') ||
+        compareText(left.assetDocumentId ?? '', right.assetDocumentId ?? '') ||
+        compareText(left.code, right.code) ||
+        compareText(left.message, right.message)
     )
   );
 
@@ -374,8 +386,8 @@ export const createBinaryAssetGitProjection = (
 
   const orderedSources = [...sources].sort(
     (left, right) =>
-      left.gitPath.localeCompare(right.gitPath) ||
-      left.assetDocumentId.localeCompare(right.assetDocumentId)
+      compareText(left.gitPath, right.gitPath) ||
+      compareText(left.assetDocumentId, right.assetDocumentId)
   );
   const manifestEntries: BinaryAssetGitManifestEntry[] = [];
   const files: BinaryAssetGitProjectionFile[] = [];
@@ -439,15 +451,17 @@ export const createBinaryAssetGitProjection = (
   });
   if (lfsPaths.length) files.push(createAttributesFile(lfsPaths));
   files.push(createManifestFile(manifest));
-  files.sort((left, right) => left.path.localeCompare(right.path));
+  files.sort((left, right) => compareText(left.path, right.path));
   const lfsObjects: BinaryAssetGitLfsObject[] = [...lfsObjectsByOid.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
+    .sort(([left], [right]) => compareText(left, right))
     .map(([oid, entry]) =>
       Object.freeze({
         oid,
         byteLength: entry.materialization.reference.byteLength,
         contents: new Uint8Array(entry.materialization.contents),
-        assetDocumentIds: Object.freeze([...entry.documentIds].sort()),
+        assetDocumentIds: Object.freeze(
+          [...entry.documentIds].sort(compareText)
+        ),
       })
     );
   return Object.freeze({

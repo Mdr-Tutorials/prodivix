@@ -127,6 +127,7 @@ export function BlueprintEditorCanvas({
   const velocityRef = useRef({ x: 0, y: 0 });
   const lastMoveRef = useRef({ x: 0, y: 0, time: 0 });
   const inertiaFrameRef = useRef<number | null>(null);
+  const lastEmittedPanRef = useRef<{ x: number; y: number } | null>(null);
   const suppressSelectRef = useRef(false);
   const canvasWidth = parseDimension(viewportWidth, 1440, 320);
   const canvasHeight = parseDimension(viewportHeight, 900, 240);
@@ -139,10 +140,6 @@ export function BlueprintEditorCanvas({
     data: { kind: 'canvas' },
     disabled: !isDesignMode,
   });
-
-  useEffect(() => {
-    panRef.current = pan;
-  }, [pan]);
 
   useEffect(() => {
     zoomRef.current = zoom;
@@ -179,8 +176,19 @@ export function BlueprintEditorCanvas({
 
   const applyPan = useCallback((nextPan: { x: number; y: number }) => {
     panRef.current = nextPan;
+    lastEmittedPanRef.current = nextPan;
     onPanChangeRef.current(nextPan);
   }, []);
+
+  useEffect(() => {
+    const emitted = lastEmittedPanRef.current;
+    if (emitted && emitted.x === pan.x && emitted.y === pan.y) {
+      lastEmittedPanRef.current = null;
+    } else {
+      stopInertia();
+    }
+    panRef.current = pan;
+  }, [pan, stopInertia]);
 
   const applyZoom = useCallback((nextZoom: number) => {
     const clamped = Math.min(

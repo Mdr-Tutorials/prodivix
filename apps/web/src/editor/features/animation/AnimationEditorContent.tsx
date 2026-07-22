@@ -102,6 +102,7 @@ export const AnimationEditorContent = ({
     deleteSvgPrimitive,
     updateSvgPrimitiveType,
     canRemoveSvgFilter,
+    persistenceDiagnostic,
     flushPendingPersistence,
   } = useAnimationEditorState({
     animationDocumentId,
@@ -365,10 +366,10 @@ export const AnimationEditorContent = ({
   ]);
 
   const changeCursor = useCallback(
-    (nextMs: number) => {
+    (nextMs: number, targetDurationMs?: number) => {
       if (isExecuting) stopPlayback();
       effectStore.reset();
-      setCursorMs(nextMs);
+      setCursorMs(nextMs, targetDurationMs);
     },
     [effectStore, isExecuting, setCursorMs, stopPlayback]
   );
@@ -380,7 +381,8 @@ export const AnimationEditorContent = ({
     runtimePreview && effectSnapshot.cursorMs !== null
       ? effectSnapshot.cursorMs
       : cursorMs;
-  const visibleDiagnostic = diagnostic ?? executionDiagnostic;
+  const visibleDiagnostic =
+    diagnostic ?? persistenceDiagnostic ?? executionDiagnostic;
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden text-(--text-primary) [--anim-inspector-width:400px] [--anim-timeline-height:300px] max-[1100px]:[--anim-inspector-width:100%]">

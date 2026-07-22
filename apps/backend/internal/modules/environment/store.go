@@ -123,31 +123,31 @@ func normalizeSnapshotInput(input PutSnapshotInput) (PutSnapshotInput, []byte, [
 		}
 	}
 	if len(input.PublicBindings)+len(input.Secrets) > maximumBindingCount {
-		return PutSnapshotInput{}, nil, nil, errors.New("environment binding budget exceeded")
+		return PutSnapshotInput{}, nil, nil, fmt.Errorf("%w: environment binding budget exceeded", ErrInvalid)
 	}
 	for bindingID := range input.PublicBindings {
 		if _, ok := canonical(bindingID); !ok {
-			return PutSnapshotInput{}, nil, nil, errors.New("public environment binding id is invalid")
+			return PutSnapshotInput{}, nil, nil, fmt.Errorf("%w: public environment binding id is invalid", ErrInvalid)
 		}
 		if _, duplicate := input.Secrets[bindingID]; duplicate {
-			return PutSnapshotInput{}, nil, nil, errors.New("environment binding kind is ambiguous")
+			return PutSnapshotInput{}, nil, nil, fmt.Errorf("%w: environment binding kind is ambiguous", ErrInvalid)
 		}
 	}
 	secretBindingIDs := make([]string, 0, len(input.Secrets))
 	for bindingID, material := range input.Secrets {
 		if _, ok := canonical(bindingID); !ok || material == "" || len(material) > maximumSecretBytes {
-			return PutSnapshotInput{}, nil, nil, errors.New("Secret environment binding is invalid")
+			return PutSnapshotInput{}, nil, nil, fmt.Errorf("%w: Secret environment binding is invalid", ErrInvalid)
 		}
 		secretBindingIDs = append(secretBindingIDs, bindingID)
 	}
 	sort.Strings(secretBindingIDs)
 	publicJSON, err := json.Marshal(input.PublicBindings)
 	if err != nil || len(publicJSON) > maximumPublicBindingsBytes {
-		return PutSnapshotInput{}, nil, nil, errors.New("public environment bindings are invalid")
+		return PutSnapshotInput{}, nil, nil, fmt.Errorf("%w: public environment bindings are invalid", ErrInvalid)
 	}
 	var publicBindings map[string]any
 	if err := json.Unmarshal(publicJSON, &publicBindings); err != nil {
-		return PutSnapshotInput{}, nil, nil, errors.New("public environment bindings are invalid")
+		return PutSnapshotInput{}, nil, nil, fmt.Errorf("%w: public environment bindings are invalid", ErrInvalid)
 	}
 	input.Principal = principal
 	input.WorkspaceID = workspaceID
@@ -178,6 +178,16 @@ func (store *Store) PutSnapshot(ctx context.Context, rawInput PutSnapshotInput) 
 		return nil, err
 	}
 	now := store.now()
+	envelopesByBindingID := make(map[string]storedSecretEnvelope, len(secretBindingIDs))
+	for _, bindingID := range secretBindingIDs {
+		material := []byte(input.Secrets[bindingID])
+		envelope, encryptErr := store.envelopeCipher.encrypt(ctx, material, secretAdditionalData(input.WorkspaceID, input.EnvironmentID, revision, bindingID))
+		clearBytes(material)
+		if encryptErr != nil {
+			return nil, encryptErr
+		}
+		envelopesByBindingID[bindingID] = envelope
+	}
 	ctx, cancel := databaseContext(ctx)
 	defer cancel()
 	tx, err := store.db.BeginTx(ctx, nil)
@@ -216,12 +226,7 @@ func (store *Store) PutSnapshot(ctx context.Context, rawInput PutSnapshotInput) 
 		return nil, err
 	}
 	for _, bindingID := range secretBindingIDs {
-		material := []byte(input.Secrets[bindingID])
-		envelope, encryptErr := store.envelopeCipher.encrypt(ctx, material, secretAdditionalData(input.WorkspaceID, input.EnvironmentID, revision, bindingID))
-		clearBytes(material)
-		if encryptErr != nil {
-			return nil, encryptErr
-		}
+		envelope := envelopesByBindingID[bindingID]
 		if _, err = tx.ExecContext(ctx, `INSERT INTO execution_environment_secret_materials (environment_id, revision, binding_id, algorithm, key_provider, key_id, wrapped_key_nonce, wrapped_key, nonce, ciphertext) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`, input.EnvironmentID, revision, bindingID, envelope.Algorithm, envelope.KeyProvider, envelope.KeyID, envelope.WrappedKeyNonce, envelope.WrappedKey, envelope.Nonce, envelope.Ciphertext); err != nil {
 			return nil, err
 		}
@@ -412,15 +417,15 @@ func (store *Store) UseSecret(ctx context.Context, input UseSecretInput, consume
 	if _, ok := canonicalOpaque(input.Field); !ok {
 		return ErrPermissionDenied
 	}
-	ctx, cancel := databaseContext(ctx)
-	defer cancel()
+	databaseCtx, cancelDatabase := databaseContext(ctx)
 	var bindingJSON, wrappedKeyNonce, wrappedKey, nonce, ciphertext []byte
 	var algorithm, keyProvider, keyID sql.NullString
 	var expiresAt time.Time
 	query := `SELECT g.secret_bindings_json, g.expires_at, m.algorithm, m.key_provider, m.key_id, m.wrapped_key_nonce, m.wrapped_key, m.nonce, m.ciphertext
 		FROM execution_environment_grants g JOIN execution_environment_secret_materials m ON m.environment_id = g.environment_id AND m.revision = g.revision AND m.binding_id = $10
 		WHERE g.grant_id=$1 AND g.workspace_id=$2 AND g.environment_id=$3 AND g.revision=$4 AND g.principal_id=$5 AND g.session_id=$6 AND g.provider_id=$7 AND g.purpose_kind=$8 AND g.resource_id=$9 AND g.revoked_at IS NULL AND g.expires_at > NOW()`
-	err = store.db.QueryRowContext(ctx, query, input.GrantID, input.WorkspaceID, input.EnvironmentID, input.Revision, input.Principal.PrincipalID, input.Principal.SessionID, input.ProviderID, input.PurposeKind, input.ResourceID, input.BindingID).Scan(&bindingJSON, &expiresAt, &algorithm, &keyProvider, &keyID, &wrappedKeyNonce, &wrappedKey, &nonce, &ciphertext)
+	err = store.db.QueryRowContext(databaseCtx, query, input.GrantID, input.WorkspaceID, input.EnvironmentID, input.Revision, input.Principal.PrincipalID, input.Principal.SessionID, input.ProviderID, input.PurposeKind, input.ResourceID, input.BindingID).Scan(&bindingJSON, &expiresAt, &algorithm, &keyProvider, &keyID, &wrappedKeyNonce, &wrappedKey, &nonce, &ciphertext)
+	cancelDatabase()
 	if err != nil {
 		return ErrPermissionDenied
 	}
@@ -460,10 +465,9 @@ func (store *Store) UseSecret(ctx context.Context, input UseSecretInput, consume
 	if err := consumer(material); err != nil {
 		return err
 	}
-	if !expiresAt.After(store.now()) {
-		return ErrPermissionDenied
-	}
-	_, err = store.db.ExecContext(ctx, `INSERT INTO execution_environment_resolution_audit (kind, grant_id, environment_id, revision, workspace_id, principal_id, session_id, provider_id, purpose_kind, resource_id, binding_id, field, occurred_at) VALUES ('secret-used',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, input.GrantID, input.EnvironmentID, input.Revision, input.WorkspaceID, input.Principal.PrincipalID, input.Principal.SessionID, input.ProviderID, input.PurposeKind, input.ResourceID, input.BindingID, input.Field, store.now())
+	auditCtx, cancelAudit := databaseContext(ctx)
+	defer cancelAudit()
+	_, err = store.db.ExecContext(auditCtx, `INSERT INTO execution_environment_resolution_audit (kind, grant_id, environment_id, revision, workspace_id, principal_id, session_id, provider_id, purpose_kind, resource_id, binding_id, field, occurred_at) VALUES ('secret-used',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, input.GrantID, input.EnvironmentID, input.Revision, input.WorkspaceID, input.Principal.PrincipalID, input.Principal.SessionID, input.ProviderID, input.PurposeKind, input.ResourceID, input.BindingID, input.Field, store.now())
 	return err
 }
 

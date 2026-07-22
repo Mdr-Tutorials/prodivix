@@ -255,19 +255,47 @@ const scalarSchema = (name: string): DataJsonSchema202012 => {
 const schemaNode = (value: DataJsonSchema202012): DataJsonSchema202012 =>
   Object.freeze(value);
 
+type TypeSchemaProjectionContext = {
+  readonly definitions: Map<string, DataJsonSchema202012>;
+  readonly building: Set<string>;
+};
+
+const createTypeSchemaProjectionContext = (): TypeSchemaProjectionContext => ({
+  definitions: new Map(),
+  building: new Set(),
+});
+
+const projectedDefinitions = (
+  context: TypeSchemaProjectionContext
+): Readonly<Record<string, DataJsonSchema202012>> | undefined =>
+  context.definitions.size
+    ? Object.freeze(
+        Object.fromEntries(
+          [...context.definitions.entries()].sort(([left], [right]) =>
+            compare(left, right)
+          )
+        )
+      )
+    : undefined;
+
+const nullableDefinitionReference = (name: string): DataJsonSchema202012 =>
+  schemaNode({
+    anyOf: [{ $ref: `#/$defs/${name}` }, { type: 'null' }],
+  });
+
 const inputTypeSchema = (
   type: GraphQLInputType,
-  depth = 0,
-  visiting = new Set<string>()
+  context: TypeSchemaProjectionContext,
+  depth = 0
 ): DataJsonSchema202012 => {
   if (depth > DATA_GRAPHQL_IMPORT_LIMITS.maxTypeDepth) return true;
-  if (isNonNullType(type)) return inputTypeSchema(type.ofType, depth, visiting);
+  if (isNonNullType(type)) return inputTypeSchema(type.ofType, context, depth);
   if (isListType(type))
     return schemaNode({
       anyOf: [
         {
           type: 'array',
-          items: inputTypeSchema(type.ofType, depth + 1, visiting),
+          items: inputTypeSchema(type.ofType, context, depth + 1),
         },
         { type: 'null' },
       ],
@@ -286,48 +314,48 @@ const inputTypeSchema = (
         { type: 'null' },
       ],
     });
-  if (!isInputObjectType(named) || visiting.has(named.name)) return true;
-  const nextVisiting = new Set(visiting).add(named.name);
-  const properties: Record<string, DataJsonSchema202012> = {};
-  const required: string[] = [];
-  for (const field of Object.values(named.getFields()).sort((left, right) =>
-    compare(left.name, right.name)
-  )) {
-    properties[field.name] = inputTypeSchema(
-      field.type,
-      depth + 1,
-      nextVisiting
-    );
-    if (isNonNullType(field.type) && field.defaultValue === undefined)
-      required.push(field.name);
-  }
-  return schemaNode({
-    anyOf: [
-      {
+  if (!isInputObjectType(named)) return true;
+  if (
+    !context.definitions.has(named.name) &&
+    !context.building.has(named.name)
+  ) {
+    context.building.add(named.name);
+    const properties: Record<string, DataJsonSchema202012> = {};
+    const required: string[] = [];
+    for (const field of Object.values(named.getFields()).sort((left, right) =>
+      compare(left.name, right.name)
+    )) {
+      properties[field.name] = inputTypeSchema(field.type, context, depth + 1);
+      if (isNonNullType(field.type) && field.defaultValue === undefined)
+        required.push(field.name);
+    }
+    context.definitions.set(
+      named.name,
+      schemaNode({
         type: 'object',
         properties: Object.freeze(properties),
         ...(required.length ? { required: Object.freeze(required) } : {}),
         additionalProperties: false,
-      },
-      { type: 'null' },
-    ],
-  });
+      })
+    );
+    context.building.delete(named.name);
+  }
+  return nullableDefinitionReference(named.name);
 };
 
 const outputTypeSchema = (
   type: GraphQLOutputType,
-  depth = 0,
-  visiting = new Set<string>()
+  context: TypeSchemaProjectionContext,
+  depth = 0
 ): DataJsonSchema202012 => {
   if (depth > DATA_GRAPHQL_IMPORT_LIMITS.maxTypeDepth) return true;
-  if (isNonNullType(type))
-    return outputTypeSchema(type.ofType, depth, visiting);
+  if (isNonNullType(type)) return outputTypeSchema(type.ofType, context, depth);
   if (isListType(type))
     return schemaNode({
       anyOf: [
         {
           type: 'array',
-          items: outputTypeSchema(type.ofType, depth + 1, visiting),
+          items: outputTypeSchema(type.ofType, context, depth + 1),
         },
         { type: 'null' },
       ],
@@ -346,30 +374,32 @@ const outputTypeSchema = (
         { type: 'null' },
       ],
     });
-  if (
-    (!isObjectType(named) && !isInterfaceType(named) && !isUnionType(named)) ||
-    visiting.has(named.name)
-  )
+  if (!isObjectType(named) && !isInterfaceType(named) && !isUnionType(named))
     return true;
   if (isUnionType(named))
     return schemaNode({
       anyOf: [{ type: 'object', additionalProperties: true }, { type: 'null' }],
     });
-  const nextVisiting = new Set(visiting).add(named.name);
-  const properties = Object.fromEntries(
-    Object.values(named.getFields())
-      .sort((left, right) => compare(left.name, right.name))
-      .map((field) => [
-        field.name,
-        outputTypeSchema(field.type, depth + 1, nextVisiting),
-      ])
-  );
-  return schemaNode({
-    anyOf: [
-      { type: 'object', properties: Object.freeze(properties) },
-      { type: 'null' },
-    ],
-  });
+  if (
+    !context.definitions.has(named.name) &&
+    !context.building.has(named.name)
+  ) {
+    context.building.add(named.name);
+    const properties = Object.fromEntries(
+      Object.values(named.getFields())
+        .sort((left, right) => compare(left.name, right.name))
+        .map((field) => [
+          field.name,
+          outputTypeSchema(field.type, context, depth + 1),
+        ])
+    );
+    context.definitions.set(
+      named.name,
+      schemaNode({ type: 'object', properties: Object.freeze(properties) })
+    );
+    context.building.delete(named.name);
+  }
+  return nullableDefinitionReference(named.name);
 };
 
 const operationDefinition = (
@@ -551,6 +581,7 @@ const compileProjection = (
     );
     const properties: Record<string, DataJsonSchema202012> = {};
     const required: string[] = [];
+    const inputProjection = createTypeSchemaProjectionContext();
     for (const variable of definition.variableDefinitions ?? []) {
       const type = typeFromAST(schema, variable.type);
       if (!type || !isInputType(type)) {
@@ -562,10 +593,14 @@ const compileProjection = (
         );
         continue;
       }
-      properties[variable.variable.name.value] = inputTypeSchema(type);
+      properties[variable.variable.name.value] = inputTypeSchema(
+        type,
+        inputProjection
+      );
       if (isNonNullType(type) && !variable.defaultValue)
         required.push(variable.variable.name.value);
     }
+    const inputDefinitions = projectedDefinitions(inputProjection);
     const inputSchema: DataSchema = Object.freeze({
       id: inputId,
       name: `${operationName} input`,
@@ -575,6 +610,7 @@ const compileProjection = (
         properties: Object.freeze(properties),
         ...(required.length ? { required: Object.freeze(required) } : {}),
         additionalProperties: false,
+        ...(inputDefinitions ? { $defs: inputDefinitions } : {}),
       }),
     });
     const root =
@@ -589,15 +625,19 @@ const compileProjection = (
       singleField && root
         ? root.getFields()[singleField.name.value]
         : undefined;
+    const outputProjection = createTypeSchemaProjectionContext();
+    const projectedOutput = fieldDefinition
+      ? outputTypeSchema(fieldDefinition.type, outputProjection)
+      : undefined;
+    const outputDefinitions = projectedDefinitions(outputProjection);
     const outputSchemaValue: DataJsonSchema202012 = fieldDefinition
       ? Object.freeze({
           $schema: JSON_SCHEMA_2020_12_URI,
-          ...((outputTypeSchema(fieldDefinition.type) === true
-            ? {}
-            : outputTypeSchema(fieldDefinition.type)) as Record<
+          ...((projectedOutput === true ? {} : projectedOutput) as Record<
             string,
             unknown
           >),
+          ...(outputDefinitions ? { $defs: outputDefinitions } : {}),
         })
       : Object.freeze({
           $schema: JSON_SCHEMA_2020_12_URI,
@@ -711,6 +751,17 @@ const schemaDigest = (schema: DataSchema): string =>
     schema: schema.schema,
   });
 
+const managedOperationConfigurationKeys = new Set([
+  'document',
+  'operationName',
+  'variablesInputPath',
+  'resultPath',
+  'partialErrorPolicy',
+  'emptyWhen',
+  'authorization',
+  'idempotencyHeader',
+]);
+
 const operationDigest = (operation: DataOperation): string =>
   digest({
     name: operation.name,
@@ -720,16 +771,7 @@ const operationDigest = (operation: DataOperation): string =>
     outputSchemaId: operation.outputSchemaId,
     configurationByKey: Object.fromEntries(
       Object.entries(operation.configurationByKey).filter(([key]) =>
-        [
-          'document',
-          'operationName',
-          'variablesInputPath',
-          'resultPath',
-          'partialErrorPolicy',
-          'emptyWhen',
-          'authorization',
-          'idempotencyHeader',
-        ].includes(key)
+        managedOperationConfigurationKeys.has(key)
       )
     ),
   });
@@ -1077,7 +1119,11 @@ export const createDataGraphqlImportProposal = (
       operationsById[existing.id] = Object.freeze({
         ...desired.value,
         configurationByKey: Object.freeze({
-          ...existing.configurationByKey,
+          ...Object.fromEntries(
+            Object.entries(existing.configurationByKey).filter(
+              ([key]) => !managedOperationConfigurationKeys.has(key)
+            )
+          ),
           ...desired.value.configurationByKey,
         }),
         policies: existing.policies,

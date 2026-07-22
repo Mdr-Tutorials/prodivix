@@ -1840,7 +1840,7 @@ const validateRelations = (
       ['inputSchemaId', operation.inputSchemaId],
       ['outputSchemaId', operation.outputSchemaId],
     ] as const) {
-      if (schemaId && !document.schemasById[schemaId]) {
+      if (schemaId && !Object.hasOwn(document.schemasById, schemaId)) {
         appendIssue(
           issues,
           childPath(operationPath, field),

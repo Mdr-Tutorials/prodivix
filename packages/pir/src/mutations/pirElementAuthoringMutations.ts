@@ -135,7 +135,8 @@ export const updatePirElementNode = (
     },
   });
   if (isFailure(candidate)) return candidate;
-  const changed = JSON.stringify(current) !== JSON.stringify(input.node);
+  const canonicalNode = candidate.ui.graph.nodesById[input.nodeId];
+  const changed = JSON.stringify(current) !== JSON.stringify(canonicalNode);
   return Object.freeze({
     ok: true,
     changed,
@@ -163,7 +164,6 @@ export const updatePirElementNodes = (
   const seenNodeIds = new Set<string>();
   const issues: PIRComponentMutationIssue[] = [];
   const nextNodesById = { ...source.document.ui.graph.nodesById };
-  let changed = false;
 
   input.updates.forEach((update, index) => {
     const path = `/updates/${index}`;
@@ -210,7 +210,6 @@ export const updatePirElementNodes = (
       return;
     }
     nextNodesById[update.nodeId] = update.node;
-    changed ||= JSON.stringify(current) !== JSON.stringify(update.node);
   });
   if (issues.length > 0) return failure(issues);
 
@@ -219,6 +218,11 @@ export const updatePirElementNodes = (
     nodesById: nextNodesById,
   });
   if (isFailure(candidate)) return candidate;
+  const changed = input.updates.some(
+    ({ nodeId }) =>
+      JSON.stringify(source.document.ui.graph.nodesById[nodeId]) !==
+      JSON.stringify(candidate.ui.graph.nodesById[nodeId])
+  );
   const document = changed ? candidate : source.document;
   return Object.freeze({
     ok: true,

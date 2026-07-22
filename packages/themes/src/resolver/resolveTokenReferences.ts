@@ -40,10 +40,8 @@ const resolveTokenValue = (
   fallbackTokens: ThemeTokenIndex,
   context: ResolveContext
 ): ThemeTokenPrimitive => {
-  const cachedValue = context.resolvedTokens[path];
-
-  if (cachedValue !== undefined) {
-    return cachedValue;
+  if (Object.hasOwn(context.resolvedTokens, path)) {
+    return context.resolvedTokens[path] as ThemeTokenPrimitive;
   }
 
   if (context.resolving.has(path)) {
@@ -72,7 +70,11 @@ const getTokenValue = (
   tokens: ThemeTokenIndex,
   fallbackTokens: ThemeTokenIndex
 ) => {
-  const value = tokens[path] ?? fallbackTokens[path];
+  const value = Object.hasOwn(tokens, path)
+    ? tokens[path]
+    : Object.hasOwn(fallbackTokens, path)
+      ? fallbackTokens[path]
+      : undefined;
 
   if (value === undefined) {
     throw new ThemeTokenResolutionError(

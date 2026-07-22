@@ -1,17 +1,21 @@
-import { program } from 'commander';
+import { Command } from 'commander';
+import { pathToFileURL } from 'node:url';
+import { createBuildCommand } from './commands/build.js';
+import { createExportCommand } from './commands/export.js';
 
 export function cli(argv: string[]) {
-  program
+  new Command()
     .name('prodivix')
     .description('Prodivix CLI')
     .version('0.0.1')
-    .command('build', 'build project', {
-      executableFile: 'commands/build.js',
-    })
-    .command('export', 'export static site', {
-      executableFile: 'commands/export.js',
-    })
+    .addCommand(createBuildCommand())
+    .addCommand(createExportCommand())
     .parse(argv);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) cli(process.argv);
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  cli(process.argv);
+}

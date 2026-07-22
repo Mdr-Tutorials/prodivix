@@ -85,6 +85,7 @@ export function BlueprintProjectRunnerSurface({
     const previewUrl = state.previewUrl;
     const provider = state.provider;
     if (!previewUrl || !provider) return undefined;
+    const previewOrigin = new URL(previewUrl).origin;
     let active = true;
     const onMessage = (event: MessageEvent<unknown>) => {
       const frameWindow = frameRef.current?.contentWindow;
@@ -124,7 +125,7 @@ export function BlueprintProjectRunnerSurface({
           (response) => {
             if (!active || frameRef.current?.contentWindow !== frameWindow)
               return;
-            frameWindow.postMessage(response, '*');
+            frameWindow.postMessage(response, previewOrigin);
           }
         );
         return;
@@ -159,7 +160,7 @@ export function BlueprintProjectRunnerSurface({
         void openBlueprintProjectRemoteDataStream(streamRequest, (message) => {
           if (!active || frameRef.current?.contentWindow !== frameWindow)
             return;
-          frameWindow.postMessage(message, '*');
+          frameWindow.postMessage(message, previewOrigin);
         });
         return;
       }
@@ -188,7 +189,7 @@ export function BlueprintProjectRunnerSurface({
         serverFunctionRequest
       ).then((response) => {
         if (!active || frameRef.current?.contentWindow !== frameWindow) return;
-        frameWindow.postMessage(response, '*');
+        frameWindow.postMessage(response, previewOrigin);
       });
     };
     window.addEventListener('message', onMessage);
@@ -209,7 +210,7 @@ export function BlueprintProjectRunnerSurface({
           title={t('runner.previewTitle')}
           sandbox={
             state.provider === 'remote'
-              ? 'allow-scripts'
+              ? 'allow-same-origin allow-scripts'
               : 'allow-downloads allow-forms allow-modals allow-popups allow-same-origin allow-scripts'
           }
           allow={

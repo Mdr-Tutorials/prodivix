@@ -218,8 +218,10 @@ export function UnitInput({
   } | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const amountEditingRef = useRef(false);
 
   useEffect(() => {
+    if (amountEditingRef.current) return;
     setDraftAmount(parsed.amount);
     setDraftUnit(parsed.unit);
   }, [parsed.amount, parsed.unit]);
@@ -291,15 +293,25 @@ export function UnitInput({
               const sanitized = sanitizeAmount(nextAmount);
               setDraftAmount(sanitized);
               if (!sanitized) {
-                onChange(undefined);
                 return;
               }
               if (isCompleteNumber(sanitized)) {
                 onChange(toOutput(sanitized, draftUnit));
                 return;
               }
-              // Keep incomplete numeric drafts (e.g. "-", ".", "-.") without appending unit.
-              onChange(sanitized);
+            }}
+            onFocus={() => {
+              amountEditingRef.current = true;
+            }}
+            onBlur={() => {
+              amountEditingRef.current = false;
+              if (!draftAmount.trim()) {
+                onChange(undefined);
+              } else if (isCompleteNumber(draftAmount)) {
+                onChange(toOutput(draftAmount, draftUnit));
+              } else {
+                setDraftAmount(parsed.amount);
+              }
             }}
             placeholder={placeholder}
             disabled={disabled}

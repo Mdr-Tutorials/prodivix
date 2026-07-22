@@ -127,6 +127,8 @@ export const DATA_GROUP: ComponentGroup = {
       id: 'progress',
       name: 'Progress',
       preview: <PdxProgress value={62} size="Medium" />,
+      statusProp: 'status',
+      statusLabel: 'Status',
       sizeOptions: SIZE_OPTIONS,
       statusOptions: PROGRESS_STATUSES.map((status) => ({
         id: status,

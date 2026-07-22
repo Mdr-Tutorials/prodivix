@@ -78,7 +78,19 @@ export const WorkspaceCollaborationSettings = ({
         role
       );
       setPrincipalEmail('');
-      await loadRoles();
+      try {
+        setRoles(
+          await editorApi.listWorkspaceExecutionRoles(token, workspaceId)
+        );
+      } catch {
+        setError(
+          t(
+            'settings.project.rows.workspaceRoles.errors.refreshAfterSave',
+            'The collaborator was saved, but the list could not be refreshed.'
+          )
+        );
+      }
+      setStatus('ready');
     } catch {
       setError(
         t(
@@ -100,7 +112,19 @@ export const WorkspaceCollaborationSettings = ({
         workspaceId,
         principalId
       );
-      await loadRoles();
+      try {
+        setRoles(
+          await editorApi.listWorkspaceExecutionRoles(token, workspaceId)
+        );
+      } catch {
+        setError(
+          t(
+            'settings.project.rows.workspaceRoles.errors.refreshAfterRevoke',
+            'The collaborator was removed, but the list could not be refreshed.'
+          )
+        );
+      }
+      setStatus('ready');
     } catch {
       setError(
         t(

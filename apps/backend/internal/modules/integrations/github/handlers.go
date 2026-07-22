@@ -75,7 +75,7 @@ func (handler *Handler) HandleWebhook(c *gin.Context) {
 }
 
 func (handler *Handler) HandleDevEvent(c *gin.Context) {
-	if handler.environment == "production" {
+	if handler.environment != "development" && handler.environment != "test" {
 		respondError(c, http.StatusNotFound, "API-4004", "Development GitHub events are disabled.")
 		return
 	}
@@ -120,7 +120,7 @@ func (handler *Handler) HandleBeginSetup(c *gin.Context) {
 		return
 	}
 	setupURL, err := url.Parse(strings.TrimSpace(handler.cfg.SetupURL))
-	allowsInsecureDevelopmentURL := err == nil && setupURL != nil && handler.environment != "production" && setupURL.Scheme == "http"
+	allowsInsecureDevelopmentURL := err == nil && setupURL != nil && (handler.environment == "development" || handler.environment == "test") && setupURL.Scheme == "http"
 	if err != nil || setupURL == nil || setupURL.Host == "" || (setupURL.Scheme != "https" && !allowsInsecureDevelopmentURL) || setupURL.User != nil {
 		respondError(c, http.StatusServiceUnavailable, "API-5001", "GitHub App setup is not configured.")
 		return

@@ -63,11 +63,6 @@ export const materializeLocalProjectWorkspaceOperationChain = (
   const snapshots: WorkspaceSnapshot[] = [entries[0]!.baseSnapshot];
   for (const entry of entries) {
     const current = snapshots.at(-1)!;
-    if (!sameAuthoringSnapshot(current, entry.baseSnapshot)) {
-      throw new Error(
-        `Local Workspace operation ${entry.id} does not continue the durable causal chain.`
-      );
-    }
     snapshots.push(applyOperation(current, entry.operation));
   }
 

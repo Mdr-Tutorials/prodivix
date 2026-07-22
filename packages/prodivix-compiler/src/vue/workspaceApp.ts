@@ -560,7 +560,9 @@ const workspacePirRuntime = Object.freeze({
         : undefined;
       const callback = module && typeof reference?.exportName === 'string' ? module[reference.exportName] : undefined;
       if (typeof callback !== 'function') throw new Error('VUE_CODE_REFERENCE_UNAVAILABLE');
-      void Promise.resolve(callback(input.payload, Object.freeze({ source: input.source, scope: input.scope })));
+      void Promise.resolve()
+        .then(() => callback(input.payload, Object.freeze({ source: input.source, scope: input.scope })))
+        .catch((error: unknown) => console.error(error instanceof Error ? error.message : 'CODE_CALLBACK_FAILED'));
     }
   },
   resolveCodeValue(reference: JsonRecord): unknown {

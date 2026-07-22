@@ -110,6 +110,7 @@ describe('Browser Network adapter', () => {
     });
     for (const url of [
       'http://localhost:3000/',
+      'https://localhost./',
       'http://127.0.0.1/',
       'http://169.254.169.254/latest/meta-data/',
       'http://192.168.1.2/',
@@ -127,5 +128,72 @@ describe('Browser Network adapter', () => {
       ).rejects.toThrow(/URL is not safe/u);
     }
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('does not classify public hostnames by their first hexadecimal letters', async () => {
+    const fetch = vi.fn(async () => new Response('ok'));
+    const adapter = createBrowserNetworkAdapter({
+      fetch: fetch as typeof globalThis.fetch,
+    });
+
+    for (const hostname of ['fda.gov', 'fc2.com']) {
+      await expect(
+        adapter.execute({
+          requestId: `request-${hostname}`,
+          url: `https://${hostname}/`,
+          method: 'GET',
+          runtimeZone: 'client',
+          mode: 'live',
+          adapter: 'core.http',
+        })
+      ).resolves.toMatchObject({ text: 'ok' });
+    }
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('bounds streamed responses before buffering their remaining bytes', async () => {
+    const cancelled = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1, 2, 3, 4, 5]));
+      },
+      cancel: cancelled,
+    });
+    const adapter = createBrowserNetworkAdapter({
+      maximumResponseBytes: 4,
+      fetch: vi.fn(async () => new Response(body)) as typeof globalThis.fetch,
+    });
+
+    await expect(
+      adapter.execute({
+        requestId: 'request-oversized',
+        url: 'https://api.example.test/',
+        method: 'GET',
+        runtimeZone: 'client',
+        mode: 'live',
+        adapter: 'core.http',
+      })
+    ).rejects.toThrow(/configured limit/u);
+    expect(cancelled).toHaveBeenCalledOnce();
+  });
+
+  it('does not let a trace observer alter a successful request outcome', async () => {
+    const adapter = createBrowserNetworkAdapter({
+      fetch: vi.fn(async () => new Response('ok')) as typeof globalThis.fetch,
+      publishTrace: () => {
+        throw new Error('trace sink unavailable');
+      },
+    });
+
+    await expect(
+      adapter.execute({
+        requestId: 'request-trace-observer',
+        url: 'https://api.example.test/',
+        method: 'GET',
+        runtimeZone: 'client',
+        mode: 'live',
+        adapter: 'core.http',
+      })
+    ).resolves.toMatchObject({ text: 'ok' });
   });
 });

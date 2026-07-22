@@ -1,3 +1,5 @@
+import { decodeHtmlEntities } from './richText.js';
+
 export const stripHtmlTags = (value: string) => {
   let output = '';
   let cursor = 0;
@@ -38,10 +40,10 @@ export const collapseWhitespace = (value: string) => {
 };
 
 export const getVisibleTextMetrics = (htmlValue: string) => {
-  const text = collapseWhitespace(stripHtmlTags(htmlValue));
+  const text = collapseWhitespace(decodeHtmlEntities(stripHtmlTags(htmlValue)));
   return {
     text,
-    characterCount: text.length,
+    characterCount: Array.from(text).length,
     wordCount: text ? text.split(' ').length : 0,
   };
 };

@@ -13,7 +13,7 @@ import type {
   DataOperationKind,
   DataOperationReference,
 } from './data.types';
-import { cloneDataJsonValue } from './dataJsonRuntime';
+import { cloneDataJsonValue, compareDataText } from './dataJsonRuntime';
 import {
   createDataOperationInvocation,
   type DataOperationActivation,
@@ -200,7 +200,7 @@ export const normalizeDataOperationInputBinding = (
           propertiesByKey: Object.freeze(
             Object.fromEntries(
               Object.entries(candidate.propertiesByKey)
-                .sort(([left], [right]) => left.localeCompare(right))
+                .sort(([left], [right]) => compareDataText(left, right))
                 .map(([key, child]) => [
                   canonical(key),
                   normalize(child, depth + 1),
@@ -339,7 +339,7 @@ const resolveInput = async (
           );
         const entries = await Promise.all(
           Object.entries(candidate.propertiesByKey)
-            .sort(([left], [right]) => left.localeCompare(right))
+            .sort(([left], [right]) => compareDataText(left, right))
             .map(
               async ([key, child]) =>
                 [canonical(key), await resolve(child, depth + 1)] as const
@@ -564,9 +564,9 @@ export const createDataOperationDispatchCoordinator = <TContext, TResult>(
       }
       sequencesByKey.set(key, sequence);
       invocationSerial = nextInvocationSerial;
+      const result = await options.execute(invocation, context);
       if (queryInputDigest !== undefined)
         inputByQueryKey.set(key, queryInputDigest);
-      const result = await options.execute(invocation, context);
       return Object.freeze({ status: 'dispatched', invocation, result });
     },
     dispose() {

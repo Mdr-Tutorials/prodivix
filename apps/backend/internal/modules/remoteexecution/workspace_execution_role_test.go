@@ -84,9 +84,17 @@ func TestWorkspaceExecutionEditorGrantByEmailAndListAreOwnerFenced(t *testing.T)
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT u.id")).
 		WithArgs("workspace-1", "owner-1", "editor@example.test").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("editor-1"))
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT 1 FROM workspaces WHERE id = \\$1 AND owner_id = \\$2 FOR UPDATE").
+		WithArgs("workspace-1", "owner-1").
+		WillReturnRows(sqlmock.NewRows([]string{"marker"}).AddRow(1))
+	mock.ExpectQuery("SELECT COUNT\\(\\*\\), COALESCE\\(BOOL_OR\\(principal_id = \\$2\\), FALSE\\)").
+		WithArgs("workspace-1", "editor-1").
+		WillReturnRows(sqlmock.NewRows([]string{"count", "already_granted"}).AddRow(0, false))
 	mock.ExpectExec("INSERT INTO workspace_execution_role_grants").
 		WithArgs("workspace-1", "owner-1", "editor-1", workspaceExecutionEditorRole).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 	if err := store.GrantWorkspaceExecutionRoleByEmail(t.Context(), "owner-1", "workspace-1", " Editor@Example.Test ", workspaceExecutionEditorRole); err != nil {
 		t.Fatalf("grant editor role: %v", err)
 	}
@@ -156,9 +164,17 @@ func TestWorkspaceExecutionViewerGrantAndRevocationAreOwnerFenced(t *testing.T) 
 	defer database.Close()
 	store := NewStore(database)
 
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT 1 FROM workspaces WHERE id = \\$1 AND owner_id = \\$2 FOR UPDATE").
+		WithArgs("workspace-1", "owner-1").
+		WillReturnRows(sqlmock.NewRows([]string{"marker"}).AddRow(1))
+	mock.ExpectQuery("SELECT COUNT\\(\\*\\), COALESCE\\(BOOL_OR\\(principal_id = \\$2\\), FALSE\\)").
+		WithArgs("workspace-1", "viewer-1").
+		WillReturnRows(sqlmock.NewRows([]string{"count", "already_granted"}).AddRow(0, false))
 	mock.ExpectExec("INSERT INTO workspace_execution_role_grants").
 		WithArgs("workspace-1", "owner-1", "viewer-1", workspaceExecutionViewerRole).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 	if err := store.GrantWorkspaceExecutionViewer(t.Context(), "owner-1", "workspace-1", "viewer-1"); err != nil {
 		t.Fatalf("grant viewer role: %v", err)
 	}
@@ -189,9 +205,11 @@ func TestWorkspaceExecutionViewerGrantRejectsUnownedOrMissingIdentity(t *testing
 	defer database.Close()
 	store := NewStore(database)
 
-	mock.ExpectExec("INSERT INTO workspace_execution_role_grants").
-		WithArgs("workspace-1", "other-owner", "viewer-1", workspaceExecutionViewerRole).
-		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT 1 FROM workspaces WHERE id = \\$1 AND owner_id = \\$2 FOR UPDATE").
+		WithArgs("workspace-1", "other-owner").
+		WillReturnRows(sqlmock.NewRows([]string{"marker"}))
+	mock.ExpectRollback()
 	if err := store.GrantWorkspaceExecutionViewer(t.Context(), "other-owner", "workspace-1", "viewer-1"); !errors.Is(err, ErrExecutionNotFound) {
 		t.Fatalf("expected unowned workspace grant to fail closed, got %v", err)
 	}

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Bot,
@@ -337,6 +337,14 @@ export function BlueprintAssistantPanel({
   >(undefined);
   const activeRequestIdRef = useRef<string | undefined>(undefined);
   const abortControllerRef = useRef<AbortController | undefined>(undefined);
+  useEffect(
+    () => () => {
+      activeRequestIdRef.current = undefined;
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = undefined;
+    },
+    []
+  );
   const settings = useAiSettingsStore((state) => state.settings);
   const contextPreview = useMemo(
     () => [

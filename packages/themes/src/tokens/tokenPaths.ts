@@ -112,13 +112,17 @@ export const tokenPathToCssVariable = (
     return `--palette-${kebabCase(path.replace(/^palette\./, ''))}`;
   }
 
-  const knownSemanticVariable = SEMANTIC_CSS_VARIABLES[path];
+  const knownSemanticVariable = Object.hasOwn(SEMANTIC_CSS_VARIABLES, path)
+    ? SEMANTIC_CSS_VARIABLES[path]
+    : undefined;
 
   if (knownSemanticVariable) {
     return knownSemanticVariable;
   }
 
-  const knownProductVariable = PRODUCT_CSS_VARIABLES[path];
+  const knownProductVariable = Object.hasOwn(PRODUCT_CSS_VARIABLES, path)
+    ? PRODUCT_CSS_VARIABLES[path]
+    : undefined;
 
   if (knownProductVariable) {
     return knownProductVariable;

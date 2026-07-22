@@ -61,4 +61,47 @@ describe('browser animation projection properties', () => {
       })
     );
   });
+
+  it('drops untrusted CSS declaration and filter fragment values', () => {
+    const frame: AnimationFrame = {
+      stylesByNodeId: new Map([
+        [
+          'node',
+          {
+            color: 'red;} *{visibility:hidden}',
+            filter: 'url(#safe) url(//evil.example)',
+          },
+        ],
+      ]),
+      svgFilters: [],
+    };
+
+    const snapshot = projectAnimationFrameToBrowserPreview(frame, 'page-home');
+    expect(snapshot.cssText).toBe('');
+    expect(snapshot.cssText).not.toContain('visibility');
+    expect(snapshot.cssText).not.toContain('evil.example');
+  });
+
+  it('keeps supported color, transform, and local filter values', () => {
+    const frame: AnimationFrame = {
+      stylesByNodeId: new Map([
+        [
+          'node',
+          {
+            color: 'oklch(60% 0.2 40 / 0.5)',
+            transform: 'translateX(10px) scale(1.5)',
+            filter: 'url(#filter-1) blur(2px)',
+          },
+        ],
+      ]),
+      svgFilters: [],
+    };
+
+    const snapshot = projectAnimationFrameToBrowserPreview(frame, 'page-home');
+    expect(snapshot.cssText).toContain('color:oklch(60% 0.2 40 / 0.5);');
+    expect(snapshot.cssText).toContain(
+      'transform:translateX(10px) scale(1.5);'
+    );
+    expect(snapshot.cssText).toContain('filter:url(#filter-1) blur(2px);');
+  });
 });

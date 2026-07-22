@@ -1,4 +1,10 @@
-import type { AnimationFrame, SvgFilterDefinition } from '@prodivix/animation';
+import {
+  isSafeAnimationCssColor,
+  isSafeAnimationCssFilter,
+  isSafeAnimationCssTransform,
+  type AnimationFrame,
+  type SvgFilterDefinition,
+} from '@prodivix/animation';
 
 export type AnimationPreviewSnapshot = Readonly<{
   cssText: string;
@@ -42,12 +48,14 @@ export const projectAnimationFrameToBrowserPreview = (
     const declarations: string[] = [];
     if (style.opacity !== undefined)
       declarations.push(`opacity:${style.opacity};`);
-    if (style.color) declarations.push(`color:${style.color};`);
-    if (style.transform) {
+    if (style.color && isSafeAnimationCssColor(style.color))
+      declarations.push(`color:${style.color};`);
+    if (style.transform && isSafeAnimationCssTransform(style.transform)) {
       declarations.push(`transform:${style.transform};`);
       declarations.push('transform-origin:center;');
     }
-    if (style.filter) declarations.push(`filter:${style.filter};`);
+    if (style.filter && isSafeAnimationCssFilter(style.filter))
+      declarations.push(`filter:${style.filter};`);
     if (!declarations.length) return;
     rules.push(
       `[data-pir-document-id="${escapeCssAttributeValue(targetDocumentId)}"][data-pir-node-id="${escapeCssAttributeValue(nodeId)}"] {${declarations.join('')}}`

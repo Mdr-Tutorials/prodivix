@@ -159,7 +159,7 @@ export const createPirCodeSlotProvider = (input: {
     if (!dataBinding.input) continue;
     visitDataInputCodeBindings(
       dataBinding.input,
-      '/input',
+      'input',
       (code, fieldPath) => {
         const ownerRef = {
           kind: 'document',
@@ -194,7 +194,7 @@ export const createPirCodeSlotProvider = (input: {
     )) {
       const fieldPath =
         node.kind === 'component-instance'
-          ? `/bindings/events/${toJsonPointerToken(eventName)}`
+          ? `/bindings/events/${toJsonPointerToken(eventName)}/trigger`
           : `/events/${toJsonPointerToken(eventName)}`;
       if (trigger.kind === 'call-code') {
         const slot = createEventSlot(input.documentId, nodeId, trigger);

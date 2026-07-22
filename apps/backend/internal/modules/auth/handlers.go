@@ -110,21 +110,16 @@ func (handler *Handler) HandleRegister(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "API-9001", "Could not secure password.")
 		return
 	}
-	user, err := handler.users.Create(email, request.Name, request.Description, passwordHash)
+	_, err = handler.users.Create(email, request.Name, request.Description, passwordHash)
 	if err != nil {
 		if errors.Is(err, ErrEmailExists) {
-			respondError(c, http.StatusConflict, "API-4009", "Email already registered.")
+			c.JSON(http.StatusAccepted, gin.H{"accepted": true})
 			return
 		}
 		respondError(c, http.StatusInternalServerError, "API-5001", "Could not create user.")
 		return
 	}
-	session := handler.sessions.Create(user.ID, handler.tokenTTL)
-	if session == nil {
-		respondError(c, http.StatusInternalServerError, "API-9001", "Could not create session.")
-		return
-	}
-	c.JSON(http.StatusCreated, gin.H{"user": NewPublicUser(user), "token": session.Token, "expiresAt": session.ExpiresAt})
+	c.JSON(http.StatusAccepted, gin.H{"accepted": true})
 }
 
 func (handler *Handler) HandleLogin(c *gin.Context) {
@@ -279,7 +274,16 @@ func (handler *Handler) HandleUpdateAvatar(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "API-5001", "Could not save avatar file.")
 		return
 	}
-	defer destination.Close()
+	destinationClosed := false
+	keepDestination := false
+	defer func() {
+		if !destinationClosed {
+			_ = destination.Close()
+		}
+		if !keepDestination {
+			_ = os.Remove(destinationPath)
+		}
+	}()
 	if _, err := io.Copy(destination, io.LimitReader(src, maxAvatarBytes+1)); err != nil {
 		respondError(c, http.StatusInternalServerError, "API-5001", "Could not save avatar file.")
 		return
@@ -288,6 +292,11 @@ func (handler *Handler) HandleUpdateAvatar(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "API-5001", "Could not save avatar file.")
 		return
 	}
+	if err := destination.Close(); err != nil {
+		respondError(c, http.StatusInternalServerError, "API-5001", "Could not save avatar file.")
+		return
+	}
+	destinationClosed = true
 
 	avatarURL := "/uploads/avatars/" + user.ID + "/" + fileName
 	updated, err := handler.users.UpdateAvatarURL(user.ID, avatarURL)
@@ -299,7 +308,23 @@ func (handler *Handler) HandleUpdateAvatar(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "API-5001", "Could not update avatar.")
 		return
 	}
+	keepDestination = true
+	if previousPath, ok := localAvatarPath(user.ID, user.AvatarURL); ok && previousPath != destinationPath {
+		_ = os.Remove(previousPath)
+	}
 	c.JSON(http.StatusOK, gin.H{"user": NewPublicUser(updated)})
+}
+
+func localAvatarPath(userID string, avatarURL string) (string, bool) {
+	prefix := "/uploads/avatars/" + userID + "/"
+	if !strings.HasPrefix(avatarURL, prefix) {
+		return "", false
+	}
+	fileName := strings.TrimPrefix(avatarURL, prefix)
+	if fileName == "" || filepath.Base(fileName) != fileName {
+		return "", false
+	}
+	return filepath.Join("data", "uploads", "avatars", userID, fileName), true
 }
 
 func respondError(c *gin.Context, status int, code, message string) {

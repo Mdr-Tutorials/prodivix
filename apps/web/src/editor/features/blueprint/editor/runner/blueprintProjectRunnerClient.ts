@@ -73,6 +73,7 @@ let activeTerminalClient: RemoteExecutionTerminalClient | undefined;
 let activeArtifactResolver:
   | ReturnType<typeof createRemoteProjectExecutionEnvironment>['artifacts']
   | undefined;
+let startupTail: Promise<void> = Promise.resolve();
 const cancellationTerminalWaitMs = 15_000;
 const remoteDataGatewayRuns = createRemoteDataGatewayRunCoordinator({
   publishTrace: (input) => executionSessionCoordinator.publishTrace(input),
@@ -161,7 +162,7 @@ export const publishBlueprintProjectConsoleLog = (input: {
   );
 };
 
-export const startBlueprintProject = async (
+const startBlueprintProjectNow = async (
   snapshot: ExecutableProjectSnapshot,
   request: ExecutionRequest,
   options: Readonly<{
@@ -279,14 +280,38 @@ export const startBlueprintProject = async (
   return job;
 };
 
+export const startBlueprintProject = (
+  snapshot: ExecutableProjectSnapshot,
+  request: ExecutionRequest,
+  options: Readonly<{
+    provider: BlueprintProjectRunProvider;
+    accessToken?: string | null;
+  }> = { provider: 'browser' }
+): Promise<ExecutionJob> => {
+  const startup = startupTail.then(() =>
+    startBlueprintProjectNow(snapshot, request, options)
+  );
+  startupTail = startup.then(
+    () => undefined,
+    () => undefined
+  );
+  return startup;
+};
+
 export const stopBlueprintProject = async (
   reason = 'Project execution stopped.',
-  options: Readonly<{ waitForTerminal?: boolean }> = {}
+  options: Readonly<{
+    waitForTerminal?: boolean;
+    expectedJobId?: string;
+  }> = {}
 ): Promise<ExecutionCancellationResult | undefined> => {
+  const job = activeJob;
+  if (options.expectedJobId && job?.id !== options.expectedJobId) {
+    return undefined;
+  }
   remoteDataGatewayRuns.deactivate();
   remoteDataStreamRuns.deactivate();
   remoteServerFunctionRuns.deactivate();
-  const job = activeJob;
   if (!job) {
     activeProvider = undefined;
     activeTerminalClient = undefined;

@@ -20,6 +20,7 @@ import type {
   WebContainerRuntimeOptions,
 } from './browserProjectRuntime';
 import {
+  BrowserProjectRuntimeHostLeaseError,
   createBrowserProjectRuntimeHost,
   type BrowserProjectRuntimeHost,
 } from './browserProjectRuntimeHost';
@@ -320,7 +321,22 @@ export const createBrowserProjectTestRunner = (
         SERVER_RUNTIME_TEST_INVOCATION_TRACE_FILE_PATH,
         lease
       );
-    } catch {
+    } catch (error) {
+      const missing =
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'ENOENT';
+      if (!missing) {
+        emitLog(
+          controller,
+          error instanceof BrowserProjectRuntimeHostLeaseError
+            ? 'Server Function traces were unavailable because the runtime lease became stale.'
+            : `Server Function traces could not be read: ${error instanceof Error ? error.message : String(error)}`,
+          'stderr',
+          'warning'
+        );
+      }
       return;
     }
     const traces = decodeServerRuntimeTestInvocationTraces(source);
@@ -349,10 +365,13 @@ export const createBrowserProjectTestRunner = (
       activeController !== controller &&
       isJobActive(activeController)
     ) {
+      const previousController = activeController;
       await runtimeHost.stopOwner(ownerId);
-      activeController.finishCancelled(
-        'Superseded by a newer project test snapshot.'
-      );
+      if (isJobActive(previousController)) {
+        previousController.finishCancelled(
+          'Superseded by a newer project test snapshot.'
+        );
+      }
     }
     activeController = controller;
     controller.markStarting();

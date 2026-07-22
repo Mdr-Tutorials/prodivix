@@ -19,6 +19,11 @@ export const adoptWorkspaceSettingsOutboxResult = (
   const editor = useEditorStore.getState();
   const currentWorkspace = editor.workspace;
   if (!currentWorkspace) return;
+  const resultWorkspaceId =
+    result.kind === 'acknowledged'
+      ? result.mutation.workspaceId
+      : result.baseSnapshot.id;
+  if (resultWorkspaceId !== currentWorkspace.id) return;
   if (result.kind === 'acknowledged') {
     editor.applyWorkspaceMutation(result.mutation);
   } else {

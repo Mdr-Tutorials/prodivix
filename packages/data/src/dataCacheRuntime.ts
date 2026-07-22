@@ -5,7 +5,7 @@ import {
   type DataCachePolicy,
   type DataJsonValue,
 } from './data.types';
-import { cloneDataJsonValue } from './dataJsonRuntime';
+import { cloneDataJsonValue, compareDataText } from './dataJsonRuntime';
 import type {
   DataOperationAdapterDescriptor,
   DataOperationAdapterResult,
@@ -252,7 +252,7 @@ const stableJson = (value: unknown): string => {
     if (Array.isArray(candidate)) return candidate.map(sort);
     return Object.fromEntries(
       Object.entries(candidate as Record<string, unknown>)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => compareDataText(left, right))
         .map(([key, entry]) => [key, sort(entry)])
     );
   };

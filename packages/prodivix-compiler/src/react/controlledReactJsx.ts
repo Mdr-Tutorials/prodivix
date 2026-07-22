@@ -200,12 +200,12 @@ const renderNode = (
       : []),
     ...(node.kind === 'component-slot-outlet'
       ? [
-          `${attributeIndent}${CONTROLLED_REACT_JSX_SLOT_MEMBER_ATTRIBUTE}=${toStableJson(node.slotMemberId)}`,
+          `${attributeIndent}${CONTROLLED_REACT_JSX_SLOT_MEMBER_ATTRIBUTE}={${toStableJson(node.slotMemberId)}}`,
         ]
       : []),
-    `${attributeIndent}${CONTROLLED_REACT_JSX_NODE_ID_ATTRIBUTE}=${toStableJson(
+    `${attributeIndent}${CONTROLLED_REACT_JSX_NODE_ID_ATTRIBUTE}={${toStableJson(
       node.id
-    )}`,
+    )}}`,
   ];
   const type = node.kind === 'element' ? node.type : 'slot';
   const opening = `${indent}<${type}\n${attributes.join('\n')}\n${indent}`;

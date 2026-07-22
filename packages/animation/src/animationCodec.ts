@@ -12,6 +12,10 @@ import type {
   SvgFilterPrimitive,
 } from './animation.types';
 import type { CodeReference, CodeSlotBinding } from '@prodivix/authoring';
+import {
+  isSafeAnimationCssColor,
+  isSafeAnimationCssFragmentId,
+} from './animationCssSafety';
 
 export const DEFAULT_TIMELINE_DURATION_MS = 1000;
 export const DEFAULT_TIMELINE_NAME = 'Timeline';
@@ -80,6 +84,11 @@ const isFiniteNumber = (value: unknown): value is number =>
 
 const normalizeId = (value: unknown) =>
   typeof value === 'string' && value.trim() ? value.trim() : '';
+
+const normalizeCssFragmentId = (value: unknown) => {
+  const normalized = normalizeId(value);
+  return isSafeAnimationCssFragmentId(normalized) ? normalized : '';
+};
 
 const normalizeCodeReference = (source: unknown): CodeReference | null => {
   if (!isPlainObject(source)) return null;
@@ -299,7 +308,11 @@ const normalizeSvgFilter = (
     });
   }
   const filter: SvgFilterDefinition = {
-    id: allocateUniqueId(source.id, `filter-${index + 1}`, usedIds),
+    id: allocateUniqueId(
+      normalizeCssFragmentId(source.id),
+      `filter-${index + 1}`,
+      usedIds
+    ),
     primitives,
   };
   if (
@@ -343,13 +356,24 @@ const normalizeTrack = (
       ? (source.property as StyleTrack['property'])
       : 'opacity';
     const track: StyleTrack = { id, kind: 'style', property, keyframes: [] };
+    const keyframes = normalizeKeyframes(
+      source.keyframes,
+      durationMs,
+      resolveTrackFallbackValue(track)
+    );
     return {
       ...track,
-      keyframes: normalizeKeyframes(
-        source.keyframes,
-        durationMs,
-        resolveTrackFallbackValue(track)
-      ),
+      keyframes:
+        property === 'color'
+          ? keyframes.map((keyframe) => ({
+              ...keyframe,
+              value:
+                typeof keyframe.value === 'string' &&
+                isSafeAnimationCssColor(keyframe.value)
+                  ? keyframe.value
+                  : resolveTrackFallbackValue(track),
+            }))
+          : keyframes,
     };
   }
   if (source.kind === 'css-filter') {
@@ -379,17 +403,27 @@ const normalizeTrack = (
   if (source.kind !== 'svg-filter-attr') return null;
 
   const defaults = resolveSvgTrackDefaults(svgFilters);
-  const filterId = normalizeId(source.filterId) || defaults.filterId;
+  const requestedFilterId =
+    normalizeCssFragmentId(source.filterId) || defaults.filterId;
   const filter =
-    svgFilters.find((candidate) => candidate.id === filterId) ?? svgFilters[0];
+    svgFilters.find((candidate) => candidate.id === requestedFilterId) ??
+    svgFilters[0];
+  const filterId = filter?.id ?? defaults.filterId;
+  const requestedPrimitiveId = normalizeId(source.primitiveId);
+  const primitiveId =
+    (requestedPrimitiveId &&
+    filter?.primitives.some(
+      (primitive) => primitive.id === requestedPrimitiveId
+    )
+      ? requestedPrimitiveId
+      : undefined) ??
+    filter?.primitives[0]?.id ??
+    defaults.primitiveId;
   const track: SvgFilterAttrTrack = {
     id,
     kind: 'svg-filter-attr',
     filterId,
-    primitiveId:
-      normalizeId(source.primitiveId) ||
-      filter?.primitives[0]?.id ||
-      defaults.primitiveId,
+    primitiveId,
     attr:
       typeof source.attr === 'string' && source.attr.trim()
         ? source.attr.trim()

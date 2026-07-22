@@ -433,8 +433,14 @@ export const compilePirReactDocument = (
   for (const [nodeId, node] of Object.entries(document.ui.graph.nodesById).sort(
     ([left], [right]) => compareText(left, right)
   )) {
-    if (node.kind !== 'element') continue;
-    for (const [eventName, trigger] of Object.entries(node.events ?? {}).sort(
+    const events =
+      node.kind === 'element'
+        ? node.events
+        : node.kind === 'component-instance'
+          ? node.bindings.events
+          : undefined;
+    if (!events) continue;
+    for (const [eventName, trigger] of Object.entries(events).sort(
       ([left], [right]) => compareText(left, right)
     )) {
       if (trigger.kind !== 'dispatch-data-operation') continue;
@@ -443,6 +449,10 @@ export const compilePirReactDocument = (
           trigger.operation.operationId
         ];
       if (operation === 'mutation') continue;
+      const eventPath =
+        node.kind === 'component-instance'
+          ? `/bindings/events/${escapeJsonPointerToken(eventName)}`
+          : `/events/${escapeJsonPointerToken(eventName)}`;
       diagnostics.push({
         code: operation
           ? PIR_REACT_COMPILE_DIAGNOSTIC_CODES.dataOperationKindMismatch
@@ -452,7 +462,7 @@ export const compilePirReactDocument = (
         message: operation
           ? `PIR event "${eventName}" on node "${nodeId}" must reference a mutation operation for React export.`
           : `PIR event "${eventName}" on node "${nodeId}" references an unresolved Data operation for React export.`,
-        path: `/docsById/${escapeJsonPointerToken(documentId)}/content/ui/graph/nodesById/${escapeJsonPointerToken(nodeId)}/events/${escapeJsonPointerToken(eventName)}`,
+        path: `/docsById/${escapeJsonPointerToken(documentId)}/content/ui/graph/nodesById/${escapeJsonPointerToken(nodeId)}${eventPath}`,
       });
     }
   }

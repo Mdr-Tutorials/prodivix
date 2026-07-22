@@ -76,6 +76,14 @@ export const useRemoteExecutionTerminal = (input: {
     Readonly<{ columns: number; rows: number }> | undefined
   >(undefined);
   const busyRef = useRef(false);
+  const busyOperationRef = useRef(0);
+  const sessionGenerationRef = useRef(0);
+  const latestAvailabilityRef = useRef(input.availability);
+  const availabilityIdentityRef = useRef(
+    input.availability.status === 'available'
+      ? `available:${input.availability.jobId}`
+      : input.availability.status
+  );
 
   const clearCredential = useCallback(() => {
     accessRef.current = undefined;
@@ -101,14 +109,23 @@ export const useRemoteExecutionTerminal = (input: {
     const executionId = executionIdRef.current;
     const terminalSessionId = terminalSessionIdRef.current;
     if (!client || !executionId || !terminalSessionId) return false;
+    const generation = sessionGenerationRef.current;
     try {
       const resumed = await client.resume({ executionId, terminalSessionId });
+      if (
+        generation !== sessionGenerationRef.current ||
+        executionIdRef.current !== executionId ||
+        terminalSessionIdRef.current !== terminalSessionId
+      ) {
+        return false;
+      }
       accessRef.current = resumed.access;
       lastSizeRef.current = resumed.snapshot.size;
       setEmulator(emulatorController.resize(resumed.snapshot.size));
       setView((current) => ({ ...current, phase: 'open', error: undefined }));
       return true;
     } catch {
+      if (generation !== sessionGenerationRef.current) return false;
       clearCredential();
       setView((current) => ({
         ...current,
@@ -124,12 +141,15 @@ export const useRemoteExecutionTerminal = (input: {
     const executionId = executionIdRef.current;
     const terminalSessionId = terminalSessionIdRef.current;
     if (!executionId || !terminalSessionId) return;
+    const generation = sessionGenerationRef.current;
+    const busyOperation = ++busyOperationRef.current;
     busyRef.current = true;
     try {
       let access = accessRef.current;
       if (!access || access.expiresAt <= Date.now() + 5_000) {
         setView((current) => ({ ...current, phase: 'reconnecting' }));
         if (!(await resume())) return;
+        if (generation !== sessionGenerationRef.current) return;
         access = accessRef.current;
       }
       if (!access) return;
@@ -140,6 +160,13 @@ export const useRemoteExecutionTerminal = (input: {
           accessToken: access.token,
           afterCursor: cursorRef.current,
         });
+        if (
+          generation !== sessionGenerationRef.current ||
+          executionIdRef.current !== executionId ||
+          terminalSessionIdRef.current !== terminalSessionId
+        ) {
+          return;
+        }
         let emulatorSnapshot: ExecutionTerminalEmulatorSnapshot;
         try {
           emulatorSnapshot = emulatorController.consume({
@@ -173,6 +200,7 @@ export const useRemoteExecutionTerminal = (input: {
         if (!result.hasMore) break;
       }
     } catch {
+      if (generation !== sessionGenerationRef.current) return;
       setView((current) => ({
         ...current,
         phase: 'reconnecting',
@@ -180,7 +208,9 @@ export const useRemoteExecutionTerminal = (input: {
       }));
       clearCredential();
     } finally {
-      busyRef.current = false;
+      if (busyOperationRef.current === busyOperation) {
+        busyRef.current = false;
+      }
     }
   }, [
     clearCredential,
@@ -197,6 +227,10 @@ export const useRemoteExecutionTerminal = (input: {
       busyRef.current
     )
       return false;
+    const requestedExecutionId = input.availability.jobId;
+    const generation = sessionGenerationRef.current;
+    const busyOperation = ++busyOperationRef.current;
+    const client = input.client;
     busyRef.current = true;
     const existingExecutionId = executionIdRef.current;
     const existingSessionId = terminalSessionIdRef.current;
@@ -209,10 +243,25 @@ export const useRemoteExecutionTerminal = (input: {
     try {
       if (existingExecutionId === input.availability.jobId && existingSessionId)
         return await resume();
-      const opened = await input.client.open({
-        executionId: input.availability.jobId,
+      const opened = await client.open({
+        executionId: requestedExecutionId,
         size: { columns: 100, rows: 30 },
       });
+      const latestAvailability = latestAvailabilityRef.current;
+      if (
+        generation !== sessionGenerationRef.current ||
+        latestAvailability.status !== 'available' ||
+        latestAvailability.jobId !== requestedExecutionId
+      ) {
+        await client
+          .close({
+            executionId: opened.snapshot.executionId,
+            terminalSessionId: opened.snapshot.terminalSessionId,
+            accessToken: opened.access.token,
+          })
+          .catch(() => undefined);
+        return false;
+      }
       executionIdRef.current = opened.snapshot.executionId;
       terminalSessionIdRef.current = opened.snapshot.terminalSessionId;
       accessRef.current = opened.access;
@@ -224,6 +273,7 @@ export const useRemoteExecutionTerminal = (input: {
       setView({ ...initialView, phase: 'open' });
       return true;
     } catch {
+      if (generation !== sessionGenerationRef.current) return false;
       clearCredential();
       setView({
         ...initialView,
@@ -232,7 +282,9 @@ export const useRemoteExecutionTerminal = (input: {
       });
       return false;
     } finally {
-      busyRef.current = false;
+      if (busyOperationRef.current === busyOperation) {
+        busyRef.current = false;
+      }
     }
   }, [
     clearCredential,
@@ -395,6 +447,9 @@ export const useRemoteExecutionTerminal = (input: {
     const access = accessRef.current;
     const executionId = executionIdRef.current;
     const terminalSessionId = terminalSessionIdRef.current;
+    sessionGenerationRef.current += 1;
+    busyOperationRef.current += 1;
+    busyRef.current = false;
     clearCredential();
     executionIdRef.current = undefined;
     terminalSessionIdRef.current = undefined;
@@ -410,6 +465,10 @@ export const useRemoteExecutionTerminal = (input: {
       })
       .catch(() => undefined);
   }, [clearCredential, input.client, rejectQueuedInputs]);
+
+  useEffect(() => {
+    latestAvailabilityRef.current = input.availability;
+  }, [input.availability]);
 
   useEffect(() => {
     if (!input.enabled || !['open', 'reconnecting'].includes(view.phase))
@@ -432,6 +491,16 @@ export const useRemoteExecutionTerminal = (input: {
   }, [drainInputQueue, view.phase]);
 
   useEffect(() => {
+    const nextAvailabilityIdentity =
+      input.availability.status === 'available'
+        ? `available:${input.availability.jobId}`
+        : input.availability.status;
+    if (availabilityIdentityRef.current !== nextAvailabilityIdentity) {
+      availabilityIdentityRef.current = nextAvailabilityIdentity;
+      sessionGenerationRef.current += 1;
+      busyOperationRef.current += 1;
+      busyRef.current = false;
+    }
     if (
       input.availability.status === 'available' &&
       (!executionIdRef.current ||
@@ -439,6 +508,9 @@ export const useRemoteExecutionTerminal = (input: {
     )
       return;
     clearCredential();
+    sessionGenerationRef.current += 1;
+    busyOperationRef.current += 1;
+    busyRef.current = false;
     executionIdRef.current = undefined;
     terminalSessionIdRef.current = undefined;
     rejectQueuedInputs();

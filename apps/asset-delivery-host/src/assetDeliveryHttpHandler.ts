@@ -338,7 +338,11 @@ export const createAssetDeliveryHttpHandler = (
   if (!Number.isSafeInteger(maximumUploadBytes) || maximumUploadBytes < 1) {
     throw new TypeError('Asset delivery upload limit is invalid.');
   }
-  if (!Number.isSafeInteger(defaultTtlMs) || defaultTtlMs < 1_000) {
+  if (
+    !Number.isSafeInteger(defaultTtlMs) ||
+    defaultTtlMs < 1_000 ||
+    defaultTtlMs % 1_000 !== 0
+  ) {
     throw new TypeError('Asset delivery default TTL is invalid.');
   }
 

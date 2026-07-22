@@ -128,7 +128,18 @@ export const createIndexedDbCausalOutboxStore = <
     const store = transaction.objectStore(options.storeName);
     const existing = await readCurrent(store, entry.id);
     if (!existing) {
-      store.put(entry);
+      const currentEntries = (await requestResult(store.getAll()))
+        .map(options.decode)
+        .filter((candidate): candidate is TEntry => Boolean(candidate))
+        .filter((candidate) => candidate.workspaceId === entry.workspaceId);
+      const maximumSequence = Math.max(
+        0,
+        ...currentEntries.map((candidate) => candidate.causalSequence ?? 0)
+      );
+      store.put({
+        ...entry,
+        causalSequence: entry.causalSequence ?? maximumSequence + 1,
+      });
     } else if (
       JSON.stringify(existing.request) !== JSON.stringify(entry.request)
     ) {

@@ -1,5 +1,6 @@
 import './PdxDiv.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import type React from 'react';
 
 interface PdxDivSpecificProps {
@@ -52,7 +53,7 @@ function PdxDiv({
   const fullClassName =
     `PdxDiv ${display} ${overflow} ${textAlign ? textAlign : ''} ${className || ''}`.trim();
 
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   const customStyle: React.CSSProperties = {
     ...(style as React.CSSProperties),

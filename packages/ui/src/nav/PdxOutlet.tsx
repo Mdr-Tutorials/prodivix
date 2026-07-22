@@ -1,5 +1,6 @@
 import type React from 'react';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import './PdxOutlet.scss';
 
 interface PdxOutletSpecificProps {
@@ -21,7 +22,7 @@ function PdxOutlet({
       className={`PdxOutlet ${className ?? ''}`.trim()}
       style={style as React.CSSProperties | undefined}
       id={id}
-      {...dataAttributes}
+      {...getDataAttributes(dataAttributes)}
     >
       {children}
     </div>

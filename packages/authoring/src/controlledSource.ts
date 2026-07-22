@@ -277,28 +277,32 @@ export const decodeControlledSourceManifest = (
       message: 'Controlled source manifest requires at least one region.',
     });
   }
-  const bindings: ControlledSourceRegionBinding[] = [];
+  const decodedBindings: Array<
+    Readonly<{ binding: ControlledSourceRegionBinding; sourceIndex: number }>
+  > = [];
   if (Array.isArray(value.regions)) {
     value.regions.forEach((region, index) => {
       const decoded = decodeRegionBinding(region, index);
-      if (decoded.ok) bindings.push(decoded.binding);
-      else issues.push(...decoded.issues);
+      if (decoded.ok) {
+        decodedBindings.push({ binding: decoded.binding, sourceIndex: index });
+      } else issues.push(...decoded.issues);
     });
   }
   const ids = new Set<string>();
-  bindings.forEach((binding, index) => {
+  decodedBindings.forEach(({ binding, sourceIndex }) => {
     if (!ids.has(binding.id)) {
       ids.add(binding.id);
       return;
     }
     issues.push({
       code: CONTROLLED_SOURCE_ISSUE_CODES.regionDuplicate,
-      path: `/regions/${index}/id`,
+      path: `/regions/${sourceIndex}/id`,
       message: `Controlled source region "${binding.id}" is declared more than once.`,
       regionId: binding.id,
     });
   });
   if (issues.length > 0) return invalid(issues);
+  const bindings = decodedBindings.map(({ binding }) => binding);
   return {
     status: 'valid',
     manifest: Object.freeze({

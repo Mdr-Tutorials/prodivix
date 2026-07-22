@@ -1,8 +1,10 @@
 import './PdxList.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import type React from 'react';
 
 export interface PdxListItem {
+  id?: React.Key;
   title: string;
   description?: string;
   extra?: React.ReactNode;
@@ -14,6 +16,7 @@ interface PdxListSpecificProps {
   bordered?: boolean;
   split?: boolean;
   renderItem?: (item: PdxListItem, index: number) => React.ReactNode;
+  rowKey?: (item: PdxListItem, index: number) => React.Key;
 }
 
 export interface PdxListProps extends PdxComponent, PdxListSpecificProps {}
@@ -24,6 +27,7 @@ function PdxList({
   bordered = false,
   split = true,
   renderItem,
+  rowKey,
   className,
   style,
   id,
@@ -31,7 +35,7 @@ function PdxList({
 }: PdxListProps) {
   const fullClassName =
     `PdxList ${size} ${bordered ? 'Bordered' : ''} ${split ? 'Split' : ''} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   return (
     <ul
@@ -41,7 +45,10 @@ function PdxList({
       {...dataProps}
     >
       {items.map((item, index) => (
-        <li key={index} className="PdxListItem">
+        <li
+          key={rowKey?.(item, index) ?? item.id ?? index}
+          className="PdxListItem"
+        >
           {renderItem ? (
             renderItem(item, index)
           ) : (

@@ -6,6 +6,7 @@ import type {
 } from './execution.types';
 import {
   assertExecutableProjectExactKeys,
+  compareExecutableProjectText,
   cloneExecutableProjectSourceTrace,
   normalizeExecutableProjectCacheHints,
   normalizeExecutableProjectBuildPlan,
@@ -175,7 +176,9 @@ const normalizeFiles = (value: unknown): readonly ExecutableProjectFile[] => {
       ...(sourceTrace ? { sourceTrace } : {}),
     });
   });
-  files.sort((left, right) => left.path.localeCompare(right.path));
+  files.sort((left, right) =>
+    compareExecutableProjectText(left.path, right.path)
+  );
   const paths = new Set(files.map((file) => file.path));
   files.forEach((file) => {
     const segments = file.path.split('/');

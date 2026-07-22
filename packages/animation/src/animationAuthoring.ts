@@ -7,6 +7,7 @@ import type {
   SvgFilterDefinition,
 } from './animation.types';
 import { resolveTrackFallbackValue } from './animationCodec';
+import { isSafeAnimationCssColor } from './animationCssSafety';
 
 export const resolveActiveTimelineId = (animation: AnimationDefinition) =>
   animation['x-animationEditor']?.activeTimelineId ||
@@ -47,7 +48,8 @@ export const coerceKeyframeValueInput = (
   rawValue: string,
   fallbackValue: number | string
 ): number | string => {
-  if (track.kind === 'style' && track.property === 'color') return rawValue;
+  if (track.kind === 'style' && track.property === 'color')
+    return isSafeAnimationCssColor(rawValue) ? rawValue : fallbackValue;
   const trimmed = rawValue.trim();
   if (!trimmed) return fallbackValue;
   const parsed = Number.parseFloat(trimmed);

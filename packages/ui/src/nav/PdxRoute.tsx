@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type React from 'react';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import {
   flattenRouteManifest,
   matchRouteManifest,
@@ -86,11 +87,11 @@ function PdxRoute({
       className={`PdxRoute ${className ?? ''}`.trim()}
       style={style as React.CSSProperties | undefined}
       id={id}
+      {...getDataAttributes(dataAttributes)}
       data-route-scope={routeScope}
       data-route-module-id={routeModule?.moduleId ?? moduleScope}
       data-route-node-id={projection?.routeNodeId}
       data-route-projected-path={projection?.path}
-      {...dataAttributes}
     >
       {content}
     </div>

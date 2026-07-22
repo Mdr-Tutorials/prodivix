@@ -186,6 +186,8 @@ const openLocalProjectDatabase = (): Promise<IDBDatabase> =>
     };
     request.onerror = () =>
       reject(request.error ?? new Error('Could not open local projects.'));
+    request.onblocked = () =>
+      reject(new Error('Local project database upgrade is blocked.'));
     request.onsuccess = () => resolve(request.result);
   });
 

@@ -146,7 +146,7 @@ export const redactExecutionConsoleText = (
         `${scheme} ${EXECUTION_SECRET_REDACTION_MARKER}`
     )
     .replace(
-      /([?&](?:access[_-]?token|refresh[_-]?token|id[_-]?token|api[_-]?key|password|secret|signature|sig)=)[^&#\s]*/giu,
+      /([?&#](?:access[_-]?token|refresh[_-]?token|id[_-]?token|api[_-]?key|password|secret|signature|sig)=)[^&#\s]*/giu,
       `$1${EXECUTION_SECRET_REDACTION_MARKER}`
     )
     .replace(

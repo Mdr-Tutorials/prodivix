@@ -298,7 +298,7 @@ export const resolveIconRef = (value: unknown) => {
   }
   void ensureIconProviderReady(provider.id).catch(() => undefined);
 
-  const cacheKey = `${provider.id}:${normalizeKey(value.name)}`;
+  const cacheKey = `${provider.id}:${normalizeKey(value.name)}:${normalizeKey(value.variant ?? '')}`;
   const cached = iconFallbackComponentCache.get(cacheKey);
   if (cached) return cached;
 

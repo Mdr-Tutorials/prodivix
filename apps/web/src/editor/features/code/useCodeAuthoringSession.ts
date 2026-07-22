@@ -219,6 +219,12 @@ export const useCodeAuthoringSession = (input: {
         return { status: 'rejected', message };
       }
       if (controlledPlan.status === 'unchanged') {
+        updateSession((current) =>
+          reconcileCodeAuthoringSessionArtifact(
+            current,
+            projectArtifactSnapshot(workspace, artifactId)
+          )
+        );
         return { status: 'unchanged' };
       }
       operation = controlledPlan.operation;

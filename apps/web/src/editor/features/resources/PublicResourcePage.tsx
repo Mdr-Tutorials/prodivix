@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { Download, FileWarning } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -120,6 +120,7 @@ export function PublicResourcePage({
     useState<WorkspaceAssetDeliverySession>();
   const [assetDeliveryError, setAssetDeliveryError] = useState<string>();
   const [assetDeliveryPending, setAssetDeliveryPending] = useState(false);
+  const assetDeliverySequenceRef = useRef(0);
 
   const selectedNode = useMemo(
     () => findNodeById(tree, selectedNodeId) ?? tree,
@@ -197,6 +198,7 @@ export function PublicResourcePage({
   }, [activeDocumentId, selectedNodeId, tree, workspaceDocumentsById]);
 
   useEffect(() => {
+    assetDeliverySequenceRef.current += 1;
     setSelectedContentUrl(undefined);
     setSelectedTextContent(undefined);
     setAssetMaterializationError(undefined);
@@ -274,6 +276,7 @@ export function PublicResourcePage({
   ]);
 
   const handleSelectNode = (nodeId: string) => {
+    assetDeliverySequenceRef.current += 1;
     setSelectedNodeId(nodeId);
     const node = findNodeById(tree, nodeId);
     if (node?.type === 'file') setActiveDocumentId(node.id);
@@ -305,6 +308,7 @@ export function PublicResourcePage({
     setAssetDelivery(undefined);
     setAssetDeliveryError(undefined);
     setAssetDeliveryPending(true);
+    const requestSequence = ++assetDeliverySequenceRef.current;
     try {
       const delivery = await editorApi.createWorkspaceAssetDeliverySession(
         token,
@@ -312,13 +316,17 @@ export function PublicResourcePage({
         selectedNode.blobReference,
         createPublicResourceAssetDeliveryRequest(selectedNode.mime)
       );
+      if (requestSequence !== assetDeliverySequenceRef.current) return;
       setAssetDelivery(delivery);
     } catch (error) {
+      if (requestSequence !== assetDeliverySequenceRef.current) return;
       setAssetDeliveryError(
         error instanceof Error ? error.message : String(error)
       );
     } finally {
-      setAssetDeliveryPending(false);
+      if (requestSequence === assetDeliverySequenceRef.current) {
+        setAssetDeliveryPending(false);
+      }
     }
   };
 
@@ -407,7 +415,7 @@ export function PublicResourcePage({
       mediaType: string;
       category: PublicFileCategory;
     }>
-  ) => {
+  ): Promise<'created' | 'conflict' | 'rejected'> => {
     if (!workspaceId) {
       throw new Error('AST-3001: No Workspace is available for asset upload.');
     }
@@ -425,7 +433,7 @@ export function PublicResourcePage({
       path,
       'asset'
     );
-    if (existing) return false;
+    if (existing) return 'conflict';
     const uploaded = localWorkspace
       ? await putLocalWorkspaceAssetBlob({
           workspaceId,
@@ -464,7 +472,19 @@ export function PublicResourcePage({
       setSelectedNodeId(documentId);
       setActiveDocumentId(documentId);
     }
-    return created;
+    return created ? 'created' : 'rejected';
+  };
+
+  const reportAssetCreationFailure = (
+    result: 'created' | 'conflict' | 'rejected',
+    name: string
+  ): void => {
+    if (result === 'created') return;
+    setAssetOperationError(
+      result === 'conflict'
+        ? `AST-3002: ${name} already exists.`
+        : `AST-3001: ${name} could not be created.`
+    );
   };
 
   const handleCreateFile = async (parentId: string) => {
@@ -474,11 +494,12 @@ export function PublicResourcePage({
     });
     setAssetOperationError(undefined);
     try {
-      await createAssetDocument(parentId, file.name, {
+      const result = await createAssetDocument(parentId, file.name, {
         contents: new TextEncoder().encode(template.content),
         mediaType: template.mime,
         category: inferCategoryByFile(file),
       });
+      reportAssetCreationFailure(result, file.name);
     } catch (error) {
       setAssetOperationError(
         error instanceof Error ? error.message : String(error)
@@ -496,11 +517,12 @@ export function PublicResourcePage({
     });
     setAssetOperationError(undefined);
     try {
-      await createAssetDocument(parentId, file.name, {
+      const result = await createAssetDocument(parentId, file.name, {
         contents: new TextEncoder().encode(template.content),
         mediaType: template.mime,
         category: inferCategoryByFile(file),
       });
+      reportAssetCreationFailure(result, file.name);
     } catch (error) {
       setAssetOperationError(
         error instanceof Error ? error.message : String(error)
@@ -511,19 +533,12 @@ export function PublicResourcePage({
   const handleDeleteNode = async (nodeId: string) => {
     const node = findNodeById(tree, nodeId);
     if (!node) return;
-    if (node.type === 'folder') {
-      await applyIntent(
-        deleteWorkspaceDirectoryIntentRequest({
-          workspaceRev: workspaceRev ?? 0,
-          intentId: createResourceIntentId(),
-          issuedAt: new Date().toISOString(),
-          nodeId,
-        })
-      );
-    } else {
+    const deletionTargets =
+      node.type === 'folder' ? flattenPublicFiles(node) : [node];
+    for (const target of deletionTargets) {
       if (
         routeManifest &&
-        isWorkspaceDocumentReferencedByRoute(routeManifest, nodeId)
+        isWorkspaceDocumentReferencedByRoute(routeManifest, target.id)
       ) {
         window.alert(
           t('publicResource.routeReferencedDeleteBlocked', {
@@ -537,7 +552,7 @@ export function PublicResourcePage({
         ? semanticIndex.getReferences(
             createAssetSymbolId(
               semanticIndex.snapshotIdentity.workspaceRevisions.workspaceId,
-              nodeId
+              target.id
             ),
             { expectedSnapshotIdentity: semanticIndex.snapshotIdentity }
           )
@@ -553,6 +568,17 @@ export function PublicResourcePage({
         );
         return;
       }
+    }
+    if (node.type === 'folder') {
+      await applyIntent(
+        deleteWorkspaceDirectoryIntentRequest({
+          workspaceRev: workspaceRev ?? 0,
+          intentId: createResourceIntentId(),
+          issuedAt: new Date().toISOString(),
+          nodeId,
+        })
+      );
+    } else {
       await applyIntent(
         deleteWorkspaceResourceDocumentRequest({
           workspaceRev: workspaceRev ?? 0,
@@ -602,12 +628,19 @@ export function PublicResourcePage({
     if (!files || files.length === 0) return;
     setAssetOperationError(undefined);
     try {
+      const skipped: string[] = [];
       for (const file of Array.from(files)) {
-        await createAssetDocument(parentId, file.name, {
+        const result = await createAssetDocument(parentId, file.name, {
           contents: new Uint8Array(await file.arrayBuffer()),
           mediaType: file.type || 'application/octet-stream',
           category: inferCategoryByFile(file),
         });
+        if (result !== 'created') skipped.push(file.name);
+      }
+      if (skipped.length > 0) {
+        setAssetOperationError(
+          `AST-3002: ${skipped.length} asset(s) were not imported: ${skipped.join(', ')}.`
+        );
       }
     } catch (error) {
       setAssetOperationError(
@@ -624,12 +657,19 @@ export function PublicResourcePage({
     if (!files || files.length === 0) return;
     setAssetOperationError(undefined);
     try {
+      const skipped: string[] = [];
       for (const file of Array.from(files)) {
-        await createAssetDocument(parentId, file.name, {
+        const result = await createAssetDocument(parentId, file.name, {
           contents: new Uint8Array(await file.arrayBuffer()),
           mediaType: file.type || 'application/octet-stream',
           category: forcedCategory,
         });
+        if (result !== 'created') skipped.push(file.name);
+      }
+      if (skipped.length > 0) {
+        setAssetOperationError(
+          `AST-3002: ${skipped.length} asset(s) were not imported: ${skipped.join(', ')}.`
+        );
       }
     } catch (error) {
       setAssetOperationError(

@@ -34,6 +34,66 @@ type ValueChecker = (
 const isRecord = (value: unknown): value is UnknownRecord =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const MAXIMUM_PIR_JSON_DEPTH = 128;
+const MAXIMUM_PIR_JSON_NODES = 100_000;
+
+const inspectPirJsonStructure = (
+  value: unknown
+): PIRDecodeIssue | undefined => {
+  const pending: Array<
+    Readonly<{ value: unknown; path: string; depth: number }>
+  > = [{ value, path: '$', depth: 0 }];
+  const seen = new WeakSet<object>();
+  let nodes = 0;
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    nodes += 1;
+    if (nodes > MAXIMUM_PIR_JSON_NODES) {
+      return {
+        code: 'PIR_WIRE_INVALID',
+        path: current.path,
+        message: 'PIR JSON node budget was exceeded.',
+      };
+    }
+    if (current.depth > MAXIMUM_PIR_JSON_DEPTH) {
+      return {
+        code: 'PIR_WIRE_INVALID',
+        path: current.path,
+        message: 'PIR JSON nesting depth was exceeded.',
+      };
+    }
+    if (current.value === null || typeof current.value !== 'object') continue;
+    if (seen.has(current.value)) {
+      return {
+        code: 'PIR_WIRE_INVALID',
+        path: current.path,
+        message: 'PIR JSON values must not contain cycles or shared objects.',
+      };
+    }
+    seen.add(current.value);
+    if (Array.isArray(current.value)) {
+      for (let index = current.value.length - 1; index >= 0; index -= 1) {
+        pending.push({
+          value: current.value[index],
+          path: `${current.path}[${index}]`,
+          depth: current.depth + 1,
+        });
+      }
+      continue;
+    }
+    const entries = Object.entries(current.value as UnknownRecord);
+    for (let index = entries.length - 1; index >= 0; index -= 1) {
+      const [key, child] = entries[index]!;
+      pending.push({
+        value: child,
+        path: `${current.path}.${key}`,
+        depth: current.depth + 1,
+      });
+    }
+  }
+  return undefined;
+};
+
 const addIssue = (
   issues: IssueCollector,
   path: string,
@@ -1283,6 +1343,8 @@ const collectDomainWireVersionIssues = (
 
 /** Decodes any registered wire schema into the version-neutral domain model. */
 export const decodePirDocument = (value: unknown): PIRDecodeResult => {
+  const structureIssue = inspectPirJsonStructure(value);
+  if (structureIssue) return { ok: false, issues: [structureIssue] };
   const upgraded = upgradePirWireDocument(value);
   if (!upgraded.ok) {
     return {
@@ -1303,6 +1365,8 @@ export const decodePirDocument = (value: unknown): PIRDecodeResult => {
 export const tryNormalizePirDocument = (
   document: PIRDocument
 ): PIRDecodeResult => {
+  const structureIssue = inspectPirJsonStructure(document);
+  if (structureIssue) return { ok: false, issues: [structureIssue] };
   const versionIssues = collectDomainWireVersionIssues(document);
   return versionIssues.length > 0
     ? { ok: false, issues: versionIssues }

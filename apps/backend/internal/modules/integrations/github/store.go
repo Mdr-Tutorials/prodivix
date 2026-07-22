@@ -419,6 +419,26 @@ SET installation_id = EXCLUDED.installation_id,
     repo = EXCLUDED.repo,
     default_branch = EXCLUDED.default_branch,
     branch = EXCLUDED.branch,
+    pir_dirty = CASE WHEN (github_repository_bindings.installation_id, github_repository_bindings.owner, github_repository_bindings.repo, github_repository_bindings.default_branch, github_repository_bindings.branch)
+        IS DISTINCT FROM (EXCLUDED.installation_id, EXCLUDED.owner, EXCLUDED.repo, EXCLUDED.default_branch, EXCLUDED.branch) THEN TRUE ELSE github_repository_bindings.pir_dirty END,
+    pir_last_synced_rev = CASE WHEN (github_repository_bindings.installation_id, github_repository_bindings.owner, github_repository_bindings.repo, github_repository_bindings.default_branch, github_repository_bindings.branch)
+        IS DISTINCT FROM (EXCLUDED.installation_id, EXCLUDED.owner, EXCLUDED.repo, EXCLUDED.default_branch, EXCLUDED.branch) THEN NULL ELSE github_repository_bindings.pir_last_synced_rev END,
+    pir_last_synced_at = CASE WHEN (github_repository_bindings.installation_id, github_repository_bindings.owner, github_repository_bindings.repo, github_repository_bindings.default_branch, github_repository_bindings.branch)
+        IS DISTINCT FROM (EXCLUDED.installation_id, EXCLUDED.owner, EXCLUDED.repo, EXCLUDED.default_branch, EXCLUDED.branch) THEN NULL ELSE github_repository_bindings.pir_last_synced_at END,
+    pir_last_commit_sha = CASE WHEN (github_repository_bindings.installation_id, github_repository_bindings.owner, github_repository_bindings.repo, github_repository_bindings.default_branch, github_repository_bindings.branch)
+        IS DISTINCT FROM (EXCLUDED.installation_id, EXCLUDED.owner, EXCLUDED.repo, EXCLUDED.default_branch, EXCLUDED.branch) THEN NULL ELSE github_repository_bindings.pir_last_commit_sha END,
+    pir_last_error_code = CASE WHEN (github_repository_bindings.installation_id, github_repository_bindings.owner, github_repository_bindings.repo, github_repository_bindings.default_branch, github_repository_bindings.branch)
+        IS DISTINCT FROM (EXCLUDED.installation_id, EXCLUDED.owner, EXCLUDED.repo, EXCLUDED.default_branch, EXCLUDED.branch) THEN NULL ELSE github_repository_bindings.pir_last_error_code END,
+    artifacts_dirty = CASE WHEN (github_repository_bindings.installation_id, github_repository_bindings.owner, github_repository_bindings.repo, github_repository_bindings.default_branch, github_repository_bindings.branch)
+        IS DISTINCT FROM (EXCLUDED.installation_id, EXCLUDED.owner, EXCLUDED.repo, EXCLUDED.default_branch, EXCLUDED.branch) THEN TRUE ELSE github_repository_bindings.artifacts_dirty END,
+    artifacts_last_synced_rev = CASE WHEN (github_repository_bindings.installation_id, github_repository_bindings.owner, github_repository_bindings.repo, github_repository_bindings.default_branch, github_repository_bindings.branch)
+        IS DISTINCT FROM (EXCLUDED.installation_id, EXCLUDED.owner, EXCLUDED.repo, EXCLUDED.default_branch, EXCLUDED.branch) THEN NULL ELSE github_repository_bindings.artifacts_last_synced_rev END,
+    artifacts_last_synced_at = CASE WHEN (github_repository_bindings.installation_id, github_repository_bindings.owner, github_repository_bindings.repo, github_repository_bindings.default_branch, github_repository_bindings.branch)
+        IS DISTINCT FROM (EXCLUDED.installation_id, EXCLUDED.owner, EXCLUDED.repo, EXCLUDED.default_branch, EXCLUDED.branch) THEN NULL ELSE github_repository_bindings.artifacts_last_synced_at END,
+    artifacts_last_commit_sha = CASE WHEN (github_repository_bindings.installation_id, github_repository_bindings.owner, github_repository_bindings.repo, github_repository_bindings.default_branch, github_repository_bindings.branch)
+        IS DISTINCT FROM (EXCLUDED.installation_id, EXCLUDED.owner, EXCLUDED.repo, EXCLUDED.default_branch, EXCLUDED.branch) THEN NULL ELSE github_repository_bindings.artifacts_last_commit_sha END,
+    artifacts_last_error_code = CASE WHEN (github_repository_bindings.installation_id, github_repository_bindings.owner, github_repository_bindings.repo, github_repository_bindings.default_branch, github_repository_bindings.branch)
+        IS DISTINCT FROM (EXCLUDED.installation_id, EXCLUDED.owner, EXCLUDED.repo, EXCLUDED.default_branch, EXCLUDED.branch) THEN NULL ELSE github_repository_bindings.artifacts_last_error_code END,
     updated_at = NOW()
 RETURNING id, user_id, project_id, workspace_id, provider, installation_id, owner, repo, default_branch, status, branch,
 	pir_dirty, pir_last_synced_rev, pir_last_synced_at, pir_last_commit_sha, pir_last_error_code,

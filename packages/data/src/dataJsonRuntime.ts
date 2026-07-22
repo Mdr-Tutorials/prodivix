@@ -1,5 +1,8 @@
 import type { DataJsonValue } from './data.types';
 
+export const compareDataText = (left: string, right: string): number =>
+  left < right ? -1 : left > right ? 1 : 0;
+
 /** Clones untrusted runtime JSON into a deeply immutable value under explicit resource budgets. */
 export const cloneDataJsonValue = (value: DataJsonValue): DataJsonValue => {
   const ancestors = new Set<object>();
@@ -37,7 +40,7 @@ export const cloneDataJsonValue = (value: DataJsonValue): DataJsonValue => {
       : Object.freeze(
           Object.fromEntries(
             Object.entries(candidate)
-              .sort(([left], [right]) => left.localeCompare(right))
+              .sort(([left], [right]) => compareDataText(left, right))
               .map(([key, entry]) => {
                 textUnits += key.length;
                 if (textUnits > 8 * 1_024 * 1_024)

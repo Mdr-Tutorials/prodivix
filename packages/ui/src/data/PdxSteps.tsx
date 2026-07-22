@@ -1,5 +1,6 @@
 import './PdxSteps.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import { Check } from 'lucide-react';
 import type React from 'react';
 
@@ -26,7 +27,7 @@ function PdxSteps({
   dataAttributes = {},
 }: PdxStepsProps) {
   const fullClassName = `PdxSteps ${direction} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   return (
     <ol

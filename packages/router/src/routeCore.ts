@@ -820,18 +820,40 @@ const matchChildren = (
     const remaining = segments.slice(result.consumed);
     const nextEntry = { node: child, params: result.params };
     if (!remaining.length) {
-      const indexChild = (child.children ?? []).find(
-        (candidate) => candidate.index
-      );
-      if (indexChild)
-        return [...chain, nextEntry, { node: indexChild, params: {} }];
-      return [...chain, nextEntry];
+      return completeEmptyRouteChain(child, [...chain, nextEntry]);
     }
     const nested = matchChildren(child, remaining, [...chain, nextEntry]);
     if (nested) return nested;
   }
 
   return null;
+};
+
+const completeEmptyRouteChain = (
+  parent: WorkspaceRouteNode,
+  chain: Array<{ node: WorkspaceRouteNode; params: Record<string, string> }>,
+  visited = new Set<string>()
+): Array<{ node: WorkspaceRouteNode; params: Record<string, string> }> => {
+  if (visited.has(parent.id)) return chain;
+  const nextVisited = new Set(visited).add(parent.id);
+  const children = parent.children ?? [];
+  const indexChild = children.find((candidate) => candidate.index);
+  if (indexChild) return [...chain, { node: indexChild, params: {} }];
+  const pathlessChild = [...children]
+    .filter(
+      (candidate) =>
+        !candidate.index && createSegmentMatchers(candidate).length === 0
+    )
+    .sort((left, right) =>
+      left.id < right.id ? -1 : left.id > right.id ? 1 : 0
+    )[0];
+  return pathlessChild
+    ? completeEmptyRouteChain(
+        pathlessChild,
+        [...chain, { node: pathlessChild, params: {} }],
+        nextVisited
+      )
+    : chain;
 };
 
 const toResolvedRouteMatchChain = (
@@ -863,15 +885,9 @@ const matchRouteManifestEntries = (
 ): Array<{ node: WorkspaceRouteNode; params: Record<string, string> }> => {
   const segments = splitPath(path);
   if (!segments.length) {
-    const indexChild = (manifest.root.children ?? []).find(
-      (candidate) => candidate.index
-    );
-    return indexChild
-      ? [
-          { node: manifest.root, params: {} },
-          { node: indexChild, params: {} },
-        ]
-      : [{ node: manifest.root, params: {} }];
+    return completeEmptyRouteChain(manifest.root, [
+      { node: manifest.root, params: {} },
+    ]);
   }
   return (
     matchChildren(manifest.root, segments, [
@@ -1010,7 +1026,8 @@ export const resolveNavigateTarget = (
   if (linkKind === 'external') {
     return { kind: 'external', url: rawPath };
   }
-  if (rawPath.includes(':') && !rawPath.startsWith('/')) {
+  const pathPart = rawPath.split(/[?#]/u, 1)[0] ?? '';
+  if (/^[a-z][a-z0-9+.-]*:/iu.test(pathPart) && !rawPath.startsWith('/')) {
     return { kind: 'unmatched', path: rawPath };
   }
 

@@ -135,11 +135,18 @@ export const validateJsonValue = (
 
       if (isArray) {
         const array = value as unknown[];
-        const unexpectedKey = ownKeys.find(
-          (key) =>
-            key !== 'length' &&
-            (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/.test(key))
-        );
+        const unexpectedKey = ownKeys.find((key) => {
+          if (key === 'length') return false;
+          if (typeof key !== 'string') return true;
+          const index = Number(key);
+          return !(
+            Number.isInteger(index) &&
+            index >= 0 &&
+            index < 2 ** 32 - 1 &&
+            String(index) === key &&
+            index < array.length
+          );
+        });
         if (unexpectedKey !== undefined) {
           return nonJsonDiagnostic(
             appendJsonPointer(manifestPath, String(unexpectedKey)),

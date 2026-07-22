@@ -1,5 +1,6 @@
 import './PdxSlider.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import { useEffect, useState } from 'react';
 import type React from 'react';
 
@@ -64,7 +65,7 @@ function PdxSlider({
 
   const fullClassName =
     `PdxSlider ${size} ${disabled ? 'Disabled' : ''} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   return (
     <div
@@ -81,6 +82,7 @@ function PdxSlider({
       )}
       {description && <div className="PdxFieldDescription">{description}</div>}
       <input
+        aria-label={label ?? 'Slider'}
         className="PdxSliderInput"
         type="range"
         min={min}

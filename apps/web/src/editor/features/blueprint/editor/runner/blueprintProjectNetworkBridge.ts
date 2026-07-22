@@ -50,9 +50,10 @@ const acceptsPreviewMessageOrigin = (input: {
 }): boolean => {
   const preview = readPreviewOrigin(input.previewUrl);
   if (!preview) return false;
-  return input.provider === 'browser'
-    ? input.messageOrigin === preview.origin
-    : input.messageOrigin === 'null' && isRemoteCapabilityPreview(preview);
+  return (
+    input.messageOrigin === preview.origin &&
+    (input.provider === 'browser' || isRemoteCapabilityPreview(preview))
+  );
 };
 
 /** Identity-fences every bridge decoder to the currently mounted iframe Window. */

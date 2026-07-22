@@ -15,7 +15,10 @@ import {
   type DataSourceDocument,
 } from '@prodivix/data';
 import type { RuntimeZone } from '@prodivix/runtime-core';
-import { DATA_HTTP_ADAPTER_ID } from './dataHttpAdapter';
+import {
+  DATA_HTTP_ADAPTER_ID,
+  DATA_HTTP_RESERVED_HEADER_NAMES,
+} from './dataHttpAdapter';
 
 export const DATA_OPENAPI_IMPORT_LIMITS = Object.freeze({
   maxDocumentBytes: 4 * 1024 * 1024,
@@ -483,6 +486,23 @@ const convertSchemaNode = (
           continue;
         }
         if (entry.startsWith('#/$defs/__prodivix_openapi__')) {
+          const definitionKey = decodePointerToken(
+            entry.slice('#/$defs/'.length)
+          );
+          const componentName = definitionKey?.startsWith(
+            '__prodivix_openapi__'
+          )
+            ? definitionKey.slice('__prodivix_openapi__'.length)
+            : undefined;
+          if (!componentName || !componentNames.has(componentName)) {
+            issue(
+              issues,
+              DATA_OPENAPI_IMPORT_ISSUE_CODES.unsupportedShape,
+              childPath(currentPath, key),
+              'Internal OpenAPI component references must resolve to an imported component.'
+            );
+            continue;
+          }
           entries.push(['$ref', entry]);
           continue;
         }
@@ -632,6 +652,18 @@ const attachComponentDefinitions = (
   const existingDefinitions = isPlainRecord(converted.$defs)
     ? converted.$defs
     : {};
+  const collidingDefinition = reachableNames.find((name) =>
+    Object.hasOwn(existingDefinitions, componentDefinitionKey(name))
+  );
+  if (collidingDefinition) {
+    issue(
+      issues,
+      DATA_OPENAPI_IMPORT_ISSUE_CODES.unsupportedShape,
+      `${path}/$defs/${pointerSegment(componentDefinitionKey(collidingDefinition))}`,
+      'Imported schemas may not define reserved OpenAPI component projection keys.'
+    );
+    return converted;
+  }
   const definitions = Object.fromEntries([
     ...Object.entries(existingDefinitions),
     ...reachableNames.map((name) => [
@@ -768,18 +800,13 @@ const parseParameters = (
       const normalizedName = location === 'header' ? name.toLowerCase() : name;
       if (
         location === 'header' &&
-        [
-          'authorization',
-          'cookie',
-          'proxy-authorization',
-          'set-cookie',
-        ].includes(normalizedName)
+        DATA_HTTP_RESERVED_HEADER_NAMES.has(normalizedName)
       ) {
         issue(
           issues,
           DATA_OPENAPI_IMPORT_ISSUE_CODES.securityUnsupported,
           childPath(entryPath, 'name'),
-          'Credential headers must be modeled by a security scheme placeholder.'
+          'Reserved HTTP headers cannot be imported as parameter mappings.'
         );
         return;
       }

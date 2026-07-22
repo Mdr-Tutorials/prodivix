@@ -144,7 +144,8 @@ export const runDataOperationTest = async (input: {
     } else {
       if (
         input.test.expected.value !== undefined &&
-        stableJson(actual.value) !== stableJson(input.test.expected.value)
+        stableJson(actual.value) !==
+          stableJson(cloneDataJsonValue(input.test.expected.value))
       )
         issues.push(
           Object.freeze({

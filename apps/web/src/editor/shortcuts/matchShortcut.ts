@@ -65,11 +65,21 @@ const normalizeEventKey = (event: KeyboardEvent) => {
   return KEY_ALIASES[normalized] ?? normalized;
 };
 
+const normalizeAltCodeKey = (event: KeyboardEvent): string | undefined => {
+  if (/^Key[A-Z]$/.test(event.code)) return event.code.slice(3).toLowerCase();
+  if (/^Digit[0-9]$/.test(event.code)) return event.code.slice(5);
+  return undefined;
+};
+
 export const matchShortcut = (
   shortcut: ParsedShortcut,
   event: KeyboardEvent
 ) => {
-  if (normalizeEventKey(event) !== shortcut.key) return false;
+  const eventKey = normalizeEventKey(event);
+  const keyMatches =
+    eventKey === shortcut.key ||
+    (shortcut.alt && normalizeAltCodeKey(event) === shortcut.key);
+  if (!keyMatches) return false;
   return (
     event.ctrlKey === shortcut.ctrl &&
     event.altKey === shortcut.alt &&

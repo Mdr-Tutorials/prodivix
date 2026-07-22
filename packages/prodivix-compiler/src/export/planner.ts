@@ -201,7 +201,7 @@ const summarizeDependencies = (
   }));
 
 const getOriginSummaryId = (origin: ExportSourceOrigin) =>
-  [
+  JSON.stringify([
     origin.kind,
     origin.owner ?? '',
     origin.packageName ?? '',
@@ -209,7 +209,8 @@ const getOriginSummaryId = (origin: ExportSourceOrigin) =>
     origin.url ?? '',
     origin.label ?? '',
     origin.contentHash ?? '',
-  ].join(':');
+    origin.license ?? '',
+  ]);
 
 const summarizeOrigins = (input: {
   files: ExportFile[];
@@ -719,10 +720,23 @@ export class ProductionExportPlanner {
     const entryModuleFilePath = modulesWithStyleImports.find(
       (module) => module.id === program.entryModuleId
     )?.filePath;
+    if (program.entryModuleId && !entryModuleFilePath) {
+      diagnostics.push({
+        code: 'EXP-4001',
+        severity: 'error',
+        source: 'export',
+        message: `Export entry module "${program.entryModuleId}" was not found.`,
+        path: '/entryModuleId',
+        suggestion:
+          'Add the declared entry module to the export program or select an existing module.',
+      });
+    }
     const entryFilePath =
       program.entryFilePath ??
       entryModuleFilePath ??
-      modulesWithStyleImports[0]?.filePath;
+      (program.entryModuleId
+        ? undefined
+        : modulesWithStyleImports[0]?.filePath);
     const originsFile = createPolicyMetadataFile({
       id: 'export-origins:prodivix',
       path: joinExportPath('.prodivix', 'origins.json'),

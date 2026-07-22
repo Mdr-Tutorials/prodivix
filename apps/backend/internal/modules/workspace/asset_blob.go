@@ -355,11 +355,17 @@ func validateWorkspaceAssetBlobReferences(
 	workspaceID string,
 	documents map[string]WorkspaceDocumentRecord,
 ) error {
+	type expectedAssetBlob struct {
+		documentID string
+		reference  WorkspaceAssetBlobReference
+	}
 	documentIDs := make([]string, 0, len(documents))
 	for documentID := range documents {
 		documentIDs = append(documentIDs, documentID)
 	}
 	sort.Strings(documentIDs)
+	expectedByDigest := make(map[string]expectedAssetBlob)
+	digests := make(map[string]struct{})
 	for _, documentID := range documentIDs {
 		document := documents[documentID]
 		if document.Type != WorkspaceDocumentTypeAsset {
@@ -369,20 +375,59 @@ func validateWorkspaceAssetBlobReferences(
 		if err != nil {
 			return err
 		}
-		const query = `SELECT media_type, byte_length
-FROM workspace_asset_blobs
-WHERE workspace_id = $1 AND digest = $2`
-		var storedMediaType string
-		var storedByteLength int64
-		if err := tx.QueryRowContext(ctx, query, workspaceID, reference.Digest).Scan(&storedMediaType, &storedByteLength); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("%w: asset document %s", ErrWorkspaceAssetBlobNotFound, document.ID)
-			}
-			return err
-		}
-		if storedMediaType != reference.MediaType || storedByteLength != reference.ByteLength {
+		if expected, exists := expectedByDigest[reference.Digest]; exists &&
+			(expected.reference.MediaType != reference.MediaType || expected.reference.ByteLength != reference.ByteLength) {
 			return fmt.Errorf("%w: asset document %s", ErrWorkspaceAssetBlobConflict, document.ID)
 		}
+		expectedByDigest[reference.Digest] = expectedAssetBlob{documentID: document.ID, reference: reference}
+		digests[reference.Digest] = struct{}{}
+	}
+	if len(expectedByDigest) == 0 {
+		return nil
+	}
+	digestJSON, err := marshalWorkspaceAssetDigestSet(digests)
+	if err != nil {
+		return err
+	}
+	const query = `SELECT digest, media_type, byte_length
+FROM workspace_asset_blobs
+WHERE workspace_id = $1
+  AND digest IN (
+	SELECT value
+	FROM jsonb_array_elements_text($2::jsonb) AS digest_set(value)
+  )
+ORDER BY digest`
+	rows, err := tx.QueryContext(ctx, query, workspaceID, digestJSON)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var digest, storedMediaType string
+		var storedByteLength int64
+		if err := rows.Scan(&digest, &storedMediaType, &storedByteLength); err != nil {
+			return err
+		}
+		expected, exists := expectedByDigest[digest]
+		if !exists || storedMediaType != expected.reference.MediaType || storedByteLength != expected.reference.ByteLength {
+			documentID := expected.documentID
+			if documentID == "" {
+				documentID = digest
+			}
+			return fmt.Errorf("%w: asset document %s", ErrWorkspaceAssetBlobConflict, documentID)
+		}
+		delete(expectedByDigest, digest)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(expectedByDigest) > 0 {
+		missing := make([]string, 0, len(expectedByDigest))
+		for digest := range expectedByDigest {
+			missing = append(missing, digest)
+		}
+		sort.Strings(missing)
+		return fmt.Errorf("%w: asset document %s", ErrWorkspaceAssetBlobNotFound, expectedByDigest[missing[0]].documentID)
 	}
 	return nil
 }

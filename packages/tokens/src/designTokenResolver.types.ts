@@ -115,6 +115,8 @@ export const DESIGN_TOKEN_RESOLUTION_ISSUE_CODES = Object.freeze({
   missingModifier: 'DTR_INPUT_MODIFIER_MISSING',
   unknownModifier: 'DTR_INPUT_MODIFIER_UNKNOWN',
   invalidContext: 'DTR_INPUT_CONTEXT_INVALID',
+  referenceMissing: 'DTR_REFERENCE_MISSING',
+  referenceCycle: 'DTR_REFERENCE_CYCLE',
 } as const);
 
 export type DesignTokenResolutionIssueCode =

@@ -13,6 +13,7 @@ import {
   type ReactNode,
   type RefAttributes,
 } from 'react';
+import { renderUnknownCellValue } from './renderUnknownCellValue';
 
 export interface PdxTableColumn<T = Record<string, unknown>> {
   align?: 'Left' | 'Center' | 'Right';
@@ -160,7 +161,7 @@ function PdxTableInner<T extends Record<string, unknown>>(
                         >
                           {column.render
                             ? column.render(value, record, index)
-                            : (value as ReactNode)}
+                            : renderUnknownCellValue(value)}
                         </td>
                       );
                     })}

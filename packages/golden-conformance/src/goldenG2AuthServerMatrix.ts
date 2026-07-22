@@ -61,6 +61,7 @@ import {
 } from './goldenG2AuthServerFixture';
 
 const execFileAsync = promisify(execFile);
+const GOLDEN_SERVER_FUNCTION_TIMEOUT_MS = 120_000;
 
 export type GoldenG2AuthServerTarget =
   | 'browser-static'
@@ -482,6 +483,8 @@ const runIsolatedProduction = async (input: {
     await execFileAsync(process.execPath, [plan.entrypointFilePath], {
       cwd: root,
       windowsHide: true,
+      timeout: GOLDEN_SERVER_FUNCTION_TIMEOUT_MS,
+      killSignal: 'SIGKILL',
     });
     let authorityConsumed = false;
     try {
@@ -649,6 +652,8 @@ const runIsolatedSourceMutationProduction = async (input: {
     await execFileAsync(process.execPath, [plan.entrypointFilePath], {
       cwd: root,
       windowsHide: true,
+      timeout: GOLDEN_SERVER_FUNCTION_TIMEOUT_MS,
+      killSignal: 'SIGKILL',
     });
     const runtime = new Uint8Array(await readFile(targetPath));
     let authorityConsumed = false;
@@ -849,6 +854,8 @@ const runIsolatedSecretProduction = async (input: {
     await execFileAsync(process.execPath, [plan.entrypointFilePath], {
       cwd: root,
       windowsHide: true,
+      timeout: GOLDEN_SERVER_FUNCTION_TIMEOUT_MS,
+      killSignal: 'SIGKILL',
     });
     let secretMaterialConsumed = false;
     try {

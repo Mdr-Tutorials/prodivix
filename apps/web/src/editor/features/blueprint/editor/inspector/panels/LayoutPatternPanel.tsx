@@ -205,7 +205,9 @@ function LayoutPatternPanelView({
                   size="Small"
                   value={String(value ?? definition.defaultValue)}
                   onValueChange={(next) => {
-                    const parsed = Number(next);
+                    const value = next.trim();
+                    if (!value) return;
+                    const parsed = Number(value);
                     if (!Number.isFinite(parsed)) return;
                     updatePatternParam(key, parsed);
                   }}

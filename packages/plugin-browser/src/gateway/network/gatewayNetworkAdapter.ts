@@ -147,7 +147,7 @@ export const createGatewayNetworkAdapter = (
               { networkOrigin: target.origin }
             );
           }
-          if (response.status >= 300 && response.status < 400) {
+          if ([301, 302, 303, 307, 308].includes(response.status)) {
             const location = response.headers.get('location');
             if (!location || redirects >= policy.maxRedirects) {
               return gatewayNetworkDenied(

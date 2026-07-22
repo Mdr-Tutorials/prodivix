@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, apiBinaryRequest, apiRequest } from '@/infra/api';
+import {
+  ApiError,
+  apiBinaryRequest,
+  apiRequest,
+  subscribeApiUnauthorized,
+} from '@/infra/api';
 
 describe('apiRequest', () => {
   afterEach(() => {
@@ -55,6 +60,53 @@ describe('apiRequest', () => {
       retryable: true,
       payload,
     });
+  });
+
+  it.each([
+    ['invalid JSON', '{'],
+    ['an empty body', ''],
+  ])(
+    'keeps non-success %s responses inside the ApiError contract',
+    async (_, body) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          new Response(body, {
+            status: 502,
+            headers: { 'content-type': 'application/json' },
+          })
+        )
+      );
+
+      const error = await apiRequest('/upstream').catch(
+        (candidate: unknown) => candidate
+      );
+
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).toMatchObject({ status: 502 });
+    }
+  );
+
+  it('publishes authenticated 401 responses without allowing observers to replace the ApiError', async () => {
+    const observer = vi.fn(() => {
+      throw new Error('observer failure');
+    });
+    const unsubscribe = subscribeApiUnauthorized(observer);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response('', {
+          status: 401,
+          headers: { 'content-type': 'application/json' },
+        })
+      )
+    );
+
+    await expect(
+      apiRequest('/session', { token: 'expired-token' })
+    ).rejects.toBeInstanceOf(ApiError);
+    expect(observer).toHaveBeenCalledOnce();
+    unsubscribe();
   });
 
   it('returns exact binary bytes and the declared response media type', async () => {

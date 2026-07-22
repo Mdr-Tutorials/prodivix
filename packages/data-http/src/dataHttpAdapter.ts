@@ -1,4 +1,5 @@
 import {
+  compareDataText,
   createDataOperationIdempotencyKey,
   type DataConfigurationValue,
   type DataOperationAbortSignal,
@@ -119,7 +120,7 @@ const appendQuery = (url: URL, input: DataJsonValue): void => {
       'HTTP query input must be an object.'
     );
   for (const [key, value] of Object.entries(input as DataJsonObject).sort(
-    ([left], [right]) => left.localeCompare(right)
+    ([left], [right]) => compareDataText(left, right)
   )) {
     if (
       value !== null &&
@@ -194,7 +195,7 @@ const readParameterMappings = (
         (wireName !== wireName.toLowerCase() ||
           wireName.length > 128 ||
           !/^[!#$%&'*+.^_|~0-9a-z-]+$/u.test(wireName) ||
-          reservedIdempotencyHeaders.has(wireName))
+          DATA_HTTP_RESERVED_HEADER_NAMES.has(wireName))
       )
         throw new DataHttpOperationError(
           'DATA_HTTP_CONFIGURATION_INVALID',
@@ -441,7 +442,7 @@ const secretConfiguration = (
   return value;
 };
 
-const reservedIdempotencyHeaders = new Set([
+export const DATA_HTTP_RESERVED_HEADER_NAMES: ReadonlySet<string> = new Set([
   'authorization',
   'connection',
   'content-length',
@@ -457,7 +458,7 @@ const safeHeaderName = (value: string): boolean =>
   value === value.toLowerCase() &&
   value.length <= 128 &&
   /^[!#$%&'*+.^_|~0-9a-z-]+$/u.test(value) &&
-  !reservedIdempotencyHeaders.has(value);
+  !DATA_HTTP_RESERVED_HEADER_NAMES.has(value);
 
 const idempotencyHeader = (
   value: DataConfigurationValue | undefined,
@@ -473,7 +474,7 @@ const idempotencyHeader = (
     header !== header.toLowerCase() ||
     header.length > 128 ||
     !/^[!#$%&'*+.^_|~0-9a-z-]+$/u.test(header) ||
-    reservedIdempotencyHeaders.has(header)
+    DATA_HTTP_RESERVED_HEADER_NAMES.has(header)
   )
     throw new DataHttpOperationError(
       'DATA_HTTP_CONFIGURATION_INVALID',

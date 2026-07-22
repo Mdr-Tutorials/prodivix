@@ -19,6 +19,7 @@ export type ProdivixAiFetchResponse = {
   status: number;
   statusText: string;
   body?: ReadableStream<Uint8Array> | null;
+  text?(): Promise<string>;
   json(): Promise<unknown>;
 };
 
@@ -31,6 +32,26 @@ export type ProdivixAiFetch = (
     signal?: AbortSignal;
   }
 ) => Promise<ProdivixAiFetchResponse>;
+
+export const readOpenAICompatibleJsonResponse = async (
+  response: ProdivixAiFetchResponse
+): Promise<unknown> => {
+  let rawResponse: string | undefined;
+  try {
+    if (response.text) {
+      rawResponse = await response.text();
+      return JSON.parse(rawResponse) as unknown;
+    }
+    return await response.json();
+  } catch (caught) {
+    throw new LlmProviderError(
+      caught instanceof Error
+        ? `OpenAI-compatible provider returned invalid JSON: ${caught.message}`
+        : 'OpenAI-compatible provider returned invalid JSON.',
+      { code: 'AI-1002', rawResponse }
+    );
+  }
+};
 
 export interface OpenAICompatibleProviderOptions {
   baseURL: string;
@@ -205,7 +226,7 @@ export class OpenAICompatibleProvider implements LlmProvider {
       );
     }
 
-    const body = await response.json();
+    const body = await readOpenAICompatibleJsonResponse(response);
     const rawResponse = extractRawResponse(body);
     let structuredOutput: unknown;
 

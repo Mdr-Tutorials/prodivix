@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -126,6 +126,33 @@ const transformGeneratedModules = async (
   return transformed;
 };
 
+const terminateProcessTree = async (child: ChildProcess): Promise<void> => {
+  if (!child.pid || child.exitCode !== null) return;
+  if (process.platform !== 'win32') {
+    child.kill('SIGKILL');
+    return;
+  }
+  await new Promise<void>((resolvePromise) => {
+    const killer = spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    let settled = false;
+    const finish = (): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolvePromise();
+    };
+    const timeout = setTimeout(() => {
+      killer.kill();
+      finish();
+    }, 10_000);
+    killer.once('error', finish);
+    killer.once('close', finish);
+  });
+};
+
 const runPnpm = async (
   root: string,
   packageManager: string,
@@ -150,18 +177,23 @@ const runPnpm = async (
     };
     child.stdout?.on('data', collect);
     child.stderr?.on('data', collect);
+    let timedOut = false;
     const timeout = setTimeout(() => {
-      child.kill();
-      rejectPromise(
-        new Error(`${command} exceeded ${timeoutMs}ms.\n${output}`)
-      );
+      timedOut = true;
+      void terminateProcessTree(child).finally(() => {
+        rejectPromise(
+          new Error(`${command} exceeded ${timeoutMs}ms.\n${output}`)
+        );
+      });
     }, timeoutMs);
     child.once('error', (error) => {
       clearTimeout(timeout);
+      if (timedOut) return;
       rejectPromise(error);
     });
     child.once('close', (code) => {
       clearTimeout(timeout);
+      if (timedOut) return;
       if (code === 0) resolvePromise();
       else
         rejectPromise(

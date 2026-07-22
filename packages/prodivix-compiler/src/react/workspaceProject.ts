@@ -1102,7 +1102,7 @@ export default function App() {
     }
   }
   const Page = match.Component;
-  return <Page __pdxRuntime={workspacePirRuntime} __pdxRouteId={match.routeNodeId} />;
+  return <Page __pdxRuntime={workspacePirRuntime} __pdxRouteId={match.routeNodeId} __pdxParamsById={match.params} />;
 }
 `,
       sourceTrace: input.routeTopology.routes.flatMap(

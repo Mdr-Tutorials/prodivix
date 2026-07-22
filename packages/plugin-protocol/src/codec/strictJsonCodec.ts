@@ -23,7 +23,7 @@ export type ProtocolJsonLimits = Readonly<{
 }>;
 
 export const DEFAULT_PROTOCOL_JSON_LIMITS: ProtocolJsonLimits = Object.freeze({
-  maxBytes: 256 * 1024,
+  maxBytes: 8 * 1024 * 1024,
   maxDepth: 48,
   maxNodes: 20_000,
 });
@@ -147,6 +147,14 @@ const inspectJsonValue = (
     }
     if (current.value === null) continue;
     const valueType = typeof current.value;
+    if (
+      valueType === 'string' &&
+      !isWellFormedUnicode(current.value as string)
+    ) {
+      return protocolFailure([
+        malformed('Protocol message contains an unpaired UTF-16 surrogate.'),
+      ]);
+    }
     if (
       valueType === 'string' ||
       valueType === 'boolean' ||

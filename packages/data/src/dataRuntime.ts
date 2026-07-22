@@ -31,7 +31,7 @@ import {
   resolveDataOperationEnvironment,
   type DataOperationEnvironmentResolution,
 } from './dataEnvironmentRuntime';
-import { cloneDataJsonValue } from './dataJsonRuntime';
+import { cloneDataJsonValue, compareDataText } from './dataJsonRuntime';
 import {
   DATA_INVOCATION_ERROR_CODES,
   DataInvocationError,
@@ -575,7 +575,7 @@ export const createDataOperationAdapterRegistry =
         Object.freeze(
           [...adapters.values()]
             .map((adapter) => adapter.descriptor)
-            .sort((left, right) => left.id.localeCompare(right.id))
+            .sort((left, right) => compareDataText(left.id, right.id))
         ),
     });
   };
@@ -589,7 +589,9 @@ const validateOperationPayload = (
     validator: DataSchemaValidator;
   }>
 ): void => {
-  const schema = input.document.schemasById[input.schemaId];
+  const schema = Object.hasOwn(input.document.schemasById, input.schemaId)
+    ? input.document.schemasById[input.schemaId]
+    : undefined;
   if (!schema)
     throw new DataSchemaRuntimeError({
       code: DATA_SCHEMA_RUNTIME_ERROR_CODES.missing,
@@ -637,8 +639,12 @@ const safeRuntimeError = (
 export const executeDataOperation = async (
   input: ExecuteDataOperationInput
 ): Promise<ExecuteDataOperationResult> => {
-  const operation =
-    input.document.operationsById[input.invocation.operation.operationId];
+  const operation = Object.hasOwn(
+    input.document.operationsById,
+    input.invocation.operation.operationId
+  )
+    ? input.document.operationsById[input.invocation.operation.operationId]
+    : undefined;
   if (!operation)
     throw new Error('Data runtime operation does not exist in the document.');
   if (operation.kind === 'subscription')

@@ -8,9 +8,11 @@ export function activate(context: vscode.ExtensionContext) {
   //   )
 
   // 2. 命令
-  vscode.commands.registerCommand('prodivix.previewPIR', () => {
-    vscode.window.showInformationMessage('PIR Preview 已连接');
-  });
+  context.subscriptions.push(
+    vscode.commands.registerCommand('prodivix.previewPIR', () => {
+      vscode.window.showInformationMessage('PIR Preview 已连接');
+    })
+  );
 
   // 3. 调试适配器（稍后实现）
   //   const factory = new PIRDebugAdapterDescriptorFactory()

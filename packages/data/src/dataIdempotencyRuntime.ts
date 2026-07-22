@@ -1,6 +1,7 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 import type { DataOperationInvocation } from './dataRuntime';
+import { compareDataText } from './dataJsonRuntime';
 
 export const DATA_IDEMPOTENCY_KEY_PREFIX = 'prodivix-data-sha256-' as const;
 
@@ -21,7 +22,7 @@ const stableJson = (value: unknown): string => {
     if (Array.isArray(candidate)) return candidate.map(sort);
     return Object.fromEntries(
       Object.entries(candidate as Record<string, unknown>)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => compareDataText(left, right))
         .map(([key, entry]) => [key, sort(entry)])
     );
   };

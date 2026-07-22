@@ -184,10 +184,7 @@ const isSafeRenameName = (
   /^[A-Za-z_][A-Za-z0-9_]*$/u.test(newName) &&
   !isReservedShaderName(document.artifact.language, newName) &&
   !document.symbols.some(
-    (candidate) =>
-      candidate.id !== symbol.id &&
-      candidate.scopeId === symbol.scopeId &&
-      candidate.name === newName
+    (candidate) => candidate.id !== symbol.id && candidate.name === newName
   );
 
 /** Provides revision-bound GLSL/WGSL authoring capabilities over CodeArtifacts. */

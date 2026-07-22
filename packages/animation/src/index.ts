@@ -39,6 +39,12 @@ export {
   resolveTimelineCursorMs,
 } from './animationEvaluation';
 export {
+  isSafeAnimationCssColor,
+  isSafeAnimationCssFilter,
+  isSafeAnimationCssFragmentId,
+  isSafeAnimationCssTransform,
+} from './animationCssSafety';
+export {
   ANIMATION_EFFECT_CAPABILITIES,
   getAnimationTimelineTotalDurationMs,
   getAnimationTrackEffectCapability,

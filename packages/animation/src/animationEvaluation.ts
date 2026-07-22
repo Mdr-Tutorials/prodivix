@@ -6,6 +6,10 @@ import type {
   SvgFilterDefinition,
 } from './animation.types';
 import { resolveCssFilterUnit } from './animationCodec';
+import {
+  isSafeAnimationCssColor,
+  isSafeAnimationCssFragmentId,
+} from './animationCssSafety';
 
 type EasingFunction = (value: number) => number;
 type SvgFilterEditMap = Map<
@@ -25,9 +29,16 @@ const parseCubicBezier = (
     );
   if (!match) return null;
   const numbers = match.slice(1).map((value) => Number.parseFloat(value));
-  return numbers.some(Number.isNaN)
-    ? null
-    : (numbers as [number, number, number, number]);
+  if (
+    numbers.some(Number.isNaN) ||
+    numbers[0]! < 0 ||
+    numbers[0]! > 1 ||
+    numbers[2]! < 0 ||
+    numbers[2]! > 1
+  ) {
+    return null;
+  }
+  return numbers as [number, number, number, number];
 };
 
 export const isSupportedAnimationEasing = (easing?: string): boolean => {
@@ -214,7 +225,11 @@ const applyTimeline = (
       const value = resolveKeyframedValue(track.keyframes, cursorMs);
       if (track.kind === 'style') {
         if (track.property === 'opacity') opacity = coerceNumber(value);
-        else if (track.property === 'color' && typeof value === 'string')
+        else if (
+          track.property === 'color' &&
+          typeof value === 'string' &&
+          isSafeAnimationCssColor(value)
+        )
           color = value;
         else if (track.property === 'transform.translateX')
           translateX.push(coerceNumber(value));
@@ -232,6 +247,7 @@ const applyTimeline = (
         return;
       }
 
+      if (!isSafeAnimationCssFragmentId(track.filterId)) return;
       const filter = `url(#${track.filterId})`;
       if (!filters.includes(filter)) filters.push(filter);
       const primitives = filterEditsByFilterId.get(track.filterId) ?? new Map();

@@ -304,11 +304,13 @@ export const createAvailabilityLifecycle = <
             context.currentOwners.set(manifest.id, previous.owner);
           } else {
             context.records.set(manifest.id, candidate);
-            await context.cleanupRecord(
-              candidate,
-              operation.operationId,
-              'activation-rollback',
-              true
+            diagnostics.push(
+              ...(await context.cleanupRecord(
+                candidate,
+                operation.operationId,
+                'activation-rollback',
+                true
+              ))
             );
           }
           return publishFailedCandidate(

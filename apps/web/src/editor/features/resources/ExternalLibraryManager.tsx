@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEditorStore } from '@/editor/store/useEditorStore';
 import {
@@ -78,6 +78,9 @@ export function ExternalLibraryManager({
     () => buildExternalLibrariesValueFromWorkspace(workspaceDocumentsById),
     [workspaceDocumentsById]
   );
+  const latestExternalResourceValueRef = useRef(externalResourceValue);
+  const externalPersistenceTailRef = useRef(Promise.resolve());
+  const pendingExternalPersistenceRef = useRef(0);
   const [registeredIconLibraries, setRegisteredIconLibraries] = useState<
     LibraryEntry[]
   >([]);
@@ -195,33 +198,37 @@ export function ExternalLibraryManager({
   const persistExternalResourceValue = async (
     value: WorkspaceExternalLibrariesValue
   ) => {
-    if (!workspace || workspaceReadonly || !workspaceId || !workspaceRev) {
+    const editorState = useEditorStore.getState();
+    const currentWorkspace = editorState.workspace;
+    if (!currentWorkspace || editorState.workspaceReadonly) {
       return;
     }
+    const currentWorkspaceId = currentWorkspace.id;
+    const currentWorkspaceRev = currentWorkspace.workspaceRev;
     const existing = getWorkspaceExternalLibrariesDocument(
-      workspaceDocumentsById
+      currentWorkspace.docsById
     );
     if (existing) {
       const command = createWorkspaceResourceValueUpdateCommand({
-        workspaceId,
+        workspaceId: currentWorkspaceId,
         document: existing,
         value,
         label: 'Update external libraries',
       });
       if (!command) return;
       const outcome = await dispatchWorkspaceAuthoringOperation({
-        workspace,
-        readonly: workspaceReadonly,
+        workspace: currentWorkspace,
+        readonly: editorState.workspaceReadonly,
         operation: { kind: 'command', command },
       });
       if (outcome.status === 'rejected') throw new Error(outcome.message);
       return;
     }
     const outcome = await dispatchWorkspaceVfsAuthoringIntent({
-      workspace,
-      readonly: workspaceReadonly,
+      workspace: currentWorkspace,
+      readonly: editorState.workspaceReadonly,
       request: createWorkspaceResourceDocumentRequest({
-        workspaceRev,
+        workspaceRev: currentWorkspaceRev,
         documentId: createWorkspaceResourceDocumentId(
           'external_config',
           RESOURCE_ROOTS.external
@@ -240,7 +247,29 @@ export function ExternalLibraryManager({
     ) => WorkspaceExternalLibrariesValue
   ) => {
     if (isBootstrapping) return;
-    void persistExternalResourceValue(updater(externalResourceValue));
+    const nextValue = updater(latestExternalResourceValueRef.current);
+    latestExternalResourceValueRef.current = nextValue;
+    pendingExternalPersistenceRef.current += 1;
+    const persistence = externalPersistenceTailRef.current.then(() =>
+      persistExternalResourceValue(nextValue)
+    );
+    externalPersistenceTailRef.current = persistence
+      .catch((error: unknown) => {
+        console.warn('[external-libraries] persistence failed', error);
+      })
+      .finally(() => {
+        pendingExternalPersistenceRef.current = Math.max(
+          0,
+          pendingExternalPersistenceRef.current - 1
+        );
+        if (pendingExternalPersistenceRef.current === 0) {
+          const currentWorkspace = useEditorStore.getState().workspace;
+          latestExternalResourceValueRef.current =
+            buildExternalLibrariesValueFromWorkspace(
+              currentWorkspace?.docsById ?? EMPTY_WORKSPACE_DOCUMENTS
+            );
+        }
+      });
   };
 
   const syncScope = (
@@ -449,12 +478,18 @@ export function ExternalLibraryManager({
         library.scope === 'icon'
           ? normalizeLibraryIds([...configuredIconLibraryIds, normalized])
           : configuredIconLibraryIds;
-      void persistExternalResourceValue(
+      updateExternalResourceValue((current) =>
         ensurePersistedLibrary(
           {
-            ...externalResourceValue,
-            componentLibraryIds: nextComponentIds,
-            iconLibraryIds: nextIconIds,
+            ...current,
+            componentLibraryIds: normalizeExternalComponentLibraryIds([
+              ...current.componentLibraryIds,
+              ...nextComponentIds,
+            ]),
+            iconLibraryIds: normalizeLibraryIds([
+              ...current.iconLibraryIds,
+              ...nextIconIds,
+            ]),
             mode: globalMode,
             packageSizeThresholds,
           },
@@ -585,6 +620,12 @@ export function ExternalLibraryManager({
   const openAdapterArtifact = (artifactId: string) => {
     onOpenCodeArtifact(artifactId);
   };
+
+  useEffect(() => {
+    if (pendingExternalPersistenceRef.current === 0) {
+      latestExternalResourceValueRef.current = externalResourceValue;
+    }
+  }, [externalResourceValue]);
 
   useEffect(() => {
     let disposed = false;

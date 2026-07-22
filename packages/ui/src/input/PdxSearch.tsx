@@ -97,7 +97,11 @@ const PdxSearch = forwardRef<HTMLInputElement, PdxSearchProps>(
             setCurrentValue(event.currentTarget.value);
           }}
           onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.defaultPrevented) {
+            if (
+              event.key === 'Enter' &&
+              !event.defaultPrevented &&
+              !event.nativeEvent.isComposing
+            ) {
               onSearch?.(currentValue);
             }
             onKeyDown?.(event);

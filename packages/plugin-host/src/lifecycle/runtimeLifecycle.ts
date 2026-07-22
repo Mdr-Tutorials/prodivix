@@ -29,6 +29,7 @@ import {
   runRuntimeOperation,
 } from '#host/runtime/runtimeSession';
 import type {
+  PluginRuntimeSession,
   RuntimeDeactivationReason,
   RuntimeTerminationEvent,
 } from '#host/runtime/pluginRuntimeAdapter';
@@ -43,6 +44,8 @@ export type RuntimeLifecycle<TMap extends HostContributionPointMap> = Readonly<{
   activate: PluginHost<TMap>['activate'];
   deactivate: PluginHost<TMap>['deactivate'];
 }>;
+
+const MAX_ACTIVATION_TRANSACTION_ATTEMPTS = 3;
 
 const matchesActivationEvent = (
   declared: ActivationEvent,
@@ -337,27 +340,9 @@ export const createRuntimeLifecycle = <TMap extends HostContributionPointMap>(
           return operationFailure(diagnostics);
         }
 
-        const transaction = context.registry.beginTransaction({
-          owner: record.owner,
-          expectedRegistryRevision: context.registry.getRevision(),
-          expectedPermissionRevision: record.permission.permissionRevision,
-          lifetime: 'activation',
-          operationId: operation.operationId,
-        });
-        const staged = await stagePreparedContributions(
-          transaction,
-          record.owner,
-          activationEntries.value,
-          operation.operationId,
-          'activation'
-        );
-        if (!staged.ok) {
-          diagnostics.push(...staged.diagnostics);
-          context.publishSnapshot(record, { runtime: 'failed', diagnostics });
-          return operationFailure(diagnostics);
-        }
-
-        const sessionToken = context.createId('runtime-session');
+        let entriesForAttempt = activationEntries.value;
+        let session: PluginRuntimeSession | undefined;
+        let sessionToken = '';
         const livePermission = Object.freeze({
           getSnapshot: () => {
             const current = context.records.get(pluginId);
@@ -379,72 +364,175 @@ export const createRuntimeLifecycle = <TMap extends HostContributionPointMap>(
             listener: Parameters<typeof context.subscribePermission>[1]
           ) => context.subscribePermission(record.owner, listener),
         });
-        const scopedTransaction = createScopedContributionTransaction({
-          transaction,
-          owner: record.owner,
-          permission: record.permission,
-          contracts: context.contracts,
-          operationId: operation.operationId,
-        });
-        const runtimeOutcome = await runRuntimeOperation(
-          {
+        for (
+          let attempt = 0;
+          attempt < MAX_ACTIVATION_TRANSACTION_ATTEMPTS;
+          attempt += 1
+        ) {
+          const currentRecord = context.records.get(pluginId);
+          const currentPermission =
+            currentRecord &&
+            isSamePluginOwner(currentRecord.owner, record.owner)
+              ? currentRecord.permission
+              : undefined;
+          if (!currentPermission || !context.operationIsCurrent(operation)) {
+            diagnostics.push(
+              context.supersededDiagnostic(record, operation),
+              ...(await disposePreparedContributions(
+                entriesForAttempt,
+                record.owner,
+                operation.operationId
+              ))
+            );
+            return operationFailure(diagnostics);
+          }
+
+          const transaction = context.registry.beginTransaction({
             owner: record.owner,
-            pluginVersion: record.manifest.version,
+            expectedRegistryRevision: context.registry.getRevision(),
+            expectedPermissionRevision: currentPermission.permissionRevision,
+            lifetime: 'activation',
             operationId: operation.operationId,
-            timeoutMs: context.runtimeTimeoutMs,
-            controller: operation.controller,
-          },
-          () =>
-            context.options.runtimeAdapter.activate(
-              {
-                owner: record.owner,
-                manifest: record.manifest,
-                runtimeArtifact: runtimeArtifact.value,
-                event,
-                operationId: operation.operationId,
-                sessionToken,
-                permission: livePermission,
-                contributions: scopedTransaction,
-              },
-              operation.controller.signal
-            ),
-          (lateSession) =>
-            deactivateLateRuntimeSession(lateSession, context.runtimeTimeoutMs)
-        );
-        if (runtimeOutcome.kind !== 'completed') {
-          diagnostics.push(runtimeOutcome.diagnostic);
-          const rollback = await transaction.rollback();
-          diagnostics.push(...rollback.diagnostics);
-          if (
-            runtimeOutcome.kind === 'timed-out'
-              ? context.operationCanPublish(operation)
-              : context.operationIsCurrent(operation)
-          ) {
+          });
+          const staged = await stagePreparedContributions(
+            transaction,
+            record.owner,
+            entriesForAttempt,
+            operation.operationId,
+            'activation'
+          );
+          if (!staged.ok) {
+            diagnostics.push(...staged.diagnostics);
+            context.publishSnapshot(record, { runtime: 'failed', diagnostics });
+            return operationFailure(diagnostics);
+          }
+
+          const candidateSessionToken = context.createId('runtime-session');
+          const scopedTransaction = createScopedContributionTransaction({
+            transaction,
+            owner: record.owner,
+            permission: currentPermission,
+            contracts: context.contracts,
+            operationId: operation.operationId,
+          });
+          const runtimeOutcome = await runRuntimeOperation(
+            {
+              owner: record.owner,
+              pluginVersion: record.manifest.version,
+              operationId: operation.operationId,
+              timeoutMs: context.runtimeTimeoutMs,
+              controller: operation.controller,
+            },
+            () =>
+              context.options.runtimeAdapter.activate(
+                {
+                  owner: record.owner,
+                  manifest: record.manifest,
+                  runtimeArtifact: runtimeArtifact.value,
+                  event,
+                  operationId: operation.operationId,
+                  sessionToken: candidateSessionToken,
+                  permission: livePermission,
+                  contributions: scopedTransaction,
+                },
+                operation.controller.signal
+              ),
+            (lateSession) =>
+              deactivateLateRuntimeSession(
+                lateSession,
+                context.runtimeTimeoutMs
+              )
+          );
+          if (runtimeOutcome.kind !== 'completed') {
+            diagnostics.push(runtimeOutcome.diagnostic);
+            const rollback = await transaction.rollback();
+            diagnostics.push(...rollback.diagnostics);
+            if (
+              runtimeOutcome.kind === 'timed-out'
+                ? context.operationCanPublish(operation)
+                : context.operationIsCurrent(operation)
+            ) {
+              context.publishSnapshot(record, {
+                runtime: 'failed',
+                diagnostics,
+              });
+            }
+            return operationFailure(diagnostics);
+          }
+          diagnostics.push(...runtimeOutcome.result.diagnostics);
+          if (!runtimeOutcome.result.ok) {
+            const rollback = await transaction.rollback();
+            diagnostics.push(...rollback.diagnostics);
             context.publishSnapshot(record, {
               runtime: 'failed',
               diagnostics,
             });
+            return operationFailure(diagnostics);
           }
-          return operationFailure(diagnostics);
+          const candidateSession = runtimeOutcome.result.value;
+          const committed = await transaction.commit();
+          if (committed.ok) {
+            diagnostics.push(...committed.diagnostics);
+            session = candidateSession;
+            sessionToken = candidateSessionToken;
+            break;
+          }
+
+          await deactivateLateRuntimeSession(
+            candidateSession,
+            context.runtimeTimeoutMs
+          );
+          const retryableConflict =
+            committed.diagnostics.length === 1 &&
+            committed.diagnostics[0]?.code ===
+              PLUGIN_DIAGNOSTIC_CODES.TRANSACTION_CONFLICT &&
+            committed.diagnostics[0].retryable &&
+            attempt + 1 < MAX_ACTIVATION_TRANSACTION_ATTEMPTS &&
+            context.operationIsCurrent(operation);
+          if (!retryableConflict) {
+            diagnostics.push(...committed.diagnostics);
+            if (context.operationIsCurrent(operation)) {
+              context.publishSnapshot(record, {
+                runtime: 'failed',
+                diagnostics,
+              });
+            }
+            return operationFailure(diagnostics);
+          }
+
+          const refreshedEntries = await prepareActivationEntries(
+            record,
+            operation
+          );
+          if (!refreshedEntries.ok) {
+            diagnostics.push(
+              ...committed.diagnostics,
+              ...refreshedEntries.diagnostics
+            );
+            context.publishSnapshot(record, {
+              runtime: 'failed',
+              diagnostics,
+            });
+            return operationFailure(diagnostics);
+          }
+          diagnostics.push(...refreshedEntries.diagnostics);
+          entriesForAttempt = refreshedEntries.value;
         }
-        diagnostics.push(...runtimeOutcome.result.diagnostics);
-        if (!runtimeOutcome.result.ok) {
-          const rollback = await transaction.rollback();
-          diagnostics.push(...rollback.diagnostics);
+
+        if (!session || !sessionToken) {
+          const diagnostic = createPluginDiagnostic(
+            PLUGIN_DIAGNOSTIC_CODES.TRANSACTION_CONFLICT,
+            'Plugin activation exhausted its contribution transaction retries.',
+            {
+              pluginId: record.owner.pluginId,
+              pluginVersion: record.manifest.version,
+              installationId: record.owner.installationId,
+              generation: record.owner.generation,
+              operationId: operation.operationId,
+            }
+          );
+          diagnostics.push(diagnostic);
           context.publishSnapshot(record, { runtime: 'failed', diagnostics });
-          return operationFailure(diagnostics);
-        }
-        const session = runtimeOutcome.result.value;
-        const committed = await transaction.commit();
-        diagnostics.push(...committed.diagnostics);
-        if (!committed.ok) {
-          await deactivateLateRuntimeSession(session, context.runtimeTimeoutMs);
-          if (context.operationIsCurrent(operation)) {
-            context.publishSnapshot(record, {
-              runtime: 'failed',
-              diagnostics,
-            });
-          }
           return operationFailure(diagnostics);
         }
 

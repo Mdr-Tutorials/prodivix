@@ -158,19 +158,29 @@ const issueTargetsBinding = (
   issue: WorkspaceComponentGraphIssue,
   section: 'props' | 'events' | 'variants',
   memberId: string
-): boolean =>
-  issue.path.includes(
-    `/bindings/${section}/${escapeJsonPointerSegment(memberId)}`
+): boolean => {
+  const pointer = `/bindings/${section}/${escapeJsonPointerSegment(memberId)}`;
+  const index = issue.path.indexOf(pointer);
+  const boundary = index + pointer.length;
+  return (
+    index >= 0 &&
+    (boundary === issue.path.length || issue.path[boundary] === '/')
   );
+};
 
 const issueTargetsSlot = (
   issue: WorkspaceComponentGraphIssue,
   nodeId: string,
   slotId: string
-): boolean =>
-  issue.path.includes(
-    `/regionsById/${escapeJsonPointerSegment(nodeId)}/${escapeJsonPointerSegment(slotId)}`
+): boolean => {
+  const pointer = `/regionsById/${escapeJsonPointerSegment(nodeId)}/${escapeJsonPointerSegment(slotId)}`;
+  const index = issue.path.indexOf(pointer);
+  const boundary = index + pointer.length;
+  return (
+    index >= 0 &&
+    (boundary === issue.path.length || issue.path[boundary] === '/')
   );
+};
 
 export const describeComponentPropBinding = (
   binding: PIRValueBinding | undefined

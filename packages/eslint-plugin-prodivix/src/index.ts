@@ -17,8 +17,6 @@ const plugin: ESLint.Plugin = {
     recommended: {
       plugins: ['prodivix'],
       rules: {
-        'prodivix/no-circular': 'error',
-        'prodivix/no-type-error': 'error',
         'prodivix/no-unused-var': 'warn',
       },
     },

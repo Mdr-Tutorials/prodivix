@@ -1,5 +1,6 @@
 import './PdxTreeSelect.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import { useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 
@@ -75,7 +76,7 @@ function PdxTreeSelect({
 
   const fullClassName =
     `PdxTreeSelect ${disabled ? 'Disabled' : ''} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   return (
     <div

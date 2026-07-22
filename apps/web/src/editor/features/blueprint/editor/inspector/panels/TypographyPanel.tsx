@@ -14,6 +14,8 @@ import type {
 } from './types';
 import {
   readCssValue,
+  readLineHeightValue,
+  toLineHeightCssValue,
   updateStyleValue,
 } from './layoutGroup/layoutPanelHelpers';
 import {
@@ -36,7 +38,7 @@ function TypographyPanelView({ node, updateNode }: InspectorPanelRenderProps) {
   const fontWeightValue =
     typeof node.style?.fontWeight === 'string' ? node.style.fontWeight : '';
   const fontSizeValue = readCssValue(node.style?.fontSize);
-  const lineHeightValue = readCssValue(node.style?.lineHeight);
+  const lineHeightValue = readLineHeightValue(node.style?.lineHeight);
   const letterSpacingValue = readCssValue(node.style?.letterSpacing);
   const textAlignValue =
     typeof node.style?.textAlign === 'string' ? node.style.textAlign : 'left';
@@ -143,7 +145,7 @@ function TypographyPanelView({ node, updateNode }: InspectorPanelRenderProps) {
                 updateStyleValue(
                   current,
                   'lineHeight',
-                  typeof value === 'number' ? String(value) : (value ?? '')
+                  toLineHeightCssValue(value, current.style?.lineHeight)
                 )
               )
             }

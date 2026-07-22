@@ -18,6 +18,8 @@ export type AuthResponse = {
   expiresAt: string;
 };
 
+export type RegistrationResponse = Readonly<{ accepted: true }>;
+
 const request = async <T>(
   path: string,
   options: RequestInit = {}
@@ -44,7 +46,7 @@ export const authApi = {
     },
     options: RequestInit = {}
   ) =>
-    request<AuthResponse>('/auth/register', {
+    request<RegistrationResponse>('/auth/register', {
       ...options,
       method: 'POST',
       headers: mergeHeaders(

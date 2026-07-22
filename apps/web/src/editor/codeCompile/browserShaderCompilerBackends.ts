@@ -137,6 +137,7 @@ type BrowserGpuShaderModule = Readonly<{
 }>;
 
 type BrowserGpuDevice = Readonly<{
+  lost?: Promise<unknown>;
   createShaderModule(
     descriptor: Readonly<{
       code: string;
@@ -166,11 +167,26 @@ export const createBrowserWebGpuShaderCompilerBackend =
       if (devicePromise) return devicePromise;
       const gpu = getBrowserGpu();
       if (!gpu) return Promise.resolve(null);
-      devicePromise = gpu
+      const pendingDevice = gpu
         .requestAdapter()
         .then((adapter) => (adapter ? adapter.requestDevice() : null))
         .catch(() => null);
-      return devicePromise;
+      devicePromise = pendingDevice;
+      void pendingDevice.then((device) => {
+        if (!device) {
+          if (devicePromise === pendingDevice) devicePromise = null;
+          return;
+        }
+        void device.lost?.then(
+          () => {
+            if (devicePromise === pendingDevice) devicePromise = null;
+          },
+          () => {
+            if (devicePromise === pendingDevice) devicePromise = null;
+          }
+        );
+      });
+      return pendingDevice;
     };
 
     return Object.freeze({
@@ -225,6 +241,7 @@ export const createBrowserWebGpuShaderCompilerBackend =
             messages,
           });
         } catch {
+          devicePromise = null;
           return Object.freeze({
             status: 'unavailable' as const,
             reason: 'The WebGPU compiler failed to produce compilation info.',

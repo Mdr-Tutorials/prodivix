@@ -1,5 +1,6 @@
 ﻿import './PdxImageUpload.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import { Image as ImageIcon, ImageUp, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
@@ -43,7 +44,7 @@ function PdxImageUpload({
   const [internalFiles, setInternalFiles] = useState<File[]>(
     defaultValue || []
   );
-  const [previews, setPreviews] = useState<string[]>([]);
+  const [previews, setPreviews] = useState<(string | null)[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const files = value ?? internalFiles;
@@ -53,8 +54,11 @@ function PdxImageUpload({
     let isActive = true;
     const urls: string[] = [];
 
-    void Promise.all(files.map(createImageUploadPreviewUrl)).then(
-      (previewUrls) => {
+    void Promise.allSettled(files.map(createImageUploadPreviewUrl)).then(
+      (results) => {
+        const previewUrls = results.map((result) =>
+          result.status === 'fulfilled' ? result.value : null
+        );
         if (!isActive) {
           previewUrls.forEach((url) => {
             if (url) URL.revokeObjectURL(url);
@@ -62,11 +66,9 @@ function PdxImageUpload({
           return;
         }
         previewUrls.forEach((url) => {
-          if (url && isBlobPreviewUrl(url)) {
-            urls.push(url);
-          }
+          if (url && isBlobPreviewUrl(url)) urls.push(url);
         });
-        setPreviews([...urls]);
+        setPreviews(previewUrls);
       }
     );
 
@@ -116,7 +118,7 @@ function PdxImageUpload({
 
   const fullClassName =
     `PdxImageUpload ${disabled ? 'Disabled' : ''} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   return (
     <div
@@ -168,10 +170,17 @@ function PdxImageUpload({
         <div className="PdxImageUploadGrid">
           {previews.map((src, index) => (
             <div key={`${src}-${index}`} className="PdxImageUploadItem">
-              <img
-                src={src}
-                alt={files[index]?.name || `Preview ${index + 1}`}
-              />
+              {src ? (
+                <img
+                  src={src}
+                  alt={files[index]?.name || `Preview ${index + 1}`}
+                />
+              ) : (
+                <span className="PdxImageUploadPreviewUnavailable">
+                  <ImageIcon aria-hidden="true" size={24} />
+                  Preview unavailable
+                </span>
+              )}
               <span className="PdxImageUploadName">
                 <ImageIcon aria-hidden="true" size={14} />
                 <span>{files[index]?.name || `Image ${index + 1}`}</span>

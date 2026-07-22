@@ -247,7 +247,7 @@ export const createPirReactNodeCompiler = (
     for (const [key, value] of Object.entries(adapterResult.props ?? {}).sort(
       ([left], [right]) => compareText(left, right)
     )) {
-      propExpressions.set(key, toJson(value));
+      if (!propExpressions.has(key)) propExpressions.set(key, toJson(value));
     }
     let styleExpression: string | undefined;
     if (adapterResult.style) {

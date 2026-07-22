@@ -46,8 +46,6 @@ function PdxTooltip({
   sideOffset = 7,
   style,
 }: PdxTooltipProps) {
-  if (disabled) return children;
-
   const tooltipContent = (
     <TooltipPrimitive.Content
       align={toAlign(align)}
@@ -65,9 +63,9 @@ function PdxTooltip({
     <span {...getDataAttributes(dataAttributes)} className="PdxTooltip" id={id}>
       <TooltipPrimitive.Provider delayDuration={delayDuration}>
         <TooltipPrimitive.Root
-          defaultOpen={defaultOpen}
-          onOpenChange={onOpenChange}
-          open={open}
+          defaultOpen={disabled ? false : defaultOpen}
+          onOpenChange={disabled ? undefined : onOpenChange}
+          open={disabled ? false : open}
         >
           <TooltipPrimitive.Trigger asChild>
             {children}

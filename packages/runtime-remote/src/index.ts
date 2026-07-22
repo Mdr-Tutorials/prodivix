@@ -8,6 +8,7 @@ export {
   createRemoteExecutionControlPlane,
   createScopeRemoteExecutionAuthorizationPolicy,
   createStaticRemoteExecutionProviderRouter,
+  REMOTE_EXECUTION_MAXIMUM_LEASE_DURATION_MS,
 } from './remoteExecutionControlPlane';
 export {
   createMemoryRemoteExecutionRepository,

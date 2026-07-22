@@ -33,7 +33,7 @@ const stableSerialize = (value: unknown): string => {
 
   return `{${Object.entries(value as Record<string, unknown>)
     .filter(([, entry]) => entry !== undefined)
-    .sort(([left], [right]) => left.localeCompare(right))
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
     .map(([key, entry]) => `${JSON.stringify(key)}:${stableSerialize(entry)}`)
     .join(',')}}`;
 };
@@ -361,7 +361,9 @@ export const queryDiagnosticIssues = (
       issue.diagnostic.domain,
       issue.diagnostic.message,
       issue.diagnostic.hint,
-      stableSerialize(issue.diagnostic.targetRef),
+      issue.diagnostic.targetRef
+        ? stableSerialize(issue.diagnostic.targetRef)
+        : undefined,
       ...issue.sources.map((source) => source.providerId),
     ]
       .filter(Boolean)

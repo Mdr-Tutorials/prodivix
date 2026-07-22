@@ -38,9 +38,12 @@ export type WorkspaceCodeArtifactModuleConversionResult =
     }>;
 
 export const projectWorkspaceCodeArtifactLifecycles = (
-  workspace: WorkspaceSnapshot
+  workspace: WorkspaceSnapshot,
+  preparedComposition?: WorkspaceCodeSlotRegistryCompositionResult
 ): WorkspaceCodeArtifactLifecycleProjectionResult => {
-  const composition = createWorkspaceCodeSlotRegistryFromSnapshot(workspace);
+  const composition =
+    preparedComposition ??
+    createWorkspaceCodeSlotRegistryFromSnapshot(workspace);
   if (composition.status === 'blocked') return composition;
   const artifacts = createWorkspaceCodeArtifactProvider(workspace)
     .listArtifacts({ surface: 'issues-panel' })
@@ -89,7 +92,10 @@ export const collectWorkspaceCodeArtifactLifecycleDiagnostics = (
         }),
       })
     );
-  const projection = projectWorkspaceCodeArtifactLifecycles(workspace);
+  const projection = projectWorkspaceCodeArtifactLifecycles(
+    workspace,
+    composition
+  );
   if (projection.status === 'blocked') return Object.freeze(missingBindings);
   return Object.freeze([
     ...missingBindings,

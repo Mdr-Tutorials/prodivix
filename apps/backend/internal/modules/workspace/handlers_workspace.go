@@ -32,9 +32,7 @@ func (handler *Handler) HandleGetWorkspaceCapabilities(c *gin.Context) {
 		backendresponse.Error(c, http.StatusUnauthorized, "API-2001", "Authentication required.")
 		return
 	}
-	if _, err := handler.module.GetSnapshotForUser(c.Request.Context(), user.ID, workspaceID); err != nil {
-		failure := MapStoreError(err)
-		c.JSON(failure.Status, failure.Payload)
+	if !handler.requireWorkspaceOwner(c, user.ID, workspaceID) {
 		return
 	}
 	c.JSON(http.StatusOK, map[string]any{"workspaceId": workspaceID, "capabilities": DefaultCapabilities()})

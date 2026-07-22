@@ -264,9 +264,9 @@ func TestAssetImportHandlerAtomicallyPersistsProjectWorkspaceBlobAndDocuments(t 
 	mock.ExpectExec("INSERT INTO workspace_asset_blobs").
 		WithArgs(sqlmock.AnyArg(), blob.Reference.Digest, blob.Reference.MediaType, blob.Reference.ByteLength, contents).
 		WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectQuery("SELECT media_type, byte_length").
-		WithArgs(sqlmock.AnyArg(), blob.Reference.Digest).
-		WillReturnRows(sqlmock.NewRows([]string{"media_type", "byte_length"}).AddRow(blob.Reference.MediaType, blob.Reference.ByteLength))
+	mock.ExpectQuery("SELECT digest, media_type, byte_length").
+		WithArgs(sqlmock.AnyArg(), `["`+blob.Reference.Digest+`"]`).
+		WillReturnRows(sqlmock.NewRows([]string{"digest", "media_type", "byte_length"}).AddRow(blob.Reference.Digest, blob.Reference.MediaType, blob.Reference.ByteLength))
 	mock.ExpectExec("UPDATE workspace_asset_blobs").
 		WithArgs(sqlmock.AnyArg(), `["`+blob.Reference.Digest+`"]`).
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -315,9 +315,9 @@ func TestAssetImportTransactionRollsBackProjectAndBlobWhenDocumentInsertFails(t 
 	mock.ExpectExec("INSERT INTO workspace_asset_blobs").
 		WithArgs(project.ID, blob.Reference.Digest, blob.Reference.MediaType, blob.Reference.ByteLength, contents).
 		WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectQuery("SELECT media_type, byte_length").
-		WithArgs(project.ID, blob.Reference.Digest).
-		WillReturnRows(sqlmock.NewRows([]string{"media_type", "byte_length"}).AddRow(blob.Reference.MediaType, blob.Reference.ByteLength))
+	mock.ExpectQuery("SELECT digest, media_type, byte_length").
+		WithArgs(project.ID, `["`+blob.Reference.Digest+`"]`).
+		WillReturnRows(sqlmock.NewRows([]string{"digest", "media_type", "byte_length"}).AddRow(blob.Reference.Digest, blob.Reference.MediaType, blob.Reference.ByteLength))
 	mock.ExpectExec("UPDATE workspace_asset_blobs").
 		WithArgs(project.ID, `["`+blob.Reference.Digest+`"]`).
 		WillReturnResult(sqlmock.NewResult(0, 1))

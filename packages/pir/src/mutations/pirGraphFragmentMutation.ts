@@ -13,6 +13,9 @@ import {
   validatePirPlacementTargetInput,
 } from './pirMutationValidation';
 
+const compareText = (left: string, right: string): number =>
+  left < right ? -1 : left > right ? 1 : 0;
+
 export type PIRGraphFragment = Readonly<{
   rootNodeIds: readonly string[];
   primaryNodeId: string;
@@ -272,9 +275,7 @@ export const insertPirGraphFragment = (
     document: result.document,
     primaryNodeId: input.fragment.primaryNodeId,
     insertedNodeIds: Object.freeze(
-      Object.keys(input.fragment.nodesById).sort((left, right) =>
-        left.localeCompare(right)
-      )
+      Object.keys(input.fragment.nodesById).sort(compareText)
     ),
     placement: placement.placement,
   });

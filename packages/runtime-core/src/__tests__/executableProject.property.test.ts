@@ -202,6 +202,33 @@ describe('executable project snapshot properties', () => {
     expect(Object.isFrozen(left.files)).toBe(true);
   });
 
+  it('does not depend on the host locale when canonicalizing digest input', () => {
+    const localeCompare = String.prototype.localeCompare;
+    String.prototype.localeCompare = () => {
+      throw new Error('host locale ordering was used');
+    };
+    try {
+      const snapshot = createExecutableProjectSnapshot({
+        ...createInput(),
+        files: [
+          ...createInput().files,
+          { path: 'Vendor.js', contents: '' },
+          { path: 'app.js', contents: '' },
+          { path: '中文.js', contents: '' },
+        ],
+      });
+      expect(snapshot.files.map(({ path }) => path)).toEqual([
+        'Vendor.js',
+        'app.js',
+        'package.json',
+        'src/main.ts',
+        '中文.js',
+      ]);
+    } finally {
+      String.prototype.localeCompare = localeCompare;
+    }
+  });
+
   it('changes the digest for executable content, commands, target, or source trace', () => {
     const input = createInput();
     const baseline = createExecutableProjectSnapshot(input).contentDigest;

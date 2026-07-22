@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthPage } from './AuthPage';
@@ -42,13 +48,16 @@ describe('AuthPage', () => {
       </MemoryRouter>
     );
 
-    fireEvent.change(screen.getByLabelText('fields.email'), {
+    const loginPanel = screen.getByRole('tabpanel');
+    fireEvent.change(within(loginPanel).getByLabelText('fields.email'), {
       target: { value: ' user@example.com ' },
     });
-    fireEvent.change(screen.getByLabelText('fields.password'), {
+    fireEvent.change(within(loginPanel).getByLabelText('fields.password'), {
       target: { value: 'password' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'actions.login' }));
+    fireEvent.click(
+      within(loginPanel).getByRole('button', { name: 'actions.login' })
+    );
 
     await waitFor(() => {
       expect(login).toHaveBeenCalledWith({
@@ -57,5 +66,52 @@ describe('AuthPage', () => {
       });
     });
     expect(await screen.findByText('Profile')).toBeTruthy();
+  });
+
+  it('returns an accepted registration to login without creating a session', async () => {
+    const register = vi
+      .spyOn(authApi, 'register')
+      .mockResolvedValue({ accepted: true });
+    render(
+      <MemoryRouter initialEntries={['/auth']}>
+        <Routes>
+          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/profile" element={<div>Profile</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'tabs.register' }));
+    const registerPanel = screen.getByRole('tabpanel');
+    fireEvent.change(within(registerPanel).getByLabelText('fields.name'), {
+      target: { value: ' User ' },
+    });
+    fireEvent.change(within(registerPanel).getByLabelText('fields.email'), {
+      target: { value: ' user@example.com ' },
+    });
+    fireEvent.change(
+      within(registerPanel).getByPlaceholderText('placeholders.password'),
+      { target: { value: 'password' } }
+    );
+    fireEvent.click(
+      within(registerPanel).getByRole('button', { name: 'actions.register' })
+    );
+
+    await waitFor(() =>
+      expect(register).toHaveBeenCalledWith({
+        name: 'User',
+        email: 'user@example.com',
+        password: 'password',
+        description: '',
+      })
+    );
+    expect(await screen.findByText('registration.accepted')).toBeTruthy();
+    expect(
+      screen
+        .getByRole('tab', { name: 'tabs.login' })
+        .getAttribute('aria-selected')
+    ).toBe('true');
+    expect(setSession).not.toHaveBeenCalled();
+    expect(screen.queryByText('Profile')).toBeNull();
   });
 });

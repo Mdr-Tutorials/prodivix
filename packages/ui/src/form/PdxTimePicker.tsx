@@ -1,5 +1,6 @@
 import './PdxTimePicker.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import type React from 'react';
 
 interface PdxTimePickerSpecificProps {
@@ -53,7 +54,7 @@ function PdxTimePicker({
 }: PdxTimePickerProps) {
   const fullClassName =
     `PdxTimePicker ${size} ${state} ${disabled ? 'Disabled' : ''} ${readOnly ? 'ReadOnly' : ''} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (onChange) {

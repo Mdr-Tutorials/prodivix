@@ -739,81 +739,84 @@ export const useBlueprintEditorController = (
     }
   };
 
-  const dispatchTrigger = (request: PIRTriggerDispatchRequest) => {
-    const trigger = request.trigger;
-    if (trigger.kind === 'open-url') {
-      if (typeof window !== 'undefined') {
-        window.open(trigger.href, '_blank', 'noopener,noreferrer');
+  const dispatchTrigger = useCallback(
+    (request: PIRTriggerDispatchRequest) => {
+      const trigger = request.trigger;
+      if (trigger.kind === 'open-url') {
+        if (typeof window !== 'undefined') {
+          window.open(trigger.href, '_blank', 'noopener,noreferrer');
+        }
+        return;
       }
-      return;
-    }
-    if (trigger.kind === 'navigate-route') {
-      const route = routes.find((item) => item.id === trigger.routeId);
-      if (route) setPreviewPath(route.path);
-      else setStatusMessage(`Route ${trigger.routeId} is unavailable.`);
-      return;
-    }
-    if (trigger.kind === 'run-nodegraph') {
-      const document = workspace?.docsById[trigger.documentId];
-      if (!document || document.type !== 'pir-graph') {
+      if (trigger.kind === 'navigate-route') {
+        const route = routes.find((item) => item.id === trigger.routeId);
+        if (route) setPreviewPath(route.path);
+        else setStatusMessage(`Route ${trigger.routeId} is unavailable.`);
+        return;
+      }
+      if (trigger.kind === 'run-nodegraph') {
+        const document = workspace?.docsById[trigger.documentId];
+        if (!document || document.type !== 'pir-graph') {
+          setStatusMessage(
+            `NodeGraph document ${trigger.documentId} is unavailable.`
+          );
+          return;
+        }
+        if (!workspace) return;
+        void startWorkspaceNodeGraphExecution({
+          workspace,
+          documentId: document.id,
+          source: {
+            ownerId: request.source.nodeId,
+            trigger: 'pir-event',
+            eventKey: request.source.instancePath,
+          },
+          params:
+            trigger.inputMapping && typeof trigger.inputMapping === 'object'
+              ? (trigger.inputMapping as Record<string, unknown>)
+              : undefined,
+          input: request.payload,
+        })
+          .then(({ job, sessionId }) => {
+            setExecutionSessionId(sessionId);
+            return job.completion;
+          })
+          .then((result) => {
+            const output = readNodeGraphExecutionJobOutput(result);
+            if (output && Object.keys(output.statePatch).length > 0) {
+              patchRuntimeState(blueprintKey, output.statePatch);
+            }
+            if (result.status === 'failed') {
+              setStatusMessage(result.failure.message);
+            } else if (result.status === 'timed-out') {
+              setStatusMessage('NodeGraph execution timed out.');
+            }
+          })
+          .catch((error: unknown) => {
+            setStatusMessage(
+              error instanceof Error ? error.message : String(error)
+            );
+          });
+        return;
+      }
+      if (trigger.kind === 'play-animation') {
         setStatusMessage(
-          `NodeGraph document ${trigger.documentId} is unavailable.`
+          `Animation ${trigger.documentId} requires an ExecutionProvider.`
         );
         return;
       }
-      if (!workspace) return;
-      void startWorkspaceNodeGraphExecution({
-        workspace,
-        documentId: document.id,
-        source: {
-          ownerId: request.source.nodeId,
-          trigger: 'pir-event',
-          eventKey: request.source.instancePath,
-        },
-        params:
-          trigger.inputMapping && typeof trigger.inputMapping === 'object'
-            ? (trigger.inputMapping as Record<string, unknown>)
-            : undefined,
-        input: request.payload,
-      })
-        .then(({ job, sessionId }) => {
-          setExecutionSessionId(sessionId);
-          return job.completion;
-        })
-        .then((result) => {
-          const output = readNodeGraphExecutionJobOutput(result);
-          if (output && Object.keys(output.statePatch).length > 0) {
-            patchRuntimeState(blueprintKey, output.statePatch);
-          }
-          if (result.status === 'failed') {
-            setStatusMessage(result.failure.message);
-          } else if (result.status === 'timed-out') {
-            setStatusMessage('NodeGraph execution timed out.');
-          }
-        })
-        .catch((error: unknown) => {
-          setStatusMessage(
-            error instanceof Error ? error.message : String(error)
-          );
-        });
-      return;
-    }
-    if (trigger.kind === 'play-animation') {
+      if (trigger.kind === 'dispatch-data-operation') {
+        setStatusMessage(
+          `Data mutation ${trigger.operation.operationId} requires an active Data execution context.`
+        );
+        return;
+      }
       setStatusMessage(
-        `Animation ${trigger.documentId} requires an ExecutionProvider.`
+        `CodeArtifact ${trigger.reference.artifactId} requires a Code ExecutionProvider.`
       );
-      return;
-    }
-    if (trigger.kind === 'dispatch-data-operation') {
-      setStatusMessage(
-        `Data mutation ${trigger.operation.operationId} requires an active Data execution context.`
-      );
-      return;
-    }
-    setStatusMessage(
-      `CodeArtifact ${trigger.reference.artifactId} requires a Code ExecutionProvider.`
-    );
-  };
+    },
+    [blueprintKey, patchRuntimeState, routes, workspace]
+  );
 
   const saveIndicator = useWorkspaceSaveIndicator({
     workspaceId: workspace?.id,
@@ -823,6 +826,15 @@ export const useBlueprintEditorController = (
     ? (collectionPreviewByLocation[collectionPreviewKey(selection)] ??
       AUTO_COLLECTION_PREVIEW)
     : AUTO_COLLECTION_PREVIEW;
+  const selectCanvasNode = useCallback((location: PIRRenderLocation) => {
+    setSelection(location);
+    setInspectorCollapsed(false);
+  }, []);
+  const resolveCollectionPreviewState = useCallback(
+    (location: PIRCollectionProjectionLocation) =>
+      collectionPreviewByLocation[collectionPreviewKey(location)],
+    [collectionPreviewByLocation]
+  );
 
   const toggleGroup = (groupId: string, collapsed: boolean) => {
     setCollapsedGroups((current) => ({
@@ -960,10 +972,7 @@ export const useBlueprintEditorController = (
       dropHint: dragDrop.treeDropHint,
       compositionIssue,
       onToggleCollapse: () => setTreeCollapsed((current) => !current),
-      onSelectNode: (location: PIRRenderLocation) => {
-        setSelection(location);
-        setInspectorCollapsed(false);
-      },
+      onSelectNode: selectCanvasNode,
       onDeleteSelected: () => {
         if (selection) void deleteTreeNode(selection);
       },
@@ -990,14 +999,9 @@ export const useBlueprintEditorController = (
         setBlueprintState(blueprintKey, { pan }),
       onZoomChange: (zoom: number) =>
         setBlueprintState(blueprintKey, { zoom: clampZoom(zoom) }),
-      onSelectNode: (location: PIRRenderLocation) => {
-        setSelection(location);
-        setInspectorCollapsed(false);
-      },
+      onSelectNode: selectCanvasNode,
       onBlockingIssuesChange: handleBlockingIssues,
-      resolveCollectionPreviewState: (
-        location: PIRCollectionProjectionLocation
-      ) => collectionPreviewByLocation[collectionPreviewKey(location)],
+      resolveCollectionPreviewState,
       dispatchTrigger,
     },
     inspector: {

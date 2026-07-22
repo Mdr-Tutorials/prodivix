@@ -281,24 +281,38 @@ export type NodeGraphDiffSummary = {
 };
 
 export const summarizeNodeGraphDiff = (
-  nodes: readonly NodeGraphDiffNodePresentation[]
+  nodes: readonly NodeGraphDiffNodePresentation[],
+  edges: readonly NodeGraphDiffEdgePresentation[] = []
 ): NodeGraphDiffSummary => {
-  const conflictEntityIds = new Set<string>();
-  const resolvedConflictEntityIds = new Set<string>();
+  const conflictIds = new Set<string>();
+  const resolvedConflictIds = new Set<string>();
 
-  for (const node of nodes) {
-    if (node.status === 'conflict-local' || node.status === 'conflict-remote') {
-      conflictEntityIds.add(node.entityId);
-      if (node.resolution) resolvedConflictEntityIds.add(node.entityId);
+  for (const [kind, presentations] of [
+    ['node', nodes],
+    ['edge', edges],
+  ] as const) {
+    for (const presentation of presentations) {
+      if (
+        presentation.status !== 'conflict-local' &&
+        presentation.status !== 'conflict-remote'
+      ) {
+        continue;
+      }
+      const keys = presentation.conflictIds?.length
+        ? presentation.conflictIds
+        : [`${kind}:${presentation.entityId}`];
+      keys.forEach((key) => {
+        conflictIds.add(key);
+        if (presentation.resolution) resolvedConflictIds.add(key);
+      });
     }
   }
 
   return {
     addedCount: nodes.filter((node) => node.status === 'added').length,
-    conflictCount: conflictEntityIds.size,
+    conflictCount: conflictIds.size,
     deletedCount: nodes.filter((node) => node.status === 'deleted').length,
     modifiedCount: nodes.filter((node) => node.status === 'modified').length,
-    unresolvedConflictCount:
-      conflictEntityIds.size - resolvedConflictEntityIds.size,
+    unresolvedConflictCount: conflictIds.size - resolvedConflictIds.size,
   };
 };

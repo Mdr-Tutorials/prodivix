@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { WorkspaceNodeGraphListItem } from './nodeGraphWorkspaceDocuments';
 
 type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
@@ -35,6 +35,7 @@ export const NodeGraphGraphManager = ({
   t,
 }: NodeGraphGraphManagerProps) => {
   const [draftName, setDraftName] = useState(activeGraphName);
+  const cancelRenameRef = useRef(false);
 
   useEffect(
     () => setDraftName(activeGraphName),
@@ -42,6 +43,11 @@ export const NodeGraphGraphManager = ({
   );
 
   const commitRename = () => {
+    if (cancelRenameRef.current) {
+      cancelRenameRef.current = false;
+      setDraftName(activeGraphName);
+      return;
+    }
     const nextName = draftName.trim() || activeGraphName;
     setDraftName(nextName);
     if (activeGraphId && nextName !== activeGraphName) onRenameGraph(nextName);
@@ -82,6 +88,7 @@ export const NodeGraphGraphManager = ({
         onKeyDown={(event) => {
           if (event.key === 'Enter') event.currentTarget.blur();
           if (event.key === 'Escape') {
+            cancelRenameRef.current = true;
             setDraftName(activeGraphName);
             event.currentTarget.blur();
           }

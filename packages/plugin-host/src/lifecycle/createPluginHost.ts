@@ -93,12 +93,21 @@ export const createPluginHost = <TMap extends HostContributionPointMap>(
         left.localeCompare(right)
       );
       for (const pluginId of pluginIds) {
+        if (!context.records.has(pluginId)) continue;
         try {
           const deactivated = await runtime.deactivate(
             pluginId,
             'host-shutdown'
           );
-          diagnostics.push(...deactivated.diagnostics);
+          diagnostics.push(
+            ...deactivated.diagnostics.filter(
+              (diagnostic) =>
+                context.records.has(pluginId) ||
+                diagnostic.code !==
+                  PLUGIN_DIAGNOSTIC_CODES.INVALID_HOST_TRANSITION
+            )
+          );
+          if (!context.records.has(pluginId)) continue;
           const disabled = await availability.disable(pluginId);
           diagnostics.push(...disabled.diagnostics);
         } catch {

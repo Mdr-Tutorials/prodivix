@@ -1,5 +1,6 @@
 import './PdxPasswordStrength.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import { useEffect, useState } from 'react';
 import type React from 'react';
 
@@ -72,7 +73,7 @@ function PdxPasswordStrength({
 
   const fullClassName =
     `PdxPasswordStrength ${size} ${disabled ? 'Disabled' : ''} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   return (
     <div
@@ -89,6 +90,7 @@ function PdxPasswordStrength({
       )}
       {description && <div className="PdxFieldDescription">{description}</div>}
       <input
+        aria-label={label ?? 'Password'}
         className="PdxPasswordStrengthInput"
         type="password"
         value={currentValue}

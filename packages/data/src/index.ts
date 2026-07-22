@@ -32,6 +32,7 @@ export {
   createDataOperationIdempotencyKey,
   DATA_IDEMPOTENCY_KEY_PREFIX,
 } from './dataIdempotencyRuntime';
+export { compareDataText } from './dataJsonRuntime';
 export {
   createDataOperationCachePlan,
   createMemoryDataOperationCacheStore,

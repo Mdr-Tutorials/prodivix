@@ -1,5 +1,6 @@
 import './PdxTag.scss';
 import { type PdxComponent } from '@prodivix/shared';
+import { getDataAttributes } from '../foundation/component';
 import { X } from 'lucide-react';
 import type React from 'react';
 
@@ -30,7 +31,7 @@ function PdxTag({
 }: PdxTagProps) {
   const fullClassName =
     `PdxTag ${size} ${color} ${variant} ${className || ''}`.trim();
-  const dataProps = { ...dataAttributes };
+  const dataProps = getDataAttributes(dataAttributes);
 
   return (
     <span

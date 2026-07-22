@@ -1,5 +1,4 @@
 import type { Rule } from 'eslint';
-import type { Identifier, Node, VariableDeclarator } from 'estree';
 
 const rule: Rule.RuleModule = {
   meta: {
@@ -16,29 +15,21 @@ const rule: Rule.RuleModule = {
   },
 
   create(context): Rule.RuleListener {
-    const sourceCode = context.sourceCode;
-    const declaredVars = new Map<string, Node>();
-    const usedVars = new Set<string>();
-
     return {
-      VariableDeclarator(node: VariableDeclarator) {
-        if (node.id.type === 'Identifier') {
-          declaredVars.set(node.id.name, node);
-        }
-      },
-
-      Identifier(node: Identifier) {
-        usedVars.add(node.name);
-      },
-
       'Program:exit'() {
-        for (const [name, node] of declaredVars) {
-          if (!usedVars.has(name)) {
-            context.report({
-              node,
-              messageId: 'unused',
-              data: { name },
-            });
+        for (const scope of context.sourceCode.scopeManager.scopes) {
+          for (const variable of scope.variables) {
+            const declaration = variable.defs.find(
+              (definition) => definition.type === 'Variable'
+            );
+            const identifier = variable.identifiers[0];
+            if (declaration && identifier && variable.references.length === 0) {
+              context.report({
+                node: identifier,
+                messageId: 'unused',
+                data: { name: variable.name },
+              });
+            }
           }
         }
       },

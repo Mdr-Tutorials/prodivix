@@ -33,6 +33,8 @@ import type {
   RemoteExecutionStoredRecord,
   RemoteExecutionIngestionLimits,
 } from './remoteExecutionControlPlane.types';
+
+export const REMOTE_EXECUTION_MAXIMUM_LEASE_DURATION_MS = 5 * 60 * 1_000;
 import type {
   RemoteExecutionErrorCode,
   RemoteExecutionResponseEnvelope,
@@ -576,10 +578,11 @@ export const createRemoteExecutionControlPlane = (
     async claimNext(input) {
       if (
         !Number.isSafeInteger(input.leaseDurationMs) ||
-        input.leaseDurationMs < 1
+        input.leaseDurationMs < 1 ||
+        input.leaseDurationMs > REMOTE_EXECUTION_MAXIMUM_LEASE_DURATION_MS
       )
         throw new TypeError(
-          'Remote lease duration must be a positive integer.'
+          'Remote lease duration must be a bounded positive integer.'
         );
       return options.repository.claimNext({
         ...input,
@@ -591,10 +594,11 @@ export const createRemoteExecutionControlPlane = (
     async renewLease(input) {
       if (
         !Number.isSafeInteger(input.leaseDurationMs) ||
-        input.leaseDurationMs < 1
+        input.leaseDurationMs < 1 ||
+        input.leaseDurationMs > REMOTE_EXECUTION_MAXIMUM_LEASE_DURATION_MS
       )
         throw new TypeError(
-          'Remote lease duration must be a positive integer.'
+          'Remote lease duration must be a bounded positive integer.'
         );
       return options.repository.renewLease({ ...input, now: now() });
     },

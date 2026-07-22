@@ -43,6 +43,28 @@ describe('Blueprint Inspector Data mutation projection', () => {
 });
 
 describe('Blueprint Inspector navigation projection', () => {
+  it('round-trips an http open-url binding', () => {
+    const current: PIRElementNode = {
+      id: 'link',
+      kind: 'element',
+      type: 'a',
+      events: {
+        onClick: { kind: 'open-url', href: 'http://example.test/path' },
+      },
+    };
+
+    expect(
+      toElementNode(
+        {
+          id: current.id,
+          type: current.type,
+          events: projectEvents(current.events),
+        },
+        current
+      )
+    ).toEqual(current);
+  });
+
   it('does not persist an internal path as an opaque route id', () => {
     const current: PIRElementNode = {
       id: 'link',
@@ -91,6 +113,63 @@ describe('Blueprint Inspector navigation projection', () => {
     expect(next.events?.onClick).toEqual({
       kind: 'navigate-route',
       routeId: 'route-products',
+    });
+  });
+});
+
+describe('Blueprint Inspector read-only binding preservation', () => {
+  it('keeps a read-only event when an editable event is renamed onto it', () => {
+    const callCode = {
+      kind: 'call-code' as const,
+      slotId: 'slot-submit',
+      reference: { artifactId: 'artifact-submit' },
+    };
+    const current: PIRElementNode = {
+      id: 'button',
+      kind: 'element',
+      type: 'button',
+      events: {
+        onClick: callCode,
+        onChange: { kind: 'navigate-route', routeId: 'route-products' },
+      },
+    };
+    const events = projectEvents(current.events)!;
+
+    const next = toElementNode(
+      {
+        id: current.id,
+        type: current.type,
+        events: {
+          ...events,
+          onChange: { ...events.onChange!, trigger: 'onClick' },
+        },
+      },
+      current
+    );
+
+    expect(next.events).toEqual({ onClick: callCode });
+  });
+
+  it('keeps non-literal data bindings when the inspector view omits data', () => {
+    const current: PIRElementNode = {
+      id: 'catalog',
+      kind: 'element',
+      type: 'section',
+      data: {
+        source: { kind: 'data', dataId: 'catalog-source' },
+        value: { kind: 'literal', value: 'editable' },
+        extend: {
+          selected: { kind: 'state', stateId: 'selected-id' },
+          label: { kind: 'literal', value: 'editable' },
+        },
+      },
+    };
+
+    const next = toElementNode({ id: current.id, type: current.type }, current);
+
+    expect(next.data).toEqual({
+      source: { kind: 'data', dataId: 'catalog-source' },
+      extend: { selected: { kind: 'state', stateId: 'selected-id' } },
     });
   });
 });

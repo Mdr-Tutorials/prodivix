@@ -156,17 +156,22 @@ const PdxTabs = forwardRef<HTMLDivElement, PdxTabsProps>(function PdxTabs(
           );
         })}
       </div>
-      {selectedItem ? (
-        <div
-          aria-labelledby={`${baseId}-tab-${selectedIndex}`}
-          className="PdxTabsPanel"
-          id={`${baseId}-panel-${selectedIndex}`}
-          role="tabpanel"
-          tabIndex={0}
-        >
-          {selectedItem.content}
-        </div>
-      ) : null}
+      {items.map((item, index) => {
+        const isSelected = item.key === selectedKey;
+        return (
+          <div
+            aria-labelledby={`${baseId}-tab-${index}`}
+            className="PdxTabsPanel"
+            hidden={!isSelected}
+            id={`${baseId}-panel-${index}`}
+            key={item.key}
+            role="tabpanel"
+            tabIndex={isSelected ? 0 : -1}
+          >
+            {item.content}
+          </div>
+        );
+      })}
     </div>
   );
 });

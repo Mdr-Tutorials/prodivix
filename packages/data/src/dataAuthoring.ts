@@ -10,6 +10,7 @@ import {
   normalizeDataSourceDocument,
   validateDataSourceDocument,
 } from './dataDocument';
+import { compareDataText } from './dataJsonRuntime';
 
 export const DATA_MANUAL_AUTHORING_ISSUE_CODES = Object.freeze({
   invalid: 'DATA_AUTHORING_INVALID',
@@ -56,7 +57,7 @@ const stableJson = (value: unknown): string => {
     if (!entry || typeof entry !== 'object') return entry;
     return Object.fromEntries(
       Object.entries(entry)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => compareDataText(left, right))
         .map(([key, child]) => [key, sort(child)])
     );
   };
@@ -67,9 +68,7 @@ const digest = (value: unknown): string =>
   bytesToHex(sha256(utf8ToBytes(stableJson(value))));
 
 const sortedUnique = (values: readonly string[]): readonly string[] =>
-  Object.freeze(
-    [...new Set(values)].sort((left, right) => left.localeCompare(right))
-  );
+  Object.freeze([...new Set(values)].sort(compareDataText));
 
 const impact = (
   schemaIds: readonly string[],

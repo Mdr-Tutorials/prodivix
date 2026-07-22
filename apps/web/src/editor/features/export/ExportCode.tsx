@@ -81,6 +81,7 @@ export function ExportCode() {
   const workspaceSnapshot = useEditorStore(selectWorkspace);
   const [copied, setCopied] = useState(false);
   const [downloadingZip, setDownloadingZip] = useState(false);
+  const [downloadError, setDownloadError] = useState<string>();
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ExportTab>('vfs');
   const [activeReactFile, setActiveReactFile] = useState('');
@@ -416,6 +417,7 @@ export function ExportCode() {
       activeTab === 'vue' ? vueProjectFiles : reactProjectFiles;
     if (!projectFiles.length) return;
     setDownloadingZip(true);
+    setDownloadError(undefined);
     try {
       const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
@@ -437,6 +439,13 @@ export function ExportCode() {
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(downloadUrl);
+    } catch {
+      setDownloadError(
+        t('downloadFailed', {
+          defaultValue:
+            'The ZIP archive could not be created. Please try again.',
+        })
+      );
     } finally {
       setDownloadingZip(false);
     }
@@ -485,6 +494,11 @@ export function ExportCode() {
       />
 
       <div className="ExportCodeBody">
+        {downloadError ? (
+          <div className="mb-2 rounded-md border border-red-300/60 bg-red-100/40 px-2 py-1 text-xs text-red-900 dark:border-red-700/60 dark:bg-red-900/20 dark:text-red-100">
+            {downloadError}
+          </div>
+        ) : null}
         {activeTab === 'react' && reactMainDiagnostics.length ? (
           <div className="mb-2 rounded-md border border-amber-300/60 bg-amber-100/40 px-2 py-1 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-100">
             {reactMainDiagnostics.map((item) => (

@@ -120,29 +120,40 @@ export const createExecutionProviderRegistry =
         }
 
         const job = await provider.start(request);
-        if (!job.id.trim()) {
-          throw new ExecutionProviderContractError(
-            normalized,
-            'job id must not be empty'
-          );
-        }
-        if (job.provider.id !== normalized) {
-          throw new ExecutionProviderContractError(
-            normalized,
-            `job declared provider ${job.provider.id}`
-          );
-        }
-        if (job.provider.version !== provider.descriptor.version) {
-          throw new ExecutionProviderContractError(
-            normalized,
-            `job declared provider version ${job.provider.version} instead of ${provider.descriptor.version}`
-          );
-        }
-        if (job.request !== request) {
-          throw new ExecutionProviderContractError(
-            normalized,
-            'job must retain the exact canonical execution request object'
-          );
+        try {
+          if (!job.id.trim()) {
+            throw new ExecutionProviderContractError(
+              normalized,
+              'job id must not be empty'
+            );
+          }
+          if (job.provider.id !== normalized) {
+            throw new ExecutionProviderContractError(
+              normalized,
+              `job declared provider ${job.provider.id}`
+            );
+          }
+          if (job.provider.version !== provider.descriptor.version) {
+            throw new ExecutionProviderContractError(
+              normalized,
+              `job declared provider version ${job.provider.version} instead of ${provider.descriptor.version}`
+            );
+          }
+          if (job.request !== request) {
+            throw new ExecutionProviderContractError(
+              normalized,
+              'job must retain the exact canonical execution request object'
+            );
+          }
+        } catch (error) {
+          try {
+            await job.cancel({
+              reason: 'Execution provider contract validation failed.',
+            });
+          } catch {
+            // Contract validation remains primary; cancellation is best-effort.
+          }
+          throw error;
         }
         return job;
       },
